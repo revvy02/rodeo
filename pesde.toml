@@ -9,6 +9,7 @@ includes = [
   "LICENSE",
   "src/**/*.luau",
   "plugins/**/*.luau",
+  "plugins/**/*.json",
   ".luaurc",
 ]
 

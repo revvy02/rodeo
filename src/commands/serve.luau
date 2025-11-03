@@ -7,6 +7,7 @@ local task = require("@lune/task")
 
 local COLORS = require("../utils/colors")
 local output = require("../utils/output")
+local constants = require("../utils/constants")
 
 type Config = {
 	port: number,
@@ -26,8 +27,6 @@ type State = {
 	activeExecutionId: string?,
 }
 
-local DEFAULT_PORT = 34872
-
 local state: State = {
 	studioWs = nil,
 	studioConnected = false,
@@ -38,7 +37,7 @@ local state: State = {
 
 local function parseArguments(args: any): Config
 	return {
-		port = args.port or DEFAULT_PORT,
+		port = args.port or constants.DEFAULT_PORT,
 	}
 end
 

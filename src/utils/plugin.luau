@@ -1,6 +1,5 @@
 local process = require("@lune/process")
 local fs = require("@lune/fs")
-local serde = require("@lune/serde")
 local output = require("./output")
 
 local plugin = {}
@@ -21,28 +20,8 @@ function plugin.buildWithRojo(rojoProjectPath: string, outputPath: string): bool
 	return true
 end
 
-function plugin.generatePluginFile(port: number, pluginPath: string, templatePath: string)
-	local tempBuildPath = `rir3-{port}-temp.rbxmx`
-	local rojoProjectPath = `rir3-{port}-temp.project.json`
-
-	-- Create temporary Rojo project
-	local rojoConfig = {
-		name = "rir3-plugin",
-		tree = {
-			["$path"] = templatePath,
-		},
-	}
-
-	fs.writeFile(rojoProjectPath, serde.encode("json", rojoConfig))
-
-	if not plugin.buildWithRojo(rojoProjectPath, tempBuildPath) then
-		pcall(fs.removeFile, rojoProjectPath)
-		error("Failed to build plugin")
-	end
-
-	local template = fs.readFile(tempBuildPath)
-	local pluginContent = template:gsub("{{PORT}}", tostring(port))
-
+function plugin.generatePluginFile(pluginPath: string, rojoProjectPath: string)
+	-- Ensure plugin directory exists
 	local pluginsDir = pluginPath:match("(.+)/[^/]+$")
 	if pluginsDir and not fs.isDir(pluginsDir) then
 		pcall(function()
@@ -50,9 +29,10 @@ function plugin.generatePluginFile(port: number, pluginPath: string, templatePat
 		end)
 	end
 
-	fs.writeFile(pluginPath, pluginContent)
-	fs.removeFile(tempBuildPath)
-	fs.removeFile(rojoProjectPath)
+	-- Build directly to plugin path
+	if not plugin.buildWithRojo(rojoProjectPath, pluginPath) then
+		error("Failed to build plugin")
+	end
 end
 
 return plugin

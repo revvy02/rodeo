@@ -1,0 +1,9 @@
+{
+    "name": "rir3_once_plugin",
+    "tree": {
+        "$path": "src",
+        "constants": {
+            "$path": "../shared/constants.luau"
+        }
+    }
+}

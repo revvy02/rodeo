@@ -12,6 +12,7 @@ local COLORS = require("../utils/colors")
 local output = require("../utils/output")
 local uuid = require("../utils/uuid")
 local plugin = require("../utils/plugin")
+local constants = require("../utils/constants")
 
 type Config = {
 	script: string,
@@ -31,8 +32,6 @@ type DoneMessage = {
 	type: "done",
 	executionId: string,
 }
-
-local DEFAULT_PORT = 34872
 local CONNECTION_TIMEOUT = 60
 
 local function parseArguments(args: any): Config
@@ -40,7 +39,7 @@ local function parseArguments(args: any): Config
 	return {
 		script = args.script,
 		place = args.place,
-		port = args.port or DEFAULT_PORT,
+		port = args.port or constants.DEFAULT_PORT,
 		ignorePattern = args["ignore-pattern"] or args["ignore_pattern"] or {},
 	}
 end
@@ -113,14 +112,14 @@ local function main(args: any)
 
 	local scriptContent = fs.readFile(config.script)
 	local executionId = uuid.generate()
-	local pluginPath = `{roblox.studioPluginPath()}/rir3-{config.port}.rbxmx`
-	local templatePath = _G.PESDE_ROOT .. "/plugins/plugin_once_template.server.luau"
+	local pluginPath = `{roblox.studioPluginPath()}/rir3-once.rbxmx`
+	local rojoProjectPath = _G.PESDE_ROOT .. "/plugins/once/default.project.json"
 
 	local placeToOpen = config.place
 	local tempPlacePath = nil
 	if placeToOpen then
 		local extension = placeToOpen:match("%.([^%.]+)$") or "rbxlx"
-		tempPlacePath = `/tmp/rir3-place-{config.port}.{extension}`
+		tempPlacePath = `/tmp/rir3-place.{extension}`
 
 		if fs.isFile(tempPlacePath) then
 			fs.removeFile(tempPlacePath)
@@ -130,7 +129,7 @@ local function main(args: any)
 		placeToOpen = tempPlacePath
 	end
 
-	plugin.generatePluginFile(config.port, pluginPath, templatePath)
+	plugin.generatePluginFile(pluginPath, rojoProjectPath)
 
 	local exitCodeRef = { value = 0 }
 	local isComplete = false

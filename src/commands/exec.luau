@@ -8,18 +8,17 @@ local serde = require("@lune/serde")
 local COLORS = require("../utils/colors")
 local output = require("../utils/output")
 local uuid = require("../utils/uuid")
+local constants = require("../utils/constants")
 
 type Config = {
 	script: string,
 	port: number,
 }
 
-local DEFAULT_PORT = 34872
-
 local function parseArguments(args: any): Config
 	return {
 		script = args.script,
-		port = args.port or DEFAULT_PORT,
+		port = args.port or constants.DEFAULT_PORT,
 	}
 end
 
