@@ -8,6 +8,7 @@ includes = [
   "README.md",
   "LICENSE",
   "src/**/*.luau",
+  "plugins/**/*.luau",
   ".luaurc",
 ]
 
