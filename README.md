@@ -8,6 +8,13 @@ Run scripts in Roblox Studio from your command line. All Studio output (prints, 
 
 Uses WebSockets to communicate between the CLI and Studio. `rir3 once` is functionally identical to [run-in-roblox](https://github.com/rojo-rbx/run-in-roblox) and can serve as a drop-in replacement.
 
+## Plans
+File path + sourcemap reconciliation in execution for accurate stack traces
+Output timestamps + better output formatting
+Clickable output
+Output syncing (i.e. NexusSync)
+Cloud execution
+
 ## Usage
 
 ### One-off execution
