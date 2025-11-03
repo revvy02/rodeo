@@ -1,5 +1,5 @@
 name = "rvy/rir3"
-version = "0.0.0"
+version = "0.0.1"
 description = "sync studio output to cli and also allow studio code execution from cli"
 authors = ["rvy"]
 license = "MIT"
@@ -8,11 +8,12 @@ includes = [
   "README.md",
   "LICENSE",
   "src/**/*.luau",
+  ".luaurc",
 ]
 
 [target]
 environment = "lune"
-bin = "src"
+bin = "src/init.luau"
 
 [indices]
 default = "https://github.com/pesde-pkg/index"
