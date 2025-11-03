@@ -1,0 +1,27 @@
+name = "jiwonz/dirs"
+version = "0.6.0"
+description = "A library for lune that provides config/cache/data paths. Heavily inspired by dirs-rs"
+license = "MIT"
+authors = ["jiwonz <me@jiwonz.kr>"]
+repository = "https://github.com/jiwonz/dirs-lune/"
+private = false
+includes = ["src/**", "README.md", "pesde.toml", "LICENSE"]
+
+[target]
+environment = "lune"
+lib = "src/lib.luau"
+
+[engines]
+pesde = "^0.7.1"
+lune = "^0.10.2"
+
+[dependencies.greentea]
+name = "jiwonz/greentea_luau"
+version = "^0.2.0"
+index = "https://github.com/pesde-pkg/index"
+target = "luau"
+
+[dependencies.pathfs]
+name = "jiwonz/pathfs"
+version = "^0.6.0"
+index = "https://github.com/pesde-pkg/index"

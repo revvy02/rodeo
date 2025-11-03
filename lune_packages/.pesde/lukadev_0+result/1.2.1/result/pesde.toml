@@ -1,0 +1,12 @@
+name = "lukadev_0/result"
+version = "1.2.1"
+description = "Result<T, E> type in Luau"
+license = "MIT"
+authors = ["LukaDev <luka@lukadev.me> (https://lukadev.me/)"]
+repository = "https://github.com/lukadev-0/util.luau"
+private = false
+includes = ["result/**/*", "README.md", "LICENSE", "pesde.toml"]
+
+[target]
+environment = "lune"
+lib = "result/lib.luau"

@@ -1,0 +1,40 @@
+name = "0x5eal/unzip"
+version = "0.2.0"
+description = "Unzip implementation in pure Luau"
+license = "MIT"
+authors = ["Erica Marigold <hi@devcomp.xyz>"]
+repository = "https://github.com/0x5eal/luau-unzip"
+private = false
+includes = ["README.md", "LICENSE.md", "pesde.toml", "lib/**/*.luau", "!tests/**/*", "docs/**/*.md"]
+
+[target]
+environment = "luau"
+lib = "lib/init.luau"
+
+[dev_dependencies.asciitable]
+name = "kimpure/asciitable"
+version = "^0.2.3"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.dirs]
+name = "jiwonz/dirs"
+version = "^0.6.0"
+index = "https://github.com/pesde-pkg/index"
+target = "lune"
+
+[dev_dependencies.frktest]
+name = "itsfrank/frktest"
+version = "^0.0.4"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.luau-lsp]
+name = "pesde/luau_lsp"
+version = "=1.53.2"
+index = "https://github.com/pesde-pkg/index"
+target = "lune"
+
+[dev_dependencies.stylua]
+name = "pesde/stylua"
+version = "=2.1.0"
+index = "https://github.com/pesde-pkg/index"
+target = "lune"

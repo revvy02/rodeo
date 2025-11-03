@@ -1,0 +1,30 @@
+name = "pesde/scripts_rojo"
+version = "0.2.0"
+description = "Scripts for Rojo-based Roblox projects."
+license = "MIT"
+authors = ["daimond113 <contact@daimond113.com> (https://www.daimond113.com/)", "Erica Marigold <hi@devcomp.xyz>"]
+repository = "https://github.com/pesde-pkg/scripts"
+private = false
+includes = ["roblox_sync_config_generator.luau", "sourcemap_generator.luau", "pesde.toml", "README.md", "LICENSE"]
+
+[target]
+environment = "lune"
+
+[target.scripts]
+roblox_sync_config_generator = "roblox_sync_config_generator.luau"
+sourcemap_generator = "sourcemap_generator.luau"
+
+[engines]
+pesde = "^0.7.0"
+lune = "^0.10.2"
+
+[dependencies.scripts_core]
+name = "pesde/scripts_core"
+version = "^0.2.0"
+index = "https://github.com/pesde-pkg/index"
+target = "lune"
+
+[peer_dependencies.rojo]
+name = "pesde/rojo"
+version = "^7.5.1"
+index = "https://github.com/pesde-pkg/index"

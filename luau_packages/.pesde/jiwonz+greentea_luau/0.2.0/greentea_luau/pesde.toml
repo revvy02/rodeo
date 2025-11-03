@@ -1,0 +1,15 @@
+name = "jiwonz/greentea_luau"
+version = "0.2.0"
+description = "A runtime typechecker with Luau types, pretty errors, and inspection"
+license = "MIT"
+authors = ["Corecii (Shae A.) <github.com/corecii>", "jiwonz <me@jiwonz.kr>"]
+repository = "https://github.com/jiwonz/greentea-luau"
+private = false
+includes = ["src/**", "pesde.toml", "LICENSE", "README.md"]
+
+[target]
+environment = "luau"
+lib = "src/lib.luau"
+
+[engines]
+pesde = "^0.7.0"

@@ -1,0 +1,126 @@
+-- Exec command: Execute script via persistent serve server
+
+local net = require("@lune/net")
+local process = require("@lune/process")
+local fs = require("@lune/fs")
+local serde = require("@lune/serde")
+
+local COLORS = require("../utils/colors")
+local output = require("../utils/output")
+local uuid = require("../utils/uuid")
+
+type Config = {
+	script: string,
+	port: number,
+	timeout: number,
+}
+
+local DEFAULT_PORT = 34872
+local DEFAULT_TIMEOUT = 300 -- 5 minutes
+
+local function parseArguments(args: any): Config
+	return {
+		script = args.script,
+		port = args.port or DEFAULT_PORT,
+		timeout = args.timeout or DEFAULT_TIMEOUT,
+	}
+end
+
+local function validateConfig(config: Config)
+	if not fs.isFile(config.script) then
+		output.printError(`Script file not found: {config.script}`)
+		process.exit(1)
+	end
+end
+
+local function checkServerHealth(port: number): boolean
+	local success, response = pcall(function()
+		return net.request({
+			url = `http://localhost:{port}/health`,
+			method = "GET",
+		})
+	end)
+
+	return success and response.ok
+end
+
+local function connectToServer(port: number): any
+	return net.socket(`ws://localhost:{port}`)
+end
+
+local function identifyClient(ws: any)
+	ws:send(serde.encode("json", {
+		clientType = "exec",
+	}))
+end
+
+local function submitScript(ws: any, executionId: string, script: string, timeout: number)
+	ws:send(serde.encode("json", {
+		type = "submit",
+		script = script,
+		executionId = executionId,
+		timeout = timeout,
+	}))
+end
+
+local function handleMessage(decoded: any, exitCodeRef: { value: number }): boolean
+	if decoded.type == "queued" then
+		if decoded.position and decoded.position > 1 then
+			output.printColored(`Queued at position {decoded.position}`, COLORS.Info)
+		end
+	elseif decoded.type == "output" then
+		output.printColored(decoded.body, COLORS[decoded.level] or COLORS.Print)
+		if decoded.level == "Error" then
+			exitCodeRef.value = 1
+		end
+	elseif decoded.type == "done" then
+		return true
+	elseif decoded.type == "timeout" then
+		output.printError("Execution timed out")
+		exitCodeRef.value = 2
+		return true
+	elseif decoded.type == "disconnect" then
+		output.printError("Studio disconnected")
+		exitCodeRef.value = 2
+		return true
+	end
+
+	return false
+end
+
+local function main(args: any)
+	local config = parseArguments(args)
+	validateConfig(config)
+
+	if not checkServerHealth(config.port) then
+		output.printError(`No rir3 server found on port {config.port}. Run 'rir3 serve' first.`)
+		process.exit(1)
+	end
+
+	local scriptContent = fs.readFile(config.script)
+	local executionId = uuid.generate()
+	local exitCodeRef = { value = 0 }
+
+	local ws = connectToServer(config.port)
+	identifyClient(ws)
+	submitScript(ws, executionId, scriptContent, config.timeout)
+
+	while true do
+		local message = ws:next()
+		if not message then
+			break
+		end
+
+		local decoded = serde.decode("json", message)
+		local isDone = handleMessage(decoded, exitCodeRef)
+
+		if isDone then
+			ws:close()
+			break
+		end
+	end
+
+	process.exit(exitCodeRef.value)
+end
+
+return main

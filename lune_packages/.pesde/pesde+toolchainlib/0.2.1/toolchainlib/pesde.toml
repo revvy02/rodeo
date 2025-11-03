@@ -1,0 +1,41 @@
+name = "pesde/toolchainlib"
+version = "0.2.1"
+description = "A Luau library for implementing toolchain management"
+license = "MIT"
+repository = "https://github.com/pesde-pkg/tooling/tree/main/toolchainlib"
+private = false
+includes = ["src/**/*.luau", "pesde.toml", "LICENSE", "README.md"]
+
+[target]
+environment = "lune"
+lib = "src/init.luau"
+
+[engines]
+pesde = "^0.7.0"
+lune = "^0.10.2"
+
+[dependencies.dirs]
+name = "jiwonz/dirs"
+version = "^0.6.0"
+index = "https://github.com/pesde-pkg/index"
+
+[dependencies.pathfs]
+name = "jiwonz/pathfs"
+version = "^0.6.0"
+index = "https://github.com/pesde-pkg/index"
+
+[dependencies.unzip]
+name = "0x5eal/unzip"
+version = "^0.2.0"
+index = "https://github.com/pesde-pkg/index"
+target = "luau"
+
+[peer_dependencies.option]
+name = "lukadev_0/option"
+version = "^1.2.1"
+index = "https://github.com/pesde-pkg/index"
+
+[peer_dependencies.result]
+name = "lukadev_0/result"
+version = "^1.2.1"
+index = "https://github.com/pesde-pkg/index"

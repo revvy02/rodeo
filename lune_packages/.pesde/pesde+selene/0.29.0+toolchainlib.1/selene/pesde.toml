@@ -1,0 +1,31 @@
+name = "pesde/selene"
+version = "0.29.0+toolchainlib.1"
+description = "A blazing-fast modern Lua linter written in Rust"
+authors = ["CompeyDev <hi@devcomp.xyz>", "Kampfkarren <kampfkarren@gmail.com>"]
+repository = "https://github.com/pesde-pkg/tooling/tree/main/bins/selene"
+private = false
+includes = ["init.luau", "README.md", "pesde.toml"]
+
+[target]
+environment = "lune"
+bin = "init.luau"
+
+[engines]
+pesde = "^0.7.0"
+lune = "^0.10.2"
+
+[dependencies.option]
+name = "lukadev_0/option"
+version = "^1.2.1"
+index = "https://github.com/pesde-pkg/index"
+
+[dependencies.result]
+name = "lukadev_0/result"
+version = "^1.2.1"
+index = "https://github.com/pesde-pkg/index"
+
+[dependencies.toolchainlib]
+name = "pesde/toolchainlib"
+version = "^0.2.0"
+index = "https://github.com/pesde-pkg/index"
+target = "lune"

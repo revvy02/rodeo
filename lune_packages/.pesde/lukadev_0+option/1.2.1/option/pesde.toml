@@ -1,0 +1,12 @@
+name = "lukadev_0/option"
+version = "1.2.1"
+description = "Option<T> type in Luau"
+license = "MIT"
+authors = ["LukaDev <luka@lukadev.me> (https://lukadev.me/)"]
+repository = "https://github.com/lukadev-0/util.luau"
+private = false
+includes = ["README.md", "LICENSE", "option/**/*", "pesde.toml"]
+
+[target]
+environment = "lune"
+lib = "option/lib.luau"

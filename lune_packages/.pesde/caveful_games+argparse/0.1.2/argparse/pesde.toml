@@ -1,0 +1,32 @@
+name = "caveful_games/argparse"
+version = "0.1.2"
+description = "mpeterv/argparse for Lune"
+license = "MIT"
+authors = ["Peter Melnichenko", "jiwonz <me@jiwonz.kr>", "kimpure"]
+repository = "https://github.com/CavefulGames/argparse-lune"
+private = false
+includes = ["src/**", "pesde.toml", "README.md", "LICENSE"]
+
+[target]
+environment = "lune"
+lib = "src/lib.luau"
+
+[dev_dependencies.luau_check]
+name = "jiwonz/luau_check"
+version = "^0.2.0"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.luau_lsp]
+name = "pesde/luau_lsp"
+version = "^1.38.0"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.selene]
+name = "pesde/selene"
+version = "^0.27.1"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.stylua]
+name = "pesde/stylua"
+version = "^2.0.2"
+index = "https://github.com/pesde-pkg/index"

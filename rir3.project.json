@@ -1,0 +1,6 @@
+{
+  "name": "rir3-plugin",
+  "tree": {
+    "$path": "plugins/plugin_once_template.server.luau"
+  }
+}

@@ -1,0 +1,12 @@
+syntax = "Luau"
+line_endings = "Unix"
+indent_type = "Tabs"
+indent_width = 4
+column_width = 240
+quote_style = "AutoPreferDouble"
+call_parentheses = "Always"
+collapse_simple_statement = "Never"
+space_after_function_names = "Never"
+
+[sort_requires]
+enabled = true

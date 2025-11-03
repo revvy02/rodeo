@@ -1,0 +1,62 @@
+name = "pesde/scripts_core"
+version = "0.2.0"
+description = "Scripts and other utilities for use with pesde"
+license = "MIT"
+authors = ["daimond113 <contact@daimond113.com> (https://www.daimond113.com/)", "Erica Marigold <hi@devcomp.xyz>"]
+repository = "https://github.com/pesde-pkg/scripts"
+private = false
+includes = ["src/**/*.luau", "!src/**/*.spec.luau", "pesde.toml", "README.md", "LICENSE"]
+workspace_members = [".", "dist/*"]
+
+[target]
+environment = "lune"
+lib = "src/init.luau"
+
+[engines]
+pesde = "^0.7.0"
+lune = "^0.10.2"
+
+[dev_dependencies.argon]
+name = "pesde/argon"
+version = "^2.0.26"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.frktest]
+name = "itsfrank/frktest"
+version = "^0.0.4"
+index = "https://github.com/pesde-pkg/index"
+target = "luau"
+
+[dev_dependencies.luau-lsp]
+name = "pesde/luau_lsp"
+version = "^1.53.5"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.pathfs]
+name = "jiwonz/pathfs"
+version = "^0.6.0"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.rojo]
+name = "pesde/rojo"
+version = "^7.5.1"
+index = "https://github.com/pesde-pkg/index"
+
+[dev_dependencies.stylua]
+name = "pesde/stylua"
+version = "^2.2.0"
+index = "https://github.com/pesde-pkg/index"
+
+[meta.scripts.argon]
+version = "0.2.0"
+
+[meta.scripts.argon.tool_dependencies.argon]
+name = "pesde/argon"
+version = "^2.0.26+toolchainlib.1"
+
+[meta.scripts.rojo]
+version = "0.2.0"
+
+[meta.scripts.rojo.tool_dependencies.rojo]
+name = "pesde/rojo"
+version = "^7.5.1+toolchainlib.1"

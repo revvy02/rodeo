@@ -1,0 +1,13 @@
+std = "roblox"
+exclude = ["*_packages/**", "out/**"]
+
+[config]
+include = ["plugin/**/*.luau"]
+global_usage = { ignore_pattern = "__[a-zA-Z0-9_]+__" }
+
+[lints]
+shadowing = "allow"
+empty_if = "allow"
+mixed_table = "allow"
+incorrect_standard_library_use = "allow"
+multiple_statements = "allow"

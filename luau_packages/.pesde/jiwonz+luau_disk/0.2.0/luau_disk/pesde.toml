@@ -1,0 +1,15 @@
+name = "jiwonz/luau_disk"
+version = "0.2.0"
+description = "[Fork] Immutable data structures for Lua by jeparlefrancais, Uploaded for pesde"
+license = "MIT"
+authors = ["jeparlefrancais <jeparlefrancais21@gmail.com>"]
+repository = "https://github.com/jiwonz/luau-disk"
+private = false
+includes = ["src/**", "pesde.toml", "LICENSE.txt", "README.md", "docs"]
+
+[target]
+environment = "luau"
+lib = "src/init.luau"
+
+[engines]
+pesde = "^0.7.0"
