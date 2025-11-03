@@ -23,10 +23,10 @@ local function main(args: any)
 	output.printColored(`Building serve plugin for port {config.port}...`, COLORS.Info)
 
 	local pluginPath = `{roblox.studioPluginPath()}/rir3-serve-{config.port}.rbxmx`
-	local serveTemplatePath = _G.PESDE_ROOT .. "/plugins/plugin_serve_template.server.luau"
+	local templatePath = _G.PESDE_ROOT .. "/plugins/plugin_serve_template.server.luau"
 
 	local success = pcall(function()
-		plugin.generatePluginFile(config.port, pluginPath, serveTemplatePath)
+		plugin.generatePluginFile(config.port, pluginPath, templatePath)
 	end)
 
 	if not success then

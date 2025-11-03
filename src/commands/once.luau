@@ -114,6 +114,7 @@ local function main(args: any)
 	local scriptContent = fs.readFile(config.script)
 	local executionId = uuid.generate()
 	local pluginPath = `{roblox.studioPluginPath()}/rir3-{config.port}.rbxmx`
+	local templatePath = _G.PESDE_ROOT .. "/plugins/plugin_once_template.server.luau"
 
 	local placeToOpen = config.place
 	local tempPlacePath = nil
@@ -129,7 +130,7 @@ local function main(args: any)
 		placeToOpen = tempPlacePath
 	end
 
-	plugin.generatePluginFile(config.port, pluginPath)
+	plugin.generatePluginFile(config.port, pluginPath, templatePath)
 
 	local exitCodeRef = { value = 0 }
 	local isComplete = false

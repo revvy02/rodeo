@@ -5,8 +5,6 @@ local output = require("./output")
 
 local plugin = {}
 
-local ROJO_PROJECT_FILE = _G.PESDE_ROOT .. "/rir3.project.json"
-
 function plugin.buildWithRojo(rojoProjectPath: string, outputPath: string): boolean
 	local result = process.exec("rojo", {
 		"build",
@@ -23,30 +21,22 @@ function plugin.buildWithRojo(rojoProjectPath: string, outputPath: string): bool
 	return true
 end
 
-function plugin.generatePluginFile(port: number, pluginPath: string, templatePath: string?)
+function plugin.generatePluginFile(port: number, pluginPath: string, templatePath: string)
 	local tempBuildPath = `rir3-{port}-temp.rbxmx`
-	local rojoProjectPath = ROJO_PROJECT_FILE
-	local needsCleanup = false
+	local rojoProjectPath = `rir3-{port}-temp.project.json`
 
-	-- If a template path is provided, create a temporary Rojo project
-	if templatePath then
-		rojoProjectPath = `rir3-{port}-temp.project.json`
-		needsCleanup = true
+	-- Create temporary Rojo project
+	local rojoConfig = {
+		name = "rir3-plugin",
+		tree = {
+			["$path"] = templatePath,
+		},
+	}
 
-		local rojoConfig = {
-			name = "rir3-plugin",
-			tree = {
-				["$path"] = templatePath,
-			},
-		}
-
-		fs.writeFile(rojoProjectPath, serde.encode("json", rojoConfig))
-	end
+	fs.writeFile(rojoProjectPath, serde.encode("json", rojoConfig))
 
 	if not plugin.buildWithRojo(rojoProjectPath, tempBuildPath) then
-		if needsCleanup then
-			pcall(fs.removeFile, rojoProjectPath)
-		end
+		pcall(fs.removeFile, rojoProjectPath)
 		error("Failed to build plugin")
 	end
 
@@ -62,10 +52,7 @@ function plugin.generatePluginFile(port: number, pluginPath: string, templatePat
 
 	fs.writeFile(pluginPath, pluginContent)
 	fs.removeFile(tempBuildPath)
-
-	if needsCleanup then
-		pcall(fs.removeFile, rojoProjectPath)
-	end
+	fs.removeFile(rojoProjectPath)
 end
 
 return plugin
