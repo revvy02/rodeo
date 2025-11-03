@@ -6,6 +6,8 @@ Execute Luau code inside Roblox Studio and see output in your terminal.
 
 Run scripts in Roblox Studio from your command line. All Studio output (prints, warnings, errors) appears in your terminal with color coding.
 
+Uses WebSockets to communicate between the CLI and Studio. `rir3 once` is functionally identical to [run-in-roblox](https://github.com/rojo-rbx/run-in-roblox) and can serve as a drop-in replacement.
+
 ## Usage
 
 ### One-off execution
