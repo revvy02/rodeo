@@ -59,7 +59,7 @@ end
 local function handleMessage(decoded: any, exitCodeRef: { value: number }): boolean
 	if decoded.type == "queued" then
 		if decoded.position and decoded.position > 1 then
-			output.printColored(`Queued at position {decoded.position}`, COLORS.Info)
+			-- output.printColored(`Queued at position {decoded.position}`, COLORS.Info)
 		end
 	elseif decoded.type == "output" then
 		output.printColored(decoded.body, COLORS[decoded.level] or COLORS.Print)

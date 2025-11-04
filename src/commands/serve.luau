@@ -6,6 +6,11 @@ local task = require("@lune/task")
 local COLORS = require("../utils/colors")
 local output = require("../utils/output")
 local constants = require("../utils/constants")
+local StudioConnection = require("../utils/StudioConnection")
+local ExecConnection = require("../utils/ExecConnection")
+
+type StudioConnection = StudioConnection.StudioConnection
+type ExecConnection = ExecConnection.ExecConnection
 
 type QueueItem = {
 	executionId: string,
@@ -13,81 +18,11 @@ type QueueItem = {
 	queuedAt: number,
 }
 
-export type StudioConnection = {
-	ws: any,
-	connected: boolean,
-	activeExecutionId: string?,
-
-	new: (ws: any) -> StudioConnection,
-	send: (self: StudioConnection, data: string) -> (),
-	close: (self: StudioConnection) -> (),
-	isConnected: (self: StudioConnection) -> boolean,
-}
-
-export type ExecConnection = {
-	ws: any,
-	executionId: string,
-
-	new: (ws: any, executionId: string) -> ExecConnection,
-	send: (self: ExecConnection, data: string) -> (),
-	close: (self: ExecConnection) -> (),
-}
-
 type State = {
 	studioConnection: StudioConnection?,
 	execConnections: { [string]: ExecConnection },
 	queue: { QueueItem },
 }
-
-local StudioConnectionClass = {}
-StudioConnectionClass.__index = StudioConnectionClass
-
-function StudioConnectionClass.new(ws: any): StudioConnection
-	local self = setmetatable({}, StudioConnectionClass)
-	self.ws = ws
-	self.connected = true
-	self.activeExecutionId = nil
-	return (self :: any) :: StudioConnection
-end
-
-function StudioConnectionClass:send(data: string)
-	pcall(function()
-		self.ws:send(data)
-	end)
-end
-
-function StudioConnectionClass:close()
-	self.connected = false
-	pcall(function()
-		self.ws:close()
-	end)
-end
-
-function StudioConnectionClass:isConnected(): boolean
-	return self.connected
-end
-
-local ExecConnectionClass = {}
-ExecConnectionClass.__index = ExecConnectionClass
-
-function ExecConnectionClass.new(ws: any, executionId: string): ExecConnection
-	local self = setmetatable({}, ExecConnectionClass)
-	self.ws = ws
-	self.executionId = executionId
-	return (self :: any) :: ExecConnection
-end
-
-function ExecConnectionClass:send(data: string)
-	pcall(function()
-		self.ws:send(data)
-	end)
-end
-
-function ExecConnectionClass:close()
-	pcall(function()
-		self.ws:close()
-	end)
-end
 
 local state: State = {
 	studioConnection = nil,
@@ -168,7 +103,7 @@ local function handleExecClient(ws: any)
 
 		if decoded.type == "submit" then
 			clientExecutionId = decoded.executionId
-			local execConnection = ExecConnectionClass.new(ws, clientExecutionId)
+			local execConnection = ExecConnection.new(ws, clientExecutionId)
 			queueExecution(execConnection, decoded.script)
 		end
 	end
@@ -213,7 +148,7 @@ local function handleStudioClient(ws: any)
 		return
 	end
 
-	local studioConnection = StudioConnectionClass.new(ws)
+	local studioConnection = StudioConnection.new(ws)
 	state.studioConnection = studioConnection
 	stdio.write(`[serve] Studio plugin connected\n`)
 

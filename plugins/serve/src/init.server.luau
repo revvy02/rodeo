@@ -129,7 +129,7 @@ local function connect()
 		end)
 
 		client.Error:Connect(function(responseStatusCode, errorMessage)
-			warn("[rir3] WebSocket error:", responseStatusCode, errorMessage)
+			-- warn("[rir3] WebSocket error:", responseStatusCode, errorMessage)
 			isConnected = false
 		end)
 
