@@ -4,22 +4,16 @@ local roblox = require("@lune/roblox")
 local output = require("../utils/output")
 local COLORS = require("../utils/colors")
 local plugin = require("../utils/plugin")
+local pathfs = require("@pkg/pathfs")
 
 local function main(_args: any)
 
 	output.printColored(`Building serve plugin...`, COLORS.Info)
 
 	local pluginPath = `{roblox.studioPluginPath()}/rir3-serve.rbxmx`
-	local rojoProjectPath = _G.PESDE_ROOT .. "/plugins/serve/plugin.project.json"
+	local rojoProjectPath = pathfs.absolute(_G.PESDE_ROOT .. "/plugins/serve/plugin.project.json"):toString()
 
-    -- print(rojoProjectPath)
-	local success = pcall(function()
-		plugin.generatePluginFile(pluginPath, rojoProjectPath)
-	end)
-
-	if not success then
-		process.exit(1)
-	end
+	plugin.generatePluginFile(pluginPath, rojoProjectPath)
 
 	output.printColored(`Plugin installed to: {pluginPath}`, COLORS.Info)
 	output.printColored(`Restart Roblox Studio to load the plugin`, COLORS.Info)
