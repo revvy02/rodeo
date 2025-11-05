@@ -13,10 +13,12 @@ local output = require("../utils/output")
 local uuid = require("../utils/uuid")
 local plugin = require("../utils/plugin")
 local constants = require("../utils/constants")
+local sourcemap = require("../utils/sourcemap")
 
 type Config = {
 	script: string,
 	place: string?,
+	sourcemap: string?,
 	ignorePattern: { string },
 }
 
@@ -38,6 +40,7 @@ local function parseArguments(args: any): Config
 	return {
 		script = args.script,
 		place = args.place,
+		sourcemap = args.sourcemap,
 		ignorePattern = args["ignore-pattern"] or args["ignore_pattern"] or {},
 	}
 end
@@ -45,6 +48,12 @@ end
 local function validateConfig(config: Config)
 	if not fs.isFile(config.script) then
 		output.printError(`Script file not found: {config.script}`)
+		process.exit(1)
+	end
+
+	if config.sourcemap and not config.place then
+		output.printError("--sourcemap requires --place to resolve instances")
+		output.printInfo("Usage: rir3 once script.luau --place game.rbxl --sourcemap sourcemap.json")
 		process.exit(1)
 	end
 
@@ -58,15 +67,21 @@ local function handlePluginConnection(
 	ws: any,
 	executionId: string,
 	scriptContent: string,
+	instancePath: string?,
 	ignorePatterns: { string },
 	exitCodeRef: { value: number }
 ): boolean
-	-- Send exec message
-	ws:send(serde.encode("json", {
+	local message: any = {
 		type = "exec",
 		executionId = executionId,
 		script = scriptContent,
-	}))
+	}
+
+	if instancePath then
+		message.instancePath = instancePath
+	end
+
+	ws:send(serde.encode("json", message))
 
 	while true do
 		local message = ws:next()
@@ -129,13 +144,28 @@ local function main(args: any)
 
 	plugin.generatePluginFile(pluginPath, rojoProjectPath)
 
+	local instancePath: string? = nil
+	if config.sourcemap then
+		local map, err = sourcemap.loadSourcemap(config.sourcemap)
+		if not map then
+			output.printError(err or "Failed to load sourcemap")
+			process.exit(1)
+		end
+
+		instancePath = sourcemap.findInstancePath(map, config.script)
+		if not instancePath then
+			output.printWarning(`Script not found in sourcemap: {config.script}`)
+			output.printInfo("Falling back to temporary module execution")
+		end
+	end
+
 	local exitCodeRef = { value = 0 }
 	local isComplete = false
 
 	-- Start WebSocket server BEFORE launching Studio
 	local server = net.serve(constants.ONCE_PORT, {
 		handleWebSocket = function(ws)
-			isComplete = handlePluginConnection(ws, executionId, scriptContent, config.ignorePattern or {}, exitCodeRef)
+			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.ignorePattern or {}, exitCodeRef)
 		end,
 	})
 

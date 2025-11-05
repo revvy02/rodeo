@@ -9,6 +9,7 @@ local function main()
 	local onceCmd = parser:command("once", "Execute script once in Studio (ephemeral)")
 	onceCmd:argument("script", "Path to the script to execute")
 	onceCmd:option("-p --place", "Path to the place file to open")
+	onceCmd:option("-s --sourcemap", "Path to sourcemap.json for instance resolution")
 	onceCmd:option("--ignore-pattern", "Regex patterns to ignore in error messages"):count("*")
 
 	-- Define serve command
@@ -17,6 +18,7 @@ local function main()
 	-- Define exec command
 	local execCmd = parser:command("exec", "Execute script via running serve instance")
 	execCmd:argument("script", "Path to the script to execute")
+	execCmd:option("-s --sourcemap", "Path to sourcemap.json for instance resolution")
 	execCmd:option("--timeout", "Execution timeout in seconds"):default("300"):convert(tonumber)
 
 	-- Define build command

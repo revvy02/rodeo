@@ -4,6 +4,9 @@
         "$path": "src",
         "constants": {
             "$path": "../shared/constants.luau"
+        },
+        "utils": {
+            "$path": "../shared/utils.luau"
         }
     }
 }

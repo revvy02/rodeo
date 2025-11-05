@@ -15,6 +15,7 @@ type ExecConnection = ExecConnection.ExecConnection
 type QueueItem = {
 	executionId: string,
 	script: string,
+	instancePath: string?,
 	queuedAt: number,
 }
 
@@ -44,11 +45,17 @@ local function processQueue()
 
 	stdio.write(`[serve] Starting execution: {item.executionId}\n`)
 
-	state.studioConnection:send(serde.encode("json", {
+	local message: any = {
 		type = "exec",
 		executionId = item.executionId,
 		script = item.script,
-	}))
+	}
+
+	if item.instancePath then
+		message.instancePath = item.instancePath
+	end
+
+	state.studioConnection:send(serde.encode("json", message))
 end
 
 local function notifyExecClient(executionId: string, messageType: string)
@@ -69,13 +76,14 @@ local function cleanupExecution(executionId: string)
 	state.execConnections[executionId] = nil
 end
 
-local function queueExecution(execConnection: ExecConnection, script: string)
+local function queueExecution(execConnection: ExecConnection, script: string, instancePath: string?)
 	local executionId = execConnection.executionId
 	state.execConnections[executionId] = execConnection
 
 	table.insert(state.queue, {
 		executionId = executionId,
 		script = script,
+		instancePath = instancePath,
 		queuedAt = os.time(),
 	} :: QueueItem)
 
@@ -104,7 +112,7 @@ local function handleExecClient(ws: any)
 		if decoded.type == "submit" then
 			clientExecutionId = decoded.executionId
 			local execConnection = ExecConnection.new(ws, clientExecutionId)
-			queueExecution(execConnection, decoded.script)
+			queueExecution(execConnection, decoded.script, decoded.instancePath)
 		end
 	end
 

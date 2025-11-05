@@ -17,4 +17,12 @@ function output.printError(message: string)
 	output.printColored(`Error: {message}`, COLORS.Error)
 end
 
+function output.printWarning(message: string)
+	output.printColored(`Warning: {message}`, COLORS.Warning)
+end
+
+function output.printInfo(message: string)
+	output.printColored(message, COLORS.Info)
+end
+
 return output

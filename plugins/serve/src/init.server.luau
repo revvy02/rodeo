@@ -1,4 +1,5 @@
 local constants = require(script.constants)
+local utils = require(script.utils)
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
 
@@ -71,26 +72,11 @@ local function setupLogCapture()
 	end)
 end
 
-local function executeScript(script: string, executionId: string)
+local function executeScript(script: string, executionId: string, instancePath: string?)
 	currentExecutionId = executionId
 
-	local moduleScript = Instance.new("ModuleScript")
-	moduleScript.Source = script .. "\nif true then return true end"
-
-    local moduleScript = Instance.new("ModuleScript")
-	moduleScript.Source = "return function() " .. script .. "\nend"
-
-    local success, result = xpcall(require(moduleScript), debug.traceback)
-	moduleScript:Destroy()
-
-	if not success then
-		local event = Instance.new("BindableEvent")
-		event.Event:Connect(function()
-			error(result, 0)
-			return
-		end)
-		event:Fire()
-	end
+	local moduleScript = utils.createModuleScript(script, instancePath)
+	utils.executeModule(moduleScript)
 
 	task.wait(0.1)
 
@@ -139,7 +125,7 @@ local function connect()
 			local decoded = HttpService:JSONDecode(message)
 
 			if decoded.type == "exec" then
-				executeScript(decoded.script, decoded.executionId)
+				executeScript(decoded.script, decoded.executionId, decoded.instancePath)
 			end
 		end)
 	end)

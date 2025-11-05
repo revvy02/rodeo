@@ -9,14 +9,17 @@ local COLORS = require("../utils/colors")
 local output = require("../utils/output")
 local uuid = require("../utils/uuid")
 local constants = require("../utils/constants")
+local sourcemap = require("../utils/sourcemap")
 
 type Config = {
 	script: string,
+	sourcemap: string?,
 }
 
 local function parseArguments(args: any): Config
 	return {
 		script = args.script,
+		sourcemap = args.sourcemap,
 	}
 end
 
@@ -48,12 +51,18 @@ local function identifyClient(ws: any)
 	}))
 end
 
-local function submitScript(ws: any, executionId: string, script: string)
-	ws:send(serde.encode("json", {
+local function submitScript(ws: any, executionId: string, script: string, instancePath: string?)
+	local message: any = {
 		type = "submit",
 		script = script,
 		executionId = executionId,
-	}))
+	}
+
+	if instancePath then
+		message.instancePath = instancePath
+	end
+
+	ws:send(serde.encode("json", message))
 end
 
 local function handleMessage(decoded: any, exitCodeRef: { value: number }): boolean
@@ -86,13 +95,28 @@ local function main(args: any)
 		process.exit(1)
 	end
 
+	local instancePath: string? = nil
+	if config.sourcemap then
+		local map, err = sourcemap.loadSourcemap(config.sourcemap)
+		if not map then
+			output.printError(err or "Failed to load sourcemap")
+			process.exit(1)
+		end
+
+		instancePath = sourcemap.findInstancePath(map, config.script)
+		if not instancePath then
+			output.printWarning(`Script not found in sourcemap: {config.script}`)
+			output.printInfo("Falling back to temporary module execution")
+		end
+	end
+
 	local scriptContent = fs.readFile(config.script)
 	local executionId = uuid.generate()
 	local exitCodeRef = { value = 0 }
 
 	local ws = connectToServer(constants.SERVE_PORT)
 	identifyClient(ws)
-	submitScript(ws, executionId, scriptContent)
+	submitScript(ws, executionId, scriptContent, instancePath)
 
 	while true do
 		local message = ws:next()

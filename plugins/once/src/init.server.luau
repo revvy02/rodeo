@@ -1,4 +1,5 @@
 local constants = require(script.constants)
+local utils = require(script.utils)
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
 
@@ -61,22 +62,8 @@ client.MessageReceived:Connect(function(message)
 			}))
 		end)
 
-		-- Wrap the code in a function to ensure it always returns something
-		-- Put the function() on the same line as the first line of code with a semicolon to preserve line numbers
-		local moduleScript = Instance.new("ModuleScript")
-		moduleScript.Source = "return function() " .. decoded.script .. "\nend"
-
-        local success, result = xpcall(require(moduleScript), debug.traceback)
-        moduleScript:Destroy()
-
-		if not success then
-			local event = Instance.new("BindableEvent")
-			event.Event:Connect(function()
-				error(result, 0)
-				return
-			end)
-			event:Fire()
-		end
+		local moduleScript = utils.createModuleScript(decoded.script, decoded.instancePath)
+		utils.executeModule(moduleScript)
 
 		task.wait(0.1)
 

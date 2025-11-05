@@ -2,56 +2,71 @@
 
 Execute Luau code inside Roblox Studio and see output in your terminal.
 
-## What it does
+## Overview
 
-Run scripts in Roblox Studio from your command line. All Studio output (prints, warnings, errors) appears in your terminal with color coding.
-
-Uses WebSockets to communicate between the CLI and Studio. `rir3 once` is functionally identical to [run-in-roblox](https://github.com/rojo-rbx/run-in-roblox) and can serve as a drop-in replacement.
-
-## Plans
-File path + sourcemap reconciliation in execution for accurate stack traces
-Output timestamps + better output formatting
-Clickable output
-Output syncing (i.e. NexusSync)
-Cloud execution
+Run scripts in Roblox Studio from your command line. All Studio output (prints, warnings, errors) appears in your terminal with color coding. Uses WebSockets to communicate between the CLI and Studio.
 
 ## Usage
 
-### One-off execution
+### Once Mode (One-off execution)
 
-Run a script once (no setup needed):
+Execute a script once without any setup. Studio opens temporarily and closes after execution.
 
 ```bash
-rir3 once demo/hello.luau
+# Basic execution with temporary module
+rir3 once path/to/script.luau
+
+# Open a specific place file
+rir3 once path/to/script.luau --place path/to/place.rbxl
+
+# Use sourcemap for preserved stack traces
+rir3 once path/to/script.luau --place path/to/place.rbxl --sourcemap path/to/sourcemap.json
 ```
 
-Optionally specify a place file:
-```bash
-rir3 once demo/hello.luau demo/Place.rbxlx
-```
+**With sourcemap**: Finds the instance path for your script in the sourcemap, clones the actual ModuleScript from the place file, and executes it. This preserves the real instance path in error stack traces.
 
-### Persistent mode
+**Without sourcemap**: Sends the script source directly through WebSocket for execution in a temporary module.
 
-For running multiple scripts without restarting Studio:
+### Serve Mode (Persistent execution)
 
-1. Build the plugin (once):
+For running multiple scripts without restarting Studio. Requires one-time setup.
+
+**Setup** (first time only):
 ```bash
 rir3 build
 ```
 
-2. Start the server (terminal 1):
+**Start server** (terminal 1):
 ```bash
 rir3 serve
 ```
 
-3. Execute scripts (terminal 2):
+The serve command creates a server that routes execution requests to any running Studio instance.
+
+**Execute scripts** (terminal 2):
 ```bash
-rir3 exec demo/hello.luau
+# Basic execution
+rir3 exec path/to/script.luau
+
+# With sourcemap for preserved stack traces
+rir3 exec path/to/script.luau --sourcemap path/to/sourcemap.json
 ```
 
-## Writing scripts
+**With sourcemap**: Finds the instance path for your script in the sourcemap for output preservation, sends the source as a fallback if not found.
 
-Scripts have full access to Studio APIs:
+**Without sourcemap**: Sends the script source directly to the Studio instance for execution.
+
+## Features
+
+- **Color-coded output**: Prints, warnings, and errors are color-coded in your terminal
+- **Sourcemap support**: Preserve instance paths in stack traces using Rojo/Argon sourcemaps
+- **Instance cloning**: When using sourcemaps, clones actual ModuleScripts to maintain tree structure
+- **Graceful fallbacks**: Falls back to temporary modules if instance not found
+- **Full Studio API access**: Scripts have complete access to all Studio APIs
+
+## Writing Scripts
+
+Scripts execute with full access to Studio APIs:
 
 ```lua
 print("Hello from Studio!")
