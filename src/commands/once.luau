@@ -2,6 +2,7 @@
 
 local fs = require("@lune/fs")
 local net = require("@lune/net")
+local pathfs = require("@pkg/pathfs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
@@ -119,7 +120,7 @@ local function main(args: any)
 	local scriptContent = fs.readFile(config.script)
 	local executionId = uuid.generate()
 	local pluginPath = `{roblox.studioPluginPath()}/rir3-once.rbxmx`
-	local rojoProjectPath = _G.PESDE_ROOT .. "/plugins/once/plugin.project.json"
+	local rojoProjectPath = pathfs.absolute(_G.PESDE_ROOT .. "/plugins/once/plugin.project.json"):toString()
 
 	local placeToOpen = config.place
 	local tempPlacePath = nil
