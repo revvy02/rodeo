@@ -82,29 +82,77 @@ local function cleanupConnection()
 	currentExecutionId = nil
 end
 
-local function setupLogCapture()
+local function setupLogCapture(logFilter: any)
+	if not logFilter or not logFilter.enableLogs then
+		return
+	end
+
 	logConnection = LogService.MessageOut:Connect(function(body, messageType)
 		if not isConnected or not currentExecutionId then
 			return
 		end
 
+		local level = LOG_TYPE_TO_LEVEL[messageType] or "Info"
+
+		-- Filter based on log level
+		if level == "Warning" and not logFilter.enableWarn then
+			return
+		elseif level == "Error" and not logFilter.enableError then
+			return
+		elseif level == "Info" and not logFilter.enableInfo then
+			return
+		elseif level == "Print" and not logFilter.enableOutput then
+			return
+		end
+
 		sendMessage("output", currentExecutionId, {
-			level = LOG_TYPE_TO_LEVEL[messageType] or "Info",
+			level = level,
 			body = body,
 		})
 	end)
 end
 
-local function executeScript(script: string, executionId: string, instancePath: string?)
+local function executeScript(script: string, executionId: string, instancePath: string?, logFilter: any)
 	currentExecutionId = executionId
 
+	-- Clear previous log connection
+	if logConnection then
+		logConnection:Disconnect()
+		logConnection = nil
+	end
+
+	-- Setup log capture with filter
+	setupLogCapture(logFilter)
+
 	local moduleScript = utils.createModuleScript(script, instancePath)
-	utils.executeModule(moduleScript)
+	local success, result = utils.executeModule(moduleScript)
 
 	task.wait(0.1)
 
-	sendMessage("done", currentExecutionId)
+	-- Serialize result
+	local serializedResult = nil
+	if success and result ~= nil then
+		local serializeSuccess, encoded = pcall(function()
+			return HttpService:JSONEncode(result)
+		end)
+		if serializeSuccess then
+			serializedResult = encoded
+		else
+			-- Fallback to tostring for non-serializable types
+			serializedResult = tostring(result)
+		end
+	end
+
+	sendMessage("done", currentExecutionId, {
+		result = serializedResult,
+	})
 	currentExecutionId = nil
+
+	-- Cleanup log connection after execution
+	if logConnection then
+		logConnection:Disconnect()
+		logConnection = nil
+	end
 end
 
 local function connect()
@@ -143,13 +191,18 @@ local function connect()
 			isConnected = false
 		end)
 
-		setupLogCapture()
-
 		client.MessageReceived:Connect(function(message)
 			local decoded = HttpService:JSONDecode(message)
 
 			if decoded.type == "exec" then
-				executeScript(decoded.script, decoded.executionId, decoded.instancePath)
+				local logFilter = decoded.logFilter or {
+					enableWarn = true,
+					enableError = true,
+					enableInfo = true,
+					enableOutput = true,
+					enableLogs = true,
+				}
+				executeScript(decoded.script, decoded.executionId, decoded.instancePath, logFilter)
 			end
 		end)
 	end)

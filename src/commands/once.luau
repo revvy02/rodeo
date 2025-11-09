@@ -20,7 +20,15 @@ type Config = {
 	script: string,
 	place: string?,
 	sourcemap: string?,
-	ignorePattern: { string },
+	logFilter: LogFilter,
+}
+
+type LogFilter = {
+	enableWarn: boolean,
+	enableError: boolean,
+	enableInfo: boolean,
+	enableOutput: boolean,
+	enableLogs: boolean,
 }
 
 type OutputMessage = {
@@ -33,16 +41,25 @@ type OutputMessage = {
 type DoneMessage = {
 	type: "done",
 	executionId: string,
+	result: string?,
 }
 local CONNECTION_TIMEOUT = 60
 
 local function parseArguments(args: any): Config
 	-- Args are already parsed by the router, just convert to our Config type
+	local noLogs = args["no_logs"] or false
+
 	return {
 		script = args.script,
 		place = args.place,
 		sourcemap = args.sourcemap,
-		ignorePattern = args["ignore-pattern"] or args["ignore_pattern"] or {},
+		logFilter = {
+			enableWarn = not (args["no_warn"] or noLogs),
+			enableError = not (args["no_error"] or noLogs),
+			enableInfo = not (args["no_info"] or noLogs),
+			enableOutput = not (args["no_output"] or noLogs),
+			enableLogs = not noLogs,
+		},
 	}
 end
 
@@ -64,11 +81,12 @@ local function validateConfig(config: Config)
 	end
 end
 
-local function handlePluginConnection(ws: any, executionId: string, scriptContent: string, instancePath: string?, ignorePatterns: { string }, exitCodeRef: { value: number }): boolean
+local function handlePluginConnection(ws: any, executionId: string, scriptContent: string, instancePath: string?, logFilter: LogFilter, exitCodeRef: { value: number }): boolean
 	local message: any = {
 		type = "exec",
 		executionId = executionId,
 		script = scriptContent,
+		logFilter = logFilter,
 	}
 
 	if instancePath then
@@ -90,21 +108,13 @@ local function handlePluginConnection(ws: any, executionId: string, scriptConten
 			output.printColored(msg.body, COLORS[msg.level] or COLORS.Print)
 
 			if msg.level == "Error" then
-				-- Check if error matches any ignore pattern
-				local shouldIgnore = false
-				for _, pattern in ignorePatterns do
-					if string.match(msg.body, pattern) then
-						shouldIgnore = true
-						stdio.write(`[Ignored error by pattern: {pattern}]\n`)
-						break
-					end
-				end
-
-				if not shouldIgnore then
-					exitCodeRef.value = 1
-				end
+				exitCodeRef.value = 1
 			end
 		elseif decoded.type == "done" then
+			local msg = decoded :: DoneMessage
+			if msg.result then
+				stdio.write(msg.result .. "\n")
+			end
 			return true
 		end
 	end
@@ -159,7 +169,7 @@ local function main(args: any)
 	-- Start WebSocket server BEFORE launching Studio
 	local server = net.serve(constants.ONCE_PORT, {
 		handleWebSocket = function(ws)
-			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.ignorePattern or {}, exitCodeRef)
+			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.logFilter, exitCodeRef)
 		end,
 	})
 

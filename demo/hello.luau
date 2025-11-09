@@ -1,5 +1,10 @@
 print("Hello, world!")
-
+local n = 0
+game:GetService("LogService").MessageOut:Connect(function(a, b)
+	if string.find(a, "Stack Begin") then
+		n += 1
+	end
+end)
 for i = 1, 100 do
 	local choice = math.random(1, 4)
 
@@ -15,3 +20,7 @@ for i = 1, 100 do
 		end)
 	end
 end
+
+task.wait(1)
+
+return n

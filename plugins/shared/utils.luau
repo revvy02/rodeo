@@ -39,9 +39,10 @@ local function createModuleScript(script: string, instancePath: string?): Module
 	return moduleScript
 end
 
-local function executeModule(moduleScript: ModuleScript)
+local function executeModule(moduleScript: ModuleScript): (boolean, any)
 	local success, result = xpcall(function()
-		require(moduleScript)()
+		local fn = require(moduleScript)
+		return fn()
 	end, debug.traceback)
 	moduleScript:Destroy()
 
@@ -51,7 +52,10 @@ local function executeModule(moduleScript: ModuleScript)
 			error(result, 0)
 		end)
 		event:Fire()
+		return false, nil
 	end
+
+	return true, result
 end
 
 return {

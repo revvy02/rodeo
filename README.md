@@ -73,12 +73,67 @@ rir3 exec script.luau --edit 0
 
 Omit a flag to match any value. Use `1` to require it, `0` to exclude it.
 
+### Log Filtering
+
+Control which logs are shown in your terminal:
+
+```bash
+# Suppress warnings
+rir3 once script.luau --no-warn
+
+# Suppress errors (still sets exit code on error)
+rir3 exec script.luau --no-error
+
+# Suppress all output
+rir3 once script.luau --no-output
+
+# Suppress all logs entirely
+rir3 exec script.luau --no-logs
+```
+
+**Available flags:**
+- `--no-warn` - Hide warning messages
+- `--no-error` - Hide error messages
+- `--no-info` - Hide info messages
+- `--no-output` - Hide print output
+- `--no-logs` - Disable all log capture (most efficient)
+
+### Return Values
+
+Scripts can return values that will be printed to stdout:
+
+```bash
+# Capture return value
+result=$(rir3 once script.luau --no-logs)
+echo "Result: $result"
+```
+
+**Example script:**
+```lua
+-- Calculate and return a value
+local sum = 0
+for i = 1, 100 do
+    sum = sum + i
+end
+
+return { sum = sum, count = 100 }
+```
+
+**Output:**
+```
+{"sum":5050,"count":100}
+```
+
+Return values are JSON-encoded if possible, otherwise converted to string with `tostring()`.
+
 ## Features
 
 - **Color-coded output** - Prints, warnings, and errors appear in your terminal with colors
 - **Environment targeting** - Route executions to specific runtime contexts (edit/play, client/server)
+- **Log filtering** - Control which log levels are displayed
+- **Return values** - Capture script return values via stdout
 - **Sourcemap support** - Preserve stack traces using sourcemaps
-- **Full Studio API** - Scripts have complete access to all Studio APIs.
+- **Full Studio API** - Scripts have complete access to all Studio APIs
 
 ## Example Script
 

@@ -4,6 +4,7 @@ local fs = require("@lune/fs")
 local net = require("@lune/net")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
+local stdio = require("@lune/stdio")
 
 local COLORS = require("../utils/colors")
 local constants = require("../utils/constants")
@@ -16,6 +17,15 @@ type Config = {
 	sourcemap: string?,
 	filterBits: number,
 	filterMask: number,
+	logFilter: LogFilter,
+}
+
+type LogFilter = {
+	enableWarn: boolean,
+	enableError: boolean,
+	enableInfo: boolean,
+	enableOutput: boolean,
+	enableLogs: boolean,
 }
 
 local function parseContextFlags(args: any): (number, number)
@@ -49,12 +59,20 @@ end
 
 local function parseArguments(args: any): Config
 	local filterBits, filterMask = parseContextFlags(args)
+	local noLogs = args["no_logs"] or false
 
 	return {
 		script = args.script,
 		sourcemap = args.sourcemap,
 		filterBits = filterBits,
 		filterMask = filterMask,
+		logFilter = {
+			enableWarn = not (args["no_warn"] or noLogs),
+			enableError = not (args["no_error"] or noLogs),
+			enableInfo = not (args["no_info"] or noLogs),
+			enableOutput = not (args["no_output"] or noLogs),
+			enableLogs = not noLogs,
+		},
 	}
 end
 
@@ -86,13 +104,22 @@ local function identifyClient(ws: any)
 	}))
 end
 
-local function submitScript(ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number)
+local function submitScript(
+	ws: any,
+	executionId: string,
+	script: string,
+	instancePath: string?,
+	filterBits: number,
+	filterMask: number,
+	logFilter: LogFilter
+)
 	local message: any = {
 		type = "submit",
 		script = script,
 		executionId = executionId,
 		filterBits = filterBits,
 		filterMask = filterMask,
+		logFilter = logFilter,
 	}
 
 	if instancePath then
@@ -115,6 +142,9 @@ local function handleMessage(decoded: any, exitCodeRef: { value: number }): bool
 			exitCodeRef.value = 1
 		end
 	elseif decoded.type == "done" then
+		if decoded.result then
+			stdio.write(decoded.result .. "\n")
+		end
 		return true
 	elseif decoded.type == "disconnect" then
 		output.printError("Studio disconnected")
@@ -155,7 +185,7 @@ local function main(args: any)
 
 	local ws = connectToServer(constants.SERVE_PORT)
 	identifyClient(ws)
-	submitScript(ws, executionId, scriptContent, instancePath, config.filterBits, config.filterMask)
+	submitScript(ws, executionId, scriptContent, instancePath, config.filterBits, config.filterMask, config.logFilter)
 
 	while true do
 		local message = ws:next()

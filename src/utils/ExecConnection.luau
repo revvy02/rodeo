@@ -1,3 +1,11 @@
+export type LogFilter = {
+	enableWarn: boolean,
+	enableError: boolean,
+	enableInfo: boolean,
+	enableOutput: boolean,
+	enableLogs: boolean,
+}
+
 export type ExecConnection = {
 	ws: any,
 	executionId: string,
@@ -5,9 +13,18 @@ export type ExecConnection = {
 	instancePath: string?,
 	filterBits: number,
 	filterMask: number,
+	logFilter: LogFilter,
 	queuedAt: number,
 
-	new: (ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number) -> ExecConnection,
+	new: (
+		ws: any,
+		executionId: string,
+		script: string,
+		instancePath: string?,
+		filterBits: number,
+		filterMask: number,
+		logFilter: LogFilter
+	) -> ExecConnection,
 	send: (self: ExecConnection, data: string) -> (),
 	close: (self: ExecConnection) -> (),
 }
@@ -15,7 +32,15 @@ export type ExecConnection = {
 local ExecConnection = {}
 ExecConnection.__index = ExecConnection
 
-function ExecConnection.new(ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number): ExecConnection
+function ExecConnection.new(
+	ws: any,
+	executionId: string,
+	script: string,
+	instancePath: string?,
+	filterBits: number,
+	filterMask: number,
+	logFilter: LogFilter
+): ExecConnection
 	local self = setmetatable({}, ExecConnection)
 	self.ws = ws
 	self.executionId = executionId
@@ -23,6 +48,7 @@ function ExecConnection.new(ws: any, executionId: string, script: string, instan
 	self.instancePath = instancePath
 	self.filterBits = filterBits
 	self.filterMask = filterMask
+	self.logFilter = logFilter
 	self.queuedAt = os.time()
 	return (self :: any) :: ExecConnection
 end
