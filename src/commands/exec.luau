@@ -15,6 +15,7 @@ local uuid = require("../utils/uuid")
 type Config = {
 	script: string,
 	sourcemap: string?,
+	output: string?,
 	filterBits: number,
 	filterMask: number,
 	logFilter: LogFilter,
@@ -64,6 +65,7 @@ local function parseArguments(args: any): Config
 	return {
 		script = args.script,
 		sourcemap = args.sourcemap,
+		output = args.output,
 		filterBits = filterBits,
 		filterMask = filterMask,
 		logFilter = {
@@ -104,15 +106,7 @@ local function identifyClient(ws: any)
 	}))
 end
 
-local function submitScript(
-	ws: any,
-	executionId: string,
-	script: string,
-	instancePath: string?,
-	filterBits: number,
-	filterMask: number,
-	logFilter: LogFilter
-)
+local function submitScript(ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number, logFilter: LogFilter)
 	local message: any = {
 		type = "submit",
 		script = script,
@@ -129,7 +123,7 @@ local function submitScript(
 	ws:send(serde.encode("json", message))
 end
 
-local function handleMessage(decoded: any, exitCodeRef: { value: number }): boolean
+local function handleMessage(decoded: any, exitCodeRef: { value: number }, outputPath: string?): boolean
 	if decoded.type == "queued" then
 		if decoded.waiting then
 			output.printColored(`Waiting: {decoded.waiting}`, COLORS.Info)
@@ -143,7 +137,12 @@ local function handleMessage(decoded: any, exitCodeRef: { value: number }): bool
 		end
 	elseif decoded.type == "done" then
 		if decoded.result then
-			stdio.write(decoded.result .. "\n")
+			if outputPath then
+				fs.writeFile(outputPath, decoded.result)
+			else
+				stdio.write(decoded.result)
+				stdio.write("\n")
+			end
 		end
 		return true
 	elseif decoded.type == "disconnect" then
@@ -194,7 +193,7 @@ local function main(args: any)
 		end
 
 		local decoded = serde.decode("json", message)
-		local isDone = handleMessage(decoded, exitCodeRef)
+		local isDone = handleMessage(decoded, exitCodeRef, config.output)
 
 		if isDone then
 			ws:close()

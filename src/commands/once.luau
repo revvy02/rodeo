@@ -20,6 +20,7 @@ type Config = {
 	script: string,
 	place: string?,
 	sourcemap: string?,
+	output: string?,
 	logFilter: LogFilter,
 }
 
@@ -53,6 +54,7 @@ local function parseArguments(args: any): Config
 		script = args.script,
 		place = args.place,
 		sourcemap = args.sourcemap,
+		output = args.output,
 		logFilter = {
 			enableWarn = not (args["no_warn"] or noLogs),
 			enableError = not (args["no_error"] or noLogs),
@@ -81,7 +83,7 @@ local function validateConfig(config: Config)
 	end
 end
 
-local function handlePluginConnection(ws: any, executionId: string, scriptContent: string, instancePath: string?, logFilter: LogFilter, exitCodeRef: { value: number }): boolean
+local function handlePluginConnection(ws: any, executionId: string, scriptContent: string, instancePath: string?, logFilter: LogFilter, exitCodeRef: { value: number }, outputPath: string?): boolean
 	local message: any = {
 		type = "exec",
 		executionId = executionId,
@@ -113,7 +115,12 @@ local function handlePluginConnection(ws: any, executionId: string, scriptConten
 		elseif decoded.type == "done" then
 			local msg = decoded :: DoneMessage
 			if msg.result then
-				stdio.write(msg.result .. "\n")
+				if outputPath then
+					fs.writeFile(outputPath, msg.result)
+				else
+					stdio.write(msg.result)
+					stdio.write("\n")
+				end
 			end
 			return true
 		end
@@ -169,7 +176,7 @@ local function main(args: any)
 	-- Start WebSocket server BEFORE launching Studio
 	local server = net.serve(constants.ONCE_PORT, {
 		handleWebSocket = function(ws)
-			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.logFilter, exitCodeRef)
+			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.logFilter, exitCodeRef, config.output)
 		end,
 	})
 
