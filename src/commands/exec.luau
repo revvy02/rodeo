@@ -6,27 +6,20 @@ local process = require("@lune/process")
 local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 
-local COLORS = require("../utils/colors")
+local colors = require("../utils/colors")
 local constants = require("../utils/constants")
-local output = require("../utils/output")
-local sourcemap = require("../utils/sourcemap")
+local execution = require("../utils/execution")
 local uuid = require("../utils/uuid")
 
 type Config = {
-	script: string,
+	scriptPath: string?,
+	scriptSource: string?,
 	sourcemap: string?,
-	output: string?,
+	outputFile: string?,
+	returnFile: string?,
 	filterBits: number,
 	filterMask: number,
-	logFilter: LogFilter,
-}
-
-type LogFilter = {
-	enableWarn: boolean,
-	enableError: boolean,
-	enableInfo: boolean,
-	enableOutput: boolean,
-	enableLogs: boolean,
+	logFilter: execution.LogFilter,
 }
 
 local function parseContextFlags(args: any): (number, number)
@@ -60,27 +53,48 @@ end
 
 local function parseArguments(args: any): Config
 	local filterBits, filterMask = parseContextFlags(args)
-	local noLogs = args["no_logs"] or false
+
+	-- Determine script source: --source flag, stdin (-), or file path
+	local scriptPath = nil
+	local scriptSource = args.source
+
+	if args.script then
+		if args.script == "-" then
+			-- Read from stdin
+			scriptSource = stdio.readToEnd()
+		else
+			-- File path
+			scriptPath = args.script
+		end
+	end
 
 	return {
-		script = args.script,
+		scriptPath = scriptPath,
+		scriptSource = scriptSource,
 		sourcemap = args.sourcemap,
-		output = args.output,
+		outputFile = args.output,
+		returnFile = args["return"],
 		filterBits = filterBits,
 		filterMask = filterMask,
-		logFilter = {
-			enableWarn = not (args["no_warn"] or noLogs),
-			enableError = not (args["no_error"] or noLogs),
-			enableInfo = not (args["no_info"] or noLogs),
-			enableOutput = not (args["no_output"] or noLogs),
-			enableLogs = not noLogs,
-		},
+		logFilter = execution.buildLogFilter(args),
 	}
 end
 
 local function validateConfig(config: Config)
-	if not fs.isFile(config.script) then
-		output.printError(`Script file not found: {config.script}`)
+	-- Validate that exactly one script source is provided
+	if not config.scriptPath and not config.scriptSource then
+		stdio.write(colors.error("Error: No script source provided. Use a file path, '-' for stdin, or --source for inline execution") .. "\n")
+		process.exit(1)
+	end
+
+	if config.scriptPath and config.scriptSource then
+		stdio.write(colors.error("Error: Cannot specify both a script file and --source flag") .. "\n")
+		process.exit(1)
+	end
+
+	-- Validate script file exists if using file path
+	if config.scriptPath and not fs.isFile(config.scriptPath) then
+		stdio.write(colors.error(`Error: Script file not found: {config.scriptPath}`) .. "\n")
 		process.exit(1)
 	end
 end
@@ -123,30 +137,27 @@ local function submitScript(ws: any, executionId: string, script: string, instan
 	ws:send(serde.encode("json", message))
 end
 
-local function handleMessage(decoded: any, exitCodeRef: { value: number }, outputPath: string?): boolean
+local function handleMessage(decoded: any, exitCodeRef: { value: number }, outputFile: string?, returnFile: string?): boolean
 	if decoded.type == "queued" then
 		if decoded.waiting then
-			output.printColored(`Waiting: {decoded.waiting}`, COLORS.Info)
+			stdio.write(colors.cyan(`Waiting: {decoded.waiting}`) .. "\n")
 		elseif decoded.matches then
 			-- Queued successfully to matching studios
 		end
 	elseif decoded.type == "output" then
-		output.printColored(decoded.body, COLORS[decoded.level] or COLORS.Print)
+		local colorFn = colors.levelColors[decoded.level] or function(s) return s end
+		local coloredOutput = colorFn(decoded.body) .. "\n"
+		execution.writeExecutionOutput(coloredOutput, outputFile)
 		if decoded.level == "Error" then
 			exitCodeRef.value = 1
 		end
 	elseif decoded.type == "done" then
 		if decoded.result then
-			if outputPath then
-				fs.writeFile(outputPath, decoded.result)
-			else
-				stdio.write(decoded.result)
-				stdio.write("\n")
-			end
+			execution.writeExecutionResult(decoded.result, returnFile)
 		end
 		return true
 	elseif decoded.type == "disconnect" then
-		output.printError("Studio disconnected")
+		stdio.write(colors.error("Error: Studio disconnected") .. "\n")
 		exitCodeRef.value = 2
 		return true
 	end
@@ -159,26 +170,12 @@ local function main(args: any)
 	validateConfig(config)
 
 	if not checkServerHealth(constants.SERVE_PORT) then
-		output.printError(`No rir3 server found on port {constants.SERVE_PORT}. Run 'rir3 serve' first.`)
+		stdio.write(colors.error(`Error: No rir3 server found on port {constants.SERVE_PORT}. Run 'rir3 serve' first.`) .. "\n")
 		process.exit(1)
 	end
 
-	local instancePath: string? = nil
-	if config.sourcemap then
-		local map, err = sourcemap.loadSourcemap(config.sourcemap)
-		if not map then
-			output.printError(err or "Failed to load sourcemap")
-			process.exit(1)
-		end
-
-		instancePath = sourcemap.findInstancePath(map, config.script)
-		if not instancePath then
-			output.printWarning(`Script not found in sourcemap: {config.script}`)
-			output.printInfo("Falling back to temporary module execution")
-		end
-	end
-
-	local scriptContent = fs.readFile(config.script)
+	local instancePath = execution.resolveInstancePath(config.sourcemap, config.scriptPath)
+	local scriptContent = execution.readScriptContent(config.scriptPath, config.scriptSource)
 	local executionId = uuid.generate()
 	local exitCodeRef = { value = 0 }
 
@@ -193,7 +190,7 @@ local function main(args: any)
 		end
 
 		local decoded = serde.decode("json", message)
-		local isDone = handleMessage(decoded, exitCodeRef, config.output)
+		local isDone = handleMessage(decoded, exitCodeRef, config.outputFile, config.returnFile)
 
 		if isDone then
 			ws:close()

@@ -1,6 +1,8 @@
 local fs = require("@lune/fs")
-local output = require("./output")
 local process = require("@lune/process")
+local stdio = require("@lune/stdio")
+
+local colors = require("./colors")
 
 local function buildWithRojo(rojoProjectPath: string, outputPath: string): boolean
 	local result = process.exec("rojo", {
@@ -11,7 +13,7 @@ local function buildWithRojo(rojoProjectPath: string, outputPath: string): boole
 	})
 
 	if not result.ok then
-		output.printError(`Failed to build plugin:\n{result.stderr}`)
+		stdio.write(colors.error(`Error: Failed to build plugin:\n{result.stderr}`) .. "\n")
 		return false
 	end
 

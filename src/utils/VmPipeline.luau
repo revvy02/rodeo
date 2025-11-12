@@ -1,7 +1,7 @@
 local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 
-local COLORS = require("./colors")
+local colors = require("./colors")
 local ExecConnection = require("./ExecConnection")
 local StudioConnection = require("./StudioConnection")
 local output = require("./output")
@@ -110,7 +110,7 @@ function VmPipeline:forwardOutput(executionId: string, message: string)
 end
 
 function VmPipeline:disconnect()
-	stdio.write(`{COLORS.Grey}VM disconnected: [id:{COLORS.Reset} {self.studioId}{COLORS.Grey}] [{COLORS.Reset}{output.formatBitset(self.bitset)}{COLORS.Grey}]{COLORS.Reset}\n`)
+	stdio.write(`{colors.grey('VM disconnected: [id:')} {self.studioId}{colors.grey('] [')} {output.formatBitset(self.bitset)}{colors.grey(']')}\n`)
 
 	self.studio:close()
 

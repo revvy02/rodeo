@@ -1,28 +1,7 @@
--- Output utilities for colored terminal printing
+-- Output utilities for formatted terminal printing
 
-local COLORS = require("./colors")
+local chalk = require("@pkg/chalk_luau")
 local constants = require("./constants")
-local stdio = require("@lune/stdio")
-
-local function printColored(message: string, color: string?)
-	if color then
-		stdio.write(`{color}{message}{COLORS.Reset}\n`)
-	else
-		stdio.write(`{message}\n`)
-	end
-end
-
-local function printError(message: string)
-	printColored(`Error: {message}`, COLORS.Error)
-end
-
-local function printWarning(message: string)
-	printColored(`Warning: {message}`, COLORS.Warning)
-end
-
-local function printInfo(message: string)
-	printColored(message, COLORS.Info)
-end
 
 local function formatBitset(bitsetValue: number, filterMask: number?): string
 	local parts = {}
@@ -40,9 +19,9 @@ local function formatBitset(bitsetValue: number, filterMask: number?): string
 
 		-- Only include if no filter mask, or if filter mask includes this bit
 		if not filterMask or bit32.band(filterMask, bitMask) ~= 0 then
-			local valueColor = isSet and COLORS.Green or COLORS.Red
+			local colorFn = isSet and chalk.green or chalk.red
 			local bitValue = isSet and "1" or "0"
-			table.insert(parts, `{COLORS.Grey}{context.name}:{COLORS.Reset} {valueColor}{bitValue}{COLORS.Reset}`)
+			table.insert(parts, chalk.grey(context.name .. ':') .. ' ' .. colorFn(bitValue))
 		end
 	end
 
@@ -60,8 +39,8 @@ local function formatBitsetShort(bitset: number): string
 
 	local parts = {}
 	for _, bit in ipairs(bits) do
-		local color = bit == 1 and COLORS.Green or COLORS.Red
-		table.insert(parts, `{color}{bit}{COLORS.Reset}`)
+		local colorFn = bit == 1 and chalk.green or chalk.red
+		table.insert(parts, colorFn(tostring(bit)))
 	end
 
 	return table.concat(parts, "")
@@ -73,17 +52,13 @@ local function formatShortLog(studioId: string, bitset: number, executionId: str
 
 	if executionId then
 		local execShort = executionId:sub(6, 13) -- Skip "rir3-" prefix
-		return `{COLORS.Grey}[id:{COLORS.Reset} {shortId}{COLORS.Grey}] [{COLORS.Reset}{bitsetShort}{COLORS.Grey}]{COLORS.Reset} {execShort}`
+		return chalk.grey('[id:') .. ' ' .. shortId .. chalk.grey('] [') .. bitsetShort .. chalk.grey(']') .. ' ' .. execShort
 	else
-		return `{COLORS.Grey}[id:{COLORS.Reset} {shortId}{COLORS.Grey}] [{COLORS.Reset}{bitsetShort}{COLORS.Grey}]{COLORS.Reset}`
+		return chalk.grey('[id:') .. ' ' .. shortId .. chalk.grey('] [') .. bitsetShort .. chalk.grey(']')
 	end
 end
 
 return {
-	printColored = printColored,
-	printError = printError,
-	printWarning = printWarning,
-	printInfo = printInfo,
 	formatBitset = formatBitset,
 	formatBitsetShort = formatBitsetShort,
 	formatShortLog = formatShortLog,

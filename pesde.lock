@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 format = 2
 name = "rvy/rir3"
-version = "0.0.4-rc.4"
+version = "0.0.4-rc.16"
 target = "lune"
 
 [graph."0x5eal/unzip@0.2.0 luau".pkg_ref]
@@ -74,6 +74,17 @@ index_url = "https://github.com/pesde-pkg/index"
 frktest = [{ name = "itsfrank/frktest", version = "^0.0.4", index = "https://github.com/pesde-pkg/index", target = "luau" }, "dev"]
 greentea = [{ name = "jiwonz/greentea_luau", version = "^0.2.0", index = "https://github.com/pesde-pkg/index", target = "luau" }, "standard"]
 luau_path = [{ name = "jiwonz/luau_path", version = "^0.2.0", index = "https://github.com/pesde-pkg/index", target = "luau" }, "standard"]
+
+[graph."kimpure/chalk_luau@0.1.8 lune"]
+direct = ["chalk_luau", { name = "kimpure/chalk_luau", version = "^0.1.8", index = "default" }, "standard"]
+
+[graph."kimpure/chalk_luau@0.1.8 lune".pkg_ref]
+ref_ty = "pesde"
+index_url = "https://github.com/pesde-pkg/index"
+
+[graph."kimpure/chalk_luau@0.1.8 lune".pkg_ref.dependencies]
+darklua = [{ name = "pesde/darklua", version = "^0.16.0", index = "https://github.com/pesde-pkg/index", target = "lune" }, "dev"]
+multitarget = [{ name = "jiwonz/multitarget", version = "^0.4.0-rc.30", index = "https://github.com/pesde-pkg/index", target = "lune" }, "dev"]
 
 [graph."lukadev_0/option@1.2.1 lune".pkg_ref]
 ref_ty = "pesde"

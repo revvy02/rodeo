@@ -1,5 +1,5 @@
 name = "rvy/rir3"
-version = "0.0.4-rc.16"
+version = "0.0.4-rc.17"
 description = "sync studio output to cli and also allow studio code execution from cli"
 authors = ["rvy"]
 license = "MIT"
@@ -32,3 +32,4 @@ rojo = { name = "pesde/rojo", version = "^7.5.1", target = "lune" }
 [dependencies]
 argparse = { name = "caveful_games/argparse", version = "^0.1.2", target = "lune" }
 pathfs = { name = "jiwonz/pathfs", version = "^0.6.0" }
+chalk_luau = { name = "kimpure/chalk_luau", version = "^0.1.8" }

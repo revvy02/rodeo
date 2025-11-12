@@ -3,8 +3,9 @@
 local net = require("@lune/net")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
+local stdio = require("@lune/stdio")
 
-local COLORS = require("../utils/colors")
+local colors = require("../utils/colors")
 local constants = require("../utils/constants")
 local output = require("../utils/output")
 
@@ -29,24 +30,24 @@ local function checkServerStatus(port: number): (boolean, any?)
 end
 
 local function formatStatus(healthData: any)
-	output.printColored("rir3 serve is running", COLORS.Green)
-	output.printInfo(`Port: {constants.SERVE_PORT}`)
-	output.printInfo(`Total VMs: {healthData.totalVms}`)
-	output.printInfo(`Total Queued: {healthData.totalQueued}`)
-	output.printInfo(`Context Groups: {healthData.contextCount}`)
+	stdio.write(colors.success("rir3 serve is running") .. "\n")
+	stdio.write(colors.cyan(`Port: {constants.SERVE_PORT}`) .. "\n")
+	stdio.write(colors.cyan(`Total VMs: {healthData.totalVms}`) .. "\n")
+	stdio.write(colors.cyan(`Total Queued: {healthData.totalQueued}`) .. "\n")
+	stdio.write(colors.cyan(`Context Groups: {healthData.contextCount}`) .. "\n")
 
 	if healthData.contextCount > 0 then
 		print("")
-		output.printInfo("Connected Studios:")
+		stdio.write(colors.cyan("Connected Studios:") .. "\n")
 		for _, context in ipairs(healthData.contexts) do
 			local bitsetFormatted = output.formatBitsetShort(context.bitset)
-			output.printColored(`  Context [{bitsetFormatted}]: {context.vmCount} VM(s), {context.totalQueued} queued`, COLORS.Grey)
+			stdio.write(colors.grey(`  Context [{bitsetFormatted}]: {context.vmCount} VM(s), {context.totalQueued} queued`) .. "\n")
 
 			for _, vm in ipairs(context.vms) do
 				local studioIdShort = vm.studioId:sub(1, 8)
 				local idleStatus = vm.isIdle and "idle" or "busy"
-				local idleColor = vm.isIdle and COLORS.Green or COLORS.Yellow
-				output.printColored(`    - {studioIdShort}: {vm.queueLength} in queue, {idleColor}{idleStatus}{COLORS.Reset}`, COLORS.Grey)
+				local idleColorFn = vm.isIdle and colors.success or colors.warning
+				stdio.write(`{colors.grey(`    - {studioIdShort}: {vm.queueLength} in queue, `)}{idleColorFn(idleStatus)}\n`)
 			end
 		end
 	end
@@ -56,7 +57,7 @@ local function main(args: any)
 	local isRunning, healthData = checkServerStatus(constants.SERVE_PORT)
 
 	if not isRunning then
-		output.printError(`rir3 serve is not running on port {constants.SERVE_PORT}`)
+		stdio.write(colors.error(`Error: rir3 serve is not running on port {constants.SERVE_PORT}`) .. "\n")
 		process.exit(1)
 	end
 

@@ -1,15 +1,26 @@
--- Terminal color constants using ANSI escape codes
+-- Centralized color definitions for consistent styling across the codebase
+local chalk = require("@pkg/chalk_luau")
 
-local COLORS = {
-	Print = "",
-	Info = "\27[36m", -- Cyan
-	Warning = "\27[33m", -- Yellow
-	Error = "\27[31m", -- Red
-	Success = "\27[32m", -- Green
-	Green = "\27[32m", -- Green
-	Red = "\27[31m", -- Red
-	Grey = "\27[90m", -- Grey/Dim
-	Reset = "\27[0m",
+-- Define custom colors using RGB for better saturation/control
+local ERROR_RED = chalk.rgb(200, 0, 0) -- Deep saturated red
+local WARNING_ORANGE = chalk.rgb(255, 140, 0) -- Orange color for warnings
+
+-- Export color functions with appropriate modifiers
+local colors = {
+	error = (chalk.bold .. ERROR_RED),
+	warning = (chalk.bold .. WARNING_ORANGE),
+	info = chalk.cyan,
+	success = chalk.green,
+	grey = chalk.grey,
+	cyan = chalk.cyan,
 }
 
-return COLORS
+-- Output level color mapping for execution results
+colors.levelColors = {
+	Print = function(s) return s end,
+	Info = colors.info,
+	Warning = colors.warning,
+	Error = colors.error,
+}
+
+return colors

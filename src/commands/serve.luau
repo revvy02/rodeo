@@ -5,7 +5,7 @@ local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 local task = require("@lune/task")
 
-local COLORS = require("../utils/colors")
+local colors = require("../utils/colors")
 local ExecConnection = require("../utils/ExecConnection")
 local StudioConnection = require("../utils/StudioConnection")
 local VmPipeline = require("../utils/VmPipeline")
@@ -99,7 +99,7 @@ local function processPendingExecutions()
 			table.remove(pendingExecutions, i)
 			local bestVm = selectBestVmPipeline(matchingVms)
 			if bestVm then
-				stdio.write(`{COLORS.Success}Processing pending execution:{COLORS.Reset} {exec.executionId}\n`)
+				stdio.write(colors.success(`Processing pending execution: {exec.executionId}`) .. "\n")
 				bestVm.pipeline:enqueue(exec)
 			end
 		else
@@ -121,7 +121,7 @@ local function handleExecClient(ws: any)
 		if not success then
 			-- Connection reset or closed unexpectedly
 			if clientExecutionId then
-				stdio.write(`{COLORS.Grey}Execution cancelled: {clientExecutionId}{COLORS.Reset}\n`)
+				stdio.write(colors.grey(`Execution cancelled: {clientExecutionId}`) .. "\n")
 			end
 			break
 		end
@@ -186,7 +186,7 @@ local function handleStudioClient(ws: any, vmBitset: number)
 	end
 	pipelines[vmBitset][studioId] = vmPipeline
 
-	stdio.write(`VM connected: {COLORS.Grey}[id:{COLORS.Reset} {studioId}{COLORS.Grey}] [{COLORS.Reset}{output.formatBitset(vmBitset)}{COLORS.Grey}]{COLORS.Reset}\n`)
+	stdio.write(`VM connected: {colors.grey('[id:')} {studioId}{colors.grey('] [')} {output.formatBitset(vmBitset)}{colors.grey(']')}\n`)
 
 	-- Process any pending executions that might match this new VM
 	processPendingExecutions()
@@ -222,8 +222,8 @@ local function handleStudioClient(ws: any, vmBitset: number)
 end
 
 local function main(_args: any)
-	output.printColored(`Starting server on port {constants.SERVE_PORT}`, COLORS.Info)
-	output.printColored(`Waiting for Studio plugin to connect...`, COLORS.Info)
+	stdio.write(colors.cyan(`Starting server on port {constants.SERVE_PORT}`) .. "\n")
+	stdio.write(colors.cyan(`Waiting for Studio plugin to connect...`) .. "\n")
 
 	local _server = net.serve(constants.SERVE_PORT, {
 		handleRequest = function(request)
