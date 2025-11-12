@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 format = 2
 name = "rvy/rir3"
-version = "0.0.4-rc.16"
+version = "0.0.4-rc.19"
 target = "lune"
 
 [graph."0x5eal/unzip@0.2.0 luau".pkg_ref]
@@ -76,7 +76,7 @@ greentea = [{ name = "jiwonz/greentea_luau", version = "^0.2.0", index = "https:
 luau_path = [{ name = "jiwonz/luau_path", version = "^0.2.0", index = "https://github.com/pesde-pkg/index", target = "luau" }, "standard"]
 
 [graph."kimpure/chalk_luau@0.1.8 lune"]
-direct = ["chalk_luau", { name = "kimpure/chalk_luau", version = "^0.1.8", index = "default" }, "standard"]
+direct = ["chalk", { name = "kimpure/chalk_luau", version = "^0.1.8", index = "default" }, "standard"]
 
 [graph."kimpure/chalk_luau@0.1.8 lune".pkg_ref]
 ref_ty = "pesde"

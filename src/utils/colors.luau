@@ -1,5 +1,5 @@
 -- Centralized color definitions for consistent styling across the codebase
-local chalk = require("@pkg/chalk_luau")
+local chalk = require("@pkg/chalk")
 
 -- Define custom colors using RGB for better saturation/control
 local ERROR_RED = chalk.rgb(200, 0, 0) -- Deep saturated red
@@ -17,7 +17,9 @@ local colors = {
 
 -- Output level color mapping for execution results
 colors.levelColors = {
-	Print = function(s) return s end,
+	Print = function(s)
+		return s
+	end,
 	Info = colors.info,
 	Warning = colors.warning,
 	Error = colors.error,

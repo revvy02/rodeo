@@ -1,6 +1,6 @@
 -- Output utilities for formatted terminal printing
 
-local chalk = require("@pkg/chalk_luau")
+local chalk = require("@pkg/chalk")
 local constants = require("./constants")
 
 local function formatBitset(bitsetValue: number, filterMask: number?): string
@@ -21,7 +21,7 @@ local function formatBitset(bitsetValue: number, filterMask: number?): string
 		if not filterMask or bit32.band(filterMask, bitMask) ~= 0 then
 			local colorFn = isSet and chalk.green or chalk.red
 			local bitValue = isSet and "1" or "0"
-			table.insert(parts, chalk.grey(context.name .. ':') .. ' ' .. colorFn(bitValue))
+			table.insert(parts, chalk.grey(context.name .. ":") .. " " .. colorFn(bitValue))
 		end
 	end
 
@@ -52,9 +52,9 @@ local function formatShortLog(studioId: string, bitset: number, executionId: str
 
 	if executionId then
 		local execShort = executionId:sub(6, 13) -- Skip "rir3-" prefix
-		return chalk.grey('[id:') .. ' ' .. shortId .. chalk.grey('] [') .. bitsetShort .. chalk.grey(']') .. ' ' .. execShort
+		return chalk.grey("[id:") .. " " .. shortId .. chalk.grey("] [") .. bitsetShort .. chalk.grey("]") .. " " .. execShort
 	else
-		return chalk.grey('[id:') .. ' ' .. shortId .. chalk.grey('] [') .. bitsetShort .. chalk.grey(']')
+		return chalk.grey("[id:") .. " " .. shortId .. chalk.grey("] [") .. bitsetShort .. chalk.grey("]")
 	end
 end
 
