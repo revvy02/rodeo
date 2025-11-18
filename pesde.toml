@@ -1,5 +1,5 @@
 name = "rvy/rir3"
-version = "0.1.0"
+version = "0.1.1"
 description = "sync studio output to cli and also allow studio code execution from cli"
 authors = ["rvy"]
 license = "MIT"

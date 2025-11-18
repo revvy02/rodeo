@@ -14,6 +14,7 @@ export type ExecConnection = {
 	filterBits: number,
 	filterMask: number,
 	logFilter: LogFilter,
+	cacheRequires: boolean?,
 	queuedAt: number,
 
 	new: (
@@ -23,7 +24,8 @@ export type ExecConnection = {
 		instancePath: string?,
 		filterBits: number,
 		filterMask: number,
-		logFilter: LogFilter
+		logFilter: LogFilter,
+		cacheRequires: boolean?
 	) -> ExecConnection,
 	send: (self: ExecConnection, data: string) -> (),
 	close: (self: ExecConnection) -> (),
@@ -39,7 +41,8 @@ function ExecConnection.new(
 	instancePath: string?,
 	filterBits: number,
 	filterMask: number,
-	logFilter: LogFilter
+	logFilter: LogFilter,
+	cacheRequires: boolean?
 ): ExecConnection
 	local self = setmetatable({}, ExecConnection)
 	self.ws = ws
@@ -49,6 +52,7 @@ function ExecConnection.new(
 	self.filterBits = filterBits
 	self.filterMask = filterMask
 	self.logFilter = logFilter
+	self.cacheRequires = cacheRequires
 	self.queuedAt = os.time()
 	return (self :: any) :: ExecConnection
 end

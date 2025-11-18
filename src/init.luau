@@ -19,6 +19,7 @@ local function main()
 	onceCmd:flag("--no-info", "Disable info output")
 	onceCmd:flag("--no-output", "Disable print output")
 	onceCmd:flag("--no-logs", "Disable all log output")
+	onceCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
 
 	-- Define serve command
 	parser:command("serve", "Start persistent server for code execution")
@@ -41,6 +42,7 @@ local function main()
 	execCmd:flag("--no-info", "Disable info output")
 	execCmd:flag("--no-output", "Disable print output")
 	execCmd:flag("--no-logs", "Disable all log output")
+	execCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
 
 	-- Define build command
 	parser:command("build", "Build and install the serve plugin")

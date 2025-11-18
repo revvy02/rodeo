@@ -63,6 +63,7 @@ local function processQueue(self: VmPipeline)
 		executionId = exec.executionId,
 		script = exec.script,
 		logFilter = exec.logFilter,
+		cacheRequires = exec.cacheRequires,
 	}
 
 	if exec.instancePath then

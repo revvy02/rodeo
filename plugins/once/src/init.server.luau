@@ -89,7 +89,11 @@ client.MessageReceived:Connect(function(message)
 		local moduleScript = utils.createModuleScript(decoded.script, decoded.instancePath)
 
 		-- Setup uncachable require traversal (clones and renames modules)
-		local cleanup = reloader.setupUncachableRequireModuleTraversal(moduleScript)
+		-- Skip if --cache-requires flag is set for better performance
+		local cleanup = nil
+		if not decoded.cacheRequires then
+			cleanup = reloader.setupUncachableRequireModuleTraversal(moduleScript)
+		end
 
 		-- Execute the module
 		local success, result = utils.executeModule(moduleScript)
@@ -97,7 +101,9 @@ client.MessageReceived:Connect(function(message)
 		task.wait(0.1)
 
 		-- Cleanup: restore original names and destroy clones
-		cleanup()
+		if cleanup then
+			cleanup()
+		end
 
 		-- Serialize result
 		local serializedResult = nil

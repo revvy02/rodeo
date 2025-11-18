@@ -113,7 +113,7 @@ local function setupLogCapture(logFilter: any)
 	end)
 end
 
-local function executeScript(script: string, executionId: string, instancePath: string?, logFilter: any)
+local function executeScript(script: string, executionId: string, instancePath: string?, logFilter: any, cacheRequires: boolean?)
 	currentExecutionId = executionId
 
 	-- Clear previous log connection
@@ -128,7 +128,11 @@ local function executeScript(script: string, executionId: string, instancePath: 
 	local moduleScript = utils.createModuleScript(script, instancePath)
 
 	-- Setup uncachable require traversal (clones and renames modules)
-	local cleanup = reloader.setupUncachableRequireModuleTraversal(moduleScript)
+	-- Skip if --cache-requires flag is set for better performance
+	local cleanup = nil
+	if not cacheRequires then
+		cleanup = reloader.setupUncachableRequireModuleTraversal(moduleScript)
+	end
 
 	-- Execute the module
 	local success, result = utils.executeModule(moduleScript)
@@ -136,7 +140,9 @@ local function executeScript(script: string, executionId: string, instancePath: 
 	task.wait(0.1)
 
 	-- Cleanup: restore original names and destroy clones
-	cleanup()
+	if cleanup then
+		cleanup()
+	end
 
 	-- Serialize result
 	local serializedResult = nil
@@ -211,7 +217,7 @@ local function connect()
 					enableOutput = true,
 					enableLogs = true,
 				}
-				executeScript(decoded.script, decoded.executionId, decoded.instancePath, logFilter)
+				executeScript(decoded.script, decoded.executionId, decoded.instancePath, logFilter, decoded.cacheRequires)
 			end
 		end)
 	end)
@@ -229,6 +235,31 @@ local function connect()
 end
 
 connect()
+
+-- Create debug toggle button
+local toolbar = plugin:CreateToolbar("rir3")
+local debugButton = toolbar:CreateButton(
+	"Debug",
+	"Toggle debug logging for reloader",
+	"rbxasset://textures/ui/Settings/Help/AButtonDark.png"
+)
+
+local function updateDebugButton()
+	if _G.__RIR3_DEBUG__ then
+		debugButton:SetActive(true)
+	else
+		debugButton:SetActive(false)
+	end
+end
+
+debugButton.Click:Connect(function()
+	_G.__RIR3_DEBUG__ = not _G.__RIR3_DEBUG__
+	updateDebugButton()
+	print(`[rir3] Debug mode: {if _G.__RIR3_DEBUG__ then "ON" else "OFF"}`)
+end)
+
+-- Initialize button state
+updateDebugButton()
 
 plugin.Unloading:Connect(function()
 	cleanupConnection()

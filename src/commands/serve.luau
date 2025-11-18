@@ -143,7 +143,7 @@ local function handleExecClient(ws: any)
 				enableOutput = true,
 				enableLogs = true,
 			}
-			execConnection = ExecConnection.new(ws, clientExecutionId, decoded.script, decoded.instancePath, filterBits, filterMask, logFilter)
+			execConnection = ExecConnection.new(ws, clientExecutionId, decoded.script, decoded.instancePath, filterBits, filterMask, logFilter, decoded.cacheRequires)
 
 			-- Find matching VM pipelines
 			local matchingVms = findMatchingVmPipelines(filterBits, filterMask)

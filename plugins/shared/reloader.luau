@@ -2,21 +2,65 @@
 
 ]]
 
-local LOG = false -- Set to false to disable reloader logging
-
 local function log(message: string)
-	if LOG then
+	if _G.__RIR3_DEBUG__ then
 		warn(message)
 	end
+end
+
+-- Extract content from outermost parentheses, handling nested parens
+-- Returns: content string and ending position, or nil if not found
+local function extractParenthesisContent(str: string, startPos: number): (string?, number?)
+	local openParenPos = string.find(str, "%(", startPos)
+	if not openParenPos then
+		return nil, nil
+	end
+
+	local depth = 0
+	local pathStart = openParenPos + 1
+	local pathEnd = nil
+
+	for i = openParenPos, #str do
+		local char = string.sub(str, i, i)
+		if char == "(" then
+			depth = depth + 1
+		elseif char == ")" then
+			depth = depth - 1
+			if depth == 0 then
+				pathEnd = i - 1
+				return string.sub(str, pathStart, pathEnd), i
+			end
+		end
+	end
+
+	return nil, nil
 end
 
 -- Extract all require() calls from source code
 local function extractRequires(source: string): { string }
 	local requires = {}
-	-- Match require(...) patterns
-	for match in string.gmatch(source, "require%s*%([^)]+%)") do
-		table.insert(requires, match)
+	local pos = 1
+
+	while true do
+		-- Find next "require" keyword
+		local requireStart = string.find(source, "require%s*%(", pos)
+		if not requireStart then
+			break
+		end
+
+		-- Extract the full require call with nested parentheses
+		local content, endPos = extractParenthesisContent(source, requireStart)
+		if content and endPos then
+			-- Reconstruct the full require string
+			local fullRequire = string.sub(source, requireStart, endPos)
+			table.insert(requires, fullRequire)
+			pos = endPos + 1
+		else
+			-- Skip this occurrence and continue
+			pos = requireStart + 1
+		end
 	end
+
 	return requires
 end
 
@@ -93,12 +137,16 @@ end
 local function getRequireInstance(requireString: string, currentScript: Instance): ModuleScript?
 	log(`[rir3-reloader] Resolving require: {requireString} from {currentScript:GetFullName()}`)
 
-	-- Extract the path from require(path)
-	local pathExpr = string.match(requireString, "require%s*%((.+)%)")
+	-- Extract the path from require(path) using helper function
+	local pathExpr, _ = extractParenthesisContent(requireString, 1)
 	if not pathExpr then
 		log(`[rir3-reloader]   ✗ Failed to extract path from require string`)
 		return nil
 	end
+
+	-- Strip quotes and whitespace from the path expression
+	pathExpr = string.gsub(pathExpr, "^%s*[\"']?", "")  -- Remove leading whitespace and quotes
+	pathExpr = string.gsub(pathExpr, "[\"']?%s*$", "")  -- Remove trailing quotes and whitespace
 
 	-- Phase 1: Try to evaluate as instance path (handles script.Parent.Module, game.ReplicatedStorage.Foo, etc.)
 	local success, result = pcall(function()
@@ -140,7 +188,12 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 	-- extract require calls
 	-- for each require, convert path to instance
 	for _, requirePath in requires do
-		local requireModule = getRequireInstance(requirePath, rootModule) :: ModuleScript
+		local requireModule = getRequireInstance(requirePath, rootModule)
+
+		if not requireModule then
+			log(`[rir3-reloader]   ✗ Failed to resolve require, skipping`)
+			continue
+		end
 
 		if clonedModules[requireModule] then
 			log(`[rir3-reloader]   Skipping {requireModule:GetFullName()} (already cloned)`)

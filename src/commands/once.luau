@@ -24,6 +24,7 @@ type Config = {
 	returnFile: string?,
 	showReturn: boolean?,
 	logFilter: execution.LogFilter,
+	cacheRequires: boolean?,
 }
 
 type OutputMessage = {
@@ -64,6 +65,7 @@ local function parseArguments(args: any): Config
 		returnFile = args["return"],
 		showReturn = args.show_return,
 		logFilter = execution.buildLogFilter(args),
+		cacheRequires = args.cache_requires,
 	}
 end
 
@@ -97,12 +99,13 @@ local function validateConfig(config: Config)
 	end
 end
 
-local function handlePluginConnection(ws: any, executionId: string, scriptContent: string, instancePath: string?, logFilter: execution.LogFilter, exitCodeRef: { value: number }, outputFile: string?, returnFile: string?, showReturn: boolean?): boolean
+local function handlePluginConnection(ws: any, executionId: string, scriptContent: string, instancePath: string?, logFilter: execution.LogFilter, exitCodeRef: { value: number }, outputFile: string?, returnFile: string?, showReturn: boolean?, cacheRequires: boolean?): boolean
 	local message: any = {
 		type = "exec",
 		executionId = executionId,
 		script = scriptContent,
 		logFilter = logFilter,
+		cacheRequires = cacheRequires,
 	}
 
 	if instancePath then
@@ -184,7 +187,7 @@ local function main(args: any)
 	-- Start WebSocket server BEFORE launching Studio
 	local server = net.serve(constants.ONCE_PORT, {
 		handleWebSocket = function(ws)
-			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.logFilter, exitCodeRef, config.outputFile, config.returnFile, config.showReturn)
+			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.logFilter, exitCodeRef, config.outputFile, config.returnFile, config.showReturn, config.cacheRequires)
 		end,
 	})
 

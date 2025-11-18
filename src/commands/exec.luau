@@ -21,6 +21,7 @@ type Config = {
 	filterBits: number,
 	filterMask: number,
 	logFilter: execution.LogFilter,
+	cacheRequires: boolean?,
 }
 
 local function parseContextFlags(args: any): (number, number)
@@ -79,6 +80,7 @@ local function parseArguments(args: any): Config
 		filterBits = filterBits,
 		filterMask = filterMask,
 		logFilter = execution.buildLogFilter(args),
+		cacheRequires = args.cache_requires,
 	}
 end
 
@@ -122,7 +124,7 @@ local function identifyClient(ws: any)
 	}))
 end
 
-local function submitScript(ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number, logFilter: LogFilter)
+local function submitScript(ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number, logFilter: LogFilter, cacheRequires: boolean?)
 	local message: any = {
 		type = "submit",
 		script = script,
@@ -130,6 +132,7 @@ local function submitScript(ws: any, executionId: string, script: string, instan
 		filterBits = filterBits,
 		filterMask = filterMask,
 		logFilter = logFilter,
+		cacheRequires = cacheRequires,
 	}
 
 	if instancePath then
@@ -183,7 +186,7 @@ local function main(args: any)
 
 	local ws = connectToServer(constants.SERVE_PORT)
 	identifyClient(ws)
-	submitScript(ws, executionId, scriptContent, instancePath, config.filterBits, config.filterMask, config.logFilter)
+	submitScript(ws, executionId, scriptContent, instancePath, config.filterBits, config.filterMask, config.logFilter, config.cacheRequires)
 
 	while true do
 		local message = ws:next()
