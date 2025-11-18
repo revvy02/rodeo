@@ -1,4 +1,5 @@
 local constants = require(script.constants)
+local reloader = require(script.reloader)
 local utils = require(script.utils)
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
@@ -52,7 +53,7 @@ local function safeSend(data: string)
 	end)
 end
 
-local function sendMessage(messageType: string, executionId: string, additionalData: {[string]: any}?)
+local function sendMessage(messageType: string, executionId: string, additionalData: { [string]: any }?)
 	local message = {
 		type = messageType,
 		executionId = executionId,
@@ -125,9 +126,17 @@ local function executeScript(script: string, executionId: string, instancePath: 
 	setupLogCapture(logFilter)
 
 	local moduleScript = utils.createModuleScript(script, instancePath)
+
+	-- Setup uncachable require traversal (clones and renames modules)
+	local cleanup = reloader.setupUncachableRequireModuleTraversal(moduleScript)
+
+	-- Execute the module
 	local success, result = utils.executeModule(moduleScript)
 
 	task.wait(0.1)
+
+	-- Cleanup: restore original names and destroy clones
+	cleanup()
 
 	-- Serialize result
 	local serializedResult = nil

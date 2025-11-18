@@ -44,7 +44,7 @@ local function executeModule(moduleScript: ModuleScript): (boolean, any)
 		local fn = require(moduleScript)
 		return fn()
 	end, debug.traceback)
-	moduleScript:Destroy()
+	-- Note: moduleScript is NOT destroyed here - cleanup() handles destruction after execution
 
 	if not success then
 		local event = Instance.new("BindableEvent")

@@ -7,6 +7,9 @@
         },
         "utils": {
             "$path": "../shared/utils.luau"
+        },
+        "reloader": {
+            "$path": "../shared/reloader.luau"
         }
     }
 }
