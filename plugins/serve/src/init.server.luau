@@ -238,11 +238,7 @@ connect()
 
 -- Create debug toggle button
 local toolbar = plugin:CreateToolbar("rir3")
-local debugButton = toolbar:CreateButton(
-	"Debug",
-	"Toggle debug logging for reloader",
-	"rbxasset://textures/ui/Settings/Help/AButtonDark.png"
-)
+local debugButton = toolbar:CreateButton("Debug", "Toggle debug logging for reloader", "rbxasset://textures/ui/Settings/Help/AButtonDark.png")
 
 local function updateDebugButton()
 	if _G.__RIR3_DEBUG__ then

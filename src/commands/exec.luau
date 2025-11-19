@@ -9,6 +9,7 @@ local stdio = require("@lune/stdio")
 local colors = require("../utils/colors")
 local constants = require("../utils/constants")
 local execution = require("../utils/execution")
+local sourcemap = require("../utils/sourcemap")
 local uuid = require("../utils/uuid")
 
 type Config = {
@@ -173,6 +174,15 @@ end
 local function main(args: any)
 	local config = parseArguments(args)
 	validateConfig(config)
+
+	-- Auto-detect sourcemap if not explicitly provided
+	if not config.sourcemap and config.scriptPath then
+		local autoDetectedPath = sourcemap.findSourcemapInTree()
+		if autoDetectedPath then
+			config.sourcemap = autoDetectedPath
+			-- stdio.write(colors.cyan(`Using sourcemap: {autoDetectedPath}`) .. "\n")
+		end
+	end
 
 	if not checkServerHealth(constants.SERVE_PORT) then
 		stdio.write(colors.error(`Error: No rir3 server found on port {constants.SERVE_PORT}. Run 'rir3 serve' first.`) .. "\n")
