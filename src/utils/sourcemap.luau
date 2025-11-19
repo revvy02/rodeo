@@ -5,21 +5,21 @@ local serde = require("@lune/serde")
 local pathfs = require("@pkg/pathfs")
 
 local function findSourcemapInTree(): string?
-	local currentPath = process.cwd
+	local currentPath = pathfs.Path.from(process.cwd)
 
 	-- Walk up the directory tree looking for sourcemap.json
 	while true do
-		local sourcemapPath = pathfs.join(currentPath, "sourcemap.json")
+		local sourcemapPath = currentPath:join("sourcemap.json"):toString()
 
 		if fs.isFile(sourcemapPath) then
 			return sourcemapPath
 		end
 
 		-- Get parent directory
-		local parentPath = pathfs.parent(currentPath)
+		local parentPath = currentPath:parent()
 
 		-- Stop if we've reached the root
-		if parentPath == currentPath or parentPath == nil then
+		if parentPath == nil or parentPath:toString() == currentPath:toString() then
 			break
 		end
 
