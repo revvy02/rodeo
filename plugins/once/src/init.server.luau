@@ -98,7 +98,8 @@ client.MessageReceived:Connect(function(message)
 		-- Execute the module
 		local success, result = utils.executeModule(moduleScript)
 
-		task.wait(0.1)
+		-- Wait longer for logs to be captured and sent
+		task.wait(0.3)
 
 		-- Cleanup: restore original names and destroy clones
 		if cleanup then
@@ -125,11 +126,13 @@ client.MessageReceived:Connect(function(message)
 			result = serializedResult,
 		}))
 
+		-- Wait for "done" message to flush through WebSocket buffers
+		task.wait(0.2)
+
 		if logConnection then
 			logConnection:Disconnect()
 		end
 
-		task.wait(0.1)
 		if client and isConnected then
 			client:Close()
 		end

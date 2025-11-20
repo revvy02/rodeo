@@ -137,6 +137,7 @@ local function executeScript(script: string, executionId: string, instancePath: 
 	-- Execute the module
 	local success, result = utils.executeModule(moduleScript)
 
+	-- Wait longer for logs to be captured and sent
 	task.wait(0.1)
 
 	-- Cleanup: restore original names and destroy clones
@@ -161,6 +162,10 @@ local function executeScript(script: string, executionId: string, instancePath: 
 	sendMessage("done", currentExecutionId, {
 		result = serializedResult,
 	})
+
+	-- Wait for "done" message to flush through WebSocket buffers
+	task.wait(0.1)
+
 	currentExecutionId = nil
 
 	-- Cleanup log connection after execution

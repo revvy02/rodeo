@@ -1,6 +1,7 @@
 # rir3
 
-Execute Luau scripts in Roblox Studio from your terminal.
+Provides a roblox studio luau run-time in cli by routing code 
+execution to running studio instances via websockets.
 
 ## Installation
 
@@ -25,7 +26,7 @@ rir3 once script.luau
 # With place file
 rir3 once script.luau --place game.rbxl
 
-# With sourcemap (preserves stack traces)
+# With sourcemap (Helps preserve stack traces)
 rir3 once script.luau --place game.rbxl --sourcemap sourcemap.json
 ```
 
@@ -48,9 +49,6 @@ rir3 serve
 # Basic execution
 rir3 exec script.luau
 
-# With sourcemap
-rir3 exec script.luau --sourcemap sourcemap.json
-```
 
 ### Context Targeting
 
@@ -110,19 +108,19 @@ rir3 once script.luau --no-warn
 # Suppress errors (still sets exit code on error)
 rir3 exec script.luau --no-error
 
-# Suppress all output
-rir3 once script.luau --no-output
+# Suppress print statements
+rir3 once script.luau --no-print
 
-# Suppress all logs entirely
-rir3 exec script.luau --no-logs
+# Suppress all output
+rir3 exec script.luau --no-output
 ```
 
 **Available flags:**
 - `--no-warn` - Hide warning messages
 - `--no-error` - Hide error messages
 - `--no-info` - Hide info messages
-- `--no-output` - Hide print output
-- `--no-logs` - Disable all log capture (most efficient)
+- `--no-print` - Hide print statements
+- `--no-output` - Disable all output (most efficient)
 
 ### Return Values
 
@@ -142,7 +140,7 @@ rir3 exec script.luau --return result.json
 rir3 once script.luau --return result.json --show-return
 
 # Capture return value in shell (with --show-return)
-result=$(rir3 once script.luau --no-logs --show-return)
+result=$(rir3 once script.luau --no-output --show-return)
 echo "Result: $result"
 ```
 
@@ -164,8 +162,36 @@ return { sum = sum, count = 100 }
 
 Return values are JSON-encoded if possible, otherwise converted to string with `tostring()`.
 
+### Hot-Reloaded Execution
+
+By default, rir3 doesn't cache modules or their dependencies. Every execution reflects the most up-to-date code without needing to restart Studio.
+
+**The problem:** Roblox caches `require()` results, so code changes don't take effect until you restart Studio.
+
+**The solution:** rir3 automatically bypasses Roblox's module cache, ensuring your changes are always reflected.
+
+```bash
+# Edit config.luau, utils.luau, or any required modules
+# Run your script - changes take effect immediately
+rir3 exec main.luau
+
+# Edit modules again
+# Run again - fresh code every time
+rir3 exec main.luau
+```
+
+This default behavior is ideal for development, ensuring executions always reflect your latest changes.
+
+**Performance optimization:** If you need faster execution and your modules aren't changing, use `--cache-requires` to enable caching:
+
+```bash
+# Enable module caching (faster, but changes won't be reflected)
+rir3 exec script.luau --cache-requires
+```
+
 ## Features
 
+- **Hot-reloaded modules** - Code changes take effect immediately without restarting Studio
 - **Color-coded output** - Prints, warnings, and errors appear in your terminal with colors
 - **Environment targeting** - Route executions to specific runtime contexts (edit/play, client/server)
 - **Log filtering** - Control which log levels are displayed

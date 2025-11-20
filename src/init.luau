@@ -17,8 +17,8 @@ local function main()
 	onceCmd:flag("--no-warn", "Disable warning output")
 	onceCmd:flag("--no-error", "Disable error output")
 	onceCmd:flag("--no-info", "Disable info output")
-	onceCmd:flag("--no-output", "Disable print output")
-	onceCmd:flag("--no-logs", "Disable all log output")
+	onceCmd:flag("--no-print", "Disable print statements")
+	onceCmd:flag("--no-output", "Disable all output")
 	onceCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
 
 	-- Define serve command
@@ -40,8 +40,8 @@ local function main()
 	execCmd:flag("--no-warn", "Disable warning output")
 	execCmd:flag("--no-error", "Disable error output")
 	execCmd:flag("--no-info", "Disable info output")
-	execCmd:flag("--no-output", "Disable print output")
-	execCmd:flag("--no-logs", "Disable all log output")
+	execCmd:flag("--no-print", "Disable print statements")
+	execCmd:flag("--no-output", "Disable all output")
 	execCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
 
 	-- Define build command

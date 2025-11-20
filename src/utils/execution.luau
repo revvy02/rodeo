@@ -16,14 +16,14 @@ export type LogFilter = {
 
 -- Build LogFilter from CLI arguments
 local function buildLogFilter(args: any): LogFilter
-	local noLogs = args["no_logs"] or false
+	local noOutput = args["no_output"] or false
 
 	return {
-		enableWarn = not (args["no_warn"] or noLogs),
-		enableError = not (args["no_error"] or noLogs),
-		enableInfo = not (args["no_info"] or noLogs),
-		enableOutput = not (args["no_output"] or noLogs),
-		enableLogs = not noLogs,
+		enableWarn = not (args["no_warn"] or noOutput),
+		enableError = not (args["no_error"] or noOutput),
+		enableInfo = not (args["no_info"] or noOutput),
+		enableOutput = not (args["no_print"] or noOutput),
+		enableLogs = not noOutput,
 	}
 end
 
