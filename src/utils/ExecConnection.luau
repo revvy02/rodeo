@@ -17,16 +17,7 @@ export type ExecConnection = {
 	cacheRequires: boolean?,
 	queuedAt: number,
 
-	new: (
-		ws: any,
-		executionId: string,
-		script: string,
-		instancePath: string?,
-		filterBits: number,
-		filterMask: number,
-		logFilter: LogFilter,
-		cacheRequires: boolean?
-	) -> ExecConnection,
+	new: (ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number, logFilter: LogFilter, cacheRequires: boolean?) -> ExecConnection,
 	send: (self: ExecConnection, data: string) -> (),
 	close: (self: ExecConnection) -> (),
 }
@@ -34,16 +25,7 @@ export type ExecConnection = {
 local ExecConnection = {}
 ExecConnection.__index = ExecConnection
 
-function ExecConnection.new(
-	ws: any,
-	executionId: string,
-	script: string,
-	instancePath: string?,
-	filterBits: number,
-	filterMask: number,
-	logFilter: LogFilter,
-	cacheRequires: boolean?
-): ExecConnection
+function ExecConnection.new(ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number, logFilter: LogFilter, cacheRequires: boolean?): ExecConnection
 	local self = setmetatable({}, ExecConnection)
 	self.ws = ws
 	self.executionId = executionId
@@ -58,15 +40,11 @@ function ExecConnection.new(
 end
 
 function ExecConnection:send(data: string)
-	pcall(function()
-		self.ws:send(data)
-	end)
+	self.ws:send(data)
 end
 
 function ExecConnection:close()
-	pcall(function()
-		self.ws:close()
-	end)
+	self.ws:close()
 end
 
 return ExecConnection

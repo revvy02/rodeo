@@ -151,7 +151,9 @@ local function handleMessage(decoded: any, exitCodeRef: { value: number }, outpu
 			-- Queued successfully to matching studios
 		end
 	elseif decoded.type == "output" then
-		local colorFn = colors.levelColors[decoded.level] or function(s) return s end
+		local colorFn = colors.levelColors[decoded.level] or function(s)
+			return s
+		end
 		local coloredOutput = colorFn(decoded.body) .. "\n"
 		execution.writeExecutionOutput(coloredOutput, outputFile)
 		if decoded.level == "Error" then

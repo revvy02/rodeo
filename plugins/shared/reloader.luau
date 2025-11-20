@@ -145,8 +145,8 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 	end
 
 	-- Strip quotes and whitespace from the path expression
-	pathExpr = string.gsub(pathExpr, "^%s*[\"']?", "")  -- Remove leading whitespace and quotes
-	pathExpr = string.gsub(pathExpr, "[\"']?%s*$", "")  -- Remove trailing quotes and whitespace
+	pathExpr = string.gsub(pathExpr, "^%s*[\"']?", "") -- Remove leading whitespace and quotes
+	pathExpr = string.gsub(pathExpr, "[\"']?%s*$", "") -- Remove trailing quotes and whitespace
 
 	-- Phase 1: Try to evaluate as instance path (handles script.Parent.Module, game.ReplicatedStorage.Foo, etc.)
 	local success, result = pcall(function()
@@ -229,7 +229,7 @@ end
 
 -- Idea is we start at source module, parse requires, get the instance for each require,
 -- clone it, temporarily rename the original so requires pickup the clone, and recursively do that.
-local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript)
+local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript): () -> ()
 	log(`[rir3-reloader] ━━━ Starting uncachable require setup for {rootInstance:GetFullName()} ━━━`)
 
 	-- parse rootInstance Source

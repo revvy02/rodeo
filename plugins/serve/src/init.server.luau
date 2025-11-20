@@ -15,6 +15,7 @@ local currentExecutionId = nil
 local retryDelay = 2
 local maxRetryDelay = 10
 local isRetrying = false
+
 local LOG_TYPE_TO_LEVEL = {
 	[Enum.MessageType.MessageOutput] = "Print",
 	[Enum.MessageType.MessageInfo] = "Info",
@@ -48,9 +49,7 @@ local function safeSend(data: string)
 	if not client then
 		return
 	end
-	pcall(function()
-		client:Send(data)
-	end)
+	client:Send(data)
 end
 
 local function sendMessage(messageType: string, executionId: string, additionalData: { [string]: any }?)
@@ -74,9 +73,7 @@ local function cleanupConnection()
 		logConnection = nil
 	end
 	if client then
-		pcall(function()
-			client:Close()
-		end)
+		client:Close()
 		client = nil
 	end
 	isConnected = false

@@ -1,6 +1,6 @@
 local constants = require(script.constants)
-local utils = require(script.utils)
 local reloader = require(script.reloader)
+local utils = require(script.utils)
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
 
@@ -15,9 +15,7 @@ local executionId = nil
 local logConnection = nil
 
 local function safeSend(data: string)
-	pcall(function()
-		client:Send(data)
-	end)
+	client:Send(data)
 end
 
 local logTypeToLevel = {
