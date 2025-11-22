@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tag checking
+
+      - name: Extract version from pesde.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version' pesde.toml | cut -d'"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
+      - name: Check if release already exists
+        id: check_release
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git tag -l "$TAG" | grep -q "$TAG"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release $TAG already exists, skipping."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release $TAG does not exist, will create."
+          fi
+
+      - name: Install pesde
+        if: steps.check_release.outputs.exists == 'false'
+        run: |
+          curl -fsSL https://pesde.dev/install.sh | bash
+          echo "$HOME/.pesde/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        if: steps.check_release.outputs.exists == 'false'
+        run: |
+          pesde install
+
+      - name: Build binaries
+        if: steps.check_release.outputs.exists == 'false'
+        run: |
+          lune run .lune/build.luau
+
+      - name: Create release tag
+        if: steps.check_release.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Create GitHub Release
+        if: steps.check_release.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            build/releases/rodeo_macos-aarch64
+            build/releases/rodeo_macos-x86_64
+            build/releases/rodeo_linux-x86_64
+            build/releases/rodeo_windows-x86_64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
