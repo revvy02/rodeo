@@ -1,4 +1,4 @@
--- Status command: Check if rir3 serve is running
+-- Status command: Check if rodeo serve is running
 
 local net = require("@lune/net")
 local process = require("@lune/process")
@@ -30,7 +30,7 @@ local function checkServerStatus(port: number): (boolean, any?)
 end
 
 local function formatStatus(healthData: any)
-	stdio.write(colors.success("rir3 serve is running") .. "\n")
+	stdio.write(colors.success("rodeo serve is running") .. "\n")
 	stdio.write(colors.cyan(`Port: {constants.SERVE_PORT}`) .. "\n")
 	stdio.write(colors.cyan(`Total VMs: {healthData.totalVms}`) .. "\n")
 	stdio.write(colors.cyan(`Total Queued: {healthData.totalQueued}`) .. "\n")
@@ -57,7 +57,7 @@ local function main(args: any)
 	local isRunning, healthData = checkServerStatus(constants.SERVE_PORT)
 
 	if not isRunning then
-		stdio.write(colors.error(`Error: rir3 serve is not running on port {constants.SERVE_PORT}`) .. "\n")
+		stdio.write(colors.error(`Error: rodeo serve is not running on port {constants.SERVE_PORT}`) .. "\n")
 		process.exit(1)
 	end
 

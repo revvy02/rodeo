@@ -38,7 +38,7 @@ client.Closed:Connect(function()
 end)
 
 client.Error:Connect(function(responseStatusCode, errorMessage)
-	warn("[rir3 plugin] WebSocket error:", responseStatusCode, errorMessage)
+	warn("[rodeo plugin] WebSocket error:", responseStatusCode, errorMessage)
 	isConnected = false
 end)
 

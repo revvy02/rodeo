@@ -9,7 +9,7 @@ local plugin = require("../utils/plugin")
 local function main(_args: any)
 	stdio.write(colors.cyan("Building serve plugin...") .. "\n")
 
-	local pluginPath = `{roblox.studioPluginPath()}/rir3-serve.rbxmx`
+	local pluginPath = `{roblox.studioPluginPath()}/rodeo-serve.rbxmx`
 	local rojoProjectPath = pathfs.absolute(_G.PESDE_ROOT .. "/plugins/serve/plugin.project.json"):toString()
 
 	plugin.generatePluginFile(pluginPath, rojoProjectPath)

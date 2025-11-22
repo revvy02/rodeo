@@ -2,6 +2,7 @@
   "languageMode": "strict",
   "aliases": {
     "pkg": "./lune_packages",
-    "luaupkg": "./luau_packages"
+    "luaupkg": "./luau_packages",
+    "lune": "~/.lune/.typedefs/0.10.4/"
   }
 }

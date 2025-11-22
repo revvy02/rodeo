@@ -1,4 +1,4 @@
--- Shared utilities for rir3 plugins
+-- Shared utilities for rodeo plugins
 
 local function resolveInstancePath(path: string): Instance?
 	local fn = loadstring("return " .. path)
@@ -24,9 +24,9 @@ local function createModuleScript(script: string, instancePath: string?): Module
 			moduleScript.Parent = originalInstance.Parent
 		else
 			if originalInstance then
-				warn(`[rir3] Instance at {instancePath} is not a ModuleScript, using temp module`)
+				warn(`[rodeo] Instance at {instancePath} is not a ModuleScript, using temp module`)
 			else
-				warn(`[rir3] Instance not found: {instancePath}, using temp module`)
+				warn(`[rodeo] Instance not found: {instancePath}, using temp module`)
 			end
 			moduleScript = Instance.new("ModuleScript")
 			moduleScript.Source = "return function() " .. script .. "\nend"

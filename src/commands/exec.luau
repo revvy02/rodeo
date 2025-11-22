@@ -187,7 +187,7 @@ local function main(args: any)
 	end
 
 	if not checkServerHealth(constants.SERVE_PORT) then
-		stdio.write(colors.error(`Error: No rir3 server found on port {constants.SERVE_PORT}. Run 'rir3 serve' first.`) .. "\n")
+		stdio.write(colors.error(`Error: No rodeo server found on port {constants.SERVE_PORT}. Run 'rodeo serve' first.`) .. "\n")
 		process.exit(1)
 	end
 

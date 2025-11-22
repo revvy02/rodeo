@@ -1,0 +1,21 @@
+{
+    "generator": "retain_lines",
+	"rules": [
+		{
+			"rule": "convert_require",
+			"current": {
+				"name": "luau",
+				"use_luau_configuration": true
+			},
+            "target": {
+				"name": "path"
+			}
+		}
+    ],
+    "bundle": {
+        "excludes": ["@lune/**"],
+        "require_mode": {
+            "name": "luau"
+        }
+    }
+}

@@ -1,4 +1,4 @@
--- Shared constants for rir3 plugins
+-- Shared constants for rodeo plugins
 
 return {
 	SERVE_PORT = 44872,

@@ -89,7 +89,7 @@ local function validateConfig(config: Config)
 
 	if config.sourcemap and not config.place then
 		stdio.write(colors.error("Error: --sourcemap requires --place to resolve instances") .. "\n")
-		stdio.write(colors.cyan("Usage: rir3 once script.luau --place game.rbxl --sourcemap sourcemap.json") .. "\n")
+		stdio.write(colors.cyan("Usage: rodeo once script.luau --place game.rbxl --sourcemap sourcemap.json") .. "\n")
 		process.exit(1)
 	end
 
@@ -99,7 +99,18 @@ local function validateConfig(config: Config)
 	end
 end
 
-local function handlePluginConnection(ws: any, executionId: string, scriptContent: string, instancePath: string?, logFilter: execution.LogFilter, exitCodeRef: { value: number }, outputFile: string?, returnFile: string?, showReturn: boolean?, cacheRequires: boolean?): boolean
+local function handlePluginConnection(
+	ws: any,
+	executionId: string,
+	scriptContent: string,
+	instancePath: string?,
+	logFilter: execution.LogFilter,
+	exitCodeRef: { value: number },
+	outputFile: string?,
+	returnFile: string?,
+	showReturn: boolean?,
+	cacheRequires: boolean?
+): boolean
 	local message: any = {
 		type = "exec",
 		executionId = executionId,
@@ -124,7 +135,9 @@ local function handlePluginConnection(ws: any, executionId: string, scriptConten
 
 		if decoded.type == "output" then
 			local msg = decoded :: OutputMessage
-			local colorFn = colors.levelColors[msg.level] or function(s) return s end
+			local colorFn = colors.levelColors[msg.level] or function(s)
+				return s
+			end
 			local coloredOutput = colorFn(msg.body) .. "\n"
 			execution.writeExecutionOutput(coloredOutput, outputFile)
 
@@ -150,24 +163,24 @@ local function main(args: any)
 
 	local scriptContent = execution.readScriptContent(config.scriptPath, config.scriptSource)
 	local executionId = uuid.generate()
-	local pluginPath = `{roblox.studioPluginPath()}/rir3-once.rbxmx`
+	local pluginPath = `{roblox.studioPluginPath()}/rodeo-once.rbxmx`
 	local rojoProjectPath = pathfs.absolute(_G.PESDE_ROOT .. "/plugins/once/plugin.project.json"):toString()
 
 	local placeToOpen = config.place
 	local tempPlacePath = nil
 	if placeToOpen then
 		local extension = placeToOpen:match("%.([^%.]+)$") or "rbxlx"
-		local tempDir = ".rir3/.temp"
+		local tempDir = ".rodeo/.temp"
 
 		-- Ensure temp directory exists
-		if not fs.isDir(".rir3") then
-			fs.writeDir(".rir3")
+		if not fs.isDir(".rodeo") then
+			fs.writeDir(".rodeo")
 		end
 		if not fs.isDir(tempDir) then
 			fs.writeDir(tempDir)
 		end
 
-		tempPlacePath = `{tempDir}/rir3-place.{extension}`
+		tempPlacePath = `{tempDir}/rodeo-place.{extension}`
 
 		if fs.isFile(tempPlacePath) then
 			fs.removeFile(tempPlacePath)

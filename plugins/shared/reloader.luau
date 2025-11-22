@@ -3,7 +3,7 @@
 ]]
 
 local function log(message: string)
-	if _G.__RIR3_DEBUG__ then
+	if _G.__rodeo_DEBUG__ then
 		warn(message)
 	end
 end
@@ -135,12 +135,12 @@ end
 -- Resolve a require path to an actual instance
 -- Two-phase resolution: try loadstring first, then string path conversion
 local function getRequireInstance(requireString: string, currentScript: Instance): ModuleScript?
-	log(`[rir3-reloader] Resolving require: {requireString} from {currentScript:GetFullName()}`)
+	log(`[rodeo-reloader] Resolving require: {requireString} from {currentScript:GetFullName()}`)
 
 	-- Extract the path from require(path) using helper function
 	local pathExpr, _ = extractParenthesisContent(requireString, 1)
 	if not pathExpr then
-		log(`[rir3-reloader]   ✗ Failed to extract path from require string`)
+		log(`[rodeo-reloader]   ✗ Failed to extract path from require string`)
 		return nil
 	end
 
@@ -163,27 +163,27 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 
 	-- If loadstring succeeded and returned an Instance, use it
 	if success and typeof(result) == "Instance" and result:IsA("ModuleScript") then
-		log(`[rir3-reloader]   ✓ Phase 1 (loadstring): Resolved to {result:GetFullName()}`)
+		log(`[rodeo-reloader]   ✓ Phase 1 (loadstring): Resolved to {result:GetFullName()}`)
 		return result
 	end
 
 	-- Phase 2: If loadstring failed or didn't return an instance, try string path conversion
 	-- This handles "@self/path", "./relative", etc.
-	log(`[rir3-reloader]   Phase 1 failed, trying Phase 2 (string conversion)`)
+	log(`[rodeo-reloader]   Phase 1 failed, trying Phase 2 (string conversion)`)
 	local resolved = getRobloxStringPathInstance(currentScript, pathExpr)
 	if resolved then
-		log(`[rir3-reloader]   ✓ Phase 2: Resolved to {resolved:GetFullName()}`)
+		log(`[rodeo-reloader]   ✓ Phase 2: Resolved to {resolved:GetFullName()}`)
 	else
-		log(`[rir3-reloader]   ✗ Phase 2: Failed to resolve`)
+		log(`[rodeo-reloader]   ✗ Phase 2: Failed to resolve`)
 	end
 	return resolved
 end
 
 local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]: true }, disabledInstances)
-	log(`[rir3-reloader] Processing module: {rootModule:GetFullName()}`)
+	log(`[rodeo-reloader] Processing module: {rootModule:GetFullName()}`)
 	local source = rootModule.Source
 	local requires = extractRequires(source)
-	log(`[rir3-reloader]   Found {#requires} require() calls`)
+	log(`[rodeo-reloader]   Found {#requires} require() calls`)
 
 	-- extract require calls
 	-- for each require, convert path to instance
@@ -191,18 +191,18 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 		local requireModule = getRequireInstance(requirePath, rootModule)
 
 		if not requireModule then
-			log(`[rir3-reloader]   ✗ Failed to resolve require, skipping`)
+			log(`[rodeo-reloader]   ✗ Failed to resolve require, skipping`)
 			continue
 		end
 
 		if clonedModules[requireModule] then
-			log(`[rir3-reloader]   Skipping {requireModule:GetFullName()} (already cloned)`)
+			log(`[rodeo-reloader]   Skipping {requireModule:GetFullName()} (already cloned)`)
 			continue
 		end
 
 		local requireModuleCopy = requireModule:Clone()
 		clonedModules[requireModuleCopy] = true
-		log(`[rir3-reloader]   Cloned: {requireModule:GetFullName()}`)
+		log(`[rodeo-reloader]   Cloned: {requireModule:GetFullName()}`)
 
 		-- Track all descendants of the original module
 		local descendantCount = 0
@@ -213,13 +213,13 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 			end
 		end
 		if descendantCount > 0 then
-			log(`[rir3-reloader]   Tracked {descendantCount} descendant modules`)
+			log(`[rodeo-reloader]   Tracked {descendantCount} descendant modules`)
 		end
 
 		local name = requireModule.Name
-		requireModule.Name = name .. ".rir3.ignore"
+		requireModule.Name = name .. ".rodeo.ignore"
 		requireModuleCopy.Parent = requireModule.Parent
-		log(`[rir3-reloader]   Swapped: {name} <-> {requireModule.Name}`)
+		log(`[rodeo-reloader]   Swapped: {name} <-> {requireModule.Name}`)
 
 		table.insert(disabledInstances, requireModule)
 
@@ -230,7 +230,7 @@ end
 -- Idea is we start at source module, parse requires, get the instance for each require,
 -- clone it, temporarily rename the original so requires pickup the clone, and recursively do that.
 local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript): () -> ()
-	log(`[rir3-reloader] ━━━ Starting uncachable require setup for {rootInstance:GetFullName()} ━━━`)
+	log(`[rodeo-reloader] ━━━ Starting uncachable require setup for {rootInstance:GetFullName()} ━━━`)
 
 	-- parse rootInstance Source
 	local clonedModules = {}
@@ -243,25 +243,25 @@ local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript)
 		cloneCount = cloneCount + 1
 	end
 
-	log(`[rir3-reloader] ✓ Setup complete: {cloneCount} modules tracked, {#disabledInstances} originals renamed`)
+	log(`[rodeo-reloader] ✓ Setup complete: {cloneCount} modules tracked, {#disabledInstances} originals renamed`)
 
 	return function()
-		log(`[rir3-reloader] ━━━ Starting cleanup ━━━`)
+		log(`[rodeo-reloader] ━━━ Starting cleanup ━━━`)
 
 		local restoredCount = 0
 		for _, instance in disabledInstances do
-			instance.Name = string.gsub(instance.Name, "%.rir3%.ignore$", "")
+			instance.Name = string.gsub(instance.Name, "%.rodeo%.ignore$", "")
 			restoredCount = restoredCount + 1
 		end
-		log(`[rir3-reloader]   Restored {restoredCount} original module names`)
+		log(`[rodeo-reloader]   Restored {restoredCount} original module names`)
 
 		local destroyedCount = 0
 		for module in clonedModules do
 			module:Destroy()
 			destroyedCount = destroyedCount + 1
 		end
-		log(`[rir3-reloader]   Destroyed {destroyedCount} cloned modules`)
-		log(`[rir3-reloader] ✓ Cleanup complete`)
+		log(`[rodeo-reloader]   Destroyed {destroyedCount} cloned modules`)
+		log(`[rodeo-reloader] ✓ Cleanup complete`)
 	end
 end
 

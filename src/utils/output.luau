@@ -51,7 +51,7 @@ local function formatShortLog(studioId: string, bitset: number, executionId: str
 	local bitsetShort = formatBitsetShort(bitset)
 
 	if executionId then
-		local execShort = executionId:sub(6, 13) -- Skip "rir3-" prefix
+		local execShort = executionId:sub(6, 13) -- Skip "rodeo-" prefix
 		return chalk.grey("[id:") .. " " .. shortId .. chalk.grey("] [") .. bitsetShort .. chalk.grey("]") .. " " .. execShort
 	else
 		return chalk.grey("[id:") .. " " .. shortId .. chalk.grey("] [") .. bitsetShort .. chalk.grey("]")

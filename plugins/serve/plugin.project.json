@@ -1,5 +1,5 @@
 {
-    "name": "rir3_serve_plugin",
+    "name": "rodeo_serve_plugin",
     "tree": {
         "$path": "src",
         "constants": {

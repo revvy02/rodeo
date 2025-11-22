@@ -204,7 +204,7 @@ local function connect()
 		end)
 
 		client.Error:Connect(function(responseStatusCode, errorMessage)
-			-- warn("[rir3] WebSocket error:", responseStatusCode, errorMessage)
+			-- warn("[rodeo] WebSocket error:", responseStatusCode, errorMessage)
 			isConnected = false
 		end)
 
@@ -239,11 +239,11 @@ end
 connect()
 
 -- Create debug toggle button
-local toolbar = plugin:CreateToolbar("rir3")
+local toolbar = plugin:CreateToolbar("rodeo")
 local debugButton = toolbar:CreateButton("Debug", "Toggle debug logging for reloader", "rbxasset://textures/ui/Settings/Help/AButtonDark.png")
 
 local function updateDebugButton()
-	if _G.__RIR3_DEBUG__ then
+	if _G.__rodeo_DEBUG__ then
 		debugButton:SetActive(true)
 	else
 		debugButton:SetActive(false)
@@ -251,9 +251,9 @@ local function updateDebugButton()
 end
 
 debugButton.Click:Connect(function()
-	_G.__RIR3_DEBUG__ = not _G.__RIR3_DEBUG__
+	_G.__rodeo_DEBUG__ = not _G.__rodeo_DEBUG__
 	updateDebugButton()
-	print(`[rir3] Debug mode: {if _G.__RIR3_DEBUG__ then "ON" else "OFF"}`)
+	print(`[rodeo] Debug mode: {if _G.__rodeo_DEBUG__ then "ON" else "OFF"}`)
 end)
 
 -- Initialize button state

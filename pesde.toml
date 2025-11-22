@@ -1,5 +1,5 @@
-name = "rvy/rir3"
-version = "0.1.2-rc.9"
+name = "rvy/rodeo"
+version = "1.0.0"
 description = "sync studio output to cli and also allow studio code execution from cli"
 authors = ["rvy"]
 license = "MIT"
@@ -28,6 +28,8 @@ default = "https://github.com/pesde-pkg/index"
 stylua = { name = "pesde/stylua", version = "^2.3.0", target = "lune" }
 selene = { name = "pesde/selene", version = "^0.29.0+toolchainlib.1", target = "lune" }
 rojo = { name = "pesde/rojo", version = "^7.5.1", target = "lune" }
+darklua = { name = "pesde/darklua", version = "^0.17.2" }
+darklua_build = { name = "ewdev/darklua_build", version = "^0.2.2" }
 
 [dependencies]
 argparse = { name = "caveful_games/argparse", version = "^0.1.2", target = "lune" }

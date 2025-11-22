@@ -1,9 +1,9 @@
--- rir3 CLI Router
+-- rodeo CLI Router
 -- Routes commands to appropriate handlers
 local argparse = require("@pkg/argparse")
 
 local function main()
-	local parser = argparse("rir3", "Run Luau code inside Roblox Studio")
+	local parser = argparse("rodeo", "Run Luau code inside Roblox Studio")
 
 	-- Define once command
 	local onceCmd = parser:command("once", "Execute script once in Studio (ephemeral)")
@@ -48,7 +48,7 @@ local function main()
 	parser:command("build", "Build and install the serve plugin")
 
 	-- Define status command
-	parser:command("status", "Check if rir3 serve is running")
+	parser:command("status", "Check if rodeo serve is running")
 
 	local args = parser:parse()
 
