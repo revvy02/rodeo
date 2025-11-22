@@ -3,5 +3,6 @@
 /.pesde
 
 # Build artifacts
-/build/
+/build
 /.claude
+/.vscode
