@@ -72,14 +72,6 @@ jobs:
           zip "../archives/rodeo-v${VERSION}-windows-x86_64.zip" "rodeo_windows-x86_64.exe"
           cd ../..
 
-      - name: Generate checksums
-        if: steps.check_release.outputs.exists == 'false'
-        run: |
-          cd build/archives
-          sha256sum * > checksums.txt
-          cat checksums.txt
-          cd ../..
-
       - name: Create release tag
         if: steps.check_release.outputs.exists == 'false'
         run: |
@@ -100,6 +92,5 @@ jobs:
             build/archives/rodeo-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
             build/archives/rodeo-v${{ steps.version.outputs.version }}-linux-x86_64.tar.gz
             build/archives/rodeo-v${{ steps.version.outputs.version }}-windows-x86_64.zip
-            build/archives/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
