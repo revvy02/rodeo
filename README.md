@@ -1,7 +1,15 @@
 # rodeo
-
 Provides a roblox studio luau run-time in cli by routing code 
 execution to running studio instances via websockets.
+
+## Features
+- **Hot-reloaded modules** - Code changes take effect immediately without restarting Studio
+- **Color-coded output** - Prints, warnings, and errors appear in your terminal with colors
+- **Environment targeting** - Route executions to specific runtime contexts (edit/play, client/server)
+- **Log filtering** - Control which log levels are displayed
+- **Return values** - Capture script return values via stdout
+- **Sourcemap support** - Preserve stack traces using sourcemaps
+- **Full Studio API** - Scripts have complete access to all Studio APIs
 
 ## Installation
 
@@ -22,10 +30,6 @@ mise use ubi:revvy02/rodeo
 ```bash
 rokit add revvy02/rodeo
 ```
-
-## Overview
-
-Run scripts in Roblox Studio and see output in your terminal with color-coded prints, warnings, and errors. Uses WebSockets for communication between CLI and Studio.
 
 ## Usage
 
@@ -201,27 +205,6 @@ This default behavior is ideal for development, ensuring executions always refle
 ```bash
 # Enable module caching (faster, but changes won't be reflected)
 rodeo exec script.luau --cache-requires
-```
-
-## Features
-
-- **Hot-reloaded modules** - Code changes take effect immediately without restarting Studio
-- **Color-coded output** - Prints, warnings, and errors appear in your terminal with colors
-- **Environment targeting** - Route executions to specific runtime contexts (edit/play, client/server)
-- **Log filtering** - Control which log levels are displayed
-- **Return values** - Capture script return values via stdout
-- **Sourcemap support** - Preserve stack traces using sourcemaps
-- **Full Studio API** - Scripts have complete access to all Studio APIs
-
-## Example Script
-
-```lua
-print("Hello from Studio!")
-
-local part = Instance.new("Part")
-part.Parent = workspace
-
-warn("Part created in workspace")
 ```
 
 ## Output Examples
