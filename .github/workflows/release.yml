@@ -39,16 +39,15 @@ jobs:
             echo "Release $TAG does not exist, will create."
           fi
 
-      - name: Install pesde
+      - name: Install Pesde
         if: steps.check_release.outputs.exists == 'false'
-        run: |
-          curl -fsSL https://pesde.dev/install.sh | bash
-          echo "$HOME/.pesde/bin" >> $GITHUB_PATH
+        uses: lumin-org/setup-pesde@v0.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
+      - name: Install Pesde Dependencies
         if: steps.check_release.outputs.exists == 'false'
-        run: |
-          pesde install
+        run: pesde install
 
       - name: Build binaries
         if: steps.check_release.outputs.exists == 'false'
