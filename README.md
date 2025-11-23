@@ -33,21 +33,6 @@ rokit add revvy02/rodeo
 
 ## Usage
 
-### Once Mode
-
-Execute a script one time. Studio opens temporarily and closes after execution.
-
-```bash
-# Basic execution
-rodeo once script.luau
-
-# With place file
-rodeo once script.luau --place game.rbxl
-
-# With sourcemap (Helps preserve stack traces)
-rodeo once script.luau --place game.rbxl --sourcemap sourcemap.json
-```
-
 ### Serve Mode
 
 For running multiple scripts without restarting Studio.
@@ -66,7 +51,22 @@ rodeo serve
 ```bash
 # Basic execution
 rodeo exec script.luau
+```
 
+### Once Mode
+
+Execute a script one time. Studio opens temporarily and closes after execution.
+
+```bash
+# Basic execution
+rodeo once script.luau
+
+# With place file
+rodeo once script.luau --place game.rbxl
+
+# With sourcemap (Helps preserve stack traces)
+rodeo once script.luau --place game.rbxl --sourcemap sourcemap.json
+```
 
 ### Context Targeting
 
