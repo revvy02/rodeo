@@ -39,20 +39,24 @@ jobs:
             echo "Release $TAG does not exist, will create."
           fi
 
-      - name: Install Pesde
+      - name: Install mise
         if: steps.check_release.outputs.exists == 'false'
-        uses: lumin-org/setup-pesde@v0.4.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        uses: jdx/mise-action@v2
 
-      - name: Install Pesde Dependencies
+      - name: Install Pesde dependencies
         if: steps.check_release.outputs.exists == 'false'
         run: pesde install
 
-      - name: Build binaries
+      - name: Setup lune PATH
         if: steps.check_release.outputs.exists == 'false'
         run: |
-          lune run .lune/build.luau
+          # Pesde installs lune to ~/.pesde/engines but doesn't add it to PATH
+          # We need to manually add it for the build step
+          echo "$HOME/.pesde/engines/github/lune-org/lune/0.10.4" >> $GITHUB_PATH
+
+      - name: Build binaries
+        if: steps.check_release.outputs.exists == 'false'
+        run: lune run .lune/build.luau
 
       - name: Package binaries
         if: steps.check_release.outputs.exists == 'false'
