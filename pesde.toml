@@ -22,12 +22,6 @@ bin = "src/init.luau"
 [indices]
 default = "https://github.com/pesde-pkg/index"
 
-[dev_dependencies]
-stylua = { name = "pesde/stylua", version = "^2.3.0", target = "lune" }
-selene = { name = "pesde/selene", version = "^0.29.0+toolchainlib.1", target = "lune" }
-rojo = { name = "pesde/rojo", version = "^7.5.1", target = "lune" }
-darklua = { name = "pesde/darklua", version = "^0.17.2" }
-
 [dependencies]
 argparse = { name = "caveful_games/argparse", version = "^0.1.2", target = "lune" }
 pathfs = { name = "jiwonz/pathfs", version = "^0.6.0" }
