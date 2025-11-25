@@ -209,5 +209,5 @@ rodeo exec script.luau --cache-requires
 
 ## Output Example
 <p align="center">
-  <img src="demo/image1.png" width="100%" />
+  <img src="assets/docs/output.png" width="100%" />
 </p>

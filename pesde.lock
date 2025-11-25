@@ -5,6 +5,9 @@ name = "rvy/rodeo"
 version = "0.0.2"
 target = "lune"
 
+[workspace."rvy/plugin"]
+roblox = "plugin"
+
 [graph."caveful_games/argparse@0.1.2 lune"]
 direct = ["argparse", { name = "caveful_games/argparse", version = "^0.1.2", index = "default", target = "lune" }, "standard"]
 

@@ -1,6 +1,12 @@
 {
     "name": "rodeo_plugin",
     "tree": {
-        "$path": "src"
+        "$className": "Folder",
+        "plugin": {
+            "$path": "src"
+        },
+        "packages": {
+            "$path": "roblox_packages"
+        }
     }
 }

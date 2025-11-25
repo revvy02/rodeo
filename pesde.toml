@@ -11,6 +11,8 @@ includes = [
   ".luaurc",
 ]
 
+workspace_members = ["plugin"]
+
 [engines]
 pesde = "^0.7.1"
 lune = "^0.10.4"

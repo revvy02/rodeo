@@ -1,5 +1,7 @@
-/lune_packages
-/luau_packages
+**/luau_packages/
+**/lune_packages/
+**/roblox_packages/
+
 /.pesde
 
 # Build artifacts

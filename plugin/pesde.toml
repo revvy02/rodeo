@@ -1,0 +1,20 @@
+name = "rvy/plugin"
+version = "0.0.0"
+private = true
+
+[engines]
+pesde = "^0.7.1"
+lune = "^0.10.4"
+
+[target]
+environment = "roblox"
+
+[indices]
+default = "https://github.com/pesde-pkg/index"
+
+[wally_indices]
+default = "https://github.com/UpliftGames/wally-index"
+
+[dependencies]
+react = { wally = "jsdotlua/react", version = "^17.2.1" }
+react_roblox = { wally = "jsdotlua/react-roblox", version = "^17.2.1" }
