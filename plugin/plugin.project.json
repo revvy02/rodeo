@@ -1,0 +1,6 @@
+{
+    "name": "rodeo_plugin",
+    "tree": {
+        "$path": "src"
+    }
+}

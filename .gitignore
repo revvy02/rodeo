@@ -9,3 +9,5 @@
 /.rodeo
 
 .DS_Store
+
+.env

@@ -1,20 +1,26 @@
 local constants = require(script.constants)
+local flags = require(script.flags)
 local reloader = require(script.reloader)
 local utils = require(script.utils)
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
 local RunService = game:GetService("RunService")
 
-local SERVER_URL = `ws://localhost:{constants.SERVE_PORT}`
+-- Runtime settings (can be modified via UI)
+local settings = {
+	port = flags.SETTINGS.port,
+	autoConnect = flags.SETTINGS.autoConnect,
+}
+
+-- Initialize debug mode from flags
+_G.__rodeo_DEBUG__ = flags.DEBUG
 
 local client = nil
 local isConnected = false
 local logConnection = nil
 local currentExecutionId = nil
-
-local retryDelay = 2
-local maxRetryDelay = 10
-local isRetrying = false
+local retryConnection = nil
+local uiHandle = nil
 
 local LOG_TYPE_TO_LEVEL = {
 	[Enum.MessageType.MessageOutput] = "Print",
@@ -67,7 +73,17 @@ local function sendMessage(messageType: string, executionId: string, additionalD
 	safeSend(HttpService:JSONEncode(message))
 end
 
+local function updateUIStatus(connected: boolean, message: string?)
+	if uiHandle then
+		uiHandle.setConnectionStatus(connected, message)
+	end
+end
+
 local function cleanupConnection()
+	if retryConnection then
+		task.cancel(retryConnection)
+		retryConnection = nil
+	end
 	if logConnection then
 		logConnection:Disconnect()
 		logConnection = nil
@@ -78,6 +94,7 @@ local function cleanupConnection()
 	end
 	isConnected = false
 	currentExecutionId = nil
+	updateUIStatus(false, "Disconnected")
 end
 
 local function setupLogCapture(logFilter: any)
@@ -134,7 +151,7 @@ local function executeScript(script: string, executionId: string, instancePath: 
 	-- Execute the module
 	local success, result = utils.executeModule(moduleScript)
 
-	-- Wait longer for logs to be captured and sent
+	-- Wait for logs to be captured and sent
 	task.wait(0.1)
 
 	-- Cleanup: restore original names and destroy clones
@@ -170,19 +187,31 @@ local function executeScript(script: string, executionId: string, instancePath: 
 		logConnection:Disconnect()
 		logConnection = nil
 	end
+
+	-- In autoConnect mode (once), close Studio after execution
+	if flags.SETTINGS.autoConnect then
+		task.wait(0.1)
+		if client and isConnected then
+			client:Close()
+		end
+	end
 end
 
-local function connect()
+local function connect(port: number?)
+	local targetPort = port or settings.port
+	local serverUrl = `ws://localhost:{targetPort}`
+
 	cleanupConnection()
+	updateUIStatus(false, "Connecting...")
 
 	local success = pcall(function()
 		client = HttpService:CreateWebStreamClient(Enum.WebStreamClientType.WebSocket, {
-			Url = SERVER_URL,
+			Url = serverUrl,
 		})
 
 		client.Opened:Connect(function()
 			isConnected = true
-			retryDelay = 2
+			updateUIStatus(true, `Connected to port {targetPort}`)
 
 			safeSend(HttpService:JSONEncode({
 				clientType = "studio",
@@ -192,20 +221,23 @@ local function connect()
 
 		client.Closed:Connect(function()
 			isConnected = false
+			updateUIStatus(false, "Disconnected")
 
-			if not isRetrying then
-				isRetrying = true
-				task.delay(retryDelay, function()
-					isRetrying = false
-					retryDelay = math.min(retryDelay * 1.5, maxRetryDelay)
-					connect()
+			-- Only auto-retry in autoConnect mode
+			if flags.SETTINGS.autoConnect then
+				retryConnection = task.delay(1, function()
+					retryConnection = nil
+					connect(targetPort)
 				end)
 			end
 		end)
 
 		client.Error:Connect(function(responseStatusCode, errorMessage)
-			-- warn("[rodeo] WebSocket error:", responseStatusCode, errorMessage)
+			if _G.__rodeo_DEBUG__ then
+				warn("[rodeo] WebSocket error:", responseStatusCode, errorMessage)
+			end
 			isConnected = false
+			updateUIStatus(false, "Connection error")
 		end)
 
 		client.MessageReceived:Connect(function(message)
@@ -225,40 +257,48 @@ local function connect()
 	end)
 
 	if not success then
-		if not isRetrying then
-			isRetrying = true
-			task.delay(retryDelay, function()
-				isRetrying = false
-				retryDelay = math.min(retryDelay * 1.5, maxRetryDelay)
-				connect()
+		updateUIStatus(false, "Failed to connect")
+		-- Only auto-retry in autoConnect mode
+		if flags.SETTINGS.autoConnect then
+			retryConnection = task.delay(1, function()
+				retryConnection = nil
+				connect(targetPort)
 			end)
 		end
 	end
 end
 
-connect()
-
--- Create debug toggle button
-local toolbar = plugin:CreateToolbar("rodeo")
-local debugButton = toolbar:CreateButton("Debug", "Toggle debug logging for reloader", "rbxasset://textures/ui/Settings/Help/AButtonDark.png")
-
-local function updateDebugButton()
-	if _G.__rodeo_DEBUG__ then
-		debugButton:SetActive(true)
-	else
-		debugButton:SetActive(false)
-	end
+local function disconnect()
+	cleanupConnection()
 end
 
-debugButton.Click:Connect(function()
-	_G.__rodeo_DEBUG__ = not _G.__rodeo_DEBUG__
-	updateDebugButton()
-	print(`[rodeo] Debug mode: {if _G.__rodeo_DEBUG__ then "ON" else "OFF"}`)
-end)
+-- Setup UI if enabled
+if flags.SETTINGS_PANEL_ENABLED then
+	local createUI = require(script.ui)
+	uiHandle = createUI(plugin, settings, {
+		onConnect = function(port: number)
+			settings.port = port
+			connect(port)
+		end,
+		onDisconnect = function()
+			disconnect()
+		end,
+		onSettingsChanged = function(newSettings)
+			settings.port = newSettings.port
+			settings.autoConnect = newSettings.autoConnect
+		end,
+	})
+end
 
--- Initialize button state
-updateDebugButton()
+-- Auto-connect if enabled
+if flags.SETTINGS.autoConnect then
+	connect()
+end
 
+-- Cleanup on plugin unload
 plugin.Unloading:Connect(function()
 	cleanupConnection()
+	if uiHandle then
+		uiHandle.destroy()
+	end
 end)
