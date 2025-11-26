@@ -3,7 +3,7 @@
 ]]
 
 local function log(message: string)
-	if _G.__rodeo_DEBUG__ then
+	if _G.RODEO_DEBUG then
 		warn(message)
 	end
 end

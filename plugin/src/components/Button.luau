@@ -1,23 +1,17 @@
 local React = require(script.Parent.Parent.Parent.packages.react)
-local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
 
 local e = React.createElement
 
-export type Props = {}
+export type Props = {
+	text: string,
+	color: Color3,
+	backgroundColor: Color3,
+	hoverBackgroundColor: Color3,
+	onClick: () -> (),
+}
 
-local function Button()
-	local context = useAppContext()
+local function Button(props: Props)
 	local isHovering, setIsHovering = React.useState(false)
-
-	local isConnected = context.connectionStatus.connected
-
-	local function handleClick()
-		if isConnected then
-			context.handleDisconnect()
-		else
-			context.handleConnect()
-		end
-	end
 
 	local function handleMouseEnter()
 		setIsHovering(true)
@@ -27,8 +21,7 @@ local function Button()
 		setIsHovering(false)
 	end
 
-	local baseColor = if isConnected then context.COLORS.buttonDisconnect else context.COLORS.buttonConnect
-	local backgroundColor = if isHovering then context.COLORS.buttonHover else context.COLORS.buttonBackground
+	local backgroundColor = if isHovering then props.hoverBackgroundColor else props.backgroundColor
 	local strokeThickness = if isHovering then 2 else 1.5
 
 	return e("TextButton", {
@@ -38,7 +31,7 @@ local function Button()
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Text = "",
-		[React.Event.Activated] = handleClick,
+		[React.Event.Activated] = props.onClick,
 		[React.Event.MouseEnter] = handleMouseEnter,
 		[React.Event.MouseLeave] = handleMouseLeave,
 	}, {
@@ -46,7 +39,7 @@ local function Button()
 			CornerRadius = UDim.new(0, 8),
 		}),
 		Stroke = e("UIStroke", {
-			Color = baseColor,
+			Color = props.color,
 			Thickness = strokeThickness,
 			Transparency = 0,
 		}, {
@@ -60,8 +53,8 @@ local function Button()
 			}),
 		}),
 		Label = e("TextLabel", {
-			Text = if isConnected then "DISCONNECT" else "CONNECT",
-			TextColor3 = baseColor,
+			Text = props.text,
+			TextColor3 = props.color,
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
 			Font = Enum.Font.Arcade,
@@ -73,15 +66,14 @@ local function Button()
 				MinTextSize = 10,
 			}),
 			Gradient = e("UIGradient", {
-				Color = if isConnected
-					then ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 60, 65)),
-						ColorSequenceKeypoint.new(1, Color3.fromRGB(140, 40, 45)),
-					})
-					else ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 110)),
-						ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 70)),
-					}),
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, props.color),
+					ColorSequenceKeypoint.new(1, Color3.new(
+						props.color.R * 0.7,
+						props.color.G * 0.7,
+						props.color.B * 0.7
+					)),
+				}),
 				Rotation = 90,
 			}),
 		}),

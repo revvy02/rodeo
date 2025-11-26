@@ -1,30 +1,34 @@
 local React = require(script.Parent.Parent.Parent.packages.react)
-local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
 
 local e = React.createElement
 
-export type Props = {}
+export type Props = {
+	value: string,
+	placeholder: string?,
+	textColor: Color3,
+	placeholderColor: Color3?,
+	textXAlignment: Enum.TextXAlignment?,
+	onValueChange: (value: string) -> (),
+}
 
-local function TextInput()
-	local context = useAppContext()
-
+local function TextInput(props: Props)
 	local function handleFocusLost(rbx: TextBox)
-		context.setPort(rbx.Text)
+		props.onValueChange(rbx.Text)
 	end
 
 	return e("TextBox", {
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Size = UDim2.new(0.4, -4, 1, 0),
-		Position = UDim2.new(1, -8, 0.5, 0),
-		AnchorPoint = Vector2.new(1, 0.5),
-		Text = context.settings.port,
-		TextColor3 = context.COLORS.text,
-		PlaceholderColor3 = context.COLORS.textDim,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromScale(0, 1),
+		Text = props.value,
+		TextColor3 = props.textColor,
+		PlaceholderText = props.placeholder,
+		PlaceholderColor3 = props.placeholderColor or props.textColor,
 		TextSize = 18,
 		TextScaled = true,
 		Font = Enum.Font.Arcade,
-		TextXAlignment = Enum.TextXAlignment.Right,
+		TextXAlignment = props.textXAlignment or Enum.TextXAlignment.Left,
 		ClearTextOnFocus = false,
 		[React.Event.FocusLost] = handleFocusLost,
 	}, {

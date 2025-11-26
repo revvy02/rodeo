@@ -1,17 +1,15 @@
 local React = require(script.Parent.Parent.Parent.packages.react)
-local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
 
 local e = React.createElement
 
-export type Props = {}
+export type Props = {
+	checked: boolean,
+	strokeColor: Color3,
+	accentColor: Color3,
+	onToggle: () -> (),
+}
 
-local function Checkbox()
-	local context = useAppContext()
-
-	local function handleActivated()
-		context.setAutoConnect(not context.settings.autoConnect)
-	end
-
+local function Checkbox(props: Props)
 	return e("Frame", {
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
@@ -22,7 +20,7 @@ local function Checkbox()
 			CornerRadius = UDim.new(0, 4),
 		}),
 		Stroke = e("UIStroke", {
-			Color = context.COLORS.stroke,
+			Color = props.strokeColor,
 			Thickness = 1,
 		}),
 		Button = e("TextButton", {
@@ -31,11 +29,11 @@ local function Checkbox()
 			Size = UDim2.fromScale(1, 1),
 			Position = UDim2.fromOffset(0, 0),
 			Text = "",
-			[React.Event.Activated] = handleActivated,
+			[React.Event.Activated] = props.onToggle,
 		}, {
 			Checkmark = e("TextLabel", {
-				Text = if context.settings.autoConnect then "✓" else "",
-				TextColor3 = context.COLORS.accent,
+				Text = if props.checked then "✓" else "",
+				TextColor3 = props.accentColor,
 				TextSize = 18,
 				Font = Enum.Font.Arcade,
 				BackgroundTransparency = 1,

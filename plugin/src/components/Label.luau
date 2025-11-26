@@ -1,20 +1,18 @@
 local React = require(script.Parent.Parent.Parent.packages.react)
-local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
 
 local e = React.createElement
 
 export type Props = {
 	text: string,
+	textColor: Color3?,
 }
 
 local function Label(props: Props)
-	local context = useAppContext()
-
 	return e("TextLabel", {
 		BackgroundTransparency = 1,
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Text = props.text,
-		TextColor3 = context.COLORS.accent,
+		TextColor3 = props.textColor or Color3.fromRGB(255, 70, 80),
 		TextSize = 20,
 		Font = Enum.Font.Arcade,
 		TextXAlignment = Enum.TextXAlignment.Left,
