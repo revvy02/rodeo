@@ -1,6 +1,6 @@
-local React = require(script.Parent.Parent.Parent.packages.react)
+local React = require("@pkg/react")
 local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
-local constants = require(script.Parent.Parent.constants)
+local constants = require(script.Parent.Parent.Parent.constants)
 local Row = require(script.Parent.Row)
 
 local e = React.createElement
@@ -20,11 +20,7 @@ local function buildContextRichText(bitset: number, numBits: number): string
 	for i = 0, numBits - 1 do
 		local active = bit32.band(bitset, bit32.lshift(1, i)) ~= 0
 		local color = if active then COLORS.success else COLORS.error
-		local hex = string.format("%02X%02X%02X",
-			math.floor(color.R * 255),
-			math.floor(color.G * 255),
-			math.floor(color.B * 255)
-		)
+		local hex = color:ToHex()
 		local digit = if active then "1" else "0"
 		table.insert(parts, `<font color="#{hex}">{digit}</font>`)
 	end

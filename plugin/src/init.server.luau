@@ -9,9 +9,9 @@
 	The settings panel (widget/toolbar) is only created when SETTINGS_PANEL_ENABLED.
 ]]
 
-local React = require(script.Parent.packages.react)
-local ReactRoblox = require(script.Parent.packages["react_roblox"])
-local App = require(script.components.App)
+local App = require(script.app.widget)
+local React = require("@pkg/react")
+local ReactRoblox = require("@pkg/react_roblox")
 local flags = require(script.flags)
 
 local e = React.createElement

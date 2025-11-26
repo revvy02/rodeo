@@ -3,7 +3,7 @@ local roblox = require("@lune/roblox")
 local stdio = require("@lune/stdio")
 
 local colors = require("../utils/colors")
-local embeddedPlugins = require("../utils/embedded_plugins")
+local embeddedPlugins = require("../utils/plugin")
 
 local function main(_args: any)
 	stdio.write(colors.cyan("Installing serve plugin...") .. "\n")

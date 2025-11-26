@@ -1,4 +1,4 @@
-local React = require(script.Parent.Parent.Parent.packages.react)
+local React = require("@pkg/react")
 
 local e = React.createElement
 

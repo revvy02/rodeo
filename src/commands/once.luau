@@ -11,7 +11,7 @@ local task = require("@lune/task")
 
 local colors = require("../utils/colors")
 local constants = require("../utils/constants")
-local embeddedPlugins = require("../utils/embedded_plugins")
+local embeddedPlugins = require("../utils/plugin")
 local execution = require("../utils/execution")
 local uuid = require("../utils/uuid")
 

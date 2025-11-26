@@ -1,16 +1,8 @@
-local React = require(script.Parent.Parent.Parent.packages.react)
-local constants = require(script.Parent.Parent.constants)
+local React = require("@pkg/react")
+local constants = require(script.Parent.Parent.Parent.constants)
 
 local e = React.createElement
 local COLORS = constants.COLORS
-
-local function colorToHex(color: Color3): string
-	return string.format("%02X%02X%02X",
-		math.floor(color.R * 255),
-		math.floor(color.G * 255),
-		math.floor(color.B * 255)
-	)
-end
 
 export type Props = {
 	checked: boolean,
@@ -20,7 +12,7 @@ export type Props = {
 
 local function Checkbox(props: Props)
 	local color = if props.checked then COLORS.success else COLORS.error
-	local hex = colorToHex(color)
+	local hex = color:ToHex()
 	local digit = if props.checked then "1" else "0"
 	local richText = `<font color="#{hex}">{digit}</font>`
 

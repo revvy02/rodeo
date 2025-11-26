@@ -4,9 +4,9 @@
 	Thin wrapper around runtime module that provides React state management.
 ]]
 
-local React = require(script.Parent.Parent.Parent.packages.react)
-local runtime = require(script.Parent.Parent.runtime)
-local utils = require(script.Parent.Parent.utils)
+local React = require("@pkg/react")
+local runtime = require(script.Parent.Parent.Parent.runtime)
+local utils = require(script.Parent.Parent.Parent.utils)
 
 export type LogFilter = runtime.LogFilter
 
@@ -21,6 +21,7 @@ export type ExecutionParams = {
 export type UseExecutionOptions = {
 	sendMessage: (messageType: string, executionId: string, additionalData: { [string]: any }?) -> (),
 	onExecutionComplete: (() -> ())?,
+	verbose: boolean?,
 }
 
 export type UseExecutionReturn = {
@@ -42,6 +43,7 @@ local function useExecution(options: UseExecutionOptions): UseExecutionReturn
 			executionId = params.executionId,
 			logFilter = params.logFilter,
 			cacheRequires = params.cacheRequires,
+			verbose = options.verbose,
 		}, {
 			onOutput = function(level, body)
 				options.sendMessage("output", params.executionId, {

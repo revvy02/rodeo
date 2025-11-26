@@ -9,13 +9,13 @@
 	All state flows through React context to child components.
 ]]
 
-local React = require(script.Parent.Parent.Parent.packages.react)
+local React = require("@pkg/react")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local constants = require(script.Parent.Parent.constants)
-local flags = require(script.Parent.Parent.flags)
-local useWebSocket = require(script.Parent.Parent.hooks.useWebSocket)
-local useExecution = require(script.Parent.Parent.hooks.useExecution)
+local constants = require(script.Parent.Parent.Parent.constants)
+local flags = require(script.Parent.Parent.Parent.flags)
+local useWebSocket = require(script.Parent.hooks.useWebSocket)
+local useExecution = require(script.Parent.hooks.useExecution)
 
 local e = React.createElement
 local CONTEXT_BITS = constants.CONTEXT_BITS
@@ -122,13 +122,21 @@ local function AppProvider(props: AppProviderProps)
 	-- WebSocket hook
 	local webSocket = useWebSocket({
 		autoRetry = flags.SETTINGS.autoConnect,
+		verbose = verbose,
+		onConnect = function(send)
+			-- Send initial identification
+			send(HttpService:JSONEncode({
+				clientType = "studio",
+				contextBitset = getContextBitset(),
+			}))
+		end,
 		onMessage = function(message: string)
 			local success, decoded = pcall(function()
 				return HttpService:JSONDecode(message)
 			end)
 
 			if not success then
-				if flags.VERBOSE then
+				if verbose then
 					warn("[rodeo] Failed to decode message:", message)
 				end
 				return
@@ -156,6 +164,7 @@ local function AppProvider(props: AppProviderProps)
 
 	-- Execution hook
 	local execution = useExecution({
+		verbose = verbose,
 		sendMessage = function(messageType: string, executionId: string, additionalData: { [string]: any }?)
 			local message = {
 				type = messageType,
@@ -221,11 +230,6 @@ local function AppProvider(props: AppProviderProps)
 			webSocket.connect(connectHost, portNum)
 		end
 	end, {}) -- Run once on mount
-
-	-- Sync verbose state to flags module
-	React.useEffect(function()
-		flags.VERBOSE = verbose
-	end, { verbose })
 
 	-- Build context value (memoized)
 	local contextValue = React.useMemo(function()

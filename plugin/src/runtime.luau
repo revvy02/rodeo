@@ -10,7 +10,6 @@
 
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
-local flags = require(script.Parent.flags)
 
 local LOG_TYPE_TO_LEVEL = {
 	[Enum.MessageType.MessageOutput] = "Print",
@@ -31,6 +30,7 @@ export type ExecutionParams = {
 	executionId: string,
 	logFilter: LogFilter?,
 	cacheRequires: boolean?,
+	verbose: boolean?,
 }
 
 export type ExecutionCallbacks = {
@@ -38,9 +38,11 @@ export type ExecutionCallbacks = {
 	onComplete: (result: string?) -> (),
 }
 
--- Debug logging
+-- Debug logging (verbose flag passed per-execution)
+local VERBOSE = false
+
 local function log(message: string)
-	if flags.VERBOSE then
+	if VERBOSE then
 		warn(message)
 	end
 end
@@ -329,6 +331,9 @@ end
 
 -- Main execute function
 local function execute(moduleScript: ModuleScript, params: ExecutionParams, callbacks: ExecutionCallbacks)
+	-- Set verbose flag for this execution
+	VERBOSE = params.verbose or false
+
 	local logConnection: RBXScriptConnection? = nil
 	local logFilter = params.logFilter or {
 		enableWarn = true,
