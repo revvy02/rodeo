@@ -1,14 +1,20 @@
 local React = require(script.Parent.Parent.Parent.packages.react)
 
-local AppProvider = require(script.Parent.AppProvider)
+local AppContext = require(script.Parent.Parent.context.AppContext)
 local Container = require(script.Parent.Container)
 local Label = require(script.Parent.Label)
 local RodeoLabel = require(script.Parent.RodeoLabel)
+local Row = require(script.Parent.Row)
 local StatusIndicator = require(script.Parent.StatusIndicator)
 local TextInput = require(script.Parent.TextInput)
 local Checkbox = require(script.Parent.Checkbox)
 local Button = require(script.Parent.Button)
-local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
+local constants = require(script.Parent.Parent.constants)
+
+local AppProvider = AppContext.AppProvider
+local useAppContext = AppContext.useAppContext
+
+local COLORS = constants.COLORS
 
 local e = React.createElement
 
@@ -32,13 +38,12 @@ local function AppContent()
 		Status = e(StatusIndicator),
 
 		-- Port row (only when settings panel enabled)
-		PortRow = showSettings and e("Frame", {
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, 30),
-			LayoutOrder = 2,
+		PortRow = showSettings and e(Row, {
+			height = 30,
+			layoutOrder = 2,
 		}, {
 			Container = e("Frame", {
-				BackgroundColor3 = context.COLORS.inputBackground,
+				BackgroundColor3 = COLORS.inputBackground,
 				BackgroundTransparency = 0,
 				BorderSizePixel = 0,
 				Size = UDim2.fromScale(1, 1),
@@ -57,22 +62,22 @@ local function AppContent()
 					CornerRadius = UDim.new(0, 4),
 				}),
 				Stroke = e("UIStroke", {
-					Color = context.COLORS.stroke,
+					Color = COLORS.stroke,
 					Thickness = 1,
 				}),
 				HostInput = e(TextInput, {
 					value = context.settings.host,
-					placeholder = "localhost",
-					textColor = context.COLORS.text,
-					placeholderColor = context.COLORS.textDim,
+					placeholder = context.settings.defaultHost,
+					textColor = COLORS.text,
+					placeholderColor = COLORS.textDim,
 					textXAlignment = Enum.TextXAlignment.Left,
 					onValueChange = context.setHost,
 				}),
 				PortInput = e(TextInput, {
 					value = context.settings.port,
-					placeholder = "44872",
-					textColor = context.COLORS.text,
-					placeholderColor = context.COLORS.textDim,
+					placeholder = context.settings.defaultPort,
+					textColor = COLORS.text,
+					placeholderColor = COLORS.textDim,
 					textXAlignment = Enum.TextXAlignment.Right,
 					onValueChange = context.setPort,
 				}),
@@ -80,27 +85,37 @@ local function AppContent()
 		}) or nil,
 
 		-- Auto Connect row (only when settings panel enabled)
-		AutoConnectRow = showSettings and e("Frame", {
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, 30),
-			LayoutOrder = 3,
+		AutoConnectRow = showSettings and e(Row, {
+			height = 30,
+			layoutOrder = 3,
 		}, {
-			Layout = e("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalFlex = Enum.UIFlexAlignment.SpaceBetween,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
 			Label = e(Label, {
 				text = "Auto Connect",
-				textColor = context.COLORS.accent,
+				textColor = COLORS.accent,
 			}),
 			Checkbox = e(Checkbox, {
 				checked = context.settings.autoConnect,
-				strokeColor = context.COLORS.stroke,
-				accentColor = context.COLORS.accent,
+				strokeColor = COLORS.stroke,
 				onToggle = function()
 					context.setAutoConnect(not context.settings.autoConnect)
+				end,
+			}),
+		}) or nil,
+
+		-- Verbose row (only when settings panel enabled)
+		VerboseRow = showSettings and e(Row, {
+			height = 30,
+			layoutOrder = 4,
+		}, {
+			Label = e(Label, {
+				text = "Verbose",
+				textColor = COLORS.accent,
+			}),
+			Checkbox = e(Checkbox, {
+				checked = context.settings.verbose,
+				strokeColor = COLORS.stroke,
+				onToggle = function()
+					context.setVerbose(not context.settings.verbose)
 				end,
 			}),
 		}) or nil,
@@ -109,13 +124,13 @@ local function AppContent()
 		ButtonContainer = showSettings and e("Frame", {
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 0.25),
-			LayoutOrder = 4,
+			LayoutOrder = 5,
 		}, {
 			Button = e(Button, {
 				text = if isConnected then "DISCONNECT" else "CONNECT",
-				color = if isConnected then context.COLORS.buttonDisconnect else context.COLORS.buttonConnect,
-				backgroundColor = context.COLORS.buttonBackground,
-				hoverBackgroundColor = context.COLORS.buttonHover,
+				color = if isConnected then COLORS.buttonDisconnect else COLORS.buttonConnect,
+				backgroundColor = COLORS.buttonBackground,
+				hoverBackgroundColor = COLORS.buttonHover,
 				onClick = if isConnected then context.disconnect else context.connect,
 			}),
 		}) or nil,

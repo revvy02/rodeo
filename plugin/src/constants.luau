@@ -1,9 +1,4 @@
--- Shared constants for rodeo plugins
-
 return {
-	SERVE_PORT = 44872,
-	ONCE_PORT = 44873,
-
 	-- Bit positions for run context bitset
 	CONTEXT_BITS = {
 		isStudio = 0,

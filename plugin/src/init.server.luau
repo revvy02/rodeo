@@ -16,9 +16,6 @@ local flags = require(script.flags)
 
 local e = React.createElement
 
--- Initialize debug mode from flags
-_G.RODEO_DEBUG = flags.DEBUG
-
 local WIDGET_INFO = DockWidgetPluginGuiInfo.new(
 	Enum.InitialDockState.Right,
 	false, -- Initially disabled
@@ -53,7 +50,7 @@ local root = ReactRoblox.createRoot(widget)
 root:render(e(App, {
 	plugin = plugin,
 	initialSettings = {
-		host = "localhost",
+		host = flags.SETTINGS.host,
 		port = flags.SETTINGS.port,
 		autoConnect = flags.SETTINGS.autoConnect,
 	},

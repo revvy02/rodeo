@@ -39,27 +39,7 @@ local function createModuleScript(script: string, instancePath: string?): Module
 	return moduleScript
 end
 
-local function executeModule(moduleScript: ModuleScript): (boolean, any)
-	local success, result = xpcall(function()
-		local fn = require(moduleScript)
-		return fn()
-	end, debug.traceback)
-	-- Note: moduleScript is NOT destroyed here - cleanup() handles destruction after execution
-
-	if not success then
-		local event = Instance.new("BindableEvent")
-		event.Event:Connect(function()
-			error(result, 0)
-		end)
-		event:Fire()
-		return false, nil
-	end
-
-	return true, result
-end
-
 return {
 	resolveInstancePath = resolveInstancePath,
 	createModuleScript = createModuleScript,
-	executeModule = executeModule,
 }

@@ -1,12 +1,53 @@
 --[[
+	runtime.luau - Script execution runtime
 
+	Encapsulates all script execution logic including:
+	- Module reloading (uncachable requires)
+	- Log capture and filtering
+	- Result serialization
+	- Cleanup
 ]]
 
+local HttpService = game:GetService("HttpService")
+local LogService = game:GetService("LogService")
+local flags = require(script.Parent.flags)
+
+local LOG_TYPE_TO_LEVEL = {
+	[Enum.MessageType.MessageOutput] = "Print",
+	[Enum.MessageType.MessageInfo] = "Info",
+	[Enum.MessageType.MessageWarning] = "Warning",
+	[Enum.MessageType.MessageError] = "Error",
+}
+
+export type LogFilter = {
+	enableWarn: boolean?,
+	enableError: boolean?,
+	enableInfo: boolean?,
+	enableOutput: boolean?,
+	enableLogs: boolean?,
+}
+
+export type ExecutionParams = {
+	executionId: string,
+	logFilter: LogFilter?,
+	cacheRequires: boolean?,
+}
+
+export type ExecutionCallbacks = {
+	onOutput: (level: string, body: string) -> (),
+	onComplete: (result: string?) -> (),
+}
+
+-- Debug logging
 local function log(message: string)
-	if _G.RODEO_DEBUG then
+	if flags.VERBOSE then
 		warn(message)
 	end
 end
+
+--------------------------------------------------------------------------------
+-- Reloader logic (merged from reloader.luau)
+--------------------------------------------------------------------------------
 
 -- Extract content from outermost parentheses, handling nested parens
 -- Returns: content string and ending position, or nil if not found
@@ -66,7 +107,6 @@ end
 
 -- Convert Roblox string path to instance
 -- Handles @self, ./, ../
--- Will need to add support for aliases eventually
 local function getRobloxStringPathInstance(rootInstance: Instance, pathString: string): ModuleScript?
 	local current = rootInstance
 
@@ -135,12 +175,12 @@ end
 -- Resolve a require path to an actual instance
 -- Two-phase resolution: try loadstring first, then string path conversion
 local function getRequireInstance(requireString: string, currentScript: Instance): ModuleScript?
-	log(`[rodeo-reloader] Resolving require: {requireString} from {currentScript:GetFullName()}`)
+	log(`[rodeo-runtime] Resolving require: {requireString} from {currentScript:GetFullName()}`)
 
 	-- Extract the path from require(path) using helper function
 	local pathExpr, _ = extractParenthesisContent(requireString, 1)
 	if not pathExpr then
-		log(`[rodeo-reloader]   ✗ Failed to extract path from require string`)
+		log(`[rodeo-runtime]   Failed to extract path from require string`)
 		return nil
 	end
 
@@ -163,27 +203,27 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 
 	-- If loadstring succeeded and returned an Instance, use it
 	if success and typeof(result) == "Instance" and result:IsA("ModuleScript") then
-		log(`[rodeo-reloader]   ✓ Phase 1 (loadstring): Resolved to {result:GetFullName()}`)
+		log(`[rodeo-runtime]   Phase 1 (loadstring): Resolved to {result:GetFullName()}`)
 		return result
 	end
 
 	-- Phase 2: If loadstring failed or didn't return an instance, try string path conversion
 	-- This handles "@self/path", "./relative", etc.
-	log(`[rodeo-reloader]   Phase 1 failed, trying Phase 2 (string conversion)`)
+	log(`[rodeo-runtime]   Phase 1 failed, trying Phase 2 (string conversion)`)
 	local resolved = getRobloxStringPathInstance(currentScript, pathExpr)
 	if resolved then
-		log(`[rodeo-reloader]   ✓ Phase 2: Resolved to {resolved:GetFullName()}`)
+		log(`[rodeo-runtime]   Phase 2: Resolved to {resolved:GetFullName()}`)
 	else
-		log(`[rodeo-reloader]   ✗ Phase 2: Failed to resolve`)
+		log(`[rodeo-runtime]   Phase 2: Failed to resolve`)
 	end
 	return resolved
 end
 
 local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]: true }, disabledInstances)
-	log(`[rodeo-reloader] Processing module: {rootModule:GetFullName()}`)
+	log(`[rodeo-runtime] Processing module: {rootModule:GetFullName()}`)
 	local source = rootModule.Source
 	local requires = extractRequires(source)
-	log(`[rodeo-reloader]   Found {#requires} require() calls`)
+	log(`[rodeo-runtime]   Found {#requires} require() calls`)
 
 	-- extract require calls
 	-- for each require, convert path to instance
@@ -191,18 +231,18 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 		local requireModule = getRequireInstance(requirePath, rootModule)
 
 		if not requireModule then
-			log(`[rodeo-reloader]   ✗ Failed to resolve require, skipping`)
+			log(`[rodeo-runtime]   Failed to resolve require, skipping`)
 			continue
 		end
 
 		if clonedModules[requireModule] then
-			log(`[rodeo-reloader]   Skipping {requireModule:GetFullName()} (already cloned)`)
+			log(`[rodeo-runtime]   Skipping {requireModule:GetFullName()} (already cloned)`)
 			continue
 		end
 
 		local requireModuleCopy = requireModule:Clone()
 		clonedModules[requireModuleCopy] = true
-		log(`[rodeo-reloader]   Cloned: {requireModule:GetFullName()}`)
+		log(`[rodeo-runtime]   Cloned: {requireModule:GetFullName()}`)
 
 		-- Track all descendants of the original module
 		local descendantCount = 0
@@ -213,13 +253,13 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 			end
 		end
 		if descendantCount > 0 then
-			log(`[rodeo-reloader]   Tracked {descendantCount} descendant modules`)
+			log(`[rodeo-runtime]   Tracked {descendantCount} descendant modules`)
 		end
 
 		local name = requireModule.Name
 		requireModule.Name = name .. ".rodeo.ignore"
 		requireModuleCopy.Parent = requireModule.Parent
-		log(`[rodeo-reloader]   Swapped: {name} <-> {requireModule.Name}`)
+		log(`[rodeo-runtime]   Swapped: {name} <-> {requireModule.Name}`)
 
 		table.insert(disabledInstances, requireModule)
 
@@ -227,10 +267,9 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 	end
 end
 
--- Idea is we start at source module, parse requires, get the instance for each require,
--- clone it, temporarily rename the original so requires pickup the clone, and recursively do that.
+-- Setup uncachable requires by cloning and renaming modules
 local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript): () -> ()
-	log(`[rodeo-reloader] ━━━ Starting uncachable require setup for {rootInstance:GetFullName()} ━━━`)
+	log(`[rodeo-runtime] Starting uncachable require setup for {rootInstance:GetFullName()}`)
 
 	-- parse rootInstance Source
 	local clonedModules = {}
@@ -243,28 +282,131 @@ local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript)
 		cloneCount = cloneCount + 1
 	end
 
-	log(`[rodeo-reloader] ✓ Setup complete: {cloneCount} modules tracked, {#disabledInstances} originals renamed`)
+	log(`[rodeo-runtime] Setup complete: {cloneCount} modules tracked, {#disabledInstances} originals renamed`)
 
 	return function()
-		log(`[rodeo-reloader] ━━━ Starting cleanup ━━━`)
+		log(`[rodeo-runtime] Starting cleanup`)
 
 		local restoredCount = 0
 		for _, instance in disabledInstances do
 			instance.Name = string.gsub(instance.Name, "%.rodeo%.ignore$", "")
 			restoredCount = restoredCount + 1
 		end
-		log(`[rodeo-reloader]   Restored {restoredCount} original module names`)
+		log(`[rodeo-runtime]   Restored {restoredCount} original module names`)
 
 		local destroyedCount = 0
 		for module in clonedModules do
 			module:Destroy()
 			destroyedCount = destroyedCount + 1
 		end
-		log(`[rodeo-reloader]   Destroyed {destroyedCount} cloned modules`)
-		log(`[rodeo-reloader] ✓ Cleanup complete`)
+		log(`[rodeo-runtime]   Destroyed {destroyedCount} cloned modules`)
+		log(`[rodeo-runtime] Cleanup complete`)
 	end
 end
 
+--------------------------------------------------------------------------------
+-- Execution logic
+--------------------------------------------------------------------------------
+
+-- Execute module and handle errors
+local function executeModule(moduleScript: ModuleScript): (boolean, any)
+	local success, result = xpcall(function()
+		local fn = require(moduleScript)
+		return fn()
+	end, debug.traceback)
+
+	if not success then
+		local event = Instance.new("BindableEvent")
+		event.Event:Connect(function()
+			error(result, 0)
+		end)
+		event:Fire()
+		return false, nil
+	end
+
+	return true, result
+end
+
+-- Main execute function
+local function execute(moduleScript: ModuleScript, params: ExecutionParams, callbacks: ExecutionCallbacks)
+	local logConnection: RBXScriptConnection? = nil
+	local logFilter = params.logFilter or {
+		enableWarn = true,
+		enableError = true,
+		enableInfo = true,
+		enableOutput = true,
+		enableLogs = true,
+	}
+
+	-- Setup log capture
+	if logFilter.enableLogs then
+		logConnection = LogService.MessageOut:Connect(function(body, messageType)
+			local level = LOG_TYPE_TO_LEVEL[messageType] or "Info"
+
+			-- Filter based on log level
+			if level == "Warning" and not logFilter.enableWarn then
+				return
+			elseif level == "Error" and not logFilter.enableError then
+				return
+			elseif level == "Info" and not logFilter.enableInfo then
+				return
+			elseif level == "Print" and not logFilter.enableOutput then
+				return
+			end
+
+			callbacks.onOutput(level, body)
+		end)
+	end
+
+	-- Setup uncachable requires
+	local cleanup: (() -> ())? = nil
+	if not params.cacheRequires then
+		cleanup = setupUncachableRequireModuleTraversal(moduleScript)
+	end
+
+	-- Execute the module
+	local success, result = executeModule(moduleScript)
+
+	-- Wait for logs to be captured and sent
+	task.wait(0.1)
+
+	-- Cleanup: restore original names and destroy clones
+	if cleanup then
+		cleanup()
+	end
+
+	-- Serialize result
+	local serializedResult = nil
+	if success and result ~= nil then
+		local serializeSuccess, encoded = pcall(function()
+			return HttpService:JSONEncode(result)
+		end)
+		if serializeSuccess then
+			serializedResult = encoded
+		else
+			-- Fallback to tostring for non-serializable types
+			serializedResult = tostring(result)
+		end
+	end
+
+	-- Wait for "done" message to flush through WebSocket buffers
+	task.wait(0.1)
+
+	-- Cleanup log connection
+	if logConnection then
+		logConnection:Disconnect()
+	end
+
+	-- Call completion callback
+	callbacks.onComplete(serializedResult)
+end
+
 return {
+	execute = execute,
+	executeModule = executeModule,
 	setupUncachableRequireModuleTraversal = setupUncachableRequireModuleTraversal,
+	extractRequires = extractRequires,
+	extractParenthesisContent = extractParenthesisContent,
+	getRobloxStringPathInstance = getRobloxStringPathInstance,
+	getRequireInstance = getRequireInstance,
 }

@@ -9,6 +9,7 @@ local React = require(script.Parent.Parent.Parent.packages.react)
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local constants = require(script.Parent.Parent.constants)
+local flags = require(script.Parent.Parent.flags)
 
 export type ConnectionStatus = {
 	connected: boolean,
@@ -61,8 +62,8 @@ local function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn
 	-- Refs for mutable values that don't need re-renders
 	local clientRef = React.useRef(nil :: any)
 	local retryTaskRef = React.useRef(nil :: thread?)
-	local lastHostRef = React.useRef("localhost")
-	local lastPortRef = React.useRef(constants.SERVE_PORT)
+	local lastHostRef = React.useRef(flags.SETTINGS.host)
+	local lastPortRef = React.useRef(flags.SETTINGS.port)
 	local isCleaningUpRef = React.useRef(false)
 
 	-- Internal cleanup function
@@ -165,7 +166,7 @@ local function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn
 			end)
 
 			client.Error:Connect(function(responseStatusCode, errorMessage)
-				if _G.RODEO_DEBUG then
+				if flags.VERBOSE then
 					warn("[rodeo] WebSocket error:", responseStatusCode, errorMessage)
 				end
 
