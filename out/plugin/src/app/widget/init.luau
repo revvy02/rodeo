@@ -1,4 +1,4 @@
-local React = require("@pkg/react")
+local React = require(script.Parent.Parent.Parent:WaitForChild('packages'):WaitForChild('react'))
 
 local AppContext = require(script.Parent.context.AppContext)
 local Container = require(script.Container)
@@ -90,7 +90,7 @@ local function AppContent()
 			layoutOrder = 3,
 		}, {
 			Label = e(Label, {
-				text = "> Auto Connect",
+				text = "Auto Connect",
 				textColor = COLORS.accent,
 			}),
 			Checkbox = e(Checkbox, {
@@ -108,7 +108,7 @@ local function AppContent()
 			layoutOrder = 4,
 		}, {
 			Label = e(Label, {
-				text = "> Verbose",
+				text = "Verbose",
 				textColor = COLORS.accent,
 			}),
 			Checkbox = e(Checkbox, {

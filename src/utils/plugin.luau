@@ -5,9 +5,10 @@
 local fs = require("@lune/fs")
 
 type PluginConfig = {
-	DEBUG: boolean,
+	VERBOSE: boolean,
 	SETTINGS_PANEL_ENABLED: boolean,
 	SETTINGS: {
+		host: string,
 		port: number,
 		autoConnect: boolean,
 	},
@@ -18,11 +19,14 @@ type PluginConfig = {
 local function patchFlags(binaryData: string, config: PluginConfig): string
 	local patched = binaryData
 
-	-- Patch DEBUG flag
-	patched = string.gsub(patched, "DEBUG = false", `DEBUG = {tostring(config.DEBUG)}`)
+	-- Patch VERBOSE flag
+	patched = string.gsub(patched, "VERBOSE = false", `VERBOSE = {tostring(config.VERBOSE)}`)
 
 	-- Patch SETTINGS_PANEL_ENABLED flag
 	patched = string.gsub(patched, "SETTINGS_PANEL_ENABLED = true", `SETTINGS_PANEL_ENABLED = {tostring(config.SETTINGS_PANEL_ENABLED)}`)
+
+	-- Patch SETTINGS.host
+	patched = string.gsub(patched, 'host = "localhost"', `host = "{config.SETTINGS.host}"`)
 
 	-- Patch SETTINGS.port
 	patched = string.gsub(patched, "port = 44872", `port = {config.SETTINGS.port}`)
@@ -46,9 +50,10 @@ end
 
 local function writeOncePlugin(targetPath: string, port: number?)
 	local patched = patchFlags(_G.RODEO_PLUGIN, {
-		DEBUG = false,
+		VERBOSE = false,
 		SETTINGS_PANEL_ENABLED = false,
 		SETTINGS = {
+			host = "localhost",
 			port = port or 44873,
 			autoConnect = true,
 		},
@@ -58,9 +63,10 @@ end
 
 local function writeServePlugin(targetPath: string, port: number?)
 	local patched = patchFlags(_G.RODEO_PLUGIN, {
-		DEBUG = false,
+		VERBOSE = false,
 		SETTINGS_PANEL_ENABLED = true,
 		SETTINGS = {
+			host = "localhost",
 			port = port or 44872,
 			autoConnect = false,
 		},

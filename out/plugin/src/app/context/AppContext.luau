@@ -9,13 +9,13 @@
 	All state flows through React context to child components.
 ]]
 
-local React = require("@pkg/react")
+local React = require(script.Parent.Parent.Parent.Parent:WaitForChild('packages'):WaitForChild('react'))
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local constants = require(script.Parent.Parent.Parent.constants)
 local flags = require(script.Parent.Parent.Parent.flags)
-local useExecution = require(script.Parent.Parent.hooks.useExecution)
-local useWebSocket = require(script.Parent.Parent.hooks.useWebSocket)
+local useWebSocket = require(script.Parent.hooks.useWebSocket)
+local useExecution = require(script.Parent.hooks.useExecution)
 
 local e = React.createElement
 local CONTEXT_BITS = constants.CONTEXT_BITS

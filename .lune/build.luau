@@ -42,6 +42,9 @@ local function main()
 		"plugin/.darklua.json",
 	}, { stdio = "forward" })
 
+	-- Copy roblox_packages to build directory
+	fs.copy("plugin/roblox_packages", "build/plugin_bundle/roblox_packages")
+
 	fs.writeFile(
 		"build/plugin_bundle/default.project.json",
 		serde.encode("json", {
@@ -52,14 +55,28 @@ local function main()
 					["$path"] = "./src",
 				},
 				packages = {
-					["$path"] = "../../plugin/roblox_packages",
+					["$path"] = "./roblox_packages",
 				},
 			},
 		})
 	)
 	process.exec("rojo", { "build", "build/plugin_bundle/default.project.json", "-o", "build/plugin.rbxmx" }, { stdio = "forward" })
 
-	process.exec("darklua", { "process", "src", "build/release_bundle", "--config", ".darklua.json" }, { stdio = "forward" })
+	-- Read plugin binary and create darklua config with embedded plugin
+	local pluginBinary = fs.readFile("build/plugin.rbxmx")
+
+	local templateConfig = fs.readFile(".darklua.json")
+	local config = serde.decode("json", templateConfig)
+
+	table.insert(config.rules, {
+		rule = "inject_global_value",
+		identifier = "RODEO_PLUGIN",
+		value = pluginBinary,
+	})
+
+	fs.writeFile("build/release_bundle.darklua.json", serde.encode("json", config))
+
+	process.exec("darklua", { "process", "src", "build/release_bundle", "--config", "build/release_bundle.darklua.json" }, { stdio = "forward" })
 
 	ensureDir("build/releases")
 
