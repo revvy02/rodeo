@@ -29,11 +29,11 @@ return {
 
 		-- Status colors - green for connection status, red for disconnected
 		success = Color3.fromRGB(140, 220, 100),
-		error = Color3.fromRGB(150, 40, 45),
+		error = Color3.fromRGB(220, 80, 90),
 
-		-- Button colors - bright crimson for connect, dark maroon for disconnect
+		-- Button colors - bright crimson for connect, vibrant red-orange for disconnect
 		buttonConnect = Color3.fromRGB(255, 70, 80),
-		buttonDisconnect = Color3.fromRGB(150, 40, 45),
+		buttonDisconnect = Color3.fromRGB(255, 90, 70),
 
 		-- Component-specific
 		buttonBackground = Color3.fromRGB(35, 20, 22),

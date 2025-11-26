@@ -1,6 +1,7 @@
 -- rodeo CLI Router
 -- Routes commands to appropriate handlers
 local argparse = require("@pkg/argparse")
+local constants = require("@self/utils/constants")
 
 local function main()
 	local parser = argparse("rodeo", "Run Luau code inside Roblox Studio")
@@ -20,9 +21,11 @@ local function main()
 	onceCmd:flag("--no-print", "Disable print statements")
 	onceCmd:flag("--no-output", "Disable all output")
 	onceCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
+	onceCmd:option("--port", "Port number for ephemeral server"):default(constants.ONCE_PORT):convert(tonumber)
 
 	-- Define serve command
-	parser:command("serve", "Start persistent server for code execution")
+	local serveCmd = parser:command("serve", "Start persistent server for code execution")
+	serveCmd:option("--port", "Port number for server"):default(constants.SERVE_PORT):convert(tonumber)
 
 	-- Define exec command
 	local execCmd = parser:command("exec", "Execute script via running serve instance")
@@ -43,12 +46,14 @@ local function main()
 	execCmd:flag("--no-print", "Disable print statements")
 	execCmd:flag("--no-output", "Disable all output")
 	execCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
+	execCmd:option("--port", "Port number of running server"):default(constants.SERVE_PORT):convert(tonumber)
 
 	-- Define build command
 	parser:command("build", "Build and install the serve plugin")
 
 	-- Define status command
-	parser:command("status", "Check if rodeo serve is running")
+	local statusCmd = parser:command("status", "Check if rodeo serve is running")
+	statusCmd:option("--port", "Port number to check"):default(constants.SERVE_PORT):convert(tonumber)
 
 	local args = parser:parse()
 

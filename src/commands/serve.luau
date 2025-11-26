@@ -221,11 +221,12 @@ local function handleStudioClient(ws: any, vmBitset: number)
 	removePipelineFromMap(vmBitset, studioId)
 end
 
-local function main(_args: any)
-	stdio.write(colors.cyan(`Starting server on port {constants.SERVE_PORT}`) .. "\n")
+local function main(args: any)
+	local port = args.port
+	stdio.write(colors.cyan(`Starting server on port {port}`) .. "\n")
 	stdio.write(colors.cyan(`Waiting for Studio plugin to connect...`) .. "\n")
 
-	local _server = net.serve(constants.SERVE_PORT, {
+	local _server = net.serve(port, {
 		handleRequest = function(request)
 			if request.path == "/health" then
 				local contextStatus = {}

@@ -186,8 +186,10 @@ local function main(args: any)
 		end
 	end
 
-	if not checkServerHealth(constants.SERVE_PORT) then
-		stdio.write(colors.error(`Error: No rodeo server found on port {constants.SERVE_PORT}. Run 'rodeo serve' first.`) .. "\n")
+	local port = args.port
+
+	if not checkServerHealth(port) then
+		stdio.write(colors.error(`Error: No rodeo server found on port {port}. Run 'rodeo serve --port {port}' first.`) .. "\n")
 		process.exit(1)
 	end
 
@@ -196,7 +198,7 @@ local function main(args: any)
 	local executionId = uuid.generate()
 	local exitCodeRef = { value = 0 }
 
-	local ws = connectToServer(constants.SERVE_PORT)
+	local ws = connectToServer(port)
 	identifyClient(ws)
 	submitScript(ws, executionId, scriptContent, instancePath, config.filterBits, config.filterMask, config.logFilter, config.cacheRequires)
 

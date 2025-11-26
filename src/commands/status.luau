@@ -29,9 +29,9 @@ local function checkServerStatus(port: number): (boolean, any?)
 	return true, healthData
 end
 
-local function formatStatus(healthData: any)
+local function formatStatus(healthData: any, port: number)
 	stdio.write(colors.success("rodeo serve is running") .. "\n")
-	stdio.write(colors.cyan(`Port: {constants.SERVE_PORT}`) .. "\n")
+	stdio.write(colors.cyan(`Port: {port}`) .. "\n")
 	stdio.write(colors.cyan(`Total VMs: {healthData.totalVms}`) .. "\n")
 	stdio.write(colors.cyan(`Total Queued: {healthData.totalQueued}`) .. "\n")
 	stdio.write(colors.cyan(`Context Groups: {healthData.contextCount}`) .. "\n")
@@ -54,14 +54,15 @@ local function formatStatus(healthData: any)
 end
 
 local function main(args: any)
-	local isRunning, healthData = checkServerStatus(constants.SERVE_PORT)
+	local port = args.port
+	local isRunning, healthData = checkServerStatus(port)
 
 	if not isRunning then
-		stdio.write(colors.error(`Error: rodeo serve is not running on port {constants.SERVE_PORT}`) .. "\n")
+		stdio.write(colors.error(`Error: rodeo serve is not running on port {port}`) .. "\n")
 		process.exit(1)
 	end
 
-	formatStatus(healthData)
+	formatStatus(healthData, port)
 	process.exit(0)
 end
 

@@ -29,11 +29,12 @@ local function Button()
 
 	local baseColor = if isConnected then context.COLORS.buttonDisconnect else context.COLORS.buttonConnect
 	local backgroundColor = if isHovering then context.COLORS.buttonHover else context.COLORS.buttonBackground
+	local strokeThickness = if isHovering then 2 else 1.5
 
 	return e("TextButton", {
 		BackgroundColor3 = backgroundColor,
 		BackgroundTransparency = 0,
-		Size = UDim2.fromOffset(120, 50),
+		Size = UDim2.fromOffset(140, 50),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Text = "",
@@ -42,12 +43,21 @@ local function Button()
 		[React.Event.MouseLeave] = handleMouseLeave,
 	}, {
 		Corner = e("UICorner", {
-			CornerRadius = UDim.new(0, 6),
+			CornerRadius = UDim.new(0, 8),
 		}),
 		Stroke = e("UIStroke", {
 			Color = baseColor,
-			Thickness = 1.5,
+			Thickness = strokeThickness,
 			Transparency = 0,
+		}, {
+			StrokeGradient = e("UIGradient", {
+				Transparency = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, if isHovering then 0 else 0.2),
+					NumberSequenceKeypoint.new(0.5, 0),
+					NumberSequenceKeypoint.new(1, if isHovering then 0 else 0.2),
+				}),
+				Rotation = 90,
+			}),
 		}),
 		Label = e("TextLabel", {
 			Text = if isConnected then "DISCONNECT" else "CONNECT",

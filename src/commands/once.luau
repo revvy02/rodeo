@@ -189,8 +189,10 @@ local function main(args: any)
 		placeToOpen = tempPlacePath
 	end
 
+	local port = args.port
+
 	-- Write embedded plugin to Studio plugins directory
-	embeddedPlugins.writeOncePlugin(pluginPath)
+	embeddedPlugins.writeOncePlugin(pluginPath, port)
 
 	local instancePath = execution.resolveInstancePath(config.sourcemap, config.scriptPath)
 
@@ -198,7 +200,7 @@ local function main(args: any)
 	local isComplete = false
 
 	-- Start WebSocket server BEFORE launching Studio
-	local server = net.serve(constants.ONCE_PORT, {
+	local server = net.serve(port, {
 		handleWebSocket = function(ws)
 			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.logFilter, exitCodeRef, config.outputFile, config.returnFile, config.showReturn, config.cacheRequires)
 		end,

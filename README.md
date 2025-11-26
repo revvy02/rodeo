@@ -95,6 +95,30 @@ rodeo exec script.luau --edit 0
 
 Omit a flag to match any value. Use `1` to require it, `0` to exclude it.
 
+### Custom Port Configuration
+
+By default, rodeo uses port 44872 for serve mode and 44873 for once mode. You can customize the port number if needed:
+
+```bash
+# Start server on custom port
+rodeo serve --port 8080
+
+# Execute script on custom port server
+rodeo exec script.luau --port 8080
+
+# Check status of custom port server
+rodeo status --port 8080
+
+# One-time execution on custom port
+rodeo once script.luau --port 9000
+```
+
+**Available commands with `--port`:**
+- `rodeo serve --port <number>` - Start server on custom port (default: 44872)
+- `rodeo exec --port <number>` - Connect to server on custom port (default: 44872)
+- `rodeo once --port <number>` - Run ephemeral server on custom port (default: 44873)
+- `rodeo status --port <number>` - Check server on custom port (default: 44872)
+
 ### Output Redirection
 
 Redirect execution output and return values to files:
