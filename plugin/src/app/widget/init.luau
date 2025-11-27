@@ -31,7 +31,7 @@ export type Props = {
 local function AppContent()
 	local context = useAppContext()
 	local showSettings = context.settingsPanelEnabled
-	local isConnected = context.connectionStatus.connected
+	local isConnected = context.connected
 
 	return e(Container, {}, {
 		-- Status indicator (always shown)
@@ -121,12 +121,13 @@ local function AppContent()
 		}) or nil,
 
 		-- Button (only when settings panel enabled)
+		-- When connected: red text/stroke (disconnect action)
+		-- When disconnected: green text/stroke (connect action)
 		Button = showSettings and e(Button, {
 			text = if isConnected then "DISCONNECT" else "CONNECT",
-			color = if isConnected then COLORS.buttonDisconnect else COLORS.buttonConnect,
-			strokeColor = COLORS.stroke,
-			backgroundColor = COLORS.buttonBackground,
-			hoverBackgroundColor = COLORS.buttonHover,
+			color = if isConnected then COLORS.error else COLORS.success,
+			strokeColor = if isConnected then COLORS.error else COLORS.success,
+			size = UDim2.fromOffset(140, 50),
 			layoutOrder = 5,
 			onClick = if isConnected then context.disconnect else context.connect,
 		}) or nil,
@@ -137,10 +138,17 @@ local function AppContent()
 end
 
 local function App(props: Props)
-	return e(AppProvider, {
-		plugin = props.plugin,
-		initialSettings = props.initialSettings,
-	}, e(AppContent))
+	return e("Frame", {
+		BackgroundColor3 = COLORS.background,
+		BackgroundTransparency = 0,
+		Size = UDim2.fromScale(1, 1),
+		BorderSizePixel = 0,
+	}, {
+		Content = e(AppProvider, {
+			plugin = props.plugin,
+			initialSettings = props.initialSettings,
+		}, e(AppContent)),
+	})
 end
 
 return App

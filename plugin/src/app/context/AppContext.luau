@@ -19,15 +19,11 @@ local utils = require(script.Parent.Parent.Parent.utils)
 
 local e = React.createElement
 local CONTEXT_BITS = constants.CONTEXT_BITS
+local COLORS = constants.COLORS
 
 local AppContext = React.createContext(nil)
 
 -- Types
-export type ConnectionStatus = {
-	connected: boolean,
-	message: string,
-}
-
 export type Settings = {
 	host: string,
 	port: string,
@@ -39,8 +35,9 @@ export type Settings = {
 
 export type AppContextValue = {
 	-- Connection state
-	connectionStatus: ConnectionStatus,
+	connected: boolean,
 	isExecuting: boolean,
+	status: string,
 
 	-- Runtime context
 	contextBitset: number,
@@ -127,38 +124,48 @@ local function AppProvider(props: AppProviderProps)
 
 	-- WebSocket state
 	local wsUrl, setWsUrl = React.useState(nil :: string?)
-	local connectionStatus, setConnectionStatus = React.useState({
-		connected = false,
-		message = "Disconnected",
-	} :: ConnectionStatus)
+	local connected, setConnected = React.useState(false)
 
 	-- Execution state
 	local isExecuting, setIsExecuting = React.useState(false)
 
+	-- Derive status from connected + isExecuting (with rich text)
+	local status = React.useMemo(function()
+		if isExecuting then
+			local hex = COLORS.executing:ToHex()
+			return `<font color="#{hex}">Executing</font>`
+		elseif connected then
+			local hex = COLORS.success:ToHex()
+			return `<font color="#{hex}">Connected</font>`
+		else
+			local hex = COLORS.error:ToHex()
+			return `<font color="#{hex}">Disconnected</font>`
+		end
+	end, { isExecuting, connected }) :: string
+
 	-- WebSocket lifecycle effect
 	React.useEffect(function()
 		if not wsUrl then
-			setConnectionStatus({ connected = false, message = "Disconnected" })
+			setConnected(false)
 			return
 		end
-
-		setConnectionStatus({ connected = false, message = "Connecting..." })
 
 		local success, client = xpcall(function()
 			return HttpService:CreateWebStreamClient(Enum.WebStreamClientType.WebSocket, {
 				Url = wsUrl,
 			})
 		end, function(err)
-			warn(err)
-			setConnectionStatus({ connected = false, message = err })
+			warn("[rodeo] Error creating client:", err)
+			setConnected(false)
 		end)
 
 		if not success then
+			setWsUrl(nil)
 			return
 		end
 
 		client.Opened:Connect(function()
-			setConnectionStatus({ connected = true, message = "Connected" })
+			setConnected(true)
 			-- Send identification
 			client:Send(HttpService:JSONEncode({
 				clientType = "studio",
@@ -167,12 +174,13 @@ local function AppProvider(props: AppProviderProps)
 		end)
 
 		client.Error:Connect(function(code: string, message: string)
-			print("Error:", code, message)
+			warn("[rodeo] Socket error:", code, message)
+			setWsUrl(nil)
 		end)
 
 		client.Closed:Connect(function()
-			print("closed")
-			setConnectionStatus({ connected = false, message = "Disconnected" })
+			setConnected(false)
+			setWsUrl(nil)
 		end)
 
 		client.MessageReceived:Connect(function(message: string)
@@ -220,6 +228,7 @@ local function AppProvider(props: AppProviderProps)
 							result = result,
 						}))
 						setIsExecuting(false)
+						moduleScript:Destroy()
 					end,
 				})
 			end
@@ -262,24 +271,39 @@ local function AppProvider(props: AppProviderProps)
 
 	-- Disconnect handler
 	local function handleDisconnect()
+		setAutoConnect(false)
 		setWsUrl(nil)
 	end
 
-	-- Auto-connect on mount if enabled
+	-- Auto-reconnect when enabled and disconnected (retries every 1s)
 	React.useEffect(function()
-		if props.initialSettings.autoConnect then
-			local connectHost = if currentHost == "" then defaultHost else currentHost
-			local portNum = tonumber(currentPort) or tonumber(defaultPort)
-			setWsUrl(`ws://{connectHost}:{portNum}`)
+		-- Skip if: autoConnect is off, already connected, or already have a wsUrl (connection in progress)
+		if not autoConnect or connected or wsUrl then
+			return
 		end
-	end, {})
+
+		-- Delay before attempting reconnect
+		local shouldReconnect = true
+		task.delay(1, function()
+			if shouldReconnect then
+				local connectHost = if currentHost == "" then defaultHost else currentHost
+				local portNum = tonumber(currentPort) or tonumber(defaultPort)
+				setWsUrl(`ws://{connectHost}:{portNum}`)
+			end
+		end)
+
+		return function()
+			shouldReconnect = false
+		end
+	end, { autoConnect, connected, wsUrl, currentHost, currentPort, defaultHost, defaultPort })
 
 	-- Build context value (memoized)
 	local contextValue = React.useMemo(function()
 		return {
 			-- Connection state
-			connectionStatus = connectionStatus,
+			connected = connected,
 			isExecuting = isExecuting,
+			status = status,
 
 			-- Runtime context
 			contextBitset = getContextBitset(),
@@ -308,8 +332,9 @@ local function AppProvider(props: AppProviderProps)
 			disconnect = handleDisconnect,
 		}
 	end, {
-		connectionStatus,
+		connected,
 		isExecuting,
+		status,
 		currentHost,
 		currentPort,
 		defaultHost,

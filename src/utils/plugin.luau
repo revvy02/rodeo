@@ -68,7 +68,7 @@ local function writeServePlugin(targetPath: string, port: number?)
 		SETTINGS = {
 			host = "localhost",
 			port = port or 44872,
-			autoConnect = false,
+			autoConnect = true,
 		},
 	})
 	writeEmbeddedPlugin(patched, targetPath)

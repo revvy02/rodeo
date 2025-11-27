@@ -8,9 +8,9 @@ export type Props = {
 
 local function Container(props: Props)
 	return e("Frame", {
-		BackgroundColor3 = Color3.fromRGB(8, 6, 5),
-		BackgroundTransparency = 0,
-		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.fromScale(1, 0),
 		BorderSizePixel = 0,
 	}, {
 		Padding = e("UIPadding", {

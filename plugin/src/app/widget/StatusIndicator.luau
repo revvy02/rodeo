@@ -1,7 +1,7 @@
 local React = require("@pkg/react")
 local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
-local constants = require(script.Parent.Parent.Parent.constants)
 local Row = require(script.Parent.Row)
+local constants = require(script.Parent.Parent.Parent.constants)
 
 local e = React.createElement
 local COLORS = constants.COLORS
@@ -30,11 +30,14 @@ end
 
 local function StatusIndicator()
 	local context = useAppContext()
-	local connected = context.connectionStatus.connected
-	local message = context.connectionStatus.message
+	local connected = context.connected
+	local isExecuting = context.isExecuting
+	local status = context.status
 
-	local dotColor = if connected then COLORS.success else COLORS.error
-	local labelColor = if connected then COLORS.success else COLORS.textDim
+	-- Dot color: yellow when executing, green when connected, red when disconnected
+	local dotColor = if isExecuting then COLORS.executing
+		elseif connected then COLORS.success
+		else COLORS.error
 
 	local contextText = buildContextRichText(context.contextBitset, NUM_CONTEXT_BITS)
 
@@ -66,8 +69,9 @@ local function StatusIndicator()
 				BackgroundTransparency = 1,
 				AutomaticSize = Enum.AutomaticSize.X,
 				Size = UDim2.fromScale(0, 1),
-				Text = message,
-				TextColor3 = labelColor,
+				Text = status,
+				RichText = true,
+				TextColor3 = COLORS.text,
 				TextSize = 18,
 				TextScaled = true,
 				Font = Enum.Font.Arcade,
@@ -105,7 +109,7 @@ local function StatusIndicator()
 				Text = contextText,
 				RichText = true,
 				TextColor3 = COLORS.text,
-				TextSize = 18,
+				TextSize = 20,
 				Font = Enum.Font.Arcade,
 				TextXAlignment = Enum.TextXAlignment.Right,
 			}),

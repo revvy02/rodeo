@@ -11,7 +11,7 @@ return {
 	-- UI Colors for arcade design - Rodeo red theme
 	COLORS = {
 		-- Backgrounds - dark with subtle red tint
-		background = Color3.fromRGB(12, 5, 6),
+		background = Color3.fromRGB(8, 6, 5),
 		backgroundLight = Color3.fromRGB(20, 10, 12),
 
 		-- Text - red/pink tones
@@ -22,9 +22,10 @@ return {
 		accent = Color3.fromRGB(255, 70, 80),
 		accentHover = Color3.fromRGB(255, 100, 110),
 
-		-- Status colors - green for connection status, red for disconnected
+		-- Status colors - green for connected, red for disconnected, yellow for executing
 		success = Color3.fromRGB(140, 220, 100),
 		error = Color3.fromRGB(220, 80, 90),
+		executing = Color3.fromRGB(255, 200, 50),
 
 		-- Button colors - bright crimson for connect, vibrant red-orange for disconnect
 		buttonConnect = Color3.fromRGB(255, 70, 80),

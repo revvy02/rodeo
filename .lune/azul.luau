@@ -1,3 +1,5 @@
+-- script to convert a standard roblox project directory to a darklua out directory
+-- usage: lune run dark_rojo <src_path> <config_path>
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")

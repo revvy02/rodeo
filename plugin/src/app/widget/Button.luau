@@ -6,65 +6,63 @@ export type Props = {
 	text: string,
 	color: Color3,
 	strokeColor: Color3,
-	backgroundColor: Color3,
-	hoverBackgroundColor: Color3,
+	size: UDim2,
+	cornerRadius: number?,
 	layoutOrder: number?,
 	onClick: () -> (),
 }
 
 local function Button(props: Props)
-	local isHovering, setIsHovering = React.useState(false)
+	local cornerRadius = props.cornerRadius or 8
+	local isPressed, setIsPressed = React.useState(false)
 
-	local function handleMouseEnter()
-		setIsHovering(true)
+	local function handleMouseButton1Down()
+		setIsPressed(true)
+	end
+
+	local function handleMouseButton1Up()
+		setIsPressed(false)
 	end
 
 	local function handleMouseLeave()
-		setIsHovering(false)
+		setIsPressed(false)
 	end
 
-	local backgroundColor = if isHovering then props.hoverBackgroundColor else props.backgroundColor
+	local textColor = if isPressed then Color3.fromRGB(255, 255, 255) else props.color
+	local strokeColor = if isPressed then Color3.fromRGB(255, 255, 255) else props.strokeColor
 
 	return e("TextButton", {
-		BackgroundColor3 = backgroundColor,
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 		BackgroundTransparency = 0,
-		Size = UDim2.fromOffset(140, 50),
+		AutoButtonColor = true,
+		Size = props.size,
 		Text = "",
 		LayoutOrder = props.layoutOrder,
 		[React.Event.Activated] = props.onClick,
-		[React.Event.MouseEnter] = handleMouseEnter,
+		[React.Event.MouseButton1Down] = handleMouseButton1Down,
+		[React.Event.MouseButton1Up] = handleMouseButton1Up,
 		[React.Event.MouseLeave] = handleMouseLeave,
 	}, {
 		Corner = e("UICorner", {
-			CornerRadius = UDim.new(0, 8),
+			CornerRadius = UDim.new(0, cornerRadius),
 		}),
 		Stroke = e("UIStroke", {
-			Color = props.strokeColor,
+			Color = strokeColor,
 			Thickness = 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}),
 		Label = e("TextLabel", {
 			Text = props.text,
-			TextColor3 = props.color,
+			TextColor3 = textColor,
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 1),
 			Font = Enum.Font.Arcade,
-			TextSize = 16,
+			TextSize = 18,
 			TextScaled = true,
 		}, {
 			TextSizeConstraint = e("UITextSizeConstraint", {
-				MaxTextSize = 16,
+				MaxTextSize = 20,
 				MinTextSize = 10,
-			}),
-			Gradient = e("UIGradient", {
-				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, props.color),
-					ColorSequenceKeypoint.new(1, Color3.new(
-						props.color.R * 0.7,
-						props.color.G * 0.7,
-						props.color.B * 0.7
-					)),
-				}),
-				Rotation = 90,
 			}),
 		}),
 	})

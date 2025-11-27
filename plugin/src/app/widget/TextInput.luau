@@ -25,7 +25,7 @@ local function TextInput(props: Props)
 		TextColor3 = props.textColor,
 		PlaceholderText = props.placeholder,
 		PlaceholderColor3 = props.placeholderColor or props.textColor,
-		TextSize = 18,
+		TextSize = 20,
 		TextScaled = true,
 		Font = Enum.Font.Arcade,
 		TextXAlignment = props.textXAlignment or Enum.TextXAlignment.Left,
@@ -33,7 +33,7 @@ local function TextInput(props: Props)
 		[React.Event.FocusLost] = handleFocusLost,
 	}, {
 		TextSizeConstraint = e("UITextSizeConstraint", {
-			MaxTextSize = 18,
+			MaxTextSize = 20,
 			MinTextSize = 12,
 		}),
 		Gradient = e("UIGradient", {

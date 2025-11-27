@@ -39,7 +39,7 @@ export type ExecutionCallbacks = {
 }
 
 -- Debug logging (verbose flag passed per-execution)
-local VERBOSE = false
+local VERBOSE = true
 
 local function log(message: string)
 	if VERBOSE then
@@ -190,22 +190,21 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 	pathExpr = string.gsub(pathExpr, "^%s*[\"']?", "") -- Remove leading whitespace and quotes
 	pathExpr = string.gsub(pathExpr, "[\"']?%s*$", "") -- Remove trailing quotes and whitespace
 
-	-- Phase 1: Try to evaluate as instance path (handles script.Parent.Module, game.ReplicatedStorage.Foo, etc.)
+	-- Phase 1: Evaluate path using temp module (avoids loadstring/setfenv VM de-optimization)
 	local success, result = pcall(function()
-		local env = {
-			script = currentScript,
-			game = game,
-		}
-		local fn = loadstring("return " .. pathExpr)
-		if fn then
-			setfenv(fn, env)
-			return fn()
-		end
+		local tempModule = Instance.new("ModuleScript")
+		tempModule.Name = "__rodeo_resolver"
+		-- Assign script to currentScript so child paths like script.SomeChild work
+		tempModule.Source = "script = script.Parent[\"" .. currentScript.Name .. "\"]\nreturn " .. pathExpr
+		tempModule.Parent = currentScript.Parent
+		local resolved = require(tempModule)
+		tempModule:Destroy()
+		return resolved
 	end)
 
-	-- If loadstring succeeded and returned an Instance, use it
+	-- If temp module succeeded and returned a ModuleScript, use it
 	if success and typeof(result) == "Instance" and result:IsA("ModuleScript") then
-		log(`[rodeo-runtime]   Phase 1 (loadstring): Resolved to {result:GetFullName()}`)
+		log(`[rodeo-runtime]   Phase 1 (temp module): Resolved to {result:GetFullName()}`)
 		return result
 	end
 
@@ -332,7 +331,7 @@ end
 -- Main execute function
 local function execute(moduleScript: ModuleScript, params: ExecutionParams, callbacks: ExecutionCallbacks)
 	-- Set verbose flag for this execution
-	VERBOSE = params.verbose or false
+	-- VERBOSE = params.verbose or false
 
 	local logConnection: RBXScriptConnection? = nil
 	local logFilter = params.logFilter or {
