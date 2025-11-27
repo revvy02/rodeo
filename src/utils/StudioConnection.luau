@@ -25,12 +25,16 @@ function StudioConnection.new(ws: any, bitset: number): StudioConnection
 end
 
 function StudioConnection:send(data: string)
+	print("[StudioConnection:send] connected:", self.connected)
 	self.ws:send(data)
 end
 
 function StudioConnection:close()
+	print("[StudioConnection:close] connected:", self.connected)
 	self.connected = false
-	self.ws:close()
+	pcall(function()
+		self.ws:close()
+	end)
 end
 
 function StudioConnection:isConnected(): boolean

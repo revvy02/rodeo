@@ -171,6 +171,7 @@ local function handleExecClient(ws: any)
 			end
 		end
 	end
+	ws:close()
 end
 
 local function handleStudioClient(ws: any, vmBitset: number)
@@ -191,6 +192,7 @@ local function handleStudioClient(ws: any, vmBitset: number)
 	-- Process any pending executions that might match this new VM
 	processPendingExecutions()
 
+	print("[handleStudioClient] entering message loop")
 	while true do
 		local success, message = pcall(function()
 			return ws:next()
@@ -198,10 +200,12 @@ local function handleStudioClient(ws: any, vmBitset: number)
 
 		if not success then
 			-- Connection reset or closed unexpectedly
+			print("[handleStudioClient] ws:next() failed, breaking loop")
 			break
 		end
 
 		if not message then
+			print("[handleStudioClient] ws:next() returned nil, breaking loop")
 			break
 		end
 
@@ -216,9 +220,11 @@ local function handleStudioClient(ws: any, vmBitset: number)
 	end
 
 	-- Handle disconnect
+	print("[handleStudioClient] calling vmPipeline:disconnect()")
 	vmPipeline:disconnect()
-
+	print("[handleStudioClient] calling removePipelineFromMap")
 	removePipelineFromMap(vmBitset, studioId)
+	print("[handleStudioClient] done")
 end
 
 local function main(args: any)

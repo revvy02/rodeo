@@ -14,8 +14,8 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local constants = require(script.Parent.Parent.Parent.constants)
 local flags = require(script.Parent.Parent.Parent.flags)
-local useExecution = require(script.Parent.Parent.hooks.useExecution)
-local useWebSocket = require(script.Parent.Parent.hooks.useWebSocket)
+local runtime = require(script.Parent.Parent.Parent.runtime)
+local utils = require(script.Parent.Parent.Parent.utils)
 
 local e = React.createElement
 local CONTEXT_BITS = constants.CONTEXT_BITS
@@ -104,6 +104,15 @@ local function useAppContext(): AppContextValue
 	return context
 end
 
+-- local clients = {}
+-- game:GetService("RunService").Heartbeat:Connect(function()
+-- 	local x = {}
+-- 	for _, client in clients do
+-- 		table.insert(x, client.ConnectionState)
+-- 	end
+-- 	print(x)
+-- end)
+
 -- Provider component
 local function AppProvider(props: AppProviderProps)
 	-- Default values (used as placeholders and fallbacks)
@@ -116,21 +125,57 @@ local function AppProvider(props: AppProviderProps)
 	local autoConnect, setAutoConnect = React.useState(props.initialSettings.autoConnect)
 	local verbose, setVerbose = React.useState(flags.VERBOSE)
 
-	-- Ref to hold execution hook (needed for circular dependency with webSocket)
-	local executionRef = React.useRef(nil :: any)
+	-- WebSocket state
+	local wsUrl, setWsUrl = React.useState(nil :: string?)
+	local connectionStatus, setConnectionStatus = React.useState({
+		connected = false,
+		message = "Disconnected",
+	} :: ConnectionStatus)
 
-	-- WebSocket hook
-	local webSocket = useWebSocket({
-		autoRetry = flags.SETTINGS.autoConnect,
-		verbose = verbose,
-		onConnect = function(send)
-			-- Send initial identification
-			send(HttpService:JSONEncode({
+	-- Execution state
+	local isExecuting, setIsExecuting = React.useState(false)
+
+	-- WebSocket lifecycle effect
+	React.useEffect(function()
+		if not wsUrl then
+			setConnectionStatus({ connected = false, message = "Disconnected" })
+			return
+		end
+
+		setConnectionStatus({ connected = false, message = "Connecting..." })
+
+		local success, client = xpcall(function()
+			return HttpService:CreateWebStreamClient(Enum.WebStreamClientType.WebSocket, {
+				Url = wsUrl,
+			})
+		end, function(err)
+			warn(err)
+			setConnectionStatus({ connected = false, message = err })
+		end)
+
+		if not success then
+			return
+		end
+
+		client.Opened:Connect(function()
+			setConnectionStatus({ connected = true, message = "Connected" })
+			-- Send identification
+			client:Send(HttpService:JSONEncode({
 				clientType = "studio",
 				contextBitset = getContextBitset(),
 			}))
-		end,
-		onMessage = function(message: string)
+		end)
+
+		client.Error:Connect(function(code: string, message: string)
+			print("Error:", code, message)
+		end)
+
+		client.Closed:Connect(function()
+			print("closed")
+			setConnectionStatus({ connected = false, message = "Disconnected" })
+		end)
+
+		client.MessageReceived:Connect(function(message: string)
 			local success, decoded = pcall(function()
 				return HttpService:JSONDecode(message)
 			end)
@@ -143,100 +188,98 @@ local function AppProvider(props: AppProviderProps)
 			end
 
 			if decoded.type == "exec" then
-				if executionRef.current then
-					executionRef.current.executeScript({
-						script = decoded.script,
-						executionId = decoded.executionId,
-						instancePath = decoded.instancePath,
-						logFilter = decoded.logFilter or {
-							enableWarn = true,
-							enableError = true,
-							enableInfo = true,
-							enableOutput = true,
-							enableLogs = true,
-						},
-						cacheRequires = decoded.cacheRequires,
-					})
-				end
+				setIsExecuting(true)
+
+				local moduleScript = utils.createModuleScript(decoded.script, decoded.instancePath)
+				local logFilter = decoded.logFilter or {
+					enableWarn = true,
+					enableError = true,
+					enableInfo = true,
+					enableOutput = true,
+					enableLogs = true,
+				}
+
+				runtime.execute(moduleScript, {
+					executionId = decoded.executionId,
+					logFilter = logFilter,
+					cacheRequires = decoded.cacheRequires,
+					verbose = verbose,
+				}, {
+					onOutput = function(level, body)
+						client:Send(HttpService:JSONEncode({
+							type = "output",
+							executionId = decoded.executionId,
+							level = level,
+							body = body,
+						}))
+					end,
+					onComplete = function(result)
+						client:Send(HttpService:JSONEncode({
+							type = "done",
+							executionId = decoded.executionId,
+							result = result,
+						}))
+						setIsExecuting(false)
+					end,
+				})
 			end
-		end,
-	})
+		end)
 
-	-- Execution hook
-	local execution = useExecution({
-		verbose = verbose,
-		sendMessage = function(messageType: string, executionId: string, additionalData: { [string]: any }?)
-			local message = {
-				type = messageType,
-				executionId = executionId,
-			}
-
-			if additionalData then
-				for key, value in additionalData do
-					message[key] = value
-				end
-			end
-
-			webSocket.send(HttpService:JSONEncode(message))
-		end,
-		onExecutionComplete = function()
-			-- In autoConnect mode (once), close connection after execution
-			if flags.SETTINGS.autoConnect then
-				task.delay(0.1, function()
-					webSocket.disconnect()
-				end)
-			end
-		end,
-	})
-
-	-- Store execution ref for webSocket callback
-	executionRef.current = execution
+		return function()
+			client:Close()
+		end
+	end, { wsUrl })
 
 	-- Port change handler with validation
-	local handlePortChange = React.useCallback(function(newPort: string)
+	local function handlePortChange(newPort: string)
 		local portNum = tonumber(newPort)
 		if newPort == "" or (portNum and portNum > 0 and portNum < 65536) then
 			setCurrentPort(newPort)
 		end
-	end, {})
+	end
 
 	-- Host change handler
-	local handleHostChange = React.useCallback(function(newHost: string)
+	local function handleHostChange(newHost: string)
 		setCurrentHost(newHost)
-	end, {})
+	end
 
 	-- Auto-connect toggle handler
-	local handleAutoConnectToggle = React.useCallback(function(newAutoConnect: boolean)
+	local function handleAutoConnectToggle(newAutoConnect: boolean)
 		setAutoConnect(newAutoConnect)
-	end, {})
+	end
 
 	-- Verbose toggle handler
-	local handleVerboseToggle = React.useCallback(function(newVerbose: boolean)
+	local function handleVerboseToggle(newVerbose: boolean)
 		setVerbose(newVerbose)
-	end, {})
+	end
 
 	-- Connect handler uses current host:port (falls back to defaults if empty)
-	local handleConnect = React.useCallback(function()
+	local function handleConnect()
 		local connectHost = if currentHost == "" then defaultHost else currentHost
 		local portNum = tonumber(currentPort) or tonumber(defaultPort)
-		webSocket.connect(connectHost, portNum)
-	end, { currentHost, currentPort, defaultHost, defaultPort, webSocket.connect })
+		setWsUrl(`ws://{connectHost}:{portNum}`)
+	end
+
+	-- Disconnect handler
+	local function handleDisconnect()
+		setWsUrl(nil)
+	end
 
 	-- Auto-connect on mount if enabled
 	React.useEffect(function()
 		if props.initialSettings.autoConnect then
 			local connectHost = if currentHost == "" then defaultHost else currentHost
 			local portNum = tonumber(currentPort) or tonumber(defaultPort)
-			webSocket.connect(connectHost, portNum)
+			setWsUrl(`ws://{connectHost}:{portNum}`)
 		end
-	end, {}) -- Run once on mount
+	end, {})
 
 	-- Build context value (memoized)
 	local contextValue = React.useMemo(function()
 		return {
 			-- Connection state
-			connectionStatus = webSocket.connectionStatus,
-			isExecuting = execution.isExecuting,
+			connectionStatus = connectionStatus,
+			isExecuting = isExecuting,
 
 			-- Runtime context
 			contextBitset = getContextBitset(),
@@ -262,11 +305,11 @@ local function AppProvider(props: AppProviderProps)
 
 			-- Actions
 			connect = handleConnect,
-			disconnect = webSocket.disconnect,
+			disconnect = handleDisconnect,
 		}
 	end, {
-		webSocket.connectionStatus,
-		execution.isExecuting,
+		connectionStatus,
+		isExecuting,
 		currentHost,
 		currentPort,
 		defaultHost,
@@ -278,7 +321,7 @@ local function AppProvider(props: AppProviderProps)
 		handleAutoConnectToggle,
 		handleVerboseToggle,
 		handleConnect,
-		webSocket.disconnect,
+		handleDisconnect,
 	})
 
 	return e(AppContext.Provider, {

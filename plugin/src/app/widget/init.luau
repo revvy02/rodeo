@@ -1,14 +1,14 @@
 local React = require("@pkg/react")
 
 local AppContext = require(script.Parent.context.AppContext)
+local Button = require(script.Button)
+local Checkbox = require(script.Checkbox)
 local Container = require(script.Container)
 local Label = require(script.Label)
 local RodeoLabel = require(script.RodeoLabel)
 local Row = require(script.Row)
 local StatusIndicator = require(script.StatusIndicator)
 local TextInput = require(script.TextInput)
-local Checkbox = require(script.Checkbox)
-local Button = require(script.Button)
 local constants = require(script.Parent.Parent.constants)
 
 local AppProvider = AppContext.AppProvider
@@ -120,19 +120,15 @@ local function AppContent()
 			}),
 		}) or nil,
 
-		-- Button container (only when settings panel enabled)
-		ButtonContainer = showSettings and e("Frame", {
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 0.25),
-			LayoutOrder = 5,
-		}, {
-			Button = e(Button, {
-				text = if isConnected then "DISCONNECT" else "CONNECT",
-				color = if isConnected then COLORS.buttonDisconnect else COLORS.buttonConnect,
-				backgroundColor = COLORS.buttonBackground,
-				hoverBackgroundColor = COLORS.buttonHover,
-				onClick = if isConnected then context.disconnect else context.connect,
-			}),
+		-- Button (only when settings panel enabled)
+		Button = showSettings and e(Button, {
+			text = if isConnected then "DISCONNECT" else "CONNECT",
+			color = if isConnected then COLORS.buttonDisconnect else COLORS.buttonConnect,
+			strokeColor = COLORS.stroke,
+			backgroundColor = COLORS.buttonBackground,
+			hoverBackgroundColor = COLORS.buttonHover,
+			layoutOrder = 5,
+			onClick = if isConnected then context.disconnect else context.connect,
 		}) or nil,
 
 		-- Rodeo label (always shown)

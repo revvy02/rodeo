@@ -5,8 +5,10 @@ local e = React.createElement
 export type Props = {
 	text: string,
 	color: Color3,
+	strokeColor: Color3,
 	backgroundColor: Color3,
 	hoverBackgroundColor: Color3,
+	layoutOrder: number?,
 	onClick: () -> (),
 }
 
@@ -22,15 +24,13 @@ local function Button(props: Props)
 	end
 
 	local backgroundColor = if isHovering then props.hoverBackgroundColor else props.backgroundColor
-	local strokeThickness = if isHovering then 2 else 1.5
 
 	return e("TextButton", {
 		BackgroundColor3 = backgroundColor,
 		BackgroundTransparency = 0,
 		Size = UDim2.fromOffset(140, 50),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
 		Text = "",
+		LayoutOrder = props.layoutOrder,
 		[React.Event.Activated] = props.onClick,
 		[React.Event.MouseEnter] = handleMouseEnter,
 		[React.Event.MouseLeave] = handleMouseLeave,
@@ -39,18 +39,8 @@ local function Button(props: Props)
 			CornerRadius = UDim.new(0, 8),
 		}),
 		Stroke = e("UIStroke", {
-			Color = props.color,
-			Thickness = strokeThickness,
-			Transparency = 0,
-		}, {
-			StrokeGradient = e("UIGradient", {
-				Transparency = NumberSequence.new({
-					NumberSequenceKeypoint.new(0, if isHovering then 0 else 0.2),
-					NumberSequenceKeypoint.new(0.5, 0),
-					NumberSequenceKeypoint.new(1, if isHovering then 0 else 0.2),
-				}),
-				Rotation = 90,
-			}),
+			Color = props.strokeColor,
+			Thickness = 1,
 		}),
 		Label = e("TextLabel", {
 			Text = props.text,
