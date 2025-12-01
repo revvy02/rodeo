@@ -242,6 +242,12 @@ local function main(args: any)
 	if tempPlacePath and fs.isFile(tempPlacePath) then
 		fs.removeFile(tempPlacePath)
 	end
+	if fs.isDir(".rodeo/.temp") then
+		fs.removeDir(".rodeo/.temp")
+	end
+	if fs.isDir(".rodeo") then
+		fs.removeDir(".rodeo")
+	end
 
 	if not isComplete then
 		stdio.write(colors.error("Error: Timeout waiting for execution to complete") .. "\n")
