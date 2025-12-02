@@ -174,7 +174,7 @@ local function AppProvider(props: AppProviderProps)
 		end)
 
 		client.Error:Connect(function(code: string, message: string)
-			warn("[rodeo] Socket error:", code, message)
+			-- warn("[rodeo] Socket error:", code, message)
 			setWsUrl(nil)
 		end)
 
