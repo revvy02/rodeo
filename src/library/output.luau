@@ -1,16 +1,16 @@
 -- Output utilities for formatted terminal printing
 
 local chalk = require("@pkg/chalk")
-local constants = require("./constants")
+local config = require("./config")
 
 local function formatBitset(bitsetValue: number, filterMask: number?): string
 	local parts = {}
 	local contextOrder = {
-		{ name = "studio", bit = constants.CONTEXT_BITS.isStudio },
-		{ name = "server", bit = constants.CONTEXT_BITS.isServer },
-		{ name = "client", bit = constants.CONTEXT_BITS.isClient },
-		{ name = "edit", bit = constants.CONTEXT_BITS.isEdit },
-		{ name = "running", bit = constants.CONTEXT_BITS.isRunning },
+		{ name = "studio", bit = config.CONTEXT_BITS.isStudio },
+		{ name = "server", bit = config.CONTEXT_BITS.isServer },
+		{ name = "client", bit = config.CONTEXT_BITS.isClient },
+		{ name = "edit", bit = config.CONTEXT_BITS.isEdit },
+		{ name = "running", bit = config.CONTEXT_BITS.isRunning },
 	}
 
 	for _, context in ipairs(contextOrder) do
@@ -30,11 +30,11 @@ end
 
 local function formatBitsetShort(bitset: number): string
 	local bits = {
-		bit32.band(bit32.rshift(bitset, constants.CONTEXT_BITS.isStudio), 1),
-		bit32.band(bit32.rshift(bitset, constants.CONTEXT_BITS.isServer), 1),
-		bit32.band(bit32.rshift(bitset, constants.CONTEXT_BITS.isClient), 1),
-		bit32.band(bit32.rshift(bitset, constants.CONTEXT_BITS.isEdit), 1),
-		bit32.band(bit32.rshift(bitset, constants.CONTEXT_BITS.isRunning), 1),
+		bit32.band(bit32.rshift(bitset, config.CONTEXT_BITS.isStudio), 1),
+		bit32.band(bit32.rshift(bitset, config.CONTEXT_BITS.isServer), 1),
+		bit32.band(bit32.rshift(bitset, config.CONTEXT_BITS.isClient), 1),
+		bit32.band(bit32.rshift(bitset, config.CONTEXT_BITS.isEdit), 1),
+		bit32.band(bit32.rshift(bitset, config.CONTEXT_BITS.isRunning), 1),
 	}
 
 	local parts = {}

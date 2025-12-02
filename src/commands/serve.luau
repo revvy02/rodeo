@@ -2,25 +2,23 @@
 
 local net = require("@lune/net")
 local serde = require("@lune/serde")
-local stdio = require("@lune/stdio")
 local task = require("@lune/task")
 
-local colors = require("../utils/colors")
-local ExecConnection = require("../utils/ExecConnection")
-local StudioConnection = require("../utils/StudioConnection")
-local VmPipeline = require("../utils/VmPipeline")
-local constants = require("../utils/constants")
-local output = require("../utils/output")
+local config = require("../library/config")
+local log = require("../library/log")
+local output = require("../library/output")
+local VmPipeline = require("../library/VmPipeline")
 
-type StudioConnection = StudioConnection.StudioConnection
-type ExecConnection = ExecConnection.ExecConnection
+local colors = config.CLI_LOG_COLORS
+
+type ExecRequest = VmPipeline.ExecRequest
 type VmPipeline = VmPipeline.VmPipeline
 
 -- Nested map: bitset -> studioId -> VmPipeline
 local pipelines: { [number]: { [string]: VmPipeline } } = {}
 
 -- Pending executions waiting for a matching VM to connect
-local pendingExecutions: { ExecConnection } = {}
+local pendingExecutions: { ExecRequest } = {}
 
 local function generateId(): string
 	local random = math.random
@@ -99,7 +97,7 @@ local function processPendingExecutions()
 			table.remove(pendingExecutions, i)
 			local bestVm = selectBestVmPipeline(matchingVms)
 			if bestVm then
-				stdio.write(colors.success(`Processing pending execution: {exec.executionId}`) .. "\n")
+				log.success(`Processing pending execution: {exec.executionId}`)
 				bestVm.pipeline:enqueue(exec)
 			end
 		else
@@ -111,7 +109,7 @@ end
 
 local function handleExecClient(ws: any)
 	local clientExecutionId = nil
-	local execConnection = nil
+	local execRequest: ExecRequest? = nil
 
 	while true do
 		local success, message = pcall(function()
@@ -121,7 +119,7 @@ local function handleExecClient(ws: any)
 		if not success then
 			-- Connection reset or closed unexpectedly
 			if clientExecutionId then
-				stdio.write(colors.grey(`Execution cancelled: {clientExecutionId}`) .. "\n")
+				log.write(colors.debug(`Execution cancelled: {clientExecutionId}`) .. "\n")
 			end
 			break
 		end
@@ -143,27 +141,37 @@ local function handleExecClient(ws: any)
 				enableOutput = true,
 				enableLogs = true,
 			}
-			execConnection = ExecConnection.new(ws, clientExecutionId, decoded.script, decoded.instancePath, filterBits, filterMask, logFilter, decoded.cacheRequires)
+			execRequest = {
+				ws = ws,
+				executionId = clientExecutionId,
+				script = decoded.script,
+				instancePath = decoded.instancePath,
+				filterBits = filterBits,
+				filterMask = filterMask,
+				logFilter = logFilter,
+				cacheRequires = decoded.cacheRequires,
+				queuedAt = os.time(),
+			}
 
 			-- Find matching VM pipelines
 			local matchingVms = findMatchingVmPipelines(filterBits, filterMask)
 
 			if #matchingVms == 0 then
 				-- No matching VMs - add to pending queue
-				table.insert(pendingExecutions, execConnection)
-				stdio.write(`Waiting for VM: [{output.formatBitset(filterBits, filterMask)}]\n`)
+				table.insert(pendingExecutions, execRequest)
+				log.write(`Waiting for VM: [{output.formatBitset(filterBits, filterMask)}]\n`)
 			else
 				-- Use load balancing to select best VM
 				local bestVm = selectBestVmPipeline(matchingVms)
 				if bestVm then
-					bestVm.pipeline:enqueue(execConnection)
+					bestVm.pipeline:enqueue(execRequest)
 				end
 			end
 		end
 	end
 
 	-- Cleanup: remove from pending queue if still there
-	if execConnection and clientExecutionId then
+	if execRequest and clientExecutionId then
 		for i, pending in ipairs(pendingExecutions) do
 			if pending.executionId == clientExecutionId then
 				table.remove(pendingExecutions, i)
@@ -176,10 +184,9 @@ end
 
 local function handleStudioClient(ws: any, vmBitset: number)
 	local studioId = generateId()
-	local studioConnection = StudioConnection.new(ws, vmBitset)
 
 	-- Create VmPipeline for this Studio
-	local vmPipeline = VmPipeline.new(vmBitset, studioId, studioConnection)
+	local vmPipeline = VmPipeline.new(vmBitset, studioId, ws)
 
 	-- Add to nested pipeline map
 	if not pipelines[vmBitset] then
@@ -187,12 +194,12 @@ local function handleStudioClient(ws: any, vmBitset: number)
 	end
 	pipelines[vmBitset][studioId] = vmPipeline
 
-	stdio.write(`VM connected: {colors.grey('[id:')} {studioId}{colors.grey('] [')} {output.formatBitset(vmBitset)}{colors.grey(']')}\n`)
+	log.write(`VM connected: {colors.debug('[id:')} {studioId}{colors.debug('] [')} {output.formatBitset(vmBitset)}{colors.debug(']')}\n`)
 
 	-- Process any pending executions that might match this new VM
 	processPendingExecutions()
 
-	print("[handleStudioClient] entering message loop")
+	log.debug("handleStudioClient", "entering message loop")
 	while true do
 		local success, message = pcall(function()
 			return ws:next()
@@ -200,12 +207,12 @@ local function handleStudioClient(ws: any, vmBitset: number)
 
 		if not success then
 			-- Connection reset or closed unexpectedly
-			print("[handleStudioClient] ws:next() failed, breaking loop")
+			log.debug("handleStudioClient", "ws:next() failed, breaking loop")
 			break
 		end
 
 		if not message then
-			print("[handleStudioClient] ws:next() returned nil, breaking loop")
+			log.debug("handleStudioClient", "ws:next() returned nil, breaking loop")
 			break
 		end
 
@@ -220,17 +227,17 @@ local function handleStudioClient(ws: any, vmBitset: number)
 	end
 
 	-- Handle disconnect
-	print("[handleStudioClient] calling vmPipeline:disconnect()")
+	log.debug("handleStudioClient", "calling vmPipeline:disconnect()")
 	vmPipeline:disconnect()
-	print("[handleStudioClient] calling removePipelineFromMap")
+	log.debug("handleStudioClient", "calling removePipelineFromMap")
 	removePipelineFromMap(vmBitset, studioId)
-	print("[handleStudioClient] done")
+	log.debug("handleStudioClient", "done")
 end
 
 local function main(args: any)
 	local port = args.port
-	stdio.write(colors.cyan(`Starting server on port {port}`) .. "\n")
-	stdio.write(colors.cyan(`Waiting for Studio plugin to connect...`) .. "\n")
+	log.info(`Starting server on port {port}`)
+	log.info("Waiting for Studio plugin to connect...")
 
 	local _server = net.serve(port, {
 		handleRequest = function(request)
@@ -307,7 +314,7 @@ local function main(args: any)
 		end,
 	})
 
-	stdio.write(`[serve] Server started.\n`)
+	log.debug("serve", "Server started")
 
 	while true do
 		task.wait(1)

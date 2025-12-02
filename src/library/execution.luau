@@ -3,7 +3,7 @@
 local fs = require("@lune/fs")
 local stdio = require("@lune/stdio")
 
-local colors = require("./colors")
+local log = require("./log")
 local sourcemap = require("./sourcemap")
 
 export type LogFilter = {
@@ -34,20 +34,20 @@ local function resolveInstancePath(sourcemapPath: string?, scriptFilePath: strin
 	end
 
 	if not scriptFilePath then
-		stdio.write(colors.warning("Warning: Sourcemap ignored: only works with file-based scripts") .. "\n")
+		log.warn("Sourcemap ignored: only works with file-based scripts")
 		return nil
 	end
 
 	local map, err = sourcemap.loadSourcemap(sourcemapPath)
 	if not map then
-		stdio.write(colors.error(`Error: {err or "Failed to load sourcemap"}`) .. "\n")
+		log.error(err or "Failed to load sourcemap")
 		return nil
 	end
 
 	local instancePath = sourcemap.findInstancePath(map, scriptFilePath)
 	if not instancePath then
-		stdio.write(colors.warning(`Warning: Script not found in sourcemap: {scriptFilePath}`) .. "\n")
-		stdio.write(colors.cyan("Falling back to temporary module execution") .. "\n")
+		log.warn(`Script not found in sourcemap: {scriptFilePath}`)
+		log.info("Falling back to temporary module execution")
 	end
 
 	return instancePath

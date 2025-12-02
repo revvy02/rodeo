@@ -2,18 +2,19 @@
 
 local fs = require("@lune/fs")
 local net = require("@lune/net")
-local pathfs = require("@pkg/pathfs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 local task = require("@lune/task")
 
-local colors = require("../utils/colors")
-local constants = require("../utils/constants")
-local embeddedPlugins = require("../utils/plugin")
-local execution = require("../utils/execution")
-local uuid = require("../utils/uuid")
+local config = require("../library/config")
+local embeddedPlugins = require("../library/plugin")
+local execution = require("../library/execution")
+local log = require("../library/log")
+local uuid = require("../library/uuid")
+
+local execColors = config.EXEC_LOG_COLORS
 
 type Config = {
 	scriptPath: string?,
@@ -69,32 +70,32 @@ local function parseArguments(args: any): Config
 	}
 end
 
-local function validateConfig(config: Config)
+local function validateConfig(cfg: Config)
 	-- Validate that exactly one script source is provided
-	if not config.scriptPath and not config.scriptSource then
-		stdio.write(colors.error("Error: No script source provided. Use a file path, '-' for stdin, or --source for inline execution") .. "\n")
+	if not cfg.scriptPath and not cfg.scriptSource then
+		log.error("No script source provided. Use a file path, '-' for stdin, or --source for inline execution")
 		process.exit(1)
 	end
 
-	if config.scriptPath and config.scriptSource then
-		stdio.write(colors.error("Error: Cannot specify both a script file and --source flag") .. "\n")
+	if cfg.scriptPath and cfg.scriptSource then
+		log.error("Cannot specify both a script file and --source flag")
 		process.exit(1)
 	end
 
 	-- Validate script file exists if using file path
-	if config.scriptPath and not fs.isFile(config.scriptPath) then
-		stdio.write(colors.error(`Error: Script file not found: {config.scriptPath}`) .. "\n")
+	if cfg.scriptPath and not fs.isFile(cfg.scriptPath) then
+		log.error(`Script file not found: {cfg.scriptPath}`)
 		process.exit(1)
 	end
 
-	if config.sourcemap and not config.place then
-		stdio.write(colors.error("Error: --sourcemap requires --place to resolve instances") .. "\n")
-		stdio.write(colors.cyan("Usage: rodeo once script.luau --place game.rbxl --sourcemap sourcemap.json") .. "\n")
+	if cfg.sourcemap and not cfg.place then
+		log.error("--sourcemap requires --place to resolve instances")
+		log.info("Usage: rodeo once script.luau --place game.rbxl --sourcemap sourcemap.json")
 		process.exit(1)
 	end
 
-	if config.place and not fs.isFile(config.place) then
-		stdio.write(colors.error(`Error: Place file not found: {config.place}`) .. "\n")
+	if cfg.place and not fs.isFile(cfg.place) then
+		log.error(`Place file not found: {cfg.place}`)
 		process.exit(1)
 	end
 end
@@ -135,7 +136,7 @@ local function handlePluginConnection(
 
 		if decoded.type == "output" then
 			local msg = decoded :: OutputMessage
-			local colorFn = colors.levelColors[msg.level] or function(s)
+			local colorFn = execColors[msg.level] or function(s)
 				return s
 			end
 			local coloredOutput = colorFn(msg.body) .. "\n"
@@ -158,14 +159,14 @@ local function handlePluginConnection(
 end
 
 local function main(args: any)
-	local config = parseArguments(args)
-	validateConfig(config)
+	local cfg = parseArguments(args)
+	validateConfig(cfg)
 
-	local scriptContent = execution.readScriptContent(config.scriptPath, config.scriptSource)
+	local scriptContent = execution.readScriptContent(cfg.scriptPath, cfg.scriptSource)
 	local executionId = uuid.generate()
 	local pluginPath = `{roblox.studioPluginPath()}/rodeo-once.rbxmx`
 
-	local placeToOpen = config.place
+	local placeToOpen = cfg.place
 	local tempPlacePath = nil
 	if placeToOpen then
 		local extension = placeToOpen:match("%.([^%.]+)$") or "rbxlx"
@@ -194,7 +195,7 @@ local function main(args: any)
 	-- Write embedded plugin to Studio plugins directory
 	embeddedPlugins.writeOncePlugin(pluginPath, port)
 
-	local instancePath = execution.resolveInstancePath(config.sourcemap, config.scriptPath)
+	local instancePath = execution.resolveInstancePath(cfg.sourcemap, cfg.scriptPath)
 
 	local exitCodeRef = { value = 0 }
 	local isComplete = false
@@ -202,7 +203,7 @@ local function main(args: any)
 	-- Start WebSocket server BEFORE launching Studio
 	local server = net.serve(port, {
 		handleWebSocket = function(ws)
-			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, config.logFilter, exitCodeRef, config.outputFile, config.returnFile, config.showReturn, config.cacheRequires)
+			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, cfg.logFilter, exitCodeRef, cfg.outputFile, cfg.returnFile, cfg.showReturn, cfg.cacheRequires)
 		end,
 	})
 
@@ -250,7 +251,7 @@ local function main(args: any)
 	end
 
 	if not isComplete then
-		stdio.write(colors.error("Error: Timeout waiting for execution to complete") .. "\n")
+		log.error("Timeout waiting for execution to complete")
 		process.exit(2)
 	end
 

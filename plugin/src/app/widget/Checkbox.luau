@@ -1,5 +1,5 @@
 local React = require("@pkg/react")
-local constants = require(script.Parent.Parent.Parent.constants)
+local constants = require(script.Parent.Parent.Parent.library.constants)
 local Button = require(script.Parent.Button)
 
 local e = React.createElement

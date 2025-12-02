@@ -1,23 +1,42 @@
 local serde = require("@lune/serde")
-local stdio = require("@lune/stdio")
 
-local colors = require("./colors")
-local ExecConnection = require("./ExecConnection")
-local StudioConnection = require("./StudioConnection")
+local config = require("./config")
+local log = require("./log")
 local output = require("./output")
 
-type StudioConnection = StudioConnection.StudioConnection
-type ExecConnection = ExecConnection.ExecConnection
+local colors = config.CLI_LOG_COLORS
+
+export type LogFilter = {
+	enableWarn: boolean,
+	enableError: boolean,
+	enableInfo: boolean,
+	enableOutput: boolean,
+	enableLogs: boolean,
+}
+
+export type ExecRequest = {
+	ws: any,
+	executionId: string,
+	script: string,
+	instancePath: string?,
+	filterBits: number,
+	filterMask: number,
+	logFilter: LogFilter,
+	cacheRequires: boolean?,
+	queuedAt: number,
+}
 
 export type VmPipeline = {
 	bitset: number,
 	studioId: string,
-	studio: StudioConnection,
-	execQueue: { ExecConnection },
-	activeExecution: ExecConnection?,
+	studioWs: any,
+	studioConnected: boolean,
+	connectedAt: number,
+	execQueue: { ExecRequest },
+	activeExecution: ExecRequest?,
 
-	new: (bitset: number, studioId: string, studio: StudioConnection) -> VmPipeline,
-	enqueue: (self: VmPipeline, exec: ExecConnection) -> (),
+	new: (bitset: number, studioId: string, studioWs: any) -> VmPipeline,
+	enqueue: (self: VmPipeline, exec: ExecRequest) -> (),
 	completeExecution: (self: VmPipeline, executionId: string) -> (),
 	forwardOutput: (self: VmPipeline, executionId: string, message: string) -> (),
 	disconnect: (self: VmPipeline) -> (),
@@ -28,11 +47,13 @@ export type VmPipeline = {
 local VmPipeline = {}
 VmPipeline.__index = VmPipeline
 
-function VmPipeline.new(bitset: number, studioId: string, studio: StudioConnection): VmPipeline
+function VmPipeline.new(bitset: number, studioId: string, studioWs: any): VmPipeline
 	local self = setmetatable({}, VmPipeline)
 	self.bitset = bitset
 	self.studioId = studioId
-	self.studio = studio
+	self.studioWs = studioWs
+	self.studioConnected = true
+	self.connectedAt = os.time()
 	self.execQueue = {}
 	self.activeExecution = nil
 	return (self :: any) :: VmPipeline
@@ -44,7 +65,7 @@ local function processQueue(self: VmPipeline)
 	end
 
 	-- Check if Studio is idle
-	if not self.studio:isConnected() or self.activeExecution then
+	if not self.studioConnected or self.activeExecution then
 		return
 	end
 
@@ -55,7 +76,7 @@ local function processQueue(self: VmPipeline)
 	-- Set as active execution
 	self.activeExecution = exec
 
-	stdio.write(`Execution started: {output.formatShortLog(self.studioId, self.bitset, exec.executionId)}\n`)
+	log.write(`Execution started: {output.formatShortLog(self.studioId, self.bitset, exec.executionId)}\n`)
 
 	-- Send to Studio
 	local message: any = {
@@ -70,19 +91,19 @@ local function processQueue(self: VmPipeline)
 		message.instancePath = exec.instancePath
 	end
 
-	self.studio:send(serde.encode("json", message))
+	self.studioWs:send(serde.encode("json", message))
 end
 
-function VmPipeline:enqueue(exec: ExecConnection)
+function VmPipeline:enqueue(exec: ExecRequest)
 	table.insert(self.execQueue, exec)
 
-	exec:send(serde.encode("json", {
+	exec.ws:send(serde.encode("json", {
 		type = "queued",
 		executionId = exec.executionId,
 		position = #self.execQueue,
 	}))
 
-	stdio.write(`Queued execution: {output.formatShortLog(self.studioId, self.bitset, exec.executionId)}\n`)
+	log.write(`Queued execution: {output.formatShortLog(self.studioId, self.bitset, exec.executionId)}\n`)
 
 	-- Try to process immediately
 	processQueue(self)
@@ -93,7 +114,7 @@ function VmPipeline:completeExecution(executionId: string)
 		return
 	end
 
-	stdio.write(`Execution complete: {output.formatShortLog(self.studioId, self.bitset, executionId)}\n`)
+	log.write(`Execution complete: {output.formatShortLog(self.studioId, self.bitset, executionId)}\n`)
 
 	-- Clear active execution
 	self.activeExecution = nil
@@ -105,34 +126,35 @@ end
 function VmPipeline:forwardOutput(executionId: string, message: string)
 	-- Check if this is the active execution
 	if self.activeExecution and self.activeExecution.executionId == executionId then
-		local e = self.activeExecution :: ExecConnection
-		e:send(message)
+		self.activeExecution.ws:send(message)
 	end
 end
 
 function VmPipeline:disconnect()
-	stdio.write(`{colors.grey('VM disconnected: [id:')} {self.studioId}{colors.grey('] [')} {output.formatBitset(self.bitset)}{colors.grey(']')}\n`)
+	log.write(`{colors.debug('VM disconnected: [id:')} {self.studioId}{colors.debug('] [')} {output.formatBitset(self.bitset)}{colors.debug(']')}\n`)
 
-	self.studio:close()
+	self.studioConnected = false
+	pcall(function()
+		self.studioWs:close()
+	end)
 
 	-- Notify active execution if any
 	if self.activeExecution then
-		local exec = self.activeExecution :: ExecConnection
-		exec:send(serde.encode("json", {
+		local exec = self.activeExecution
+		exec.ws:send(serde.encode("json", {
 			type = "disconnect",
 			executionId = exec.executionId,
 		}))
-		exec:close()
+		exec.ws:close()
 	end
 
 	-- Notify all queued executions
 	for _, exec in ipairs(self.execQueue) do
-		local e = exec :: ExecConnection
-		e:send(serde.encode("json", {
+		exec.ws:send(serde.encode("json", {
 			type = "disconnect",
-			executionId = e.executionId,
+			executionId = exec.executionId,
 		}))
-		e:close()
+		exec.ws:close()
 	end
 end
 
@@ -141,7 +163,7 @@ function VmPipeline:getQueueLength(): number
 end
 
 function VmPipeline:isIdle(): boolean
-	return self.studio:isConnected() and not self.activeExecution
+	return self.studioConnected and not self.activeExecution
 end
 
 return VmPipeline

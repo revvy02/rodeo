@@ -6,11 +6,13 @@ local process = require("@lune/process")
 local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 
-local colors = require("../utils/colors")
-local constants = require("../utils/constants")
-local execution = require("../utils/execution")
-local sourcemap = require("../utils/sourcemap")
-local uuid = require("../utils/uuid")
+local config = require("../library/config")
+local execution = require("../library/execution")
+local log = require("../library/log")
+local sourcemap = require("../library/sourcemap")
+local uuid = require("../library/uuid")
+
+local execColors = config.EXEC_LOG_COLORS
 
 type Config = {
 	scriptPath: string?,
@@ -30,11 +32,11 @@ local function parseContextFlags(args: any): (number, number)
 	local filterMask = 0
 
 	local contextMap = {
-		studio = constants.CONTEXT_BITS.isStudio,
-		client = constants.CONTEXT_BITS.isClient,
-		server = constants.CONTEXT_BITS.isServer,
-		edit = constants.CONTEXT_BITS.isEdit,
-		running = constants.CONTEXT_BITS.isRunning,
+		studio = config.CONTEXT_BITS.isStudio,
+		client = config.CONTEXT_BITS.isClient,
+		server = config.CONTEXT_BITS.isServer,
+		edit = config.CONTEXT_BITS.isEdit,
+		running = config.CONTEXT_BITS.isRunning,
 	}
 
 	for flagName, bitPos in pairs(contextMap) do
@@ -85,21 +87,21 @@ local function parseArguments(args: any): Config
 	}
 end
 
-local function validateConfig(config: Config)
+local function validateConfig(cfg: Config)
 	-- Validate that exactly one script source is provided
-	if not config.scriptPath and not config.scriptSource then
-		stdio.write(colors.error("Error: No script source provided. Use a file path, '-' for stdin, or --source for inline execution") .. "\n")
+	if not cfg.scriptPath and not cfg.scriptSource then
+		log.error("No script source provided. Use a file path, '-' for stdin, or --source for inline execution")
 		process.exit(1)
 	end
 
-	if config.scriptPath and config.scriptSource then
-		stdio.write(colors.error("Error: Cannot specify both a script file and --source flag") .. "\n")
+	if cfg.scriptPath and cfg.scriptSource then
+		log.error("Cannot specify both a script file and --source flag")
 		process.exit(1)
 	end
 
 	-- Validate script file exists if using file path
-	if config.scriptPath and not fs.isFile(config.scriptPath) then
-		stdio.write(colors.error(`Error: Script file not found: {config.scriptPath}`) .. "\n")
+	if cfg.scriptPath and not fs.isFile(cfg.scriptPath) then
+		log.error(`Script file not found: {cfg.scriptPath}`)
 		process.exit(1)
 	end
 end
@@ -146,12 +148,12 @@ end
 local function handleMessage(decoded: any, exitCodeRef: { value: number }, outputFile: string?, returnFile: string?, showReturn: boolean?): boolean
 	if decoded.type == "queued" then
 		if decoded.waiting then
-			stdio.write(colors.cyan(`Waiting: {decoded.waiting}`) .. "\n")
+			log.info(`Waiting: {decoded.waiting}`)
 		elseif decoded.matches then
 			-- Queued successfully to matching studios
 		end
 	elseif decoded.type == "output" then
-		local colorFn = colors.levelColors[decoded.level] or function(s)
+		local colorFn = execColors[decoded.level] or function(s)
 			return s
 		end
 		local coloredOutput = colorFn(decoded.body) .. "\n"
@@ -165,7 +167,7 @@ local function handleMessage(decoded: any, exitCodeRef: { value: number }, outpu
 		end
 		return true
 	elseif decoded.type == "disconnect" then
-		stdio.write(colors.error("Error: Studio disconnected") .. "\n")
+		log.error("Studio disconnected")
 		exitCodeRef.value = 2
 		return true
 	end
@@ -174,33 +176,32 @@ local function handleMessage(decoded: any, exitCodeRef: { value: number }, outpu
 end
 
 local function main(args: any)
-	local config = parseArguments(args)
-	validateConfig(config)
+	local cfg = parseArguments(args)
+	validateConfig(cfg)
 
 	-- Auto-detect sourcemap if not explicitly provided
-	if not config.sourcemap and config.scriptPath then
+	if not cfg.sourcemap and cfg.scriptPath then
 		local autoDetectedPath = sourcemap.findSourcemapInTree()
 		if autoDetectedPath then
-			config.sourcemap = autoDetectedPath
-			-- stdio.write(colors.cyan(`Using sourcemap: {autoDetectedPath}`) .. "\n")
+			cfg.sourcemap = autoDetectedPath
 		end
 	end
 
 	local port = args.port
 
 	if not checkServerHealth(port) then
-		stdio.write(colors.error(`Error: No rodeo server found on port {port}. Run 'rodeo serve --port {port}' first.`) .. "\n")
+		log.error(`No rodeo server found on port {port}. Run 'rodeo serve --port {port}' first.`)
 		process.exit(1)
 	end
 
-	local instancePath = execution.resolveInstancePath(config.sourcemap, config.scriptPath)
-	local scriptContent = execution.readScriptContent(config.scriptPath, config.scriptSource)
+	local instancePath = execution.resolveInstancePath(cfg.sourcemap, cfg.scriptPath)
+	local scriptContent = execution.readScriptContent(cfg.scriptPath, cfg.scriptSource)
 	local executionId = uuid.generate()
 	local exitCodeRef = { value = 0 }
 
 	local ws = connectToServer(port)
 	identifyClient(ws)
-	submitScript(ws, executionId, scriptContent, instancePath, config.filterBits, config.filterMask, config.logFilter, config.cacheRequires)
+	submitScript(ws, executionId, scriptContent, instancePath, cfg.filterBits, cfg.filterMask, cfg.logFilter, cfg.cacheRequires)
 
 	while true do
 		local message = ws:next()
@@ -209,7 +210,7 @@ local function main(args: any)
 		end
 
 		local decoded = serde.decode("json", message)
-		local isDone = handleMessage(decoded, exitCodeRef, config.outputFile, config.returnFile, config.showReturn)
+		local isDone = handleMessage(decoded, exitCodeRef, cfg.outputFile, cfg.returnFile, cfg.showReturn)
 
 		if isDone then
 			ws:close()

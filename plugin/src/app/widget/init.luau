@@ -9,7 +9,7 @@ local RodeoLabel = require(script.RodeoLabel)
 local Row = require(script.Row)
 local StatusIndicator = require(script.StatusIndicator)
 local TextInput = require(script.TextInput)
-local constants = require(script.Parent.Parent.constants)
+local constants = require(script.Parent.Parent.library.constants)
 
 local AppProvider = AppContext.AppProvider
 local useAppContext = AppContext.useAppContext

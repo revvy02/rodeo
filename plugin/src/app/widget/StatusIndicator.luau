@@ -1,7 +1,7 @@
 local React = require("@pkg/react")
 local useAppContext = require(script.Parent.Parent.context.AppContext).useAppContext
 local Row = require(script.Parent.Row)
-local constants = require(script.Parent.Parent.Parent.constants)
+local constants = require(script.Parent.Parent.Parent.library.constants)
 
 local e = React.createElement
 local COLORS = constants.COLORS

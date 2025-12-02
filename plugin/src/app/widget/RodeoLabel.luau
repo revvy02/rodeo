@@ -1,7 +1,7 @@
 local React = require("@pkg/react")
 local TweenService = game:GetService("TweenService")
-local assets = require(script.Parent.Parent.Parent.assets)
-local constants = require(script.Parent.Parent.Parent.constants)
+local assets = require(script.Parent.Parent.Parent.library.assets)
+local constants = require(script.Parent.Parent.Parent.library.constants)
 
 local e = React.createElement
 

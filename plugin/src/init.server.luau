@@ -12,7 +12,7 @@
 local App = require(script.app.widget)
 local React = require("@pkg/react")
 local ReactRoblox = require("@pkg/react_roblox")
-local flags = require(script.flags)
+local flags = require(script.library.flags)
 
 local e = React.createElement
 

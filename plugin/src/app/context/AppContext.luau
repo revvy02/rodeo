@@ -12,10 +12,10 @@
 local React = require("@pkg/react")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local constants = require(script.Parent.Parent.Parent.constants)
-local flags = require(script.Parent.Parent.Parent.flags)
-local runtime = require(script.Parent.Parent.Parent.runtime)
-local utils = require(script.Parent.Parent.Parent.utils)
+local constants = require(script.Parent.Parent.Parent.library.constants)
+local flags = require(script.Parent.Parent.Parent.library.flags)
+local runtime = require(script.Parent.Parent.Parent.library.runtime)
+local utils = require(script.Parent.Parent.Parent.library.utils)
 
 local e = React.createElement
 local CONTEXT_BITS = constants.CONTEXT_BITS

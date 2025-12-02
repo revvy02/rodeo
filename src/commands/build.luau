@@ -1,20 +1,19 @@
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
-local stdio = require("@lune/stdio")
 
-local colors = require("../utils/colors")
-local embeddedPlugins = require("../utils/plugin")
+local embeddedPlugins = require("../library/plugin")
+local log = require("../library/log")
 
 local function main(_args: any)
-	stdio.write(colors.cyan("Installing serve plugin...") .. "\n")
+	log.info("Installing serve plugin...")
 
 	local pluginPath = `{roblox.studioPluginPath()}/rodeo-serve.rbxmx`
 
 	-- Write embedded plugin to Studio plugins directory
 	embeddedPlugins.writeServePlugin(pluginPath)
 
-	stdio.write(colors.cyan(`Plugin installed to: {pluginPath}`) .. "\n")
-	stdio.write(colors.cyan("Restart Roblox Studio to load the plugin") .. "\n")
+	log.info(`Plugin installed to: {pluginPath}`)
+	log.info("Restart Roblox Studio to load the plugin")
 
 	process.exit(0)
 end
