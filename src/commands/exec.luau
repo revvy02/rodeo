@@ -106,10 +106,10 @@ local function validateConfig(cfg: Config)
 	end
 end
 
-local function checkServerHealth(port: number): boolean
+local function checkServerHealth(host: string, port: number): boolean
 	local success, response = pcall(function()
 		return net.request({
-			url = `http://localhost:{port}/health`,
+			url = `http://{host}:{port}/health`,
 			method = "GET",
 		})
 	end)
@@ -117,8 +117,8 @@ local function checkServerHealth(port: number): boolean
 	return success and response.ok
 end
 
-local function connectToServer(port: number): any
-	return net.socket(`ws://localhost:{port}`)
+local function connectToServer(host: string, port: number): any
+	return net.socket(`ws://{host}:{port}`)
 end
 
 local function identifyClient(ws: any)
@@ -187,10 +187,11 @@ local function main(args: any)
 		end
 	end
 
+	local host = args.host
 	local port = args.port
 
-	if not checkServerHealth(port) then
-		log.error(`No rodeo server found on port {port}. Run 'rodeo serve --port {port}' first.`)
+	if not checkServerHealth(host, port) then
+		log.error(`No rodeo server found at {host}:{port}. Run 'rodeo serve --port {port}' first.`)
 		process.exit(1)
 	end
 
@@ -199,7 +200,7 @@ local function main(args: any)
 	local executionId = uuid.generate()
 	local exitCodeRef = { value = 0 }
 
-	local ws = connectToServer(port)
+	local ws = connectToServer(host, port)
 	identifyClient(ws)
 	submitScript(ws, executionId, scriptContent, instancePath, cfg.filterBits, cfg.filterMask, cfg.logFilter, cfg.cacheRequires)
 
