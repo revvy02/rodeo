@@ -7,6 +7,7 @@ local WARNING_ORANGE = chalk.rgb(255, 140, 0)
 return {
 	-- Ports
 	SERVE_PORT = 44872,
+	ONCE_PORT = 44873,
 
 	-- Bit positions for run context bitset
 	CONTEXT_BITS = {

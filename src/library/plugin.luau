@@ -48,6 +48,19 @@ local function writeEmbeddedPlugin(binaryData: string, targetPath: string)
 	fs.writeFile(targetPath, binaryData)
 end
 
+local function writeOncePlugin(targetPath: string, port: number?)
+	local patched = patchFlags(_G.RODEO_PLUGIN, {
+		VERBOSE = false,
+		SETTINGS_PANEL_ENABLED = false,
+		SETTINGS = {
+			host = "localhost",
+			port = port or 44873,
+			autoConnect = true,
+		},
+	})
+	writeEmbeddedPlugin(patched, targetPath)
+end
+
 local function writeServePlugin(targetPath: string, port: number?)
 	local patched = patchFlags(_G.RODEO_PLUGIN, {
 		VERBOSE = false,
@@ -62,5 +75,6 @@ local function writeServePlugin(targetPath: string, port: number?)
 end
 
 return {
+	writeOncePlugin = writeOncePlugin,
 	writeServePlugin = writeServePlugin,
 }

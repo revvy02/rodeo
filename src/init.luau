@@ -8,6 +8,23 @@ local function main()
 	local parser = argparse("rodeo", "Run Luau code inside Roblox Studio")
 	parser:flag("-v --verbose", "Enable debug output")
 
+	-- Define once command
+	local onceCmd = parser:command("once", "Execute script once in Studio (ephemeral)")
+	onceCmd:argument("script", "Path to the script to execute, or '-' for stdin"):args("?")
+	onceCmd:option("-s --source", "Execute source code passed as string")
+	onceCmd:option("--place", "Path to the place file to open")
+	onceCmd:option("--sourcemap", "Path to sourcemap.json for instance resolution")
+	onceCmd:option("--output", "Path to file for execution output (prints/logs)")
+	onceCmd:option("--return", "Path to file for return value JSON")
+	onceCmd:flag("--show-return", "Print return value to stdout")
+	onceCmd:flag("--no-warn", "Disable warning output")
+	onceCmd:flag("--no-error", "Disable error output")
+	onceCmd:flag("--no-info", "Disable info output")
+	onceCmd:flag("--no-print", "Disable print statements")
+	onceCmd:flag("--no-output", "Disable all output")
+	onceCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
+	onceCmd:option("--port", "Port number for ephemeral server"):default(config.ONCE_PORT):convert(tonumber)
+
 	-- Define serve command
 	local serveCmd = parser:command("serve", "Start persistent server for code execution")
 	serveCmd:option("--port", "Port number for server"):default(config.SERVE_PORT):convert(tonumber)
@@ -44,7 +61,10 @@ local function main()
 
 	-- Router: check which command was invoked and call it with parsed args
 	-- When a command is selected, argparse sets result[command_name] = true
-	if args.serve then
+	if args.once then
+		local onceCommand = require("@self/commands/once")
+		onceCommand(args)
+	elseif args.serve then
 		local serveCommand = require("@self/commands/serve")
 		serveCommand(args)
 	elseif args.exec then
