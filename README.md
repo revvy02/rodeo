@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/plugin/logo.png" width="200" />
+</p>
+
 # rodeo
 Provides a roblox studio luau run-time in cli by routing code 
 execution to running studio instances via websockets.
@@ -8,7 +12,7 @@ execution to running studio instances via websockets.
 - **Environment targeting** - Route executions to specific runtime contexts (edit/play, client/server)
 - **Log filtering** - Control which log levels are displayed
 - **Return values** - Capture script return values via stdout
-- **Sourcemap support** - Preserve stack traces using sourcemaps
+- **Sourcemap support** - Auto-detects `sourcemap.json` to preserve stack traces
 - **Full Studio API** - Scripts have complete access to all Studio APIs
 
 ## Installation
@@ -55,18 +59,17 @@ rodeo exec script.luau
 
 ### Once Mode
 
-Execute a script one time. Studio opens temporarily and closes after execution.
+Execute a script one time. Studio opens temporarily and closes after execution. This is functionally identical to `run-in-roblox`.
 
 ```bash
-# Basic execution
+# Basic execution (uses empty place)
 rodeo once script.luau
 
 # With place file
 rodeo once script.luau --place game.rbxl
-
-# With sourcemap (Helps preserve stack traces)
-rodeo once script.luau --place game.rbxl --sourcemap sourcemap.json
 ```
+
+If `sourcemap.json` exists in the current directory, it will be used automatically to preserve stack traces. You can also specify a custom path with `--sourcemap`.
 
 ### Context Targeting
 

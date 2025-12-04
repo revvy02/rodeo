@@ -2,30 +2,11 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 
-local pathfs = require("@pkg/pathfs")
-
-local function findSourcemapInTree(): string?
-	local currentPath = pathfs.Path.from(process.cwd)
-
-	-- Walk up the directory tree looking for sourcemap.json
-	while true do
-		local sourcemapPath = currentPath:join("sourcemap.json"):toString()
-
-		if fs.isFile(sourcemapPath) then
-			return sourcemapPath
-		end
-
-		-- Get parent directory
-		local parentPath = currentPath:parent()
-
-		-- Stop if we've reached the root
-		if parentPath == nil or parentPath:toString() == currentPath:toString() then
-			break
-		end
-
-		currentPath = parentPath
+local function findSourcemapInCwd(): string?
+	local sourcemapPath = `{process.cwd}/sourcemap.json`
+	if fs.isFile(sourcemapPath) then
+		return sourcemapPath
 	end
-
 	return nil
 end
 
@@ -74,7 +55,7 @@ local function findInstancePath(sourcemap: any, filePath: string): string?
 end
 
 return {
-	findSourcemapInTree = findSourcemapInTree,
+	findSourcemapInCwd = findSourcemapInCwd,
 	loadSourcemap = loadSourcemap,
 	findInstancePath = findInstancePath,
 }

@@ -29,7 +29,10 @@ end
 
 -- Resolve instance path from sourcemap
 local function resolveInstancePath(sourcemapPath: string?, scriptFilePath: string?): string?
-	if not sourcemapPath then
+	-- Auto-detect sourcemap.json in cwd if not provided
+	local resolvedSourcemapPath = sourcemapPath or sourcemap.findSourcemapInCwd()
+
+	if not resolvedSourcemapPath then
 		return nil
 	end
 
@@ -38,7 +41,7 @@ local function resolveInstancePath(sourcemapPath: string?, scriptFilePath: strin
 		return nil
 	end
 
-	local map, err = sourcemap.loadSourcemap(sourcemapPath)
+	local map, err = sourcemap.loadSourcemap(resolvedSourcemapPath)
 	if not map then
 		log.error(err or "Failed to load sourcemap")
 		return nil

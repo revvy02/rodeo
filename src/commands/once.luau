@@ -168,18 +168,19 @@ local function main(args: any)
 
 	local placeToOpen = cfg.place
 	local tempPlacePath = nil
+	local tempDir = ".rodeo/.temp"
+
+	-- Ensure temp directory exists
+	if not fs.isDir(".rodeo") then
+		fs.writeDir(".rodeo")
+	end
+	if not fs.isDir(tempDir) then
+		fs.writeDir(tempDir)
+	end
+
 	if placeToOpen then
+		-- Copy provided place file
 		local extension = placeToOpen:match("%.([^%.]+)$") or "rbxlx"
-		local tempDir = ".rodeo/.temp"
-
-		-- Ensure temp directory exists
-		if not fs.isDir(".rodeo") then
-			fs.writeDir(".rodeo")
-		end
-		if not fs.isDir(tempDir) then
-			fs.writeDir(tempDir)
-		end
-
 		tempPlacePath = `{tempDir}/rodeo-place.{extension}`
 
 		if fs.isFile(tempPlacePath) then
@@ -187,17 +188,28 @@ local function main(args: any)
 		end
 
 		fs.copy(placeToOpen, tempPlacePath)
-
-		-- Patch the temp place with session ID for unique identification
-		local game = roblox.deserializePlace(fs.readFile(tempPlacePath))
-		local workspace = game:FindFirstChildOfClass("Workspace")
-		if workspace then
-			workspace:SetAttribute("__RODEO_ONCE_EXECUTION_ID__", executionId)
-			fs.writeFile(tempPlacePath, roblox.serializePlace(game))
-		end
-
-		placeToOpen = tempPlacePath
+	else
+		-- Create empty place file
+		tempPlacePath = `{tempDir}/rodeo-place.rbxlx`
 	end
+
+	-- Patch the temp place with session ID for unique identification
+	local game
+	if placeToOpen then
+		game = roblox.deserializePlace(fs.readFile(tempPlacePath))
+	else
+		game = roblox.Instance.new("DataModel")
+		local ws = roblox.Instance.new("Workspace")
+		ws.Parent = game
+	end
+
+	local workspace = game:FindFirstChildOfClass("Workspace")
+	if workspace then
+		workspace:SetAttribute("__RODEO_ONCE_EXECUTION_ID__", executionId)
+	end
+	fs.writeFile(tempPlacePath, roblox.serializePlace(game))
+
+	placeToOpen = tempPlacePath
 
 	local port = args.port
 
@@ -235,8 +247,7 @@ local function main(args: any)
 	task.wait(0.5)
 
 	-- Launch Studio
-	local studioArgs = if placeToOpen then { placeToOpen } else {}
-	local studioProcess = process.create(roblox.studioApplicationPath(), studioArgs)
+	local studioProcess = process.create(roblox.studioApplicationPath(), { placeToOpen })
 
 	-- Drain stdout/stderr to prevent Studio from blocking on full pipe buffers
 	task.spawn(function()
