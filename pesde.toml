@@ -1,5 +1,5 @@
 name = "rvy/rodeo"
-version = "0.0.2"
+version = "0.0.3-rc.1"
 description = "provides roblox studio's luau runtime via cli"
 authors = ["rvy"]
 license = "MIT"
@@ -19,7 +19,7 @@ lune = "^0.10.4"
 
 [target]
 environment = "lune"
-bin = "src/init.luau"
+bin = "build/release_bundle/init.luau"
 
 [indices]
 default = "https://github.com/pesde-pkg/index"

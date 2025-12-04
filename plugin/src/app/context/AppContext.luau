@@ -166,10 +166,15 @@ local function AppProvider(props: AppProviderProps)
 
 		client.Opened:Connect(function()
 			setConnected(true)
-			-- Send identification
+
+			-- Read session ID from workspace (if present, for "once" mode)
+			local sessionId = workspace:GetAttribute("__RODEO_ONCE_EXECUTION_ID__")
+
+			-- Send identification with optional session ID
 			client:Send(HttpService:JSONEncode({
 				clientType = "studio",
 				contextBitset = getContextBitset(),
+				sessionId = sessionId,
 			}))
 		end)
 

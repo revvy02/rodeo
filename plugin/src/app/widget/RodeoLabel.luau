@@ -5,7 +5,8 @@ local constants = require(script.Parent.Parent.Parent.library.constants)
 
 local e = React.createElement
 
-local TILE_SIZE = 50
+local TILE_SIZE_X = 140
+local TILE_SIZE_Y = 40
 
 local function RodeoLabel()
 	local imageRef, setImageRef = React.useState(nil :: ImageLabel?)
@@ -18,7 +19,7 @@ local function RodeoLabel()
 		-- Create tween info for smooth continuous animation
 		-- Move by exactly one tile size so it loops seamlessly
 		local tweenInfo = TweenInfo.new(
-			1, -- Duration in seconds (adjust for speed)
+			2, -- Duration in seconds (adjust for speed)
 			Enum.EasingStyle.Linear,
 			Enum.EasingDirection.InOut,
 			-1, -- Repeat infinitely
@@ -28,7 +29,7 @@ local function RodeoLabel()
 
 		-- Tween from 0 to -TILE_SIZE pixels (one tile width)
 		local tween = TweenService:Create(imageRef, tweenInfo, {
-			Position = UDim2.fromOffset(-TILE_SIZE, 0),
+			Position = UDim2.fromOffset(-TILE_SIZE_X, 0),
 		})
 
 		tween:Play()
@@ -40,7 +41,7 @@ local function RodeoLabel()
 
 	return e("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(2, 0, 0, TILE_SIZE),
+		Size = UDim2.new(2, 0, 0, TILE_SIZE_Y),
 		LayoutOrder = 0,
 	}, {
 		Stroke = e("UIStroke", {
@@ -59,13 +60,13 @@ local function RodeoLabel()
 		}),
 		ImageLabel = e("ImageLabel", {
 			ref = setImageRef,
-			Image = assets.rodeo,
+			Image = assets.logo,
 			ImageColor3 = Color3.fromRGB(255, 70, 80),
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, TILE_SIZE, 1, 0),
+			Size = UDim2.new(1, TILE_SIZE_X, 0, TILE_SIZE_Y),
 			Position = UDim2.new(0, 0, 0, 0),
 			ScaleType = Enum.ScaleType.Tile,
-			TileSize = UDim2.fromOffset(TILE_SIZE, TILE_SIZE),
+			TileSize = UDim2.fromOffset(TILE_SIZE_X, TILE_SIZE_Y),
 		}),
 	})
 end

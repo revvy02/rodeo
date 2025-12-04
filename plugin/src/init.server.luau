@@ -12,6 +12,7 @@
 local App = require(script.app.widget)
 local React = require("@pkg/react")
 local ReactRoblox = require("@pkg/react_roblox")
+local assets = require(script.library.assets)
 local flags = require(script.library.flags)
 
 local e = React.createElement
@@ -27,13 +28,13 @@ local WIDGET_INFO = DockWidgetPluginGuiInfo.new(
 )
 
 -- Create widget
-local widget = plugin:CreateDockWidgetPluginGui("RodeoSettings", WIDGET_INFO)
+local widget = plugin:CreateDockWidgetPluginGui("Rodeo", WIDGET_INFO)
 widget.Title = "Rodeo"
 
 -- Only create toolbar button when settings panel is enabled
 if flags.SETTINGS_PANEL_ENABLED then
 	local toolbar = plugin:CreateToolbar("rodeo")
-	local toggleButton = toolbar:CreateButton("Settings", "Toggle Rodeo settings panel", "rbxasset://textures/ui/Settings/MenuBarIcons/GameSettingsTab.png")
+	local toggleButton = toolbar:CreateButton("Rodeo", "Toggle Rodeo Plugin UI", assets.rodeo)
 
 	toggleButton.Click:Connect(function()
 		widget.Enabled = not widget.Enabled

@@ -187,6 +187,15 @@ local function main(args: any)
 		end
 
 		fs.copy(placeToOpen, tempPlacePath)
+
+		-- Patch the temp place with session ID for unique identification
+		local game = roblox.deserializePlace(fs.readFile(tempPlacePath))
+		local workspace = game:FindFirstChildOfClass("Workspace")
+		if workspace then
+			workspace:SetAttribute("__RODEO_ONCE_EXECUTION_ID__", executionId)
+			fs.writeFile(tempPlacePath, roblox.serializePlace(game))
+		end
+
 		placeToOpen = tempPlacePath
 	end
 
@@ -203,6 +212,21 @@ local function main(args: any)
 	-- Start WebSocket server BEFORE launching Studio
 	local server = net.serve(port, {
 		handleWebSocket = function(ws)
+			-- Wait for identification message from plugin
+			local identMsg = ws:next()
+			if not identMsg then
+				return
+			end
+
+			local ident = serde.decode("json", identMsg)
+
+			-- Reject connections with mismatched session ID
+			if ident.sessionId ~= executionId then
+				log.debug("once", `Rejecting connection with session ID: {ident.sessionId or "nil"}`)
+				ws:close()
+				return
+			end
+
 			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, cfg.logFilter, exitCodeRef, cfg.outputFile, cfg.returnFile, cfg.showReturn, cfg.cacheRequires)
 		end,
 	})
