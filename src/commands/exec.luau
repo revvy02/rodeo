@@ -9,7 +9,6 @@ local stdio = require("@lune/stdio")
 local config = require("../library/config")
 local execution = require("../library/execution")
 local log = require("../library/log")
-local sourcemap = require("../library/sourcemap")
 local uuid = require("../library/uuid")
 
 local execColors = config.EXEC_LOG_COLORS
@@ -178,14 +177,6 @@ end
 local function main(args: any)
 	local cfg = parseArguments(args)
 	validateConfig(cfg)
-
-	-- Auto-detect sourcemap if not explicitly provided
-	if not cfg.sourcemap and cfg.scriptPath then
-		local autoDetectedPath = sourcemap.findSourcemapInTree()
-		if autoDetectedPath then
-			cfg.sourcemap = autoDetectedPath
-		end
-	end
 
 	local host = args.host
 	local port = args.port
