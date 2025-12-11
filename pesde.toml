@@ -1,5 +1,5 @@
 name = "rvy/rodeo"
-version = "0.1.0-rc.2"
+version = "0.1.0-rc.3"
 description = "provides roblox studio's luau runtime via cli"
 authors = ["rvy"]
 license = "MIT"
