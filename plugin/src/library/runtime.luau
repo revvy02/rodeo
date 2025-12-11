@@ -40,6 +40,30 @@ export type ExecutionCallbacks = {
 	onComplete: (result: string?) -> (),
 }
 
+-- Get absolute instance path from game using bracket notation
+-- e.g. game["Workspace"]["Part"] or game["ReplicatedStorage"]["Modules"]["Utils"]
+-- Returns nil if the instance is not a descendant of game
+local function getAbsoluteInstancePath(instance: Instance): string?
+	if instance == game then
+		return "game"
+	end
+
+	local parts = {}
+	local current = instance
+
+	while current and current ~= game do
+		table.insert(parts, 1, `["{current.Name}"]`)
+		current = current.Parent
+	end
+
+	-- If we didn't reach game, the instance has no valid path
+	if current ~= game then
+		return nil
+	end
+
+	return "game" .. table.concat(parts, "")
+end
+
 -- Debug logging (verbose flag passed per-execution)
 local VERBOSE = false
 
@@ -326,8 +350,7 @@ end
 -- Execute module and handle errors
 local function executeModule(moduleScript: ModuleScript): (boolean, any)
 	local success, result = xpcall(function()
-		local fn = require(moduleScript)
-		return fn()
+		return require(moduleScript)
 	end, debug.traceback)
 
 	if not success then
@@ -376,10 +399,25 @@ local function execute(moduleScript: ModuleScript, params: ExecutionParams, call
 		end)
 	end
 
+	-- Resolve path BEFORE setting up traversal so we get the correct module
+	local modulePath = getAbsoluteInstancePath(moduleScript)
+	log(`Resolved path = {modulePath}`)
+
 	-- Setup uncachable requires
 	local cleanup: (() -> ())? = nil
 	if not params.cacheRequires then
 		cleanup = setupUncachableRequireModuleTraversal(moduleScript)
+	end
+
+	-- Resolve module via path (picks up cloned module if traversal is active)
+	if modulePath then
+		local resolver = Instance.new("ModuleScript")
+		resolver.Name = "__rodeo_path_resolver"
+		resolver.Source = "return " .. modulePath
+		resolver.Parent = game:GetService("ReplicatedStorage")
+		moduleScript = require(resolver)
+		resolver:Destroy()
+		log(`Target module: {moduleScript:GetFullName()}`)
 	end
 
 	-- Execute the module

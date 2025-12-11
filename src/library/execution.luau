@@ -37,7 +37,6 @@ local function resolveInstancePath(sourcemapPath: string?, scriptFilePath: strin
 	end
 
 	if not scriptFilePath then
-		log.warn("Sourcemap ignored: only works with file-based scripts")
 		return nil
 	end
 

@@ -20,7 +20,7 @@ local function createModuleScript(script: string, instancePath: string?): Module
 		local originalInstance = resolveInstancePath(instancePath)
 		if originalInstance and originalInstance:IsA("ModuleScript") then
 			moduleScript = originalInstance:Clone()
-			moduleScript.Source = "return function() " .. script .. "\nend"
+			moduleScript.Source = script
 			moduleScript.Parent = originalInstance.Parent
 		else
 			if originalInstance then
@@ -29,11 +29,11 @@ local function createModuleScript(script: string, instancePath: string?): Module
 				warn(`[rodeo] Instance not found: {instancePath}, using temp module`)
 			end
 			moduleScript = Instance.new("ModuleScript")
-			moduleScript.Source = "return function() " .. script .. "\nend"
+			moduleScript.Source = script
 		end
 	else
 		moduleScript = Instance.new("ModuleScript")
-		moduleScript.Source = "return function() " .. script .. "\nend"
+		moduleScript.Source = script
 	end
 
 	return moduleScript

@@ -143,14 +143,18 @@ local function AppProvider(props: AppProviderProps)
 		end
 	end, { isExecuting, connected }) :: string
 
-	-- WebSocket lifecycle effect
+	-- Store client in state so message handler effect can access it
+	local client, setClient = React.useState(nil :: any)
+
+	-- WebSocket client creation effect
 	React.useEffect(function()
 		if not wsUrl then
 			setConnected(false)
+			setClient(nil)
 			return
 		end
 
-		local success, client = xpcall(function()
+		local success, newClient = xpcall(function()
 			return HttpService:CreateWebStreamClient(Enum.WebStreamClientType.WebSocket, {
 				Url = wsUrl,
 			})
@@ -164,31 +168,45 @@ local function AppProvider(props: AppProviderProps)
 			return
 		end
 
-		client.Opened:Connect(function()
+		newClient.Opened:Connect(function()
 			setConnected(true)
 
 			-- Read session ID from workspace (if present, for "once" mode)
 			local sessionId = workspace:GetAttribute("__RODEO_ONCE_EXECUTION_ID__")
 
 			-- Send identification with optional session ID
-			client:Send(HttpService:JSONEncode({
+			newClient:Send(HttpService:JSONEncode({
 				clientType = "studio",
 				contextBitset = getContextBitset(),
 				sessionId = sessionId,
 			}))
 		end)
 
-		client.Error:Connect(function(code: string, message: string)
+		newClient.Error:Connect(function(code: string, message: string)
 			-- warn("[rodeo] Socket error:", code, message)
 			setWsUrl(nil)
 		end)
 
-		client.Closed:Connect(function()
+		newClient.Closed:Connect(function()
 			setConnected(false)
 			setWsUrl(nil)
+			setClient(nil)
 		end)
 
-		client.MessageReceived:Connect(function(message: string)
+		setClient(newClient)
+
+		return function()
+			newClient:Close()
+		end
+	end, { wsUrl })
+
+	-- Message handler effect (can depend on verbose without closing socket)
+	React.useEffect(function()
+		if not client then
+			return
+		end
+
+		local connection = client.MessageReceived:Connect(function(message: string)
 			local success, decoded = pcall(function()
 				return HttpService:JSONDecode(message)
 			end)
@@ -240,9 +258,9 @@ local function AppProvider(props: AppProviderProps)
 		end)
 
 		return function()
-			client:Close()
+			connection:Disconnect()
 		end
-	end, { wsUrl })
+	end, { client, verbose })
 
 	-- Port change handler with validation
 	local function handlePortChange(newPort: string)
