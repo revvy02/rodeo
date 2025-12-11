@@ -11,6 +11,8 @@
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
 
+local terminal = require(script.Parent.terminal)
+
 local LOG_TYPE_TO_LEVEL = {
 	[Enum.MessageType.MessageOutput] = "Print",
 	[Enum.MessageType.MessageInfo] = "Info",
@@ -43,7 +45,11 @@ local VERBOSE = false
 
 local function log(message: string)
 	if VERBOSE then
-		warn(message)
+		local source, line, name = debug.info(2, "sln")
+		local formattedSource = terminal.style.gray(source)
+		local formattedLine = terminal.style.red(tostring(line))
+		local formattedName = terminal.style.green(name or "?")
+		print(`[{formattedSource}:{formattedLine} {formattedName}] {message}`)
 	end
 end
 
@@ -85,6 +91,22 @@ local function extractRequires(source: string): { string }
 		local requireStart = string.find(source, "require%s*%(", pos)
 		if not requireStart then
 			break
+		end
+
+		-- Check if this require is commented out (-- before require on same line)
+		-- Find the start of the current line by searching backwards for newline
+		local lineStart = 1
+		for i = requireStart - 1, 1, -1 do
+			if string.sub(source, i, i) == "\n" then
+				lineStart = i + 1
+				break
+			end
+		end
+		local lineBeforeRequire = string.sub(source, lineStart, requireStart - 1)
+		if string.find(lineBeforeRequire, "%-%-") then
+			-- This require is in a comment, skip it
+			pos = requireStart + 1
+			continue
 		end
 
 		-- Extract the full require call with nested parentheses
@@ -323,7 +345,7 @@ end
 -- Main execute function
 local function execute(moduleScript: ModuleScript, params: ExecutionParams, callbacks: ExecutionCallbacks)
 	-- Set verbose flag for this execution
-	-- VERBOSE = params.verbose or false
+	VERBOSE = params.verbose or false
 
 	local logConnection: RBXScriptConnection? = nil
 	local logFilter = params.logFilter or {
