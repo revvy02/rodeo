@@ -224,7 +224,7 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 	-- Extract the path from require(path) using helper function
 	local pathExpr, _ = extractParenthesisContent(requireString, 1)
 	if not pathExpr then
-		log(`  Failed to extract path from require string`)
+		log(`Failed to extract path from require string`)
 		return nil
 	end
 
@@ -246,18 +246,18 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 
 	-- If temp module succeeded and returned a ModuleScript, use it
 	if success and typeof(result) == "Instance" and result:IsA("ModuleScript") then
-		log(`  Phase 1 (temp module): Resolved to {result:GetFullName()}`)
+		log(`Phase 1 (temp module): Resolved to {result:GetFullName()}`)
 		return result
 	end
 
 	-- Phase 2: If loadstring failed or didn't return an instance, try string path conversion
 	-- This handles "@self/path", "./relative", etc.
-	log(`  Phase 1 failed, trying Phase 2 (string conversion)`)
+	log(`Phase 1 failed, trying Phase 2 (string conversion)`)
 	local resolved = getRobloxStringPathInstance(currentScript, pathExpr)
 	if resolved then
-		log(`  Phase 2: Resolved to {resolved:GetFullName()}`)
+		log(`Phase 2: Resolved to {resolved:GetFullName()}`)
 	else
-		log(`  Phase 2: Failed to resolve`)
+		log(`Phase 2: Failed to resolve`)
 	end
 	return resolved
 end
@@ -266,7 +266,7 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 	log(`Processing module: {rootModule:GetFullName()}`)
 	local source = rootModule.Source
 	local requires = extractRequires(source)
-	log(`  Found {#requires} require() calls`)
+	log(`Found {#requires} require() calls`)
 
 	-- extract require calls
 	-- for each require, convert path to instance
@@ -274,18 +274,18 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 		local requireModule = getRequireInstance(requirePath, rootModule)
 
 		if not requireModule then
-			log(`  Failed to resolve require, skipping`)
+			log(`Failed to resolve require, skipping`)
 			continue
 		end
 
 		if clonedModules[requireModule] then
-			log(`  Skipping {requireModule:GetFullName()} (already cloned)`)
+			log(`Skipping {requireModule:GetFullName()} (already cloned)`)
 			continue
 		end
 
 		local requireModuleCopy = requireModule:Clone()
 		clonedModules[requireModuleCopy] = true
-		log(`  Cloned: {requireModule:GetFullName()}`)
+		log(`Cloned: {requireModule:GetFullName()}`)
 
 		-- Track all descendants of the original module
 		local descendantCount = 0
@@ -296,13 +296,13 @@ local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]
 			end
 		end
 		if descendantCount > 0 then
-			log(`  Tracked {descendantCount} descendant modules`)
+			log(`Tracked {descendantCount} descendant modules`)
 		end
 
 		local name = requireModule.Name
 		requireModule.Name = name .. ".rodeo.ignore"
 		requireModuleCopy.Parent = requireModule.Parent
-		log(`  Swapped: {name} <-> {requireModule.Name}`)
+		log(`Swapped: {name} <-> {requireModule.Name}`)
 
 		table.insert(disabledInstances, requireModule)
 
@@ -335,14 +335,14 @@ local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript)
 			instance.Name = string.gsub(instance.Name, "%.rodeo%.ignore$", "")
 			restoredCount = restoredCount + 1
 		end
-		log(`  Restored {restoredCount} original module names`)
+		log(`Restored {restoredCount} original module names`)
 
 		local destroyedCount = 0
 		for module in clonedModules do
 			module:Destroy()
 			destroyedCount = destroyedCount + 1
 		end
-		log(`  Destroyed {destroyedCount} cloned modules`)
+		log(`Destroyed {destroyedCount} cloned modules`)
 		log(`Cleanup complete`)
 	end
 end
@@ -409,7 +409,7 @@ local function execute(moduleScript: ModuleScript, params: ExecutionParams, call
 		cleanup = setupUncachableRequireModuleTraversal(moduleScript)
 	end
 
-	-- Resolve module via path (picks up cloned module if traversal is active)
+	-- Resolve module via path (picks up cloned module if traversal is activ and the root got cloned)
 	if modulePath then
 		local resolver = Instance.new("ModuleScript")
 		resolver.Name = "__rodeo_path_resolver"

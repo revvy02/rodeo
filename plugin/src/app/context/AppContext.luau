@@ -221,7 +221,7 @@ local function AppProvider(props: AppProviderProps)
 			if decoded.type == "exec" then
 				setIsExecuting(true)
 
-				local moduleScript = utils.createModuleScript(decoded.script, decoded.instancePath)
+				local moduleScript, cleanup = utils.createModuleScript(decoded.script, decoded.instancePath)
 				local logFilter = decoded.logFilter or {
 					enableWarn = true,
 					enableError = true,
@@ -251,7 +251,7 @@ local function AppProvider(props: AppProviderProps)
 							result = result,
 						}))
 						setIsExecuting(false)
-						moduleScript:Destroy()
+						cleanup()
 					end,
 				})
 			end

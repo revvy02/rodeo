@@ -13,15 +13,23 @@ local function resolveInstancePath(path: string): Instance?
 	return nil
 end
 
-local function createModuleScript(script: string, instancePath: string?): ModuleScript
+local function createModuleScript(script: string, instancePath: string?): (ModuleScript, () -> ())
 	local moduleScript: ModuleScript
+	local cleanup = function() end
 
 	if instancePath then
 		local originalInstance = resolveInstancePath(instancePath)
 		if originalInstance and originalInstance:IsA("ModuleScript") then
 			moduleScript = originalInstance:Clone()
 			moduleScript.Source = script
+			-- Rename original so clone takes precedence
+			originalInstance.Name = originalInstance.Name .. ".rodeo.ignore"
 			moduleScript.Parent = originalInstance.Parent
+
+			cleanup = function()
+				moduleScript:Destroy()
+				originalInstance.Name = string.gsub(originalInstance.Name, "%.rodeo%.ignore$", "")
+			end
 		else
 			if originalInstance then
 				warn(`[rodeo] Instance at {instancePath} is not a ModuleScript, using temp module`)
@@ -31,14 +39,20 @@ local function createModuleScript(script: string, instancePath: string?): Module
 			moduleScript = Instance.new("ModuleScript")
 			moduleScript.Source = script
 			moduleScript.Parent = game:GetService("ReplicatedStorage")
+			cleanup = function()
+				moduleScript:Destroy()
+			end
 		end
 	else
 		moduleScript = Instance.new("ModuleScript")
 		moduleScript.Source = script
 		moduleScript.Parent = game:GetService("ReplicatedStorage")
+		cleanup = function()
+			moduleScript:Destroy()
+		end
 	end
 
-	return moduleScript
+	return moduleScript, cleanup
 end
 
 return {
