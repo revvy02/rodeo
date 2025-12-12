@@ -30,10 +30,12 @@ local function createModuleScript(script: string, instancePath: string?): Module
 			end
 			moduleScript = Instance.new("ModuleScript")
 			moduleScript.Source = script
+			moduleScript.Parent = game:GetService("ReplicatedStorage")
 		end
 	else
 		moduleScript = Instance.new("ModuleScript")
 		moduleScript.Source = script
+		moduleScript.Parent = game:GetService("ReplicatedStorage")
 	end
 
 	return moduleScript
