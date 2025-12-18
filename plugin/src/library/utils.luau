@@ -1,12 +1,17 @@
 -- Shared utilities for rodeo plugins
 
 local function resolveInstancePath(path: string): Instance?
-	local fn = loadstring("return " .. path)
-	if not fn then
-		return nil
-	end
+	local resolver = Instance.new("ModuleScript")
+	resolver.Name = "__rodeo_path_resolver"
+	resolver.Source = "return " .. path
+	resolver.Parent = game:GetService("ReplicatedStorage")
 
-	local success, result = pcall(fn)
+	local success, result = pcall(function()
+		return require(resolver)
+	end)
+
+	resolver:Destroy()
+
 	if success and typeof(result) == "Instance" then
 		return result
 	end
@@ -21,7 +26,7 @@ local function createModuleScript(script: string, instancePath: string?): (Modul
 		local originalInstance = resolveInstancePath(instancePath)
 		if originalInstance and originalInstance:IsA("ModuleScript") then
 			moduleScript = originalInstance:Clone()
-			moduleScript.Source = script
+			-- moduleScript.Source = script
 			-- Rename original so clone takes precedence
 			originalInstance.Name = originalInstance.Name .. ".rodeo.ignore"
 			moduleScript.Parent = originalInstance.Parent

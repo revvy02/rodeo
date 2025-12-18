@@ -36,11 +36,14 @@ local function findMatchingVmPipelines(filterBits: number, filterMask: number): 
 	for vmBitset, vmMap in pairs(pipelines) do
 		if bit32.band(vmBitset, filterMask) == filterBits then
 			for studioId, vmPipeline in pairs(vmMap) do
-				table.insert(matches, {
-					bitset = vmBitset,
-					studioId = studioId,
-					pipeline = vmPipeline,
-				})
+				-- Only include connected VMs
+				if vmPipeline.studioConnected then
+					table.insert(matches, {
+						bitset = vmBitset,
+						studioId = studioId,
+						pipeline = vmPipeline,
+					})
+				end
 			end
 		end
 	end
