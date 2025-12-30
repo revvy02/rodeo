@@ -153,6 +153,7 @@ local function handleExecClient(ws: any)
 				filterMask = filterMask,
 				logFilter = logFilter,
 				cacheRequires = decoded.cacheRequires,
+				context = decoded.context,
 				queuedAt = os.time(),
 			}
 

@@ -23,6 +23,7 @@ export type ExecRequest = {
 	filterMask: number,
 	logFilter: LogFilter,
 	cacheRequires: boolean?,
+	context: string?,
 	queuedAt: number,
 }
 
@@ -85,6 +86,7 @@ local function processQueue(self: VmPipeline)
 		script = exec.script,
 		logFilter = exec.logFilter,
 		cacheRequires = exec.cacheRequires,
+		target = exec.context or "plugin",
 	}
 
 	if exec.instancePath then

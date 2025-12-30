@@ -15,7 +15,6 @@ local RunService = game:GetService("RunService")
 local constants = require(script.Parent.Parent.Parent.library.constants)
 local flags = require(script.Parent.Parent.Parent.library.flags)
 local runtime = require(script.Parent.Parent.Parent.library.runtime)
-local utils = require(script.Parent.Parent.Parent.library.utils)
 
 local e = React.createElement
 local CONTEXT_BITS = constants.CONTEXT_BITS
@@ -221,7 +220,7 @@ local function AppProvider(props: AppProviderProps)
 			if decoded.type == "exec" then
 				setIsExecuting(true)
 
-				local moduleScript, cleanup = utils.createModuleScript(decoded.script, decoded.instancePath)
+				local target = decoded.target or "plugin"
 				local logFilter = decoded.logFilter or {
 					enableWarn = true,
 					enableError = true,
@@ -230,7 +229,7 @@ local function AppProvider(props: AppProviderProps)
 					enableLogs = true,
 				}
 
-				runtime.execute(moduleScript, {
+				runtime.executeInContext(decoded.script, target, {
 					executionId = decoded.executionId,
 					logFilter = logFilter,
 					cacheRequires = decoded.cacheRequires,
@@ -251,7 +250,6 @@ local function AppProvider(props: AppProviderProps)
 							result = result,
 						}))
 						setIsExecuting(false)
-						cleanup()
 					end,
 				})
 			end

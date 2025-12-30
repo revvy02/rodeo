@@ -48,6 +48,7 @@ local function main()
 	execCmd:flag("--no-print", "Disable print statements")
 	execCmd:flag("--no-output", "Disable all output")
 	execCmd:flag("--cache-requires", "Enable module caching (skip reloader for better performance)")
+	execCmd:option("--context", "Execution context: server, client, or plugin"):default("plugin")
 	execCmd:option("--host", "Host of running server"):default("localhost")
 	execCmd:option("--port", "Port number of running server"):default(config.SERVE_PORT):convert(tonumber)
 

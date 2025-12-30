@@ -10,8 +10,12 @@
 
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local terminal = require(script.Parent.terminal)
+local utils = require(script.Parent.utils)
 
 local LOG_TYPE_TO_LEVEL = {
 	[Enum.MessageType.MessageOutput] = "Print",
@@ -457,8 +461,95 @@ local function execute(moduleScript: ModuleScript, params: ExecutionParams, call
 	callbacks.onComplete(serializedResult)
 end
 
+type ExecutionTarget = "server" | "client" | "plugin"
+
+-- Execute in a specific context (server/client/plugin)
+local function executeInContext(
+	source: string,
+	target: ExecutionTarget,
+	params: ExecutionParams,
+	callbacks: ExecutionCallbacks
+)
+	-- Set verbose flag for this execution
+	VERBOSE = params.verbose or false
+
+	local ctx = utils.createExecutionContext(source, target, params.executionId)
+
+	-- Setup uncacheable require traversal (from plugin context, before execution)
+	local traversalCleanup: (() -> ())? = nil
+	if not params.cacheRequires then
+		traversalCleanup = setupUncachableRequireModuleTraversal(ctx.module)
+	end
+
+	-- Listen for logs
+	local logsConnection = ctx.logsEvent.Event:Connect(function(logData)
+		local level = logData.level
+		local body = logData.body
+		local logFilter = params.logFilter or {}
+
+		-- Apply log filter
+		if level == "Warning" and logFilter.enableWarn == false then
+			return
+		elseif level == "Error" and logFilter.enableError == false then
+			return
+		elseif level == "Info" and logFilter.enableInfo == false then
+			return
+		elseif level == "Print" and logFilter.enableOutput == false then
+			return
+		end
+
+		callbacks.onOutput(level, body)
+	end)
+
+	-- Listen for results
+	local resultsConnection
+	resultsConnection = ctx.resultsEvent.Event:Connect(function(result)
+		resultsConnection:Disconnect()
+		logsConnection:Disconnect()
+
+		if not result.success then
+			callbacks.onOutput("Error", result.error)
+		end
+
+		-- Cleanup traversal first, then destroy runner
+		if traversalCleanup then
+			traversalCleanup()
+		end
+		ctx.cleanup()
+
+		callbacks.onComplete(result.result)
+	end)
+
+	-- Parent runner to trigger execution (or require for plugin)
+	if target == "server" then
+		ctx.runner.Parent = ServerScriptService
+	elseif target == "client" then
+		local player = Players.LocalPlayer
+		if player then
+			ctx.runner.Parent = player:WaitForChild("PlayerScripts")
+		else
+			-- No LocalPlayer - can't execute in client context
+			resultsConnection:Disconnect()
+			logsConnection:Disconnect()
+			if traversalCleanup then
+				traversalCleanup()
+			end
+			ctx.cleanup()
+			callbacks.onOutput("Error", "Cannot execute in client context: no LocalPlayer")
+			callbacks.onComplete(nil)
+			return
+		end
+	else -- plugin
+		ctx.runner.Parent = ReplicatedStorage
+		task.spawn(function()
+			require(ctx.runner)
+		end)
+	end
+end
+
 return {
 	execute = execute,
+	executeInContext = executeInContext,
 	executeModule = executeModule,
 	setupUncachableRequireModuleTraversal = setupUncachableRequireModuleTraversal,
 	extractRequires = extractRequires,
