@@ -76,7 +76,8 @@ local HttpService = game:GetService("HttpService")
 
 local resultsEvent = script:WaitForChild("results")
 local logsEvent = script:WaitForChild("logs")
-local module = script:WaitForChild("module")
+local moduleRef = script:WaitForChild("moduleRef")
+local module = moduleRef.Value
 
 -- Capture logs during execution
 local logConnection
@@ -138,17 +139,24 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 	logsEvent.Name = "logs"
 	logsEvent.Parent = runner
 
-	-- Create module with user source as child of runner
+	-- Create module with user source (unparented for cleaner stack traces)
 	local module = Instance.new("ModuleScript")
 	module.Name = "module"
 	module.Source = source
-	module.Parent = runner
+	-- module stays unparented (Parent = nil)
+
+	-- Reference module via ObjectValue
+	local moduleRef = Instance.new("ObjectValue")
+	moduleRef.Name = "moduleRef"
+	moduleRef.Value = module
+	moduleRef.Parent = runner
 
 	-- Set runner source
 	runner.Source = RUNNER_SOURCE
 
 	local cleanup = function()
-		runner:Destroy() -- Children (events, module) destroyed automatically
+		module:Destroy() -- Destroy unparented module explicitly
+		runner:Destroy()
 	end
 
 	return {
