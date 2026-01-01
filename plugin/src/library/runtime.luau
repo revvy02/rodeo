@@ -11,8 +11,8 @@
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
 local Players = game:GetService("Players")
-local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local terminal = require(script.Parent.terminal)
 local utils = require(script.Parent.utils)
@@ -465,12 +465,7 @@ type ExecutionTarget = "server" | "client" | "plugin"
 
 -- Execute a module in a specific context (server/client/plugin)
 -- ctx contains the runner, module, events, and cleanup function (created by utils.createExecutionContext)
-local function executeInContext(
-	ctx: utils.ExecutionContext,
-	target: ExecutionTarget,
-	params: ExecutionParams,
-	callbacks: ExecutionCallbacks
-)
+local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTarget, params: ExecutionParams, callbacks: ExecutionCallbacks)
 	-- Set verbose flag for this execution
 	VERBOSE = params.verbose or false
 
@@ -506,10 +501,6 @@ local function executeInContext(
 		resultsConnection:Disconnect()
 		logsConnection:Disconnect()
 
-		if not result.success then
-			callbacks.onOutput("Error", result.error)
-		end
-
 		-- Cleanup traversal first, then destroy runner
 		if traversalCleanup then
 			traversalCleanup()
@@ -523,21 +514,9 @@ local function executeInContext(
 	if target == "server" then
 		ctx.runner.Parent = ServerScriptService
 	elseif target == "client" then
-		local player = Players.LocalPlayer
-		if player then
-			ctx.runner.Parent = player:WaitForChild("PlayerScripts")
-		else
-			-- No LocalPlayer - can't execute in client context
-			resultsConnection:Disconnect()
-			logsConnection:Disconnect()
-			if traversalCleanup then
-				traversalCleanup()
-			end
-			ctx.cleanup()
-			callbacks.onOutput("Error", "Cannot execute in client context: no LocalPlayer")
-			callbacks.onComplete(nil)
-			return
-		end
+		task.spawn(function()
+			ctx.runner.Parent = Players.LocalPlayer.PlayerScripts
+		end)
 	else -- plugin
 		ctx.runner.Parent = ReplicatedStorage
 		task.spawn(function()

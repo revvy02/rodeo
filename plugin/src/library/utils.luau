@@ -118,13 +118,7 @@ resultsEvent:Fire({
 })
 ]]
 
-local function createExecutionContext(
-	source: string,
-	target: ExecutionTarget,
-	executionId: string,
-	instancePath: string?,
-	scriptPath: string?
-): ExecutionContext
+local function createExecutionContext(source: string, target: ExecutionTarget, executionId: string, instancePath: string?, scriptPath: string?): ExecutionContext
 	-- Create runner script for the target context
 	local runner: Script | LocalScript | ModuleScript
 	if target == "server" then
@@ -172,15 +166,18 @@ local function createExecutionContext(
 		local originalInstance = resolveInstancePath(instancePath)
 		if originalInstance and originalInstance:IsA("ModuleScript") then
 			module = originalInstance:Clone()
+			module.Parent = originalInstance.Parent
 		else
 			module = Instance.new("ModuleScript")
+			module.Name = moduleName
+			module.Source = source
 		end
 	else
 		module = Instance.new("ModuleScript")
+		module.Name = moduleName
+		module.Source = source
 	end
 
-	module.Name = moduleName
-	module.Source = source
 	-- module stays unparented (Parent = nil) for cleaner stack traces
 
 	-- Reference module via ObjectValue
