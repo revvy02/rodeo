@@ -1,4 +1,4 @@
--- Exec command: Execute script via persistent serve server
+-- Run command: Run script via persistent serve server
 
 local fs = require("@lune/fs")
 local net = require("@lune/net")
@@ -80,6 +80,62 @@ local function resolveScriptPath(scriptArg: string): string
 
 	-- Fall back to original (will error in validateConfig if not found)
 	return scriptArg
+end
+
+local function parseDirective(content: string): { [string]: any }?
+	-- Check first line (or second if shebang)
+	local lines = string.split(content, "\n")
+	local directiveLine = lines[1]
+
+	if directiveLine and string.sub(directiveLine, 1, 2) == "#!" and lines[2] then
+		directiveLine = lines[2]
+	end
+
+	if not directiveLine then
+		return nil
+	end
+
+	-- Match --!rodeo directive
+	local directive = string.match(directiveLine, "^%-%-!rodeo%s+(.+)$")
+	if not directive then
+		return nil
+	end
+
+	-- Parse flags from directive string
+	local result = {}
+
+	-- Parse --key value pairs (e.g., --client 1, --context server)
+	for key, value in string.gmatch(directive, "%-%-([%w-]+)%s+([^%-]%S*)") do
+		local numValue = tonumber(value)
+		result[key] = numValue or value
+	end
+
+	-- Parse standalone flags (like --cache-requires)
+	-- Match flags at end of line
+	local endFlag = string.match(directive, "%-%-([%w-]+)%s*$")
+	if endFlag and not result[endFlag] then
+		result[endFlag] = true
+	end
+
+	-- Match flags followed by another flag
+	for flag in string.gmatch(directive, "%-%-([%w-]+)%s+%-%-") do
+		if not result[flag] then
+			result[flag] = true
+		end
+	end
+
+	return result
+end
+
+local function applyDirective(args: any, directive: { [string]: any })
+	for key, value in pairs(directive) do
+		-- Convert kebab-case to snake_case for argparse compatibility
+		local argKey = string.gsub(key, "-", "_")
+		-- Only apply if CLI didn't specify this flag
+		if args[argKey] == nil then
+			args[argKey] = value
+		end
+	end
 end
 
 local function parseArguments(args: any): Config
@@ -204,6 +260,28 @@ local function handleMessage(decoded: any, exitCodeRef: { value: number }, outpu
 end
 
 local function main(args: any)
+	-- Resolve script path first (for .rodeo/ lookup)
+	local scriptPath = nil
+	local scriptSource = args.source
+
+	if args.script then
+		if args.script == "-" then
+			scriptSource = stdio.readToEnd()
+		else
+			scriptPath = resolveScriptPath(args.script)
+		end
+	end
+
+	-- Read script content early to parse directives
+	local scriptContent = execution.readScriptContent(scriptPath, scriptSource)
+
+	-- Parse and apply directives from script (CLI args override)
+	local directive = parseDirective(scriptContent)
+	if directive then
+		applyDirective(args, directive)
+	end
+
+	-- Now parse arguments with directive defaults applied
 	local cfg = parseArguments(args)
 	validateConfig(cfg)
 
@@ -215,8 +293,7 @@ local function main(args: any)
 		process.exit(1)
 	end
 
-	local instancePath = execution.resolveInstancePath(cfg.sourcemap, cfg.scriptPath)
-	local scriptContent = execution.readScriptContent(cfg.scriptPath, cfg.scriptSource)
+	local instancePath = execution.resolveInstancePath(cfg.sourcemap, scriptPath)
 	local executionId = uuid.generate()
 	local exitCodeRef = { value = 0 }
 

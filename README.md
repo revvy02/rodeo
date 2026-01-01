@@ -51,10 +51,13 @@ rodeo build
 rodeo serve
 ```
 
-**Execute scripts** (in another terminal):
+**Run scripts** (in another terminal):
 ```bash
 # Basic execution
-rodeo exec script.luau
+rodeo run script.luau
+
+# Run from .rodeo/ directory
+rodeo run mytest              # runs .rodeo/mytest.luau
 ```
 
 ### Once Mode
@@ -73,20 +76,20 @@ If `sourcemap.json` exists in the current directory, it will be used automatical
 
 ### Context Targeting
 
-Target specific runtime contexts when using serve mode. Running tests in studio will automatically connect VMs, and `exec` will let you target VMs with flags.
+Target specific runtime contexts when using serve mode. Running tests in studio will automatically connect VMs, and `run` will let you target VMs with flags.
 
 ```bash
 # Run in Studio edit mode only
-rodeo exec script.luau --studio 1 --running 0
+rodeo run script.luau --studio 1 --running 0
 
 # Run in client only
-rodeo exec script.luau --client 1
+rodeo run script.luau --client 1
 
 # Run in server only
-rodeo exec script.luau --server 1
+rodeo run script.luau --server 1
 
 # Exclude edit mode
-rodeo exec script.luau --edit 0
+rodeo run script.luau --edit 0
 ```
 
 **Available environments:**
@@ -98,6 +101,25 @@ rodeo exec script.luau --edit 0
 
 Omit a flag to match any value. Use `1` to require it, `0` to exclude it.
 
+### Script Directives
+
+Embed default flags directly in your script files using the `--!rodeo` directive:
+
+```lua
+--!rodeo --client 1 --running 1 --context server
+print("This runs on client VM in server context")
+```
+
+The directive must be on line 1 (or line 2 if there's a shebang). CLI flags override directive defaults:
+
+```bash
+# Uses directive defaults
+rodeo run script.luau
+
+# Override context from directive
+rodeo run script.luau --context plugin
+```
+
 ### Custom Port Configuration
 
 By default, rodeo uses port 44872 for serve mode and 44873 for once mode. You can customize the port number if needed:
@@ -106,11 +128,8 @@ By default, rodeo uses port 44872 for serve mode and 44873 for once mode. You ca
 # Start server on custom port
 rodeo serve --port 8080
 
-# Execute script on custom port server
-rodeo exec script.luau --port 8080
-
-# Check status of custom port server
-rodeo status --port 8080
+# Run script on custom port server
+rodeo run script.luau --port 8080
 
 # One-time execution on custom port
 rodeo once script.luau --port 9000
@@ -118,9 +137,8 @@ rodeo once script.luau --port 9000
 
 **Available commands with `--port`:**
 - `rodeo serve --port <number>` - Start server on custom port (default: 44872)
-- `rodeo exec --port <number>` - Connect to server on custom port (default: 44872)
+- `rodeo run --port <number>` - Connect to server on custom port (default: 44872)
 - `rodeo once --port <number>` - Run ephemeral server on custom port (default: 44873)
-- `rodeo status --port <number>` - Check server on custom port (default: 44872)
 
 ### Output Redirection
 
@@ -131,7 +149,7 @@ Redirect execution output and return values to files:
 rodeo once script.luau --output output.txt
 
 # Save return value to file
-rodeo exec script.luau --return result.json
+rodeo run script.luau --return result.json
 
 # Save both to different files
 rodeo once script.luau --output output.txt --return result.json
@@ -151,13 +169,13 @@ Control which logs are shown in your terminal:
 rodeo once script.luau --no-warn
 
 # Suppress errors (still sets exit code on error)
-rodeo exec script.luau --no-error
+rodeo run script.luau --no-error
 
 # Suppress print statements
 rodeo once script.luau --no-print
 
 # Suppress all output
-rodeo exec script.luau --no-output
+rodeo run script.luau --no-output
 ```
 
 **Available flags:**
@@ -179,7 +197,7 @@ Scripts can return values. By default, return values are silent (not printed), b
 rodeo once script.luau --show-return
 
 # Save return value to file
-rodeo exec script.luau --return result.json
+rodeo run script.luau --return result.json
 
 # Both: save to file AND print to stdout
 rodeo once script.luau --return result.json --show-return
@@ -218,11 +236,11 @@ By default, rodeo doesn't cache modules or their dependencies. Every execution r
 ```bash
 # Edit config.luau, utils.luau, or any required modules
 # Run your script - changes take effect immediately
-rodeo exec main.luau
+rodeo run main.luau
 
 # Edit modules again
 # Run again - fresh code every time
-rodeo exec main.luau
+rodeo run main.luau
 ```
 
 This default behavior is ideal for development, ensuring executions always reflect your latest changes.
@@ -231,7 +249,7 @@ This default behavior is ideal for development, ensuring executions always refle
 
 ```bash
 # Enable module caching (faster, but changes won't be reflected)
-rodeo exec script.luau --cache-requires
+rodeo run script.luau --cache-requires
 ```
 
 ## Output Example
