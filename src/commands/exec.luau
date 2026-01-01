@@ -56,6 +56,32 @@ local function parseContextFlags(args: any): (number, number)
 	return filterBits, filterMask
 end
 
+local function resolveScriptPath(scriptArg: string): string
+	-- If it looks like a path (contains separator), use as-is
+	if string.find(scriptArg, "/") or string.find(scriptArg, "\\") then
+		return scriptArg
+	end
+
+	-- Try .rodeo directory
+	local rodeoDir = ".rodeo"
+	if fs.isDir(rodeoDir) then
+		-- Try with .luau extension
+		local withExt = `{rodeoDir}/{scriptArg}.luau`
+		if fs.isFile(withExt) then
+			return withExt
+		end
+
+		-- Try as-is (already has extension or no extension)
+		local asIs = `{rodeoDir}/{scriptArg}`
+		if fs.isFile(asIs) then
+			return asIs
+		end
+	end
+
+	-- Fall back to original (will error in validateConfig if not found)
+	return scriptArg
+end
+
 local function parseArguments(args: any): Config
 	local filterBits, filterMask = parseContextFlags(args)
 
@@ -68,8 +94,8 @@ local function parseArguments(args: any): Config
 			-- Read from stdin
 			scriptSource = stdio.readToEnd()
 		else
-			-- File path
-			scriptPath = args.script
+			-- Resolve script path (checks .rodeo/ for simple names)
+			scriptPath = resolveScriptPath(args.script)
 		end
 	end
 
