@@ -8,21 +8,12 @@
 	- Cleanup
 ]]
 
-local HttpService = game:GetService("HttpService")
-local LogService = game:GetService("LogService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local terminal = require(script.Parent.terminal)
 local utils = require(script.Parent.utils)
-
-local LOG_TYPE_TO_LEVEL = {
-	[Enum.MessageType.MessageOutput] = "Print",
-	[Enum.MessageType.MessageInfo] = "Info",
-	[Enum.MessageType.MessageWarning] = "Warning",
-	[Enum.MessageType.MessageError] = "Error",
-}
 
 export type LogFilter = {
 	enableWarn: boolean?,
@@ -351,116 +342,6 @@ local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript)
 	end
 end
 
--- Execute module and handle errors
-local function executeModule(moduleScript: ModuleScript): (boolean, any)
-	local success, result = xpcall(function()
-		return require(moduleScript)
-	end, debug.traceback)
-
-	if not success then
-		local event = Instance.new("BindableEvent")
-		event.Event:Connect(function()
-			error(result, 0)
-		end)
-		event:Fire()
-		return false, nil
-	end
-
-	return true, result
-end
-
--- Main execute function
-local function execute(moduleScript: ModuleScript, params: ExecutionParams, callbacks: ExecutionCallbacks)
-	-- Set verbose flag for this execution
-	VERBOSE = params.verbose or false
-
-	local logConnection: RBXScriptConnection? = nil
-	local logFilter = params.logFilter or {
-		enableWarn = true,
-		enableError = true,
-		enableInfo = true,
-		enableOutput = true,
-		enableLogs = true,
-	}
-
-	-- Setup log capture
-	if logFilter.enableLogs then
-		logConnection = LogService.MessageOut:Connect(function(body, messageType)
-			local level = LOG_TYPE_TO_LEVEL[messageType] or "Info"
-
-			-- Filter based on log level
-			if level == "Warning" and not logFilter.enableWarn then
-				return
-			elseif level == "Error" and not logFilter.enableError then
-				return
-			elseif level == "Info" and not logFilter.enableInfo then
-				return
-			elseif level == "Print" and not logFilter.enableOutput then
-				return
-			end
-
-			callbacks.onOutput(level, body)
-		end)
-	end
-
-	-- Resolve path BEFORE setting up traversal so we get the correct module
-	local modulePath = getAbsoluteInstancePath(moduleScript)
-	log(`Resolved path = {modulePath}`)
-
-	-- Setup uncachable requires
-	local cleanup: (() -> ())? = nil
-	if not params.cacheRequires then
-		cleanup = setupUncachableRequireModuleTraversal(moduleScript)
-	end
-
-	-- Resolve module via path (picks up cloned module if traversal is activ and the root got cloned)
-	if modulePath then
-		local resolver = Instance.new("ModuleScript")
-		resolver.Name = "__rodeo_path_resolver"
-		resolver.Source = "return " .. modulePath
-		resolver.Parent = game:GetService("ReplicatedStorage")
-		moduleScript = require(resolver)
-		resolver:Destroy()
-		log(`Target module: {moduleScript:GetFullName()}`)
-	end
-
-	-- Execute the module
-	local success, result = executeModule(moduleScript)
-
-	-- Wait for logs to be captured and sent
-	task.wait(0.1)
-
-	-- Cleanup: restore original names and destroy clones
-	if cleanup then
-		cleanup()
-	end
-
-	-- Serialize result
-	local serializedResult = nil
-	if success and result ~= nil then
-		local serializeSuccess, encoded = pcall(function()
-			return HttpService:JSONEncode(result)
-		end)
-		if serializeSuccess then
-			serializedResult = encoded
-		else
-			-- Fallback to tostring for non-serializable types
-			serializedResult = tostring(result)
-		end
-	end
-
-	-- Wait for "done" message to flush through WebSocket buffers
-	task.wait(0.1)
-
-	-- Cleanup log connection
-	if logConnection then
-		logConnection:Disconnect()
-	end
-
-	-- Call completion callback
-	callbacks.onComplete(serializedResult)
-end
-
 type ExecutionTarget = "server" | "client" | "plugin"
 
 -- Execute a module in a specific context (server/client/plugin)
@@ -469,10 +350,23 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 	-- Set verbose flag for this execution
 	VERBOSE = params.verbose or false
 
+	-- Get module path BEFORE traversal (so we can re-resolve after if it gets cloned)
+	local modulePath = getAbsoluteInstancePath(ctx.module)
+	log(`Resolved module path = {modulePath or "nil"}`)
+
 	-- Setup uncacheable require traversal (from plugin context, before execution)
 	local traversalCleanup: (() -> ())? = nil
 	if not params.cacheRequires then
 		traversalCleanup = setupUncachableRequireModuleTraversal(ctx.module)
+	end
+
+	-- Re-resolve module via path (picks up cloned module if traversal cloned it)
+	if modulePath then
+		local resolvedModule = utils.resolveInstancePath(modulePath)
+		if resolvedModule and resolvedModule:IsA("ModuleScript") then
+			log(`Re-resolved to: {resolvedModule:GetFullName()}`)
+			ctx.runner:FindFirstChild("moduleRef").Value = resolvedModule
+		end
 	end
 
 	-- Listen for logs
@@ -526,9 +420,7 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 end
 
 return {
-	execute = execute,
 	executeInContext = executeInContext,
-	executeModule = executeModule,
 	setupUncachableRequireModuleTraversal = setupUncachableRequireModuleTraversal,
 	extractRequires = extractRequires,
 	extractParenthesisContent = extractParenthesisContent,

@@ -116,6 +116,8 @@ resultsEvent:Fire({
 	result = serializedResult,
 	error = not success and tostring(result) or nil,
 })
+
+return nil
 ]]
 
 local function createExecutionContext(source: string, target: ExecutionTarget, executionId: string, instancePath: string?, scriptPath: string?): ExecutionContext
@@ -162,10 +164,14 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 
 	-- Create or clone module
 	local module: ModuleScript
+	local originalInstance: ModuleScript? = nil
 	if instancePath then
-		local originalInstance = resolveInstancePath(instancePath)
-		if originalInstance and originalInstance:IsA("ModuleScript") then
+		local resolved = resolveInstancePath(instancePath)
+		if resolved and resolved:IsA("ModuleScript") then
+			originalInstance = resolved
 			module = originalInstance:Clone()
+			-- Rename original so clone takes precedence (like createModuleScript does)
+			originalInstance.Name = originalInstance.Name .. ".rodeo.ignore"
 			module.Parent = originalInstance.Parent
 		else
 			module = Instance.new("ModuleScript")
@@ -178,8 +184,6 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 		module.Source = source
 	end
 
-	-- module stays unparented (Parent = nil) for cleaner stack traces
-
 	-- Reference module via ObjectValue
 	local moduleRef = Instance.new("ObjectValue")
 	moduleRef.Name = "moduleRef"
@@ -190,7 +194,10 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 	runner.Source = RUNNER_SOURCE
 
 	local cleanup = function()
-		module:Destroy() -- Destroy unparented module explicitly
+		module:Destroy()
+		if originalInstance then
+			originalInstance.Name = string.gsub(originalInstance.Name, "%.rodeo%.ignore$", "")
+		end
 		runner:Destroy()
 	end
 
