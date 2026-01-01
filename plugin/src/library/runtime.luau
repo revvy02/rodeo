@@ -463,17 +463,16 @@ end
 
 type ExecutionTarget = "server" | "client" | "plugin"
 
--- Execute in a specific context (server/client/plugin)
+-- Execute a module in a specific context (server/client/plugin)
+-- ctx contains the runner, module, events, and cleanup function (created by utils.createExecutionContext)
 local function executeInContext(
-	source: string,
+	ctx: utils.ExecutionContext,
 	target: ExecutionTarget,
 	params: ExecutionParams,
 	callbacks: ExecutionCallbacks
 )
 	-- Set verbose flag for this execution
 	VERBOSE = params.verbose or false
-
-	local ctx = utils.createExecutionContext(source, target, params.executionId)
 
 	-- Setup uncacheable require traversal (from plugin context, before execution)
 	local traversalCleanup: (() -> ())? = nil

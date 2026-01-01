@@ -19,6 +19,7 @@ export type ExecRequest = {
 	executionId: string,
 	script: string,
 	instancePath: string?,
+	scriptPath: string?,
 	filterBits: number,
 	filterMask: number,
 	logFilter: LogFilter,
@@ -91,6 +92,10 @@ local function processQueue(self: VmPipeline)
 
 	if exec.instancePath then
 		message.instancePath = exec.instancePath
+	end
+
+	if exec.scriptPath then
+		message.scriptPath = exec.scriptPath
 	end
 
 	self.studioWs:send(serde.encode("json", message))

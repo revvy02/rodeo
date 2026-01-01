@@ -118,7 +118,13 @@ resultsEvent:Fire({
 })
 ]]
 
-local function createExecutionContext(source: string, target: ExecutionTarget, executionId: string): ExecutionContext
+local function createExecutionContext(
+	source: string,
+	target: ExecutionTarget,
+	executionId: string,
+	instancePath: string?,
+	scriptPath: string?
+): ExecutionContext
 	-- Create runner script for the target context
 	local runner: Script | LocalScript | ModuleScript
 	if target == "server" then
@@ -139,11 +145,36 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 	logsEvent.Name = "logs"
 	logsEvent.Parent = runner
 
-	-- Create module with user source (unparented for cleaner stack traces)
-	local module = Instance.new("ModuleScript")
-	module.Name = "module"
+	-- Determine module name for stack traces
+	-- Priority: instancePath (extract last segment) > scriptPath (use as-is) > "rodeo"
+	local moduleName = "rodeo"
+	if instancePath then
+		-- Extract last segment: game["RS"]["MyModule"] → MyModule
+		local lastSegment = string.match(instancePath, '%["([^"]+)"%]$')
+		if lastSegment then
+			moduleName = lastSegment
+		end
+	elseif scriptPath then
+		-- Use relative path as-is for clear stack traces
+		moduleName = scriptPath
+	end
+
+	-- Create or clone module
+	local module: ModuleScript
+	if instancePath then
+		local originalInstance = resolveInstancePath(instancePath)
+		if originalInstance and originalInstance:IsA("ModuleScript") then
+			module = originalInstance:Clone()
+		else
+			module = Instance.new("ModuleScript")
+		end
+	else
+		module = Instance.new("ModuleScript")
+	end
+
+	module.Name = moduleName
 	module.Source = source
-	-- module stays unparented (Parent = nil)
+	-- module stays unparented (Parent = nil) for cleaner stack traces
 
 	-- Reference module via ObjectValue
 	local moduleRef = Instance.new("ObjectValue")

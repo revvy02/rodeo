@@ -6,6 +6,8 @@ local process = require("@lune/process")
 local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 
+local pathfs = require("@pkg/pathfs")
+
 local config = require("../library/config")
 local execution = require("../library/execution")
 local log = require("../library/log")
@@ -210,7 +212,7 @@ local function identifyClient(ws: any)
 	}))
 end
 
-local function submitScript(ws: any, executionId: string, script: string, instancePath: string?, filterBits: number, filterMask: number, logFilter: LogFilter, cacheRequires: boolean?, context: string)
+local function submitScript(ws: any, executionId: string, script: string, instancePath: string?, scriptPath: string?, filterBits: number, filterMask: number, logFilter: LogFilter, cacheRequires: boolean?, context: string)
 	local message: any = {
 		type = "submit",
 		script = script,
@@ -224,6 +226,10 @@ local function submitScript(ws: any, executionId: string, script: string, instan
 
 	if instancePath then
 		message.instancePath = instancePath
+	end
+
+	if scriptPath then
+		message.scriptPath = scriptPath
 	end
 
 	ws:send(serde.encode("json", message))
@@ -297,9 +303,18 @@ local function main(args: any)
 	local executionId = uuid.generate()
 	local exitCodeRef = { value = 0 }
 
+	-- Compute relative path from cwd for module naming in Studio
+	local relativePath: string? = nil
+	if scriptPath then
+		local absolutePath = pathfs.absolute(scriptPath)
+		local cwdPath = pathfs.cwd()
+		local diff = pathfs.diff(absolutePath, cwdPath)
+		relativePath = if diff then diff:toString() else scriptPath
+	end
+
 	local ws = connectToServer(host, port)
 	identifyClient(ws)
-	submitScript(ws, executionId, scriptContent, instancePath, cfg.filterBits, cfg.filterMask, cfg.logFilter, cfg.cacheRequires, cfg.context)
+	submitScript(ws, executionId, scriptContent, instancePath, relativePath, cfg.filterBits, cfg.filterMask, cfg.logFilter, cfg.cacheRequires, cfg.context)
 
 	while true do
 		local message = ws:next()

@@ -145,6 +145,7 @@ local function handleExecClient(ws: any)
 				executionId = clientExecutionId,
 				script = decoded.script,
 				instancePath = decoded.instancePath,
+				scriptPath = decoded.scriptPath,
 				filterBits = filterBits,
 				filterMask = filterMask,
 				logFilter = logFilter,

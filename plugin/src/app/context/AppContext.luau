@@ -15,6 +15,7 @@ local RunService = game:GetService("RunService")
 local constants = require(script.Parent.Parent.Parent.library.constants)
 local flags = require(script.Parent.Parent.Parent.library.flags)
 local runtime = require(script.Parent.Parent.Parent.library.runtime)
+local utils = require(script.Parent.Parent.Parent.library.utils)
 
 local e = React.createElement
 local CONTEXT_BITS = constants.CONTEXT_BITS
@@ -229,7 +230,16 @@ local function AppProvider(props: AppProviderProps)
 					enableLogs = true,
 				}
 
-				runtime.executeInContext(decoded.script, target, {
+				-- Create execution context (module + runner + events)
+				local ctx = utils.createExecutionContext(
+					decoded.script,
+					target,
+					decoded.executionId,
+					decoded.instancePath,
+					decoded.scriptPath
+				)
+
+				runtime.executeInContext(ctx, target, {
 					executionId = decoded.executionId,
 					logFilter = logFilter,
 					cacheRequires = decoded.cacheRequires,
