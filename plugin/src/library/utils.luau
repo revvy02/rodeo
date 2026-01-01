@@ -146,16 +146,23 @@ local function createExecutionContext(
 	logsEvent.Parent = runner
 
 	-- Determine module name for stack traces
-	-- Priority: instancePath (extract last segment) > scriptPath (use as-is) > "rodeo"
-	local moduleName = "rodeo"
+	-- The module name appears in error messages: Script 'NAME', Line X
+	--
+	-- Priority:
+	-- 1. instancePath → use instance name (e.g. "MyModule")
+	--    When running a file that maps to a Roblox instance, show the familiar instance name
+	-- 2. scriptPath → use relative file path (e.g. ".rodeo/test.luau")
+	--    When running a file not in sourcemap, show the file path for easy navigation
+	-- 3. source → use the source code itself (e.g. "print('hello')")
+	--    When running inline code via --source/stdin, emulate Roblox command bar behavior
+	--    which shows the actual code in the error: Script 'for i = 1, 20 do error("ok") end', Line 1
+	local moduleName = source
 	if instancePath then
-		-- Extract last segment: game["RS"]["MyModule"] → MyModule
 		local lastSegment = string.match(instancePath, '%["([^"]+)"%]$')
 		if lastSegment then
 			moduleName = lastSegment
 		end
 	elseif scriptPath then
-		-- Use relative path as-is for clear stack traces
 		moduleName = scriptPath
 	end
 
