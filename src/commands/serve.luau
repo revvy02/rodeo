@@ -7,6 +7,7 @@ local task = require("@lune/task")
 local config = require("../library/config")
 local log = require("../library/log")
 local output = require("../library/output")
+local uuid = require("../library/uuid")
 local VmPipeline = require("../library/VmPipeline")
 
 local colors = config.CLI_LOG_COLORS
@@ -19,11 +20,6 @@ local pipelines: { [number]: { [string]: VmPipeline } } = {}
 
 -- Pending executions waiting for a matching VM to connect
 local pendingExecutions: { ExecRequest } = {}
-
-local function generateId(): string
-	local random = math.random
-	return string.format("%08x-%04x-%04x-%04x-%012x", random(0, 0xffffffff), random(0, 0xffff), random(0, 0xffff), random(0, 0xffff), random(0, 0xffffffffffff))
-end
 
 type MatchingVm = {
 	bitset: number,
@@ -187,7 +183,7 @@ local function handleExecClient(ws: any)
 end
 
 local function handleStudioClient(ws: any, vmBitset: number)
-	local studioId = generateId()
+	local studioId = uuid.generate()
 
 	-- Create VmPipeline for this Studio
 	local vmPipeline = VmPipeline.new(vmBitset, studioId, ws)
