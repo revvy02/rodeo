@@ -1,5 +1,7 @@
 -- Shared utilities for rodeo plugins
 
+local log = require(script.Parent.log)
+
 local function resolveInstancePath(path: string): Instance?
 	local resolver = Instance.new("ModuleScript")
 	resolver.Name = "__rodeo_path_resolver"
@@ -65,6 +67,7 @@ export type ExecutionTarget = "server" | "client" | "plugin"
 export type ExecutionContext = {
 	runner: Script | LocalScript | ModuleScript,
 	module: ModuleScript,
+	originalInstance: ModuleScript?,
 	resultsEvent: BindableEvent,
 	logsEvent: BindableEvent,
 	cleanup: () -> (),
@@ -121,6 +124,9 @@ return nil
 ]]
 
 local function createExecutionContext(source: string, target: ExecutionTarget, executionId: string, instancePath: string?, scriptPath: string?): ExecutionContext
+	log.log(`START executionId={executionId}`)
+	log.log(`instancePath={instancePath or "nil"}`)
+
 	-- Create runner script for the target context
 	local runner: Script | LocalScript | ModuleScript
 	if target == "server" then
@@ -169,19 +175,29 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 		local resolved = resolveInstancePath(instancePath)
 		if resolved and resolved:IsA("ModuleScript") then
 			originalInstance = resolved
+			log.log(`Captured originalInstance: {originalInstance:GetFullName()}`)
+
 			module = originalInstance:Clone()
+			log.log(`Cloned originalInstance -> module`)
+
 			-- Rename original so clone takes precedence (like createModuleScript does)
+			local oldName = originalInstance.Name
 			originalInstance.Name = originalInstance.Name .. ".rodeo.ignore"
+			log.log(`Renamed: {oldName} -> {originalInstance.Name}`)
+
 			module.Parent = originalInstance.Parent
+			log.log(`Parented module to {module.Parent and module.Parent:GetFullName() or "nil"}`)
 		else
 			module = Instance.new("ModuleScript")
 			module.Name = moduleName
 			module.Source = source
+			log.log(`No valid instancePath, created new ModuleScript`)
 		end
 	else
 		module = Instance.new("ModuleScript")
 		module.Name = moduleName
 		module.Source = source
+		log.log(`No instancePath, created new ModuleScript`)
 	end
 
 	-- Reference module via ObjectValue
@@ -204,6 +220,7 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 	return {
 		runner = runner,
 		module = module,
+		originalInstance = originalInstance,
 		resultsEvent = resultsEvent,
 		logsEvent = logsEvent,
 		cleanup = cleanup,

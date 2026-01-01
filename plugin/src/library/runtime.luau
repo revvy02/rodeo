@@ -12,8 +12,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local terminal = require(script.Parent.terminal)
+local logModule = require(script.Parent.log)
 local utils = require(script.Parent.utils)
+
+local log = logModule.log
+local setVerbose = logModule.setVerbose
 
 export type LogFilter = {
 	enableWarn: boolean?,
@@ -34,6 +37,15 @@ export type ExecutionCallbacks = {
 	onOutput: (level: string, body: string) -> (),
 	onComplete: (result: string?) -> (),
 }
+
+-- Find the topmost ModuleScript ancestor (root of the module tree)
+local function findRootModule(module: ModuleScript): ModuleScript
+	local ancestor = module:FindFirstAncestorOfClass("ModuleScript")
+	if ancestor then
+		return findRootModule(ancestor)
+	end
+	return module
+end
 
 -- Get absolute instance path from game using bracket notation
 -- e.g. game["Workspace"]["Part"] or game["ReplicatedStorage"]["Modules"]["Utils"]
@@ -57,19 +69,6 @@ local function getAbsoluteInstancePath(instance: Instance): string?
 	end
 
 	return "game" .. table.concat(parts, "")
-end
-
--- Debug logging (verbose flag passed per-execution)
-local VERBOSE = false
-
-local function log(message: string)
-	if VERBOSE then
-		local source, line, name = debug.info(2, "sln")
-		local formattedSource = terminal.style.gray(source)
-		local formattedLine = terminal.style.red(tostring(line))
-		local formattedName = terminal.style.green(name or "?")
-		print(`[{formattedSource}:{formattedLine} {formattedName}] {message}`)
-	end
 end
 
 -- Extract content from outermost parentheses, handling nested parens
@@ -257,90 +256,87 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 	return resolved
 end
 
-local function recurse(rootModule: ModuleScript, clonedModules: { [ModuleScript]: true }, disabledInstances)
-	log(`Processing module: {rootModule:GetFullName()}`)
-	local source = rootModule.Source
+local function recurse(currentModule: ModuleScript, clonedModules: { [ModuleScript]: true }, clonedRoots: { ModuleScript }, disabledInstances)
+	log(`Processing: {currentModule:GetFullName()}`)
+	local source = currentModule.Source
 	local requires = extractRequires(source)
 	log(`Found {#requires} require() calls`)
 
-	-- extract require calls
-	-- for each require, convert path to instance
 	for _, requirePath in requires do
-		local requireModule = getRequireInstance(requirePath, rootModule)
+		log(`Resolving: {requirePath}`)
+		local requireModule = getRequireInstance(requirePath, currentModule)
 
 		if not requireModule then
-			log(`Failed to resolve require, skipping`)
+			log(`Failed to resolve, skipping`)
 			continue
 		end
 
+		log(`Resolved to: {requireModule:GetFullName()}`)
+
+		-- Skip if this module is already part of a cloned subtree
 		if clonedModules[requireModule] then
-			log(`Skipping {requireModule:GetFullName()} (already cloned)`)
+			log(`Already in cloned subtree, skipping`)
 			continue
 		end
 
-		local requireModuleCopy = requireModule:Clone()
-		clonedModules[requireModuleCopy] = true
-		log(`Cloned: {requireModule:GetFullName()}`)
+		-- Find root ancestor of this module (topmost ModuleScript)
+		local moduleRoot = findRootModule(requireModule)
+		log(`Root module: {moduleRoot:GetFullName()}`)
 
-		-- Track all descendants of the original module
-		local descendantCount = 0
-		for _, descendant in requireModuleCopy:GetDescendants() do
+		-- Clone entire root subtree
+		local rootCopy = moduleRoot:Clone()
+		table.insert(clonedRoots, rootCopy)
+		clonedModules[rootCopy] = true
+		log(`Cloned root: {moduleRoot.Name}`)
+
+		-- Track all descendant ModuleScripts for skip checking
+		for _, descendant in rootCopy:GetDescendants() do
 			if descendant:IsA("ModuleScript") then
 				clonedModules[descendant] = true
-				descendantCount = descendantCount + 1
 			end
 		end
-		if descendantCount > 0 then
-			log(`Tracked {descendantCount} descendant modules`)
-		end
 
-		local name = requireModule.Name
-		requireModule.Name = name .. ".rodeo.ignore"
-		requireModuleCopy.Parent = requireModule.Parent
-		log(`Swapped: {name} <-> {requireModule.Name}`)
+		-- Swap: rename original root, insert clone as sibling
+		local name = moduleRoot.Name
+		moduleRoot.Name = name .. ".rodeo.ignore"
+		rootCopy.Parent = moduleRoot.Parent
+		log(`Swapped: {name} <-> {moduleRoot.Name}`)
 
-		table.insert(disabledInstances, requireModule)
+		table.insert(disabledInstances, moduleRoot)
 
-		recurse(requireModuleCopy, clonedModules, disabledInstances)
+		-- Recurse into cloned root
+		recurse(rootCopy, clonedModules, clonedRoots, disabledInstances)
 	end
 end
 
 -- Setup uncachable requires by cloning and renaming modules
 local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript): () -> ()
-	log(`Starting uncachable require setup for {rootInstance:GetFullName()}`)
+	log(`START for {rootInstance:GetFullName()}`)
 
-	-- parse rootInstance Source
 	local clonedModules = {}
+	local clonedRoots = {}
 	local disabledInstances = {}
-	recurse(rootInstance, clonedModules, disabledInstances)
+	recurse(rootInstance, clonedModules, clonedRoots, disabledInstances)
 
-	-- Count cloned modules
-	local cloneCount = 0
-	for _ in clonedModules do
-		cloneCount = cloneCount + 1
-	end
-
-	log(`Setup complete: {cloneCount} modules tracked, {#disabledInstances} originals renamed`)
+	log(`COMPLETE: {#clonedRoots} roots cloned, {#disabledInstances} originals renamed`)
 
 	return function()
-		log(`Starting traversal cleanup`)
+		log(`Cleanup START`)
 
-		local restoredCount = 0
+		-- PHASE 1: Restore original names
+		log(`Restoring {#disabledInstances} original names`)
 		for _, instance in disabledInstances do
-			log(`Restoring name: {instance:GetFullName()} -> {string.gsub(instance.Name, "%.rodeo%.ignore$", "")}`)
 			instance.Name = string.gsub(instance.Name, "%.rodeo%.ignore$", "")
-			restoredCount = restoredCount + 1
 		end
-		log(`Restored {restoredCount} original module names`)
 
-		local destroyedCount = 0
-		for module in clonedModules do
-			log(`Destroying cloned module: {module:GetFullName()}`)
-			module:Destroy()
-			destroyedCount = destroyedCount + 1
+		-- PHASE 2: Destroy only the root clones (children are destroyed automatically)
+		log(`Destroying {#clonedRoots} root clones`)
+		for _, root in clonedRoots do
+			log(`  Destroying root: {root.Name}`)
+			root:Destroy()
 		end
-		log(`Destroyed {destroyedCount} cloned modules`)
-		log(`Traversal cleanup complete`)
+
+		log(`Cleanup END`)
 	end
 end
 
@@ -350,23 +346,30 @@ type ExecutionTarget = "server" | "client" | "plugin"
 -- ctx contains the runner, module, events, and cleanup function (created by utils.createExecutionContext)
 local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTarget, params: ExecutionParams, callbacks: ExecutionCallbacks)
 	-- Set verbose flag for this execution
-	VERBOSE = params.verbose
+	setVerbose(params.verbose or false)
+
+	log(`START`)
+	log(`ctx.module: {ctx.module:GetFullName()}`)
+	log(`target: {target}`)
+	log(`cacheRequires: {params.cacheRequires or false}`)
 
 	-- Get module path BEFORE traversal (so we can re-resolve after if it gets cloned)
 	local modulePath = getAbsoluteInstancePath(ctx.module)
-	log(`Resolved module path = {modulePath or "nil"}`)
+	log(`modulePath: {modulePath or "nil"}`)
 
 	-- Setup uncacheable require traversal (from plugin context, before execution)
 	local traversalCleanup: (() -> ())? = nil
 	if not params.cacheRequires then
+		log(`Setting up uncachable require traversal...`)
 		traversalCleanup = setupUncachableRequireModuleTraversal(ctx.module)
+		log(`Traversal setup complete`)
 	end
 
 	-- Re-resolve module via path (picks up cloned module if traversal cloned it)
 	if modulePath then
 		local resolvedModule = utils.resolveInstancePath(modulePath)
 		if resolvedModule and resolvedModule:IsA("ModuleScript") then
-			log(`Re-resolved to: {resolvedModule:GetFullName()}`)
+			log(`Re-resolved module: {resolvedModule:GetFullName()}`)
 			ctx.runner:FindFirstChild("moduleRef").Value = resolvedModule
 		end
 	end
@@ -394,12 +397,15 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 	-- Listen for results
 	local resultsConnection
 	resultsConnection = ctx.resultsEvent.Event:Connect(function(result)
+		log(`Results received, starting cleanup...`)
 		resultsConnection:Disconnect()
 		logsConnection:Disconnect()
 
 		-- Cleanup traversal first, then destroy runner
 		if traversalCleanup then
+			log(`Calling traversalCleanup...`)
 			traversalCleanup()
+			log(`traversalCleanup complete`)
 		end
 		log(`Starting ctx.cleanup, ctx.module = {ctx.module:GetFullName()}`)
 		ctx.cleanup()
@@ -407,6 +413,8 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 
 		callbacks.onComplete(result.result)
 	end)
+
+	log(`Starting execution...`)
 
 	-- Parent runner to trigger execution (or require for plugin)
 	if target == "server" then
