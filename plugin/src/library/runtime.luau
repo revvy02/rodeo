@@ -323,10 +323,11 @@ local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript)
 	log(`Setup complete: {cloneCount} modules tracked, {#disabledInstances} originals renamed`)
 
 	return function()
-		log(`Starting cleanup`)
+		log(`Starting traversal cleanup`)
 
 		local restoredCount = 0
 		for _, instance in disabledInstances do
+			log(`Restoring name: {instance:GetFullName()} -> {string.gsub(instance.Name, "%.rodeo%.ignore$", "")}`)
 			instance.Name = string.gsub(instance.Name, "%.rodeo%.ignore$", "")
 			restoredCount = restoredCount + 1
 		end
@@ -334,11 +335,12 @@ local function setupUncachableRequireModuleTraversal(rootInstance: ModuleScript)
 
 		local destroyedCount = 0
 		for module in clonedModules do
+			log(`Destroying cloned module: {module:GetFullName()}`)
 			module:Destroy()
 			destroyedCount = destroyedCount + 1
 		end
 		log(`Destroyed {destroyedCount} cloned modules`)
-		log(`Cleanup complete`)
+		log(`Traversal cleanup complete`)
 	end
 end
 
@@ -348,7 +350,7 @@ type ExecutionTarget = "server" | "client" | "plugin"
 -- ctx contains the runner, module, events, and cleanup function (created by utils.createExecutionContext)
 local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTarget, params: ExecutionParams, callbacks: ExecutionCallbacks)
 	-- Set verbose flag for this execution
-	VERBOSE = params.verbose or false
+	VERBOSE = params.verbose
 
 	-- Get module path BEFORE traversal (so we can re-resolve after if it gets cloned)
 	local modulePath = getAbsoluteInstancePath(ctx.module)
@@ -399,7 +401,9 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 		if traversalCleanup then
 			traversalCleanup()
 		end
+		log(`Starting ctx.cleanup, ctx.module = {ctx.module:GetFullName()}`)
 		ctx.cleanup()
+		log(`ctx.cleanup complete`)
 
 		callbacks.onComplete(result.result)
 	end)
