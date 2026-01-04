@@ -18,15 +18,9 @@ local uuid = require("../library/uuid")
 local execColors = config.EXEC_LOG_COLORS
 
 local function parseDirective(content: string): { [string]: any }?
-	local lines = string.split(content, "\n")
-	local directiveLine = lines[1]
-
-	if not directiveLine then
-		return nil
-	end
-
-	-- Match @rodeo once directive
-	local directiveStr = string.match(directiveLine, "^%-%-%s*@rodeo%s+once%s+(.+)$")
+	-- Search for @rodeo once directive anywhere in the file
+	-- Matches in single-line comments (-- @rodeo) or multiline (--[[ @rodeo ]])
+	local directiveStr = string.match(content, "@rodeo%s+once%s+([^\n%]]+)")
 	if not directiveStr then
 		return nil
 	end

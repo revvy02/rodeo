@@ -60,20 +60,9 @@ local function parseContextFlags(args: any): (number, number)
 end
 
 local function parseDirective(content: string): { [string]: any }?
-	-- Check first line (or second if shebang)
-	local lines = string.split(content, "\n")
-	local directiveLine = lines[1]
-
-	if directiveLine and string.sub(directiveLine, 1, 2) == "#!" and lines[2] then
-		directiveLine = lines[2]
-	end
-
-	if not directiveLine then
-		return nil
-	end
-
-	-- Match @rodeo run directive (-- @rodeo run or --@rodeo run)
-	local directiveStr = string.match(directiveLine, "^%-%-%s*@rodeo%s+run%s+(.+)$")
+	-- Search for @rodeo run directive anywhere in the file
+	-- Matches in single-line comments (-- @rodeo) or multiline (--[[ @rodeo ]])
+	local directiveStr = string.match(content, "@rodeo%s+run%s+([^\n%]]+)")
 	if not directiveStr then
 		return nil
 	end
