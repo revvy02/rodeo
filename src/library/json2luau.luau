@@ -33,6 +33,16 @@ local function isArray(t: { [any]: any }): boolean
 	return true
 end
 
+-- Get sorted keys from a table for deterministic iteration
+local function getSortedKeys(t: { [any]: any }): { string }
+	local keys = {}
+	for k in t do
+		table.insert(keys, tostring(k))
+	end
+	table.sort(keys)
+	return keys
+end
+
 -- Recursive walk function
 local function walk(key: string?, value: any, depth: number): string
 	local lua = getIndent(depth)
@@ -58,8 +68,10 @@ local function walk(key: string?, value: any, depth: number): string
 				lua ..= walk(nil, v, depth + 1)
 			end
 		else
-			for k, v in value do
-				lua ..= walk(tostring(k), v, depth + 1)
+			-- Sort keys for deterministic output
+			local keys = getSortedKeys(value)
+			for _, k in ipairs(keys) do
+				lua ..= walk(k, value[k], depth + 1)
 			end
 		end
 		lua ..= getIndent(depth) .. "}"
@@ -81,8 +93,10 @@ local function parse(json: string): string
 				lua ..= walk(nil, v, 1)
 			end
 		else
-			for k, v in value do
-				lua ..= walk(tostring(k), v, 1)
+			-- Sort keys for deterministic output
+			local keys = getSortedKeys(value)
+			for _, k in ipairs(keys) do
+				lua ..= walk(k, value[k], 1)
 			end
 		end
 	end
