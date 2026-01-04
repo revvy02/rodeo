@@ -3,6 +3,7 @@
 local fs = require("@lune/fs")
 local stdio = require("@lune/stdio")
 
+local json2luau = require("./json2luau")
 local log = require("./log")
 local sourcemap = require("./sourcemap")
 
@@ -83,7 +84,12 @@ end
 -- Write execution result (return value JSON) to file or stdout
 local function writeExecutionResult(result: string, returnFile: string?, showReturn: boolean?)
 	if returnFile then
-		fs.writeFile(returnFile, result)
+		local output = result
+		-- Convert to Luau table syntax if output is a .lua or .luau file
+		if returnFile:match("%.luau?$") then
+			output = json2luau.parse(result)
+		end
+		fs.writeFile(returnFile, output)
 	end
 
 	if showReturn then
