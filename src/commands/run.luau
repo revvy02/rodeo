@@ -9,6 +9,7 @@ local stdio = require("@lune/stdio")
 local pathfs = require("@pkg/pathfs")
 
 local config = require("../library/config")
+local directive = require("../library/directive")
 local execution = require("../library/execution")
 local log = require("../library/log")
 local uuid = require("../library/uuid")
@@ -58,32 +59,6 @@ local function parseContextFlags(args: any): (number, number)
 	return filterBits, filterMask
 end
 
-local function resolveScriptPath(scriptArg: string): string
-	-- If it looks like a path (contains separator), use as-is
-	if string.find(scriptArg, "/") or string.find(scriptArg, "\\") then
-		return scriptArg
-	end
-
-	-- Try .rodeo directory
-	local rodeoDir = ".rodeo"
-	if fs.isDir(rodeoDir) then
-		-- Try with .luau extension
-		local withExt = `{rodeoDir}/{scriptArg}.luau`
-		if fs.isFile(withExt) then
-			return withExt
-		end
-
-		-- Try as-is (already has extension or no extension)
-		local asIs = `{rodeoDir}/{scriptArg}`
-		if fs.isFile(asIs) then
-			return asIs
-		end
-	end
-
-	-- Fall back to original (will error in validateConfig if not found)
-	return scriptArg
-end
-
 local function parseDirective(content: string): { [string]: any }?
 	-- Check first line (or second if shebang)
 	local lines = string.split(content, "\n")
@@ -97,47 +72,13 @@ local function parseDirective(content: string): { [string]: any }?
 		return nil
 	end
 
-	-- Match --!rodeo directive
-	local directive = string.match(directiveLine, "^%-%-!rodeo%s+(.+)$")
-	if not directive then
+	-- Match @rodeo run directive (-- @rodeo run or --@rodeo run)
+	local directiveStr = string.match(directiveLine, "^%-%-%s*@rodeo%s+run%s+(.+)$")
+	if not directiveStr then
 		return nil
 	end
 
-	-- Parse flags from directive string
-	local result = {}
-
-	-- Parse --key value pairs (e.g., --client 1, --context server)
-	for key, value in string.gmatch(directive, "%-%-([%w-]+)%s+([^%-]%S*)") do
-		local numValue = tonumber(value)
-		result[key] = numValue or value
-	end
-
-	-- Parse standalone flags (like --cache-requires)
-	-- Match flags at end of line
-	local endFlag = string.match(directive, "%-%-([%w-]+)%s*$")
-	if endFlag and not result[endFlag] then
-		result[endFlag] = true
-	end
-
-	-- Match flags followed by another flag
-	for flag in string.gmatch(directive, "%-%-([%w-]+)%s+%-%-") do
-		if not result[flag] then
-			result[flag] = true
-		end
-	end
-
-	return result
-end
-
-local function applyDirective(args: any, directive: { [string]: any })
-	for key, value in pairs(directive) do
-		-- Convert kebab-case to snake_case for argparse compatibility
-		local argKey = string.gsub(key, "-", "_")
-		-- Only apply if CLI didn't specify this flag
-		if args[argKey] == nil then
-			args[argKey] = value
-		end
-	end
+	return directive.parseDirectiveFlags(directiveStr)
 end
 
 local function parseArguments(args: any): Config
@@ -153,7 +94,7 @@ local function parseArguments(args: any): Config
 			scriptSource = stdio.readToEnd()
 		else
 			-- Resolve script path (checks .rodeo/ for simple names)
-			scriptPath = resolveScriptPath(args.script)
+			scriptPath = directive.resolveScriptPath(args.script)
 		end
 	end
 
@@ -274,7 +215,7 @@ local function main(args: any)
 		if args.script == "-" then
 			scriptSource = stdio.readToEnd()
 		else
-			scriptPath = resolveScriptPath(args.script)
+			scriptPath = directive.resolveScriptPath(args.script)
 		end
 	end
 
@@ -282,9 +223,9 @@ local function main(args: any)
 	local scriptContent = execution.readScriptContent(scriptPath, scriptSource)
 
 	-- Parse and apply directives from script (CLI args override)
-	local directive = parseDirective(scriptContent)
-	if directive then
-		applyDirective(args, directive)
+	local parsedDirective = parseDirective(scriptContent)
+	if parsedDirective then
+		directive.applyDirective(args, parsedDirective)
 	end
 
 	-- Now parse arguments with directive defaults applied

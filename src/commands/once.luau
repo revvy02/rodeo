@@ -9,12 +9,30 @@ local stdio = require("@lune/stdio")
 local task = require("@lune/task")
 
 local config = require("../library/config")
+local directive = require("../library/directive")
 local embeddedPlugins = require("../library/plugin")
 local execution = require("../library/execution")
 local log = require("../library/log")
 local uuid = require("../library/uuid")
 
 local execColors = config.EXEC_LOG_COLORS
+
+local function parseDirective(content: string): { [string]: any }?
+	local lines = string.split(content, "\n")
+	local directiveLine = lines[1]
+
+	if not directiveLine then
+		return nil
+	end
+
+	-- Match @rodeo once directive
+	local directiveStr = string.match(directiveLine, "^%-%-%s*@rodeo%s+once%s+(.+)$")
+	if not directiveStr then
+		return nil
+	end
+
+	return directive.parseDirectiveFlags(directiveStr)
+end
 
 type Config = {
 	scriptPath: string?,
@@ -52,8 +70,8 @@ local function parseArguments(args: any): Config
 			-- Read from stdin
 			scriptSource = stdio.readToEnd()
 		else
-			-- File path
-			scriptPath = args.script
+			-- Resolve script path (checks .rodeo/ for simple names)
+			scriptPath = directive.resolveScriptPath(args.script)
 		end
 	end
 
@@ -159,6 +177,21 @@ local function handlePluginConnection(
 end
 
 local function main(args: any)
+	-- Resolve script path early to parse directives
+	local scriptPath = nil
+	if args.script and args.script ~= "-" then
+		scriptPath = directive.resolveScriptPath(args.script)
+	end
+
+	-- Read script content early to parse directives
+	if scriptPath and fs.isFile(scriptPath) then
+		local scriptContent = fs.readFile(scriptPath)
+		local parsedDirective = parseDirective(scriptContent)
+		if parsedDirective then
+			directive.applyDirective(args, parsedDirective)
+		end
+	end
+
 	local cfg = parseArguments(args)
 	validateConfig(cfg)
 
