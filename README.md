@@ -101,16 +101,80 @@ rodeo run script.luau --edit 0
 
 Omit a flag to match any value. Use `1` to require it, `0` to exclude it.
 
-### Script Directives
+### Execution Context
 
-Embed default flags directly in your script files using the `--!rodeo` directive:
+Control which runtime context your code executes in. This allows you to use direct references and access modules as if your code were running normally on the client or server.
 
-```lua
---!rodeo --client 1 --running 1 --context server
-print("This runs on client VM in server context")
+```bash
+# Execute in server context (Script)
+rodeo run script.luau --context server
+
+# Execute in client context (LocalScript)
+rodeo run script.luau --context client
+
+# Execute in plugin context (default)
+rodeo run script.luau --context plugin
 ```
 
-The directive must be on line 1 (or line 2 if there's a shebang). CLI flags override directive defaults:
+**Available contexts:**
+- `plugin` (default) - Runs as a ModuleScript in ReplicatedStorage
+- `server` - Runs as a Script in ServerScriptService
+- `client` - Runs as a LocalScript in PlayerScripts
+
+Example using server context to access server-only APIs:
+
+```lua
+-- @rodeo run --context server
+local ServerStorage = game:GetService("ServerStorage")
+local myModule = require(ServerStorage.Modules.MyServerModule)
+return myModule:doSomething()
+```
+
+### Script Arguments
+
+Pass arguments to scripts using the `--` separator:
+
+```bash
+# Pass arguments to script
+rodeo run script.luau -- arg1 arg2 "arg with spaces"
+
+# Works with inline source too
+rodeo run -s 'return function(args) return args end' -- hello world
+```
+
+Scripts that return a function receive the arguments:
+
+```lua
+return function(args)
+    print(args[1])  -- "arg1"
+    print(args[2])  -- "arg2"
+    return args
+end
+```
+
+Scripts that don't return a function work as before - no breaking changes.
+
+### Script Directives
+
+Embed default flags directly in your script files using the `@rodeo` directive:
+
+```lua
+-- @rodeo run --show-return --context server
+return function(args)
+    return { result = "executed on server" }
+end
+```
+
+You can also specify default arguments in directives:
+
+```lua
+-- @rodeo run --show-return -- default-arg1 default-arg2
+return function(args)
+    return args  -- uses directive args if no CLI args provided
+end
+```
+
+CLI flags and arguments override directive defaults:
 
 ```bash
 # Uses directive defaults
@@ -118,6 +182,10 @@ rodeo run script.luau
 
 # Override context from directive
 rodeo run script.luau --context plugin
+
+# Override args from directive (use -- with nothing to pass empty args)
+rodeo run script.luau -- custom-arg
+rodeo run script.luau --   # explicitly empty args
 ```
 
 ### Custom Port Configuration
