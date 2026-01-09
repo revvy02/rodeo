@@ -74,8 +74,8 @@ local function main()
 	runCmd:option("--host", "Host of running server"):default("localhost")
 	runCmd:option("--port", "Port number of running server"):default(config.SERVE_PORT):convert(tonumber)
 
-	-- Define build command
-	parser:command("build", "Build and install the serve plugin")
+	-- Define plugin command
+	parser:command("plugin", "Build and install the rodeo plugin")
 
 	local cliArgs, scriptArgs, hasCliArgs = splitArgsAtDoubleDash(process.args)
 	local args = parser:parse(cliArgs)
@@ -98,9 +98,9 @@ local function main()
 	elseif args.run then
 		local runCommand = require("@self/commands/run")
 		runCommand(args)
-	elseif args.build then
-		local buildCommand = require("@self/commands/build")
-		buildCommand(args)
+	elseif args.plugin then
+		local pluginCommand = require("@self/commands/plugin")
+		pluginCommand(args)
 	end
 end
 

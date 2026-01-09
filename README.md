@@ -43,7 +43,7 @@ For running multiple scripts without restarting Studio.
 
 **Setup** (first time only):
 ```bash
-rodeo build
+rodeo plugin
 ```
 
 **Start server**:
