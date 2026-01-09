@@ -7,7 +7,8 @@ local config = require("@self/library/config")
 local log = require("@self/library/log")
 
 -- Split process.args at "--" separator into CLI args and script args
-local function splitArgsAtDoubleDash(rawArgs: { string }): ({ string }, { string })
+-- Returns: cliArgs, scriptArgs, foundSeparator
+local function splitArgsAtDoubleDash(rawArgs: { string }): ({ string }, { string }, boolean)
 	local cliArgs = {}
 	local scriptArgs = {}
 	local foundSeparator = false
@@ -22,7 +23,7 @@ local function splitArgsAtDoubleDash(rawArgs: { string }): ({ string }, { string
 		end
 	end
 
-	return cliArgs, scriptArgs
+	return cliArgs, scriptArgs, foundSeparator
 end
 
 local function main()
@@ -76,9 +77,12 @@ local function main()
 	-- Define build command
 	parser:command("build", "Build and install the serve plugin")
 
-	local cliArgs, scriptArgs = splitArgsAtDoubleDash(process.args)
+	local cliArgs, scriptArgs, hasCliArgs = splitArgsAtDoubleDash(process.args)
 	local args = parser:parse(cliArgs)
-	args.scriptArgs = scriptArgs
+	-- Only set scriptArgs if CLI used -- separator (allows directive args to apply otherwise)
+	if hasCliArgs then
+		args.scriptArgs = scriptArgs
+	end
 
 	-- Enable verbose logging if flag is set
 	log.setVerbose(args.verbose or false)

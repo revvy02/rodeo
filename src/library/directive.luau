@@ -28,6 +28,18 @@ end
 local function parseDirectiveFlags(directive: string): { [string]: any }
 	local result: { [string]: any } = {}
 
+	-- Check for -- separator and extract script args
+	local flagsPart, argsPart = string.match(directive, "^(.-)%s+%-%-%s+(.+)$")
+	if argsPart then
+		-- Parse space-separated args after --
+		local scriptArgs = {}
+		for arg in string.gmatch(argsPart, "%S+") do
+			table.insert(scriptArgs, arg)
+		end
+		result.scriptArgs = scriptArgs
+		directive = flagsPart -- Continue parsing only the flags part
+	end
+
 	-- Parse quoted values first
 	for key, value in string.gmatch(directive, '%-%-([%w-]+)%s+"([^"]+)"') do
 		local numValue = tonumber(value)
