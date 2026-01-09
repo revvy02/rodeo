@@ -38,6 +38,7 @@ type Config = {
 	showReturn: boolean?,
 	logFilter: execution.LogFilter,
 	cacheRequires: boolean?,
+	scriptArgs: { string }?,
 }
 
 type OutputMessage = {
@@ -79,6 +80,7 @@ local function parseArguments(args: any): Config
 		showReturn = args.show_return,
 		logFilter = execution.buildLogFilter(args),
 		cacheRequires = args.cache_requires,
+		scriptArgs = args.scriptArgs,
 	}
 end
 
@@ -122,7 +124,8 @@ local function handlePluginConnection(
 	outputFile: string?,
 	returnFile: string?,
 	showReturn: boolean?,
-	cacheRequires: boolean?
+	cacheRequires: boolean?,
+	scriptArgs: { string }?
 ): boolean
 	local message: any = {
 		type = "exec",
@@ -130,6 +133,7 @@ local function handlePluginConnection(
 		script = scriptContent,
 		logFilter = logFilter,
 		cacheRequires = cacheRequires,
+		scriptArgs = scriptArgs,
 	}
 
 	if instancePath then
@@ -266,7 +270,7 @@ local function main(args: any)
 				return
 			end
 
-			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, cfg.logFilter, exitCodeRef, cfg.outputFile, cfg.returnFile, cfg.showReturn, cfg.cacheRequires)
+			isComplete = handlePluginConnection(ws, executionId, scriptContent, instancePath, cfg.logFilter, exitCodeRef, cfg.outputFile, cfg.returnFile, cfg.showReturn, cfg.cacheRequires, cfg.scriptArgs)
 		end,
 	})
 

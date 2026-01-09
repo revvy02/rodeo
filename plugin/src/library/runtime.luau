@@ -31,6 +31,7 @@ export type ExecutionParams = {
 	logFilter: LogFilter?,
 	cacheRequires: boolean?,
 	verbose: boolean?,
+	scriptArgs: { string }?,
 }
 
 export type ExecutionCallbacks = {
@@ -373,6 +374,13 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 			ctx.runner:FindFirstChild("moduleRef").Value = resolvedModule
 		end
 	end
+
+	-- Pass script arguments to runner via StringValue (JSON encoded)
+	local HttpService = game:GetService("HttpService")
+	local argsValue = Instance.new("StringValue")
+	argsValue.Name = "scriptArgs"
+	argsValue.Value = HttpService:JSONEncode(params.scriptArgs or {})
+	argsValue.Parent = ctx.runner
 
 	-- Listen for logs
 	local logsConnection = ctx.logsEvent.Event:Connect(function(logData)

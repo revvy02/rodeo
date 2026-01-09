@@ -152,6 +152,7 @@ local function handleExecClient(ws: any)
 				cacheRequires = decoded.cacheRequires,
 				context = decoded.context,
 				queuedAt = os.time(),
+				scriptArgs = decoded.scriptArgs,
 			}
 
 			-- Find matching VM pipelines

@@ -82,6 +82,13 @@ local logsEvent = script:WaitForChild("logs")
 local moduleRef = script:WaitForChild("moduleRef")
 local module = moduleRef.Value
 
+-- Get script arguments (passed as JSON-encoded string)
+local scriptArgsValue = script:FindFirstChild("scriptArgs")
+local scriptArgs = {}
+if scriptArgsValue and scriptArgsValue.Value ~= "" then
+	scriptArgs = HttpService:JSONDecode(scriptArgsValue.Value)
+end
+
 -- Capture logs during execution
 local logConnection
 logConnection = LogService.MessageOut:Connect(function(body, messageType)
@@ -99,7 +106,15 @@ logConnection = LogService.MessageOut:Connect(function(body, messageType)
 end)
 
 local success, result = xpcall(function()
-	return require(module)
+	local moduleResult = require(module)
+
+	-- If module returns a function, call it with args
+	if type(moduleResult) == "function" then
+		return moduleResult(scriptArgs)
+	end
+
+	-- Otherwise return the module result as-is (backward compatible)
+	return moduleResult
 end, debug.traceback)
 
 task.wait(0.1) -- Allow final logs to flush

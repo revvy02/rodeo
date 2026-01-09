@@ -229,6 +229,7 @@ local function AppProvider(props: AppProviderProps)
 					enableOutput = true,
 					enableLogs = true,
 				}
+				local scriptArgs = decoded.scriptArgs or {}
 
 				-- Create execution context (module + runner + events)
 				local ctx = utils.createExecutionContext(
@@ -244,6 +245,7 @@ local function AppProvider(props: AppProviderProps)
 					logFilter = logFilter,
 					cacheRequires = decoded.cacheRequires,
 					verbose = verbose,
+					scriptArgs = scriptArgs,
 				}, {
 					onOutput = function(level, body)
 						client:Send(HttpService:JSONEncode({

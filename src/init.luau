@@ -1,8 +1,29 @@
 -- rodeo CLI Router
 -- Routes commands to appropriate handlers
 local argparse = require("@pkg/argparse")
+local process = require("@lune/process")
+
 local config = require("@self/library/config")
 local log = require("@self/library/log")
+
+-- Split process.args at "--" separator into CLI args and script args
+local function splitArgsAtDoubleDash(rawArgs: { string }): ({ string }, { string })
+	local cliArgs = {}
+	local scriptArgs = {}
+	local foundSeparator = false
+
+	for _, arg in ipairs(rawArgs) do
+		if arg == "--" and not foundSeparator then
+			foundSeparator = true
+		elseif foundSeparator then
+			table.insert(scriptArgs, arg)
+		else
+			table.insert(cliArgs, arg)
+		end
+	end
+
+	return cliArgs, scriptArgs
+end
 
 local function main()
 	local parser = argparse("rodeo", "Run Luau code inside Roblox Studio")
@@ -55,7 +76,9 @@ local function main()
 	-- Define build command
 	parser:command("build", "Build and install the serve plugin")
 
-	local args = parser:parse()
+	local cliArgs, scriptArgs = splitArgsAtDoubleDash(process.args)
+	local args = parser:parse(cliArgs)
+	args.scriptArgs = scriptArgs
 
 	-- Enable verbose logging if flag is set
 	log.setVerbose(args.verbose or false)
