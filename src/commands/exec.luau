@@ -1,4 +1,4 @@
--- Run command: Run script via persistent serve server
+-- Exec command: Execute script via persistent serve server
 
 local fs = require("@lune/fs")
 local net = require("@lune/net")
@@ -61,9 +61,9 @@ local function parseContextFlags(args: any): (number, number)
 end
 
 local function parseDirective(content: string): { [string]: any }?
-	-- Search for @rodeo run directive anywhere in the file
+	-- Search for @rodeo exec directive anywhere in the file
 	-- Matches in single-line comments (-- @rodeo) or multiline (--[[ @rodeo ]])
-	local directiveStr = string.match(content, "@rodeo%s+run%s+([^\n%]]+)")
+	local directiveStr = string.match(content, "@rodeo%s+exec%s+([^\n%]]+)")
 	if not directiveStr then
 		return nil
 	end

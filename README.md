@@ -54,10 +54,10 @@ rodeo serve
 **Run scripts** (in another terminal):
 ```bash
 # Basic execution
-rodeo run script.luau
+rodeo exec script.luau
 
 # Run from .rodeo/ directory
-rodeo run mytest              # runs .rodeo/mytest.luau
+rodeo exec mytest              # runs .rodeo/mytest.luau
 ```
 
 ### VM Targeting
@@ -66,16 +66,16 @@ Target specific runtime instances when using serve mode. Running tests in studio
 
 ```bash
 # Run in Studio edit mode only
-rodeo run script.luau --studio 1 --running 0
+rodeo exec script.luau --studio 1 --running 0
 
 # Run in client only
-rodeo run script.luau --client 1
+rodeo exec script.luau --client 1
 
 # Run in server only
-rodeo run script.luau --server 1
+rodeo exec script.luau --server 1
 
 # Exclude edit mode
-rodeo run script.luau --edit 0
+rodeo exec script.luau --edit 0
 ```
 
 **Available environments:**
@@ -93,13 +93,13 @@ Control which runtime context your code executes in. This allows you to use dire
 
 ```bash
 # Execute in server context (Script)
-rodeo run script.luau --context server
+rodeo exec script.luau --context server
 
 # Execute in client context (LocalScript)
-rodeo run script.luau --context client
+rodeo exec script.luau --context client
 
 # Execute in plugin context (default)
-rodeo run script.luau --context plugin
+rodeo exec script.luau --context plugin
 ```
 
 **Available contexts:**
@@ -110,7 +110,7 @@ rodeo run script.luau --context plugin
 Example using server context to access server-only APIs:
 
 ```lua
--- @rodeo run --context server
+-- @rodeo exec --context server
 local ServerStorage = game:GetService("ServerStorage")
 local myModule = require(ServerStorage.Modules.MyServerModule)
 return myModule:doSomething()
@@ -122,10 +122,10 @@ Pass arguments to scripts using the `--` separator:
 
 ```bash
 # Pass arguments to script
-rodeo run script.luau -- arg1 arg2 "arg with spaces"
+rodeo exec script.luau -- arg1 arg2 "arg with spaces"
 
 # Works with inline source too
-rodeo run -s 'return function(args) return args end' -- hello world
+rodeo exec -s 'return function(args) return args end' -- hello world
 ```
 
 Modules that return a function receive the arguments:
@@ -145,7 +145,7 @@ Modules that don't return a function work as before - no breaking changes.
 Embed default flags directly in your script files using the `@rodeo` directive:
 
 ```lua
--- @rodeo run --show-return --context server
+-- @rodeo exec --show-return --context server
 return function(args)
     return { result = "executed on server" }
 end
@@ -154,7 +154,7 @@ end
 You can also specify default arguments in directives:
 
 ```lua
--- @rodeo run --show-return -- default-arg1 default-arg2
+-- @rodeo exec --show-return -- default-arg1 default-arg2
 return function(args)
     return args  -- uses directive args if no CLI args provided
 end
@@ -164,14 +164,14 @@ CLI flags and arguments override directive defaults:
 
 ```bash
 # Uses directive defaults
-rodeo run script.luau
+rodeo exec script.luau
 
 # Override context from directive
-rodeo run script.luau --context plugin
+rodeo exec script.luau --context plugin
 
 # Override args from directive (use -- with nothing to pass empty args)
-rodeo run script.luau -- custom-arg
-rodeo run script.luau --   # explicitly empty args
+rodeo exec script.luau -- custom-arg
+rodeo exec script.luau --   # explicitly empty args
 ```
 
 ### Custom Port Configuration
@@ -183,7 +183,7 @@ By default, rodeo uses port 44872 for serve mode and 44873 for once mode. You ca
 rodeo serve --port 8080
 
 # Run script on custom port server
-rodeo run script.luau --port 8080
+rodeo exec script.luau --port 8080
 
 # One-time execution on custom port
 rodeo once script.luau --port 9000
@@ -191,7 +191,7 @@ rodeo once script.luau --port 9000
 
 **Available commands with `--port`:**
 - `rodeo serve --port <number>` - Start server on custom port (default: 44872)
-- `rodeo run --port <number>` - Connect to server on custom port (default: 44872)
+- `rodeo exec --port <number>` - Connect to server on custom port (default: 44872)
 - `rodeo once --port <number>` - Run ephemeral server on custom port (default: 44873)
 
 ### Output Redirection
@@ -203,7 +203,7 @@ Redirect execution output and return values to files:
 rodeo once script.luau --output output.txt
 
 # Save return value to file
-rodeo run script.luau --return result.json
+rodeo exec script.luau --return result.json
 
 # Save both to different files
 rodeo once script.luau --output output.txt --return result.json
@@ -223,13 +223,13 @@ Control which logs are shown in your terminal:
 rodeo once script.luau --no-warn
 
 # Suppress errors (still sets exit code on error)
-rodeo run script.luau --no-error
+rodeo exec script.luau --no-error
 
 # Suppress print statements
 rodeo once script.luau --no-print
 
 # Suppress all output
-rodeo run script.luau --no-output
+rodeo exec script.luau --no-output
 ```
 
 **Available flags:**
@@ -252,7 +252,7 @@ rodeo once script.luau --show-return
 
 # Save return value to file, 
 # You can also have it generate a .luau file that returns a table with the json data
-rodeo run script.luau --return result.luau
+rodeo exec script.luau --return result.luau
 
 # Both: save to file AND print to stdout
 rodeo once script.luau --return result.json --show-return
