@@ -27,6 +27,14 @@ local function splitArgsAtDoubleDash(rawArgs: { string }): ({ string }, { string
 end
 
 local function main()
+	-- Handle --version / -V before argparse (which requires a command)
+	for _, arg in ipairs(process.args) do
+		if arg == "--version" or arg == "-V" then
+			print(_G.RODEO_VERSION or "dev")
+			return
+		end
+	end
+
 	local parser = argparse("rodeo", "Run Luau code inside Roblox Studio")
 	parser:flag("-v --verbose", "Enable debug output")
 

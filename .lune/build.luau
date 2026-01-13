@@ -5,6 +5,13 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 
+-- Extract version from pesde.toml
+local function getVersion(): string
+	local pesdeToml = fs.readFile("pesde.toml")
+	local version = string.match(pesdeToml, 'version%s*=%s*"([^"]+)"')
+	return version or "unknown"
+end
+
 -- Platform targets for cross-compilation
 local TARGETS = {
 	{ os = "macos", arch = "aarch64", ext = "" },
@@ -72,6 +79,12 @@ local function main()
 		rule = "inject_global_value",
 		identifier = "RODEO_PLUGIN",
 		value = pluginBinary,
+	})
+
+	table.insert(config.rules, {
+		rule = "inject_global_value",
+		identifier = "RODEO_VERSION",
+		value = getVersion(),
 	})
 
 	fs.writeFile("build/release_bundle.darklua.json", serde.encode("json", config))
