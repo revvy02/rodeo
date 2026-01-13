@@ -60,23 +60,9 @@ rodeo run script.luau
 rodeo run mytest              # runs .rodeo/mytest.luau
 ```
 
-### Once Mode
+### VM Targeting
 
-Execute a script one time. Studio opens temporarily and closes after execution. This is functionally identical to `run-in-roblox`.
-
-```bash
-# Basic execution (uses empty place)
-rodeo once script.luau
-
-# With place file
-rodeo once script.luau --place game.rbxl
-```
-
-If `sourcemap.json` exists in the current directory, it will be used automatically to preserve stack traces. You can also specify a custom path with `--sourcemap`.
-
-### Context Targeting
-
-Target specific runtime contexts when using serve mode. Running tests in studio will automatically connect VMs, and `run` will let you target VMs with flags.
+Target specific runtime instances when using serve mode. Running tests in studio will automatically connect VMs, and `run` will let you target VMs with flags. This lets you run code specifically in play mode, test mode, play test server, play test client, etc, by targeting RunService flags.
 
 ```bash
 # Run in Studio edit mode only
@@ -117,9 +103,9 @@ rodeo run script.luau --context plugin
 ```
 
 **Available contexts:**
-- `plugin` (default) - Runs as a ModuleScript in ReplicatedStorage
-- `server` - Runs as a Script in ServerScriptService
-- `client` - Runs as a LocalScript in PlayerScripts
+- `plugin` (default)
+- `server` - Runs as a Script
+- `client` - Runs as a LocalScript
 
 Example using server context to access server-only APIs:
 
@@ -142,7 +128,7 @@ rodeo run script.luau -- arg1 arg2 "arg with spaces"
 rodeo run -s 'return function(args) return args end' -- hello world
 ```
 
-Scripts that return a function receive the arguments:
+Modules that return a function receive the arguments:
 
 ```lua
 return function(args)
@@ -152,9 +138,9 @@ return function(args)
 end
 ```
 
-Scripts that don't return a function work as before - no breaking changes.
+Modules that don't return a function work as before - no breaking changes.
 
-### Script Directives
+### Directives
 
 Embed default flags directly in your script files using the `@rodeo` directive:
 
@@ -264,8 +250,9 @@ Scripts can return values. By default, return values are silent (not printed), b
 # Print return value to stdout
 rodeo once script.luau --show-return
 
-# Save return value to file
-rodeo run script.luau --return result.json
+# Save return value to file, 
+# You can also have it generate a .luau file that returns a table with the json data
+rodeo run script.luau --return result.luau
 
 # Both: save to file AND print to stdout
 rodeo once script.luau --return result.json --show-return
@@ -293,32 +280,11 @@ return { sum = sum, count = 100 }
 
 Return values are JSON-encoded if possible, otherwise converted to string with `tostring()`.
 
-### Hot-Reloaded Execution
+### Module Caching
 
-By default, rodeo doesn't cache modules or their dependencies. Every execution reflects the most up-to-date code without needing to restart Studio.
+By default, rodeo ensures fresh code on every execution by cloning module instances before running, and renaming originals. This bypasses Roblox's require cache without using loadstring or setfenv (which cause deoptimization). Static requires work reliably; dynamic requires may have edge cases.
 
-**The problem:** Roblox caches `require()` results, so code changes don't take effect until you restart Studio.
-
-**The solution:** rodeo automatically bypasses Roblox's module cache, ensuring your changes are always reflected.
-
-```bash
-# Edit config.luau, utils.luau, or any required modules
-# Run your script - changes take effect immediately
-rodeo run main.luau
-
-# Edit modules again
-# Run again - fresh code every time
-rodeo run main.luau
-```
-
-This default behavior is ideal for development, ensuring executions always reflect your latest changes.
-
-**Performance optimization:** If you need faster execution and your modules aren't changing, use `--cache-requires` to enable caching:
-
-```bash
-# Enable module caching (faster, but changes won't be reflected)
-rodeo run script.luau --cache-requires
-```
+Use `--cache-requires` to enable standard Roblox caching behavior for better performance when modules aren't changing.
 
 ## Output Example
 <p align="center">
