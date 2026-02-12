@@ -70,6 +70,8 @@ export type ExecutionContext = {
 	originalInstance: ModuleScript?,
 	resultsEvent: BindableEvent,
 	logsEvent: BindableEvent,
+	incomingEvent: BindableEvent,
+	outgoingEvent: BindableEvent,
 	cleanup: () -> (),
 }
 
@@ -79,6 +81,8 @@ local HttpService = game:GetService("HttpService")
 
 local resultsEvent = script:WaitForChild("results")
 local logsEvent = script:WaitForChild("logs")
+local incomingEvent = script:WaitForChild("incoming")
+local outgoingEvent = script:WaitForChild("outgoing")
 local moduleRef = script:WaitForChild("moduleRef")
 local module = moduleRef.Value
 
@@ -88,6 +92,27 @@ local scriptArgs = {}
 if scriptArgsValue and scriptArgsValue.Value ~= "" then
 	scriptArgs = HttpService:JSONDecode(scriptArgsValue.Value)
 end
+
+-- io API: bidirectional messaging between script and caller
+local waitingThread = nil
+
+incomingEvent.Event:Connect(function(data)
+	if waitingThread then
+		task.spawn(waitingThread, data)
+		waitingThread = nil
+	end
+end)
+
+local io = {
+	read = function()
+		outgoingEvent:Fire({ type = "input_request" })
+		waitingThread = coroutine.running()
+		return coroutine.yield()
+	end,
+	write = function(data)
+		outgoingEvent:Fire({ type = "data", data = data })
+	end,
+}
 
 -- Capture logs during execution
 local logConnection
@@ -108,9 +133,9 @@ end)
 local success, result = xpcall(function()
 	local moduleResult = require(module)
 
-	-- If module returns a function, call it with args
+	-- If module returns a function, call it with args and io
 	if type(moduleResult) == "function" then
-		return moduleResult(scriptArgs)
+		return moduleResult(scriptArgs, io)
 	end
 
 	-- Otherwise return the module result as-is (backward compatible)
@@ -161,6 +186,15 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 	local logsEvent = Instance.new("BindableEvent")
 	logsEvent.Name = "logs"
 	logsEvent.Parent = runner
+
+	-- Bidirectional messaging events
+	local incomingEvent = Instance.new("BindableEvent")
+	incomingEvent.Name = "incoming"
+	incomingEvent.Parent = runner
+
+	local outgoingEvent = Instance.new("BindableEvent")
+	outgoingEvent.Name = "outgoing"
+	outgoingEvent.Parent = runner
 
 	-- Determine module name for stack traces
 	-- The module name appears in error messages: Script 'NAME', Line X
@@ -238,6 +272,8 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 		originalInstance = originalInstance,
 		resultsEvent = resultsEvent,
 		logsEvent = logsEvent,
+		incomingEvent = incomingEvent,
+		outgoingEvent = outgoingEvent,
 		cleanup = cleanup,
 	}
 end

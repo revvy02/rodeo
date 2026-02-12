@@ -171,14 +171,9 @@ local function AppProvider(props: AppProviderProps)
 		newClient.Opened:Connect(function()
 			setConnected(true)
 
-			-- Read session ID from workspace (if present, for "once" mode)
-			local sessionId = workspace:GetAttribute("__RODEO_ONCE_EXECUTION_ID__")
-
-			-- Send identification with optional session ID
 			newClient:Send(HttpService:JSONEncode({
 				clientType = "studio",
 				contextBitset = getContextBitset(),
-				sessionId = sessionId,
 			}))
 		end)
 
@@ -205,6 +200,11 @@ local function AppProvider(props: AppProviderProps)
 		if not client then
 			return
 		end
+
+		-- Track active execution for kill/message routing
+		local activeCtx: utils.ExecutionContext? = nil
+		local activeKill: (() -> ())? = nil
+		local activeExecutionId: string? = nil
 
 		local connection = client.MessageReceived:Connect(function(message: string)
 			local success, decoded = pcall(function()
@@ -240,7 +240,10 @@ local function AppProvider(props: AppProviderProps)
 					decoded.scriptPath
 				)
 
-				runtime.executeInContext(ctx, target, {
+				activeCtx = ctx
+				activeExecutionId = decoded.executionId
+
+				activeKill = runtime.executeInContext(ctx, target, {
 					executionId = decoded.executionId,
 					logFilter = logFilter,
 					cacheRequires = decoded.cacheRequires,
@@ -261,9 +264,43 @@ local function AppProvider(props: AppProviderProps)
 							executionId = decoded.executionId,
 							result = result,
 						}))
+						activeCtx = nil
+						activeKill = nil
+						activeExecutionId = nil
 						setIsExecuting(false)
 					end,
+					onMessage = function(data)
+						client:Send(HttpService:JSONEncode({
+							type = "message",
+							executionId = decoded.executionId,
+							data = data,
+						}))
+					end,
+					onInputRequest = function(prompt)
+						client:Send(HttpService:JSONEncode({
+							type = "input_request",
+							executionId = decoded.executionId,
+							prompt = prompt,
+						}))
+					end,
 				})
+			elseif decoded.type == "kill" then
+				if activeKill and activeExecutionId == decoded.executionId then
+					activeKill()
+					client:Send(HttpService:JSONEncode({
+						type = "killed",
+						executionId = decoded.executionId,
+					}))
+					activeCtx = nil
+					activeKill = nil
+					activeExecutionId = nil
+					setIsExecuting(false)
+				end
+			elseif decoded.type == "message" then
+				-- Forward incoming message to the running script via BindableEvent
+				if activeCtx and activeExecutionId == decoded.executionId then
+					activeCtx.incomingEvent:Fire(decoded.data)
+				end
 			end
 		end)
 

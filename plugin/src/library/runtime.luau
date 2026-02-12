@@ -37,6 +37,8 @@ export type ExecutionParams = {
 export type ExecutionCallbacks = {
 	onOutput: (level: string, body: string) -> (),
 	onComplete: (result: string?) -> (),
+	onMessage: ((data: any) -> ())?,
+	onInputRequest: ((prompt: string?) -> ())?,
 }
 
 -- Find the topmost ModuleScript ancestor (root of the module tree)
@@ -402,14 +404,23 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 		callbacks.onOutput(level, body)
 	end)
 
-	-- Listen for results
-	local resultsConnection
-	resultsConnection = ctx.resultsEvent.Event:Connect(function(result)
-		log(`Results received, starting cleanup...`)
-		resultsConnection:Disconnect()
-		logsConnection:Disconnect()
+	-- Listen for outgoing messages from script (io.write / io.read requests)
+	local outgoingConnection = ctx.outgoingEvent.Event:Connect(function(msg)
+		if msg.type == "input_request" then
+			if callbacks.onInputRequest then
+				callbacks.onInputRequest(msg.prompt)
+			end
+		elseif msg.type == "data" then
+			if callbacks.onMessage then
+				callbacks.onMessage(msg.data)
+			end
+		end
+	end)
 
-		-- Cleanup traversal first, then destroy runner
+	local function doCleanup()
+		logsConnection:Disconnect()
+		outgoingConnection:Disconnect()
+
 		if traversalCleanup then
 			log(`Calling traversalCleanup...`)
 			traversalCleanup()
@@ -418,7 +429,14 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 		log(`Starting ctx.cleanup, ctx.module = {ctx.module:GetFullName()}`)
 		ctx.cleanup()
 		log(`ctx.cleanup complete`)
+	end
 
+	-- Listen for results
+	local resultsConnection
+	resultsConnection = ctx.resultsEvent.Event:Connect(function(result)
+		log(`Results received, starting cleanup...`)
+		resultsConnection:Disconnect()
+		doCleanup()
 		callbacks.onComplete(result.result)
 	end)
 
@@ -436,6 +454,13 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 		task.spawn(function()
 			require(ctx.runner)
 		end)
+	end
+
+	-- Return a kill function that destroys the runner and cleans up
+	return function()
+		log(`Kill requested, destroying runner...`)
+		resultsConnection:Disconnect()
+		doCleanup()
 	end
 end
 

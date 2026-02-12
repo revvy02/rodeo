@@ -42,6 +42,7 @@ export type VmPipeline = {
 	enqueue: (self: VmPipeline, exec: ExecRequest) -> (),
 	completeExecution: (self: VmPipeline, executionId: string) -> (),
 	forwardOutput: (self: VmPipeline, executionId: string, message: string) -> (),
+	forwardToStudio: (self: VmPipeline, executionId: string, message: string) -> (),
 	disconnect: (self: VmPipeline) -> (),
 	getQueueLength: (self: VmPipeline) -> number,
 	isIdle: (self: VmPipeline) -> boolean,
@@ -133,9 +134,16 @@ function VmPipeline:completeExecution(executionId: string)
 end
 
 function VmPipeline:forwardOutput(executionId: string, message: string)
-	-- Check if this is the active execution
+	-- Forward message from Studio to exec client
 	if self.activeExecution and self.activeExecution.executionId == executionId then
 		self.activeExecution.ws:send(message)
+	end
+end
+
+function VmPipeline:forwardToStudio(executionId: string, message: string)
+	-- Forward message from exec client to Studio
+	if self.activeExecution and self.activeExecution.executionId == executionId and self.studioConnected then
+		self.studioWs:send(message)
 	end
 end
 

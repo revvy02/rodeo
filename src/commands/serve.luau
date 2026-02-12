@@ -1,12 +1,15 @@
 --!nonstrict
 
+local fs = require("@lune/fs")
 local net = require("@lune/net")
+local process = require("@lune/process")
 local serde = require("@lune/serde")
 local task = require("@lune/task")
 
 local config = require("../library/config")
 local log = require("../library/log")
 local output = require("../library/output")
+local studio = require("../library/studio")
 local uuid = require("../library/uuid")
 local VmPipeline = require("../library/VmPipeline")
 
@@ -106,6 +109,18 @@ local function processPendingExecutions()
 	end
 end
 
+-- Find the pipeline that has a given executionId as its active execution
+local function findPipelineForExecution(executionId: string): VmPipeline?
+	for _, vmMap in pairs(pipelines) do
+		for _, vmPipeline in pairs(vmMap) do
+			if vmPipeline.activeExecution and vmPipeline.activeExecution.executionId == executionId then
+				return vmPipeline
+			end
+		end
+	end
+	return nil
+end
+
 local function handleExecClient(ws: any)
 	local clientExecutionId = nil
 	local execRequest: ExecRequest? = nil
@@ -169,6 +184,14 @@ local function handleExecClient(ws: any)
 					bestVm.pipeline:enqueue(execRequest)
 				end
 			end
+		elseif decoded.type == "kill" or decoded.type == "message" then
+			-- Forward kill/message from exec client to Studio
+			if clientExecutionId then
+				local pipeline = findPipelineForExecution(clientExecutionId)
+				if pipeline then
+					pipeline:forwardToStudio(clientExecutionId, message)
+				end
+			end
 		end
 	end
 
@@ -220,10 +243,10 @@ local function handleStudioClient(ws: any, vmBitset: number)
 
 		local decoded = serde.decode("json", message)
 
-		-- Forward output to exec client
+		-- Forward message from Studio to exec client (output, done, input_request, killed)
 		vmPipeline:forwardOutput(decoded.executionId, message)
 
-		if decoded.type == "done" then
+		if decoded.type == "done" or decoded.type == "killed" then
 			vmPipeline:completeExecution(decoded.executionId)
 		end
 	end
@@ -237,9 +260,24 @@ local function handleStudioClient(ws: any, vmBitset: number)
 end
 
 local function main(args: any)
-	local port = args.port
+	local shouldLaunch = args.launch
+	local port = args.port or (if shouldLaunch then config.ONCE_PORT else config.SERVE_PORT)
+	local placeFile = args.place
+
+	-- Validate flags
+	if placeFile and not shouldLaunch then
+		log.error("--place requires --launch")
+		process.exit(1)
+	end
+
+	if placeFile and not fs.isFile(placeFile) then
+		log.error(`Place file not found: {placeFile}`)
+		process.exit(1)
+	end
+
 	log.info(`Starting server on port {port}`)
-	log.info("Waiting for Studio plugin to connect...")
+
+	local studioInstance: studio.StudioInstance? = nil
 
 	local _server = net.serve(port, {
 		handleRequest = function(request)
@@ -278,6 +316,7 @@ local function main(args: any)
 						["Content-Type"] = "application/json",
 					},
 					body = serde.encode("json", {
+						launched = studioInstance ~= nil,
 						contextCount = #contextStatus,
 						totalVms = totalVms,
 						totalQueued = totalQueued,
@@ -318,8 +357,32 @@ local function main(args: any)
 
 	log.debug("serve", "Server started")
 
-	while true do
-		task.wait(1)
+	-- Launch Studio if requested
+	if shouldLaunch then
+		task.wait(0.5) -- Give server a moment to start listening
+		studioInstance = studio.launch({
+			port = port,
+			place = placeFile,
+		})
+	else
+		log.info("Waiting for Studio plugin to connect...")
+	end
+
+	if studioInstance then
+		-- Monitor Studio process — if it exits, clean up and shut down
+		while true do
+			local status = studioInstance.process:status()
+			if status.code ~= nil then
+				log.info("Studio exited")
+				studioInstance:cleanup()
+				process.exit(0)
+			end
+			task.wait(1)
+		end
+	else
+		while true do
+			task.wait(1)
+		end
 	end
 end
 

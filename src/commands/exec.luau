@@ -168,7 +168,7 @@ local function submitScript(ws: any, executionId: string, script: string, instan
 	ws:send(serde.encode("json", message))
 end
 
-local function handleMessage(decoded: any, exitCodeRef: { value: number }, outputFile: string?, returnFile: string?, showReturn: boolean?): boolean
+local function handleMessage(ws: any, decoded: any, executionId: string, exitCodeRef: { value: number }, outputFile: string?, returnFile: string?, showReturn: boolean?): boolean
 	if decoded.type == "queued" then
 		if decoded.waiting then
 			log.info(`Waiting: {decoded.waiting}`)
@@ -189,6 +189,33 @@ local function handleMessage(decoded: any, exitCodeRef: { value: number }, outpu
 			execution.writeExecutionResult(decoded.result, returnFile, showReturn)
 		end
 		return true
+	elseif decoded.type == "killed" then
+		log.info("Execution killed")
+		exitCodeRef.value = 1
+		return true
+	elseif decoded.type == "input_request" then
+		-- Script is waiting for input via io.read()
+		local prompt: string? = decoded.prompt
+		local input: string
+		if prompt then
+			input = stdio.prompt("text", prompt)
+		else
+			input = stdio.prompt("text")
+		end
+		ws:send(serde.encode("json", {
+			type = "message",
+			executionId = executionId,
+			data = input,
+		}))
+	elseif decoded.type == "message" then
+		-- Direct message from script via io.write()
+		local data = decoded.data
+		if type(data) == "string" then
+			stdio.write(data)
+		else
+			-- Structured data - print as JSON
+			stdio.write(serde.encode("json", data) .. "\n")
+		end
 	elseif decoded.type == "disconnect" then
 		log.error("Studio disconnected")
 		exitCodeRef.value = 2
@@ -256,7 +283,7 @@ local function main(args: any)
 		end
 
 		local decoded = serde.decode("json", message)
-		local isDone = handleMessage(decoded, exitCodeRef, cfg.outputFile, cfg.returnFile, cfg.showReturn)
+		local isDone = handleMessage(ws, decoded, executionId, exitCodeRef, cfg.outputFile, cfg.returnFile, cfg.showReturn)
 
 		if isDone then
 			ws:close()
