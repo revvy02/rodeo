@@ -1,8 +1,13 @@
 {
   "languageMode": "strict",
   "aliases": {
-    "pkg": "./lune_packages",
+    "std": "~/.lute/typedefs/0.1.0/std",
+    "lune": "~/.lune/.typedefs/0.10.4/",
+    "lint": "~/.lute/typedefs/0.1.0/lint",
     "luaupkg": "./luau_packages",
-    "lune": "~/.lune/.typedefs/0.10.4/"
+    "pkg": "./lune_packages",
+    "lute": "~/.lute/typedefs/0.1.0/lute",
+    "rodeo": "~/.rodeo/typedefs/1.0.0-rc.1",
+    "adapters": "./rodeo-adapters"
   }
 }

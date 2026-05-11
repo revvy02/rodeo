@@ -1,0 +1,169 @@
+--[[
+	runtime.luau - Script execution runtime
+
+	Handles executing scripts in server/client/plugin contexts,
+	including log capture, result serialization, and cleanup.
+	Require resolution and uncacheable module traversal are in require_resolver.luau.
+]]
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local createLogger = require(script.Parent.log)
+local createRpc = require(script.Parent.Parent.Parent.shared.rpc)
+local utils = require(script.Parent.utils)
+local requireResolver = require(script.Parent.require_resolver)
+
+export type LogFilter = {
+	enableWarn: boolean?,
+	enableError: boolean?,
+	enableInfo: boolean?,
+	enableOutput: boolean?,
+	enableLogs: boolean?,
+}
+
+export type ExecutionParams = {
+	executionId: string,
+	logFilter: LogFilter?,
+	cacheRequires: boolean?,
+	verbose: boolean?,
+	scriptArgs: { string }?,
+	returnFile: string?,
+	showReturn: boolean?,
+	outputFile: string?,
+	profile: boolean?,
+}
+
+export type ExecutionCallbacks = {
+	onComplete: (result: { success: boolean, error: string? }?) -> (),
+	onRpc: (msg: any) -> (),
+}
+
+type ExecutionTarget = "server" | "client" | "plugin"
+
+-- Execute a module in a specific context (server/client/plugin)
+-- ctx contains the runner, module, events, and cleanup function (created by utils.createExecutionContext)
+local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTarget, params: ExecutionParams, callbacks: ExecutionCallbacks)
+	-- Create RPC handle early so logger can use it
+	local rpc = createRpc(function(msg)
+		ctx.outgoingEvent:Fire(msg)
+	end)
+	ctx.incomingEvent.Event:Connect(function(msg)
+		if msg.type == "rpc:response" and msg.id then
+			rpc.handleResponse(msg)
+		end
+	end)
+	local log = createLogger(rpc, if params.verbose then "debug" else "info")
+
+	-- Pass log level to runner via attribute so it can create its own logger
+	ctx.runner:SetAttribute("logLevel", if params.verbose then "debug" else "info")
+
+	log.debug(`START`)
+	log.debug(`ctx.module: {ctx.module:GetFullName()}`)
+	log.debug(`target: {target}`)
+	log.debug(`cacheRequires: {params.cacheRequires or false}`)
+
+	-- Get module path BEFORE traversal (so we can re-resolve after if it gets cloned)
+	local modulePath = requireResolver.getAbsoluteInstancePath(ctx.module)
+	log.debug(`modulePath: {modulePath or "nil"}`)
+
+	-- Setup uncacheable require traversal (from plugin context, before execution)
+	local traversalCleanup: (() -> ())? = nil
+	if not params.cacheRequires then
+		log.debug(`Setting up uncachable require traversal...`)
+		traversalCleanup = requireResolver.setupUncachableRequireModuleTraversal(ctx.module, params.executionId, log)
+		log.debug(`Traversal setup complete`)
+	end
+
+	-- Re-resolve module via path (picks up cloned module if traversal cloned it)
+	if modulePath then
+		local resolvedModule = utils.resolveInstancePath(modulePath)
+		if resolvedModule and resolvedModule:IsA("ModuleScript") then
+			log.debug(`Re-resolved module: {resolvedModule:GetFullName()}`)
+			ctx.runner:FindFirstChild("moduleRef").Value = resolvedModule
+		end
+	end
+
+	-- Pass execution params to runner via attributes
+	local HttpService = game:GetService("HttpService")
+	ctx.runner:SetAttribute("executionId", params.executionId)
+	ctx.runner:SetAttribute("scriptArgs", HttpService:JSONEncode(params.scriptArgs or {}))
+	ctx.runner:SetAttribute("returnFile", params.returnFile or "")
+	ctx.runner:SetAttribute("showReturn", params.showReturn or false)
+	ctx.runner:SetAttribute("outputFile", params.outputFile or "")
+	ctx.runner:SetAttribute("logFilter", HttpService:JSONEncode(params.logFilter or {}))
+	ctx.runner:SetAttribute("target", target)
+
+	-- Profiler label injection: stamp each frame with execution_id so dumps can be matched
+	local profileConnection: RBXScriptConnection? = nil
+	if params.profile then
+		local RunService = game:GetService("RunService")
+		local label = "rodeo:" .. params.executionId
+		profileConnection = RunService.Heartbeat:Connect(function()
+			debug.profilebegin(label)
+			debug.profileend()
+		end)
+		log.debug(`Profiling enabled: {label}`)
+	end
+
+	-- Listen for outgoing RPC messages from script
+	local outgoingConnection = ctx.outgoingEvent.Event:Connect(function(msg)
+		if msg.type == "rpc" then
+			callbacks.onRpc(msg)
+		end
+	end)
+
+	local function doCleanup()
+		if profileConnection then
+			profileConnection:Disconnect()
+			profileConnection = nil
+		end
+		if traversalCleanup then
+			log.debug(`Calling traversalCleanup...`)
+			traversalCleanup()
+			log.debug(`traversalCleanup complete`)
+		end
+		log.debug(`Starting ctx.cleanup, ctx.module = {ctx.module:GetFullName()}`)
+		ctx.cleanup()
+		log.debug(`ctx.cleanup complete`)
+	end
+
+	-- Listen for results
+	local resultsConnection
+	resultsConnection = ctx.resultsEvent.Event:Connect(function(result)
+		log.debug(`Results received, starting cleanup...`)
+		resultsConnection:Disconnect()
+		doCleanup()
+		outgoingConnection:Disconnect()
+		callbacks.onComplete(result)
+	end)
+
+	log.debug(`Starting execution...`)
+
+	-- Trigger execution
+	if target == "server" then
+		-- Parent thin shim Script to SSS to trigger auto-execution
+		ctx.shim.Parent = ServerScriptService
+	elseif target == "client" then
+		task.spawn(function()
+			-- Parent thin shim LocalScript to PlayerScripts to trigger auto-execution
+			ctx.shim.Parent = Players.LocalPlayer.PlayerScripts
+		end)
+	else -- plugin / elevated (runner handles elevated MCP routing)
+		task.spawn(function()
+			require(ctx.runner)
+		end)
+	end
+
+	-- Return a kill function that destroys the runner and cleans up
+	return function()
+		log.debug(`Kill requested, destroying runner...`)
+		resultsConnection:Disconnect()
+		doCleanup()
+		outgoingConnection:Disconnect()
+	end
+end
+
+return {
+	executeInContext = executeInContext,
+}

@@ -1,8 +1,21 @@
+[env]
+_.path = ["./bin"]
+_.file = ".env"
+
 [tools]
 stylua = "latest"
 "ubi:Kampfkarren/selene" = "latest"
 "ubi:rojo-rbx/rojo" = "latest"
 "ubi:JohnnyMorganz/luau-lsp" = "latest"
 "ubi:pesde-pkg/pesde" = "latest"
-"ubi:seaofvoices/darklua" = "latest"
+"ubi:seaofvoices/darklua" = "0.18.0"
 "ubi:jacktabscode/asphalt" = "latest"
+"github:luau-lang/lute" = { version = "1.0.1-nightly.20260424", bin_path = "." }
+"github:lune-org/lune" = "latest"
+"ubi:cloudflare/cloudflared" = "latest"
+"ubi:Sleitnick/rbxcloud" = "latest"
+uv = "latest"
+protoc = "latest"
+"ubi:revvy02/protoc-gen-luau" = "1.1.2-fork.0"
+bun = "latest"
+"ubi:revvy02/rbx-microprofiler" = "0.1.0"

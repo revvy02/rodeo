@@ -3,14 +3,29 @@
 **/roblox_packages/
 
 /.pesde
+*.rbxl.lock
+
+.rodeo/.temp
 
 # Build artifacts
 /build
-/.claude
+/rodeo-plugin/build/
+/bin/
+/.claude/
+/.plans
 /.vscode
-/.rodeo
+
+# Rust
+/target/
+/Cargo.lock
+/rodeo-cli/target/
+node_modules
 
 .DS_Store
 
+*/.temp
+
 .env
 /out
+
+/rodeo-cli/target

@@ -1,0 +1,21 @@
+{
+  "name": "context-test",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "globalState": { "$path": "src/ReplicatedStorage/globalState.luau" }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "globalStateMutater": { "$path": "src/ServerScriptService/globalStateMutater.server.luau" }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "globalStateMutater": { "$path": "src/StarterPlayerScripts/globalStateMutater.client.luau" }
+      }
+    }
+  }
+}

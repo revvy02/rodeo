@@ -1,0 +1,16 @@
+{
+  "name": "traversal-test",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "leaf": { "$path": "src/ReplicatedStorage/leaf.luau" },
+      "mid": { "$path": "src/ReplicatedStorage/mid.luau" },
+      "deep": { "$path": "src/ReplicatedStorage/deep" }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "mutator": { "$path": "src/ServerScriptService/mutator.server.luau" }
+    }
+  }
+}

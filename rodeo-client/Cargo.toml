@@ -1,0 +1,24 @@
+[package]
+name = "rodeo-client"
+version = "0.1.0"
+edition = "2021"
+description = "Canonical rodeo client — Studio/VM handles, runCode streaming, RPC dispatch"
+
+[dependencies]
+rodeo-proto = { path = "../rodeo-proto" }
+
+connectrpc = { version = "0.3.2", features = ["client", "streaming"] }
+buffa = { version = "0.3.0", features = ["json"] }
+http = "1"
+hyper = { version = "1", features = ["client", "http1"] }
+
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+
+anyhow = "1"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+roblox_install = "1"

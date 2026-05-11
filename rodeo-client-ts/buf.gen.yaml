@@ -1,0 +1,7 @@
+version: v2
+plugins:
+  - local: protoc-gen-es
+    out: gen
+    opt: target=ts
+inputs:
+  - directory: ../rodeo-proto/proto

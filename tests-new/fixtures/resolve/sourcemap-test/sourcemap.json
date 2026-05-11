@@ -1,0 +1,1 @@
+{"name":"sourcemap_test","className":"Folder","filePaths":["default.project.json"],"children":[{"name":"helper","className":"ModuleScript","filePaths":["helper.luau"]},{"name":"main","className":"ModuleScript","filePaths":["main.luau"]},{"name":"packages","className":"Folder","children":[{"name":"mylib","className":"ModuleScript","filePaths":["packages/mylib/init.luau"]}]}]}

@@ -1,0 +1,47 @@
+import { describe, beforeAll, afterAll, it, expect } from "bun:test";
+import {
+  runRodeo,
+  spawnBackground,
+  waitForProcess,
+  waitForVm,
+  type BackgroundProcess,
+} from "../helpers.js";
+
+const PORT = 46212;
+
+describe("kill (CLI)", () => {
+  let bg: BackgroundProcess;
+
+  beforeAll(async () => {
+    bg = spawnBackground(["run", "--port", String(PORT), "--place"]);
+    await waitForVm(PORT);
+  });
+  afterAll(async () => { bg.kill(); await bg.exited; });
+
+  it("kill terminates running process", async () => {
+    const scriptProc = spawnBackground([
+      "run", "--port", String(PORT), "--source", "task.wait(30) return nil",
+    ]);
+
+    const pid = await waitForProcess(PORT, "running");
+    expect(pid).not.toBeNull();
+
+    const killResult = runRodeo(["kill", String(pid), "--port", String(PORT)]);
+    expect(killResult.ok).toBe(true);
+    expect(killResult.stderr).toContain(`Killed process #${pid}`);
+
+    // The spawner should exit non-zero when its run is killed.
+    const exitCode = await Promise.race([
+      scriptProc.exited,
+      (async () => { await Bun.sleep(10_000); return -1; })(),
+    ]);
+    expect(exitCode).not.toBe(-1);
+    expect(exitCode).not.toBe(0);
+  });
+
+  it("kill nonexistent process returns error", () => {
+    const result = runRodeo(["kill", "999", "--port", String(PORT)]);
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("not found");
+  });
+});

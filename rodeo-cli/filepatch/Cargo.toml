@@ -1,0 +1,15 @@
+[package]
+name = "filepatch"
+version = "0.1.0"
+edition = "2021"
+description = "Atomic file patch with rename-as-backup + UUID lock + RAII restore-on-drop"
+license = "MIT"
+
+[lib]
+name = "filepatch"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }

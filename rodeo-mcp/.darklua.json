@@ -1,0 +1,14 @@
+{
+  "generator": "retain_lines",
+  "bundle": {
+    "require_mode": { "name": "luau" },
+    "excludes": ["@rodeo", "@rodeo/**", "@lune", "@lune/**"]
+  },
+  "rules": [
+    {
+      "rule": "convert_require",
+      "current": { "name": "luau" },
+      "target": { "name": "path" }
+    }
+  ]
+}

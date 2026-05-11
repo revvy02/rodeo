@@ -1,0 +1,231 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use anyhow::{anyhow, bail, Result};
+
+use crate::proto;
+use crate::studio::StudioBackend;
+use crate::transport::Transport;
+use crate::vm::Vm;
+
+const POLL_INTERVAL_MS: u64 = 500;
+
+/// The root client — owns the transport shared across all handles it mints.
+#[derive(Clone)]
+pub struct RodeoClient {
+    transport: Arc<Transport>,
+}
+
+impl RodeoClient {
+    /// Connect to a rodeo master at `host:port`. No network I/O happens until
+    /// the first RPC.
+    pub fn connect(host: impl Into<String>, port: u16) -> Result<Self> {
+        Ok(Self { transport: Arc::new(Transport::new(host, port)?) })
+    }
+
+    pub fn host(&self) -> &str { &self.transport.host }
+    pub fn port(&self) -> u16 { self.transport.port }
+
+    // -----------------------------------------------------------------------
+    // Health & state
+    // -----------------------------------------------------------------------
+
+    pub async fn is_healthy(&self) -> bool {
+        self.transport
+            .master()
+            .health(proto::HealthRequest::default())
+            .await
+            .is_ok()
+    }
+
+    /// Poll `is_healthy` up to ~15s. Returns true if the master responded.
+    pub async fn wait_for_healthy(&self) -> bool {
+        for _ in 0..30 {
+            if self.is_healthy().await { return true; }
+            tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
+        }
+        false
+    }
+
+    pub async fn get_state(&self) -> Result<proto::RodeoSnapshot> {
+        Ok(self.transport
+            .master()
+            .get_state(proto::GetStateRequest::default())
+            .await
+            .map_err(|e| anyhow!("get_state failed: {e}"))?
+            .into_owned())
+    }
+
+    // -----------------------------------------------------------------------
+    // Process management
+    // -----------------------------------------------------------------------
+
+    pub async fn list_processes(&self) -> Result<Vec<proto::ProcessInfo>> {
+        Ok(self.transport
+            .master()
+            .list_processes(proto::ListProcessesRequest::default())
+            .await
+            .map_err(|e| anyhow!("list_processes failed: {e}"))?
+            .into_owned()
+            .processes)
+    }
+
+    pub async fn kill(&self, process_id: u32) -> Result<()> {
+        self.transport
+            .master()
+            .kill_process(proto::KillProcessRequest { process_id, ..Default::default() })
+            .await
+            .map_err(|e| anyhow!("kill_process({process_id}) failed: {e}"))?;
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Backend discovery
+    // -----------------------------------------------------------------------
+
+    pub async fn list_backends(&self, kind: Option<&str>) -> Result<Vec<proto::BackendInfo>> {
+        Ok(self.transport
+            .master()
+            .list_backends(proto::ListBackendsRequest { kind: kind.map(String::from), ..Default::default() })
+            .await
+            .map_err(|e| anyhow!("list_backends failed: {e}"))?
+            .into_owned()
+            .backends)
+    }
+
+    /// Poll until a studio backend appears; returns a handle.
+    pub async fn get_local_studio(&self) -> Result<StudioBackend> {
+        loop {
+            let backends = self.list_backends(Some("studio")).await?;
+            if let Some(info) = backends.into_iter().next() {
+                return Ok(StudioBackend::new(info, self.transport.clone()));
+            }
+            tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
+        }
+    }
+
+    pub async fn get_studio(&self, id_or_name: &str) -> Result<StudioBackend> {
+        let backends = self.list_backends(Some("studio")).await?;
+        backends
+            .into_iter()
+            .find(|b| b.id.starts_with(id_or_name) || b.name == id_or_name)
+            .map(|info| StudioBackend::new(info, self.transport.clone()))
+            .ok_or_else(|| anyhow!("studio backend '{id_or_name}' not found"))
+    }
+
+    // -----------------------------------------------------------------------
+    // VM discovery
+    // -----------------------------------------------------------------------
+
+    pub async fn get_vms(&self) -> Result<Vec<Vm>> {
+        Ok(self
+            .get_state()
+            .await?
+            .vms
+            .into_iter()
+            .map(|s| Vm::from_snapshot(s, self.transport.clone()))
+            .collect())
+    }
+
+    pub async fn get_vm(&self, vm_id: &str) -> Result<Vm> {
+        self.get_vms()
+            .await?
+            .into_iter()
+            .find(|v| v.vm_id == vm_id)
+            .ok_or_else(|| anyhow!("vm '{vm_id}' not found"))
+    }
+
+    pub async fn get_live_servers(&self) -> Result<Vec<Vm>> {
+        Ok(self
+            .get_vms()
+            .await?
+            .into_iter()
+            .filter(|v| v.mode == "live" && v.dom == "server")
+            .collect())
+    }
+
+    pub async fn get_live_server_for_place(&self, place_id: i64) -> Result<Vm> {
+        self.get_vms()
+            .await?
+            .into_iter()
+            .find(|v| v.mode == "live" && v.dom == "server" && v.place_id == place_id)
+            .ok_or_else(|| anyhow!("no live server found for place {place_id}"))
+    }
+
+    // -----------------------------------------------------------------------
+    // Direct master RPCs (low-level — used by CLI orchestration, not by TS)
+    // -----------------------------------------------------------------------
+
+    /// Launch a Studio, blocking until the plugin VM connects (Ready event).
+    /// Returns (backend_id, session_guid). Prefer `StudioBackend::open*` for
+    /// higher-level use — this is for CLI orchestration that builds the
+    /// LaunchStudioRequest manually.
+    pub async fn launch_studio_raw(&self, req: proto::LaunchStudioRequest) -> Result<(String, String)> {
+        let mut stream = self.transport
+            .master()
+            .launch_studio(req)
+            .await
+            .map_err(|e| anyhow!("failed to launch studio: {e}"))?;
+        while let Ok(Some(view)) = stream.message().await {
+            let event = view.to_owned_message();
+            match event.event {
+                Some(proto::launch_studio_event::Event::Ready(ready)) => {
+                    return Ok((ready.backend_id, ready.session_guid));
+                }
+                Some(proto::launch_studio_event::Event::Error(err)) => {
+                    bail!("studio launch failed: {}", err.message);
+                }
+                _ => {}
+            }
+        }
+        bail!("launch studio stream ended without ready event")
+    }
+
+    /// Close Studio, blocking until Closed event.
+    pub async fn close_studio_raw(&self, session_guid: &str) -> Result<()> {
+        let mut stream = self.transport
+            .master()
+            .close_studio(proto::CloseStudioRequest { session_guid: session_guid.to_string(), ..Default::default() })
+            .await
+            .map_err(|e| anyhow!("failed to close studio: {e}"))?;
+        while let Ok(Some(view)) = stream.message().await {
+            let event = view.to_owned_message();
+            if let Some(proto::close_studio_event::Event::Closed(_)) = event.event {
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
+
+    /// Submit a run with no VM handle — server routes by target. Used by the
+    /// CLI orchestration path where the target string (`run:server`, `play:client:2`)
+    /// is the canonical selector and master resolves it to a VM.
+    pub async fn submit_run(&self, opts: crate::run::RunCodeOpts) -> Result<crate::run::RunResult> {
+        crate::run::run_buffered_target(self.transport.clone(), opts).await
+    }
+
+    /// Streaming variant of `submit_run` — caller drives the returned stream
+    /// and decides how to handle Output events (write to stdio, emit as
+    /// structured notifications, etc.).
+    pub async fn submit_run_stream(&self, opts: crate::run::RunCodeOpts) -> Result<crate::run::RunStream> {
+        crate::run::run_stream_target(self.transport.clone(), opts).await
+    }
+
+    /// Save the default (current) studio — for CLI `rodeo save`.
+    pub async fn save_default(&self) -> Result<proto::SavePlaceResponse> {
+        let resp = self.transport
+            .master()
+            .save_place(proto::SavePlaceRequest::default())
+            .await
+            .map_err(|e| anyhow!("save failed: {e}"))?
+            .into_owned();
+        if !resp.saved {
+            bail!("save failed: {}", resp.error.as_deref().unwrap_or(""));
+        }
+        Ok(resp)
+    }
+}
+
+/// Re-exports from `rodeo_proto` that callers routinely reach for — saves them
+/// importing from the proto crate directly for the common cases.
+pub use proto::{BackendInfo, ProcessInfo, RodeoSnapshot, VmSnapshot};

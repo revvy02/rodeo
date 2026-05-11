@@ -1,0 +1,57 @@
+[package]
+name = "rbx-control"
+version = "0.1.0"
+edition = "2021"
+description = "Control plane for Roblox processes: Studio + Player launch, fflag/place config, log/profile scanners, StudioMCP client"
+license = "MIT"
+
+[lib]
+name = "rbx_control"
+path = "src/lib.rs"
+
+[dependencies]
+# Errors + serialization
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Tracing
+tracing = "0.1"
+
+# Async runtime (scanners, mcp_client, place)
+tokio = { version = "1", features = ["full"] }
+
+# Filesystem watching (scanners)
+notify = "8.2.0"
+notify-debouncer-full = "0.7.0"
+
+# Process launch
+launch-control = { path = "../../submodules/launch-control", features = ["tokio"] }
+
+# Atomic file patch + restore (fflags + Studio UI layout)
+filepatch = { path = "../filepatch" }
+
+# Studio layout plist (binary + XML) for the --no-hud transform
+plist = "1"
+xmltree = "0.11"
+
+# Roblox platform
+roblox_install = "1"
+rbx_cookie = { version = "0.1", default-features = false }
+
+# Roblox DOM (minimal place generation for Studio launch)
+rbx_dom_weak = { git = "https://github.com/revvy02/rbx-dom.git", rev = "7f25359" }
+rbx_binary = { git = "https://github.com/revvy02/rbx-dom.git", rev = "7f25359" }
+rbx_xml = { git = "https://github.com/revvy02/rbx-dom.git", rev = "7f25359" }
+
+# HTTP (place download)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
+
+# Path discovery
+dirs = "5"
+
+# Low-level (SIGTERM in fflags lock recovery; libc::kill in player process mgmt)
+libc = "0.2"
+
+# UUID generation (fflag lock owner IDs)
+uuid = { version = "1", features = ["v4"] }

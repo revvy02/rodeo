@@ -1,30 +1,19 @@
 name = "rvy/rodeo"
-version = "0.2.0"
+version = "1.0.0-rc.1"
 description = "provides roblox studio's luau runtime via cli"
 authors = ["rvy"]
 license = "MIT"
-includes = [
-  "pesde.toml",
-  "README.md",
-  "LICENSE",
-  "src/**/*.luau",
-  ".luaurc",
-]
-
-workspace_members = ["plugin"]
+private = true
 
 [engines]
-pesde = "^0.7.1"
+pesde = "^0.7.2"
 lune = "^0.10.4"
 
 [target]
 environment = "lune"
-bin = "build/release_bundle/init.luau"
 
 [indices]
 default = "https://github.com/pesde-pkg/index"
 
 [dependencies]
 argparse = { name = "caveful_games/argparse", version = "^0.1.2", target = "lune" }
-pathfs = { name = "jiwonz/pathfs", version = "^0.6.0" }
-chalk = { name = "kimpure/chalk_luau", version = "^0.1.8" }

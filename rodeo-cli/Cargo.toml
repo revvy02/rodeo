@@ -1,0 +1,106 @@
+[package]
+name = "rodeo"
+version = "1.0.0-rc.1"
+edition = "2021"
+description = "Run Luau code inside Roblox Studio"
+license = "MIT"
+
+[[bin]]
+name = "rodeo"
+path = "src/main.rs"
+
+[dependencies]
+# Proto types
+rodeo-proto = { path = "../rodeo-proto" }
+
+# Canonical client library (handles, runCode streaming, fs/stream/process RPC dispatch)
+rodeo-client = { path = "../rodeo-client" }
+
+# Control plane for Roblox processes (launch, plugin, fflags, scanners, MCP)
+rbx-control = { path = "./rbx-control" }
+
+# App launch (background mode, focus control)
+launch-control = { path = "../submodules/launch-control", features = ["tokio"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+dotenvy = "0.15"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+
+# WebSocket (plugin ↔ studio backend only)
+tokio-tungstenite = "0.26"
+futures-util = "0.3"
+
+# gRPC (Rust↔Rust RPC: backends, CLI clients)
+connectrpc = { version = "0.3.2", features = ["server", "streaming", "client"] }
+buffa = { version = "0.3.0", features = ["json"] }
+tokio-stream = "0.1"
+http = "1"
+
+# HTTP server (serve endpoints) + WebSocket upgrade
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+hyper-tungstenite = "0.17"
+http-body-util = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Roblox DOM (place creation, plugin) — using fork with serializer fix
+rbx_dom_weak = { git = "https://github.com/revvy02/rbx-dom.git", rev = "7f25359" }
+rbx_binary = { git = "https://github.com/revvy02/rbx-dom.git", rev = "7f25359" }
+rbx_xml = { git = "https://github.com/revvy02/rbx-dom.git", rev = "7f25359" }
+rbx_reflection_database = { git = "https://github.com/revvy02/rbx-dom.git", rev = "7f25359" }
+
+# HTTP client (run, ps, kill)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
+
+# Darklua (bundling)
+darklua = "0.17"
+
+# Luau AST parsing (return-nil injection)
+full_moon = "2.1"
+
+# Table formatting
+comfy-table = { version = "7", features = ["custom_styling"] }
+
+# Roblox Studio path discovery
+roblox_install = "1"
+
+# Roblox auth cookie (for downloading published places)
+rbx_cookie = { version = "0.1", default-features = false }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "ansi"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4"] }
+hostname = "0.4"
+console = "0.15"
+anyhow = "1"
+
+dirs = "5"
+regex = "1"
+base64 = "0.22"
+bytes = "1"
+pathdiff = "0.2"
+libc = "0.2"
+strum = { version = "0.28.0", features = ["derive"] }
+notify = "8.2.0"
+notify-debouncer-full = "0.7.0"
+futures = "0.3"
+process-wrap = { version = "9.1.0", features = ["tokio1"] }
+parent-exit = { version = "0.1.0", path = "../parent-exit" }
+fd-lock = "4"
+
+[build-dependencies]
+
+# Keyboard simulation (Ctrl+S on Windows only; macOS uses osascript)
+[target.'cfg(target_os = "windows")'.dependencies]
+keybd_event = "0.1"

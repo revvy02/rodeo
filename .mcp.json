@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rodeo": {
+      "command": "bin/rodeo",
+      "args": ["mcp"]
+    },
+    "Roblox_Studio": {
+      "command": "/Applications/RobloxStudio.app/Contents/MacOS/StudioMCP"
+    }
+  }
+}

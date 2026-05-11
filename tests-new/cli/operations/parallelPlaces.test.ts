@@ -1,0 +1,108 @@
+import { describe, beforeAll, afterAll, it, expect } from "bun:test";
+import {
+  runRodeo,
+  spawnBackground,
+  type BackgroundProcess,
+} from "../helpers.js";
+
+describe("parallel --place isolation (CLI)", () => {
+  it("three parallel places each see their own marker", async () => {
+    const ports = ["46220", "46222", "46224"];
+    const markers = ["alpha", "beta", "gamma"];
+
+    // Spawn all three concurrently. `Bun.spawnSync` is blocking, so wrapping
+    // it in `Promise.resolve(...)` inside `Promise.all` would still serialize
+    // them — Bun sees each call to completion before the next map iteration.
+    // Use `Bun.spawn` + await `exited` to get genuine parallelism.
+    const procs = ports.map((port, i) => {
+      const source = `game.Workspace:SetAttribute("__test_marker", "${markers[i]}") return game.Workspace:GetAttribute("__test_marker")`;
+      return Bun.spawn([
+        "rodeo", "run", "--place", "--port", port,
+        "--show-return", "--source", source,
+      ], { stdout: "pipe", stderr: "pipe" });
+    });
+
+    const exits = await Promise.all(procs.map((p) => p.exited));
+    const stdouts = await Promise.all(procs.map((p) => new Response(p.stdout).text()));
+    const stderrs = await Promise.all(procs.map((p) => new Response(p.stderr).text()));
+
+    for (let i = 0; i < 3; i++) {
+      expect(exits[i]).toBe(0);
+      expect(stdouts[i] + stderrs[i]).toContain(markers[i]);
+    }
+  });
+});
+
+describe("token prevents cross-connection (CLI)", () => {
+  let procA: BackgroundProcess;
+  let procB: BackgroundProcess;
+  const portA = 46226;
+  const portB = 46228;
+
+  beforeAll(() => {
+    procA = spawnBackground(["run", "--port", String(portA), "--place"]);
+    procB = spawnBackground(["run", "--port", String(portB), "--place"]);
+  });
+
+  afterAll(async () => {
+    procA.kill();
+    procB.kill();
+    await Promise.all([procA.exited, procB.exited]);
+  });
+
+  async function getVmCount(port: number): Promise<number> {
+    try {
+      const resp = await fetch(`http://localhost:${port}/rodeo.MasterService/Health`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!resp.ok) return 0;
+      const health = await resp.json() as { totalVms?: number };
+      return health.totalVms ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  it("each server sees exactly 1 VM", async () => {
+    // Wait for both to have a VM (max 10s).
+    for (let i = 0; i < 20; i++) {
+      if ((await getVmCount(portA)) >= 1 && (await getVmCount(portB)) >= 1) break;
+      await Bun.sleep(500);
+    }
+    // Brief pause for any stray cross-connections to appear.
+    await Bun.sleep(2000);
+
+    expect(await getVmCount(portA)).toBe(1);
+    expect(await getVmCount(portB)).toBe(1);
+  });
+
+  it("scripts execute in the correct Studio", () => {
+    const setA = runRodeo([
+      "run", "--port", String(portA), "--source",
+      `game.Workspace:SetAttribute("__isolation_test", "studio_a") return nil`,
+    ]);
+    expect(setA.ok).toBe(true);
+
+    const setB = runRodeo([
+      "run", "--port", String(portB), "--source",
+      `game.Workspace:SetAttribute("__isolation_test", "studio_b") return nil`,
+    ]);
+    expect(setB.ok).toBe(true);
+
+    const readA = runRodeo([
+      "run", "--port", String(portA), "--show-return", "--source",
+      `return game.Workspace:GetAttribute("__isolation_test")`,
+    ]);
+    expect(readA.ok).toBe(true);
+    expect(readA.stdout + readA.stderr).toContain("studio_a");
+
+    const readB = runRodeo([
+      "run", "--port", String(portB), "--show-return", "--source",
+      `return game.Workspace:GetAttribute("__isolation_test")`,
+    ]);
+    expect(readB.ok).toBe(true);
+    expect(readB.stdout + readB.stderr).toContain("studio_b");
+  });
+});

@@ -1,0 +1,707 @@
+syntax = "proto3";
+package rodeo;
+
+import "runtime.proto";
+
+// ---------------------------------------------------------------------------
+// Backend ↔ Master (studio backends, player backends)
+// ---------------------------------------------------------------------------
+
+service BackendService {
+  rpc Control(stream BackendMessage) returns (stream MasterMessage);
+  rpc SendFile(stream FileChunk) returns (FileAck);
+}
+
+service RunService {
+  rpc Run(stream RunClientMessage) returns (stream RunEvent);
+}
+
+// ---------------------------------------------------------------------------
+// Master API (unary RPCs — accessible via gRPC and HTTP via tonic-web)
+// ---------------------------------------------------------------------------
+
+service MasterService {
+  // Health + state
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc GetState(GetStateRequest) returns (RodeoSnapshot);
+
+  // Process management
+  rpc ListProcesses(ListProcessesRequest) returns (ProcessListResponse);
+  rpc KillProcess(KillProcessRequest) returns (KillResponse);
+
+  // Studio operations
+  rpc LaunchStudio(LaunchStudioRequest) returns (stream LaunchStudioEvent);
+  rpc SetStudioMode(SetStudioModeRequest) returns (SetStudioModeResponse);
+  rpc CloseStudio(CloseStudioRequest) returns (stream CloseStudioEvent);
+  rpc SavePlace(SavePlaceRequest) returns (SavePlaceResponse);
+
+  // Multiplayer-test server / clients (Studio launched via -task StartServer / StartClient)
+  rpc LaunchMultiplayerTestServer(LaunchMultiplayerTestServerRequest) returns (stream LaunchMultiplayerTestServerEvent);
+  rpc ConnectMultiplayerTestClient(ConnectMultiplayerTestClientRequest) returns (ConnectMultiplayerTestClientResponse);
+  rpc DisconnectMultiplayerTestClient(DisconnectMultiplayerTestClientRequest) returns (DisconnectMultiplayerTestClientResponse);
+  rpc CloseMultiplayerTestServer(CloseMultiplayerTestServerRequest) returns (CloseMultiplayerTestServerResponse);
+
+  // Reserved for future LaunchLivePlayer / ExitLivePlayer.
+  // (Wire-format compat preserved for the live-runtime work.)
+
+  // Backend discovery
+  rpc ListBackends(ListBackendsRequest) returns (ListBackendsResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Backend messages (backend → master)
+// ---------------------------------------------------------------------------
+
+message BackendMessage {
+  oneof msg {
+    RegisterRequest register = 1;
+    VmConnect vm_connect = 2;
+    VmDisconnect vm_disconnect = 3;
+    VmPluginMessage vm_plugin_message = 4;
+    StateSnapshot state_snapshot = 5;
+    PlayerStatus player_status = 6;
+    FilesComplete files_complete = 7;
+    MultiplayerTestServerReady multiplayer_test_server_ready = 8;
+    MultiplayerTestClientReady multiplayer_test_client_ready = 9;
+    // Process for `session_guid` exited (clean exit, crash, kill, or pre-handoff
+    // launch failure). Emitted from `Child::on_exit` on the studio backend
+    // uniformly for edit Studios, MP test servers, and MP test clients.
+    // Master responds: drop session_meta + studio_instances entries, fire
+    // Error on any open launch RPC stream for that session_guid, run reconcile.
+    // Per-VM run cleanup is handled separately by VmDisconnect (which fires
+    // from WS-close when the OS closes the plugin's socket).
+    SessionExited session_exited = 10;
+    SaveResult save_result = 11;
+  }
+}
+
+message FileChunk {
+  string filename = 1;
+  string execution_id = 2;
+  bytes data = 3;
+  bool is_last = 4;
+}
+
+message FileAck {}
+
+message FilesComplete {
+  string execution_id = 1;
+}
+
+message RegisterRequest {
+  string kind = 1;          // "studio" or "player"
+  string name = 2;          // hostname
+  optional uint32 port = 3; // local HTTP port (for studio backends)
+}
+
+message VmConnect {
+  string vm_id = 1;
+  string state_json = 2;
+}
+
+message VmDisconnect {
+  string vm_id = 1;
+}
+
+// Backend → Master: typed plugin message from a specific VM.
+message VmPluginMessage {
+  string vm_id = 1;
+  PluginMessage message = 2;
+}
+
+// Master → Backend: typed server message destined for a specific VM's plugin.
+message VmServerMessage {
+  string vm_id = 1;
+  ServerMessage message = 2;
+}
+
+message StateSnapshot {
+  repeated VmSnapshot vms = 1;
+  repeated StudioSnapshot studios = 2;
+  repeated StudioInstanceState studio_instances = 3;
+}
+
+message StudioInstanceState {
+  string session_guid = 1;
+  string status = 2;              // "launching" | "running" | "closing"
+  optional string error = 3;
+}
+
+message VmSnapshot {
+  string vm_id = 1;
+  optional string backend_id = 2;
+  optional string mode = 3;
+  optional string dom = 4;
+  optional string session_guid = 5;
+  optional int64 place_id = 6;
+  optional string game_name = 7;
+  uint32 active_runs = 8;
+  bool connected = 9;
+}
+
+message StudioSnapshot {
+  string session_guid = 1;
+  string mode = 2;
+  string name = 3;
+  int64 place_id = 4;
+}
+
+message PlayerStatus {
+  string state = 1;
+  optional uint64 place_id = 2;
+  optional string error = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Master messages (master → backend)
+// ---------------------------------------------------------------------------
+
+message MasterMessage {
+  oneof msg {
+    RegisterResponse registered = 1;
+    VmServerMessage vm_server_message = 2;
+    SaveCommand save = 3;
+    // 4 was LaunchLivePlayerCommand, 5 was ExitLivePlayerCommand —
+    // reserved for the live-runtime work.
+    RunCompleted run_completed = 6;
+    LaunchStudioCommand launch_studio = 7;
+    LaunchMultiplayerTestServerCommand launch_multiplayer_test_server = 8;
+    LaunchMultiplayerTestClientCommand launch_multiplayer_test_client = 9;
+    KillMultiplayerTestProcessCommand kill_multiplayer_test = 10;
+    CloseStudioCommand close_studio = 11;
+    // 12 was SetModeCommand; replaced by plugin-driven SetTargetModeMsg
+  }
+  reserved 4, 5;
+}
+
+message CloseStudioCommand {
+  string session_guid = 1;
+}
+
+message RunCompleted {
+  string execution_id = 1;
+}
+
+message RegisterResponse {
+  string id = 1;
+  // Master's bootstrap UUID (minted at master startup). Backends stamp this
+  // on their tracing spans so distributed logs can be correlated across hosts
+  // by `jq 'select(.master_id=="…")'`.
+  string master_id = 2;
+}
+
+// Master → studio backend: trigger a save.
+//   request_id: UUID minted per-RPC by master. Backend echoes it in SaveResult
+//               so master can route the reply to the awaiting save_place RPC
+//               without conflating routing with payload.
+//   session_guid: which Studio to save. Optional — if empty, backend picks the
+//                 only connected Studio (CLI convenience), errors if 0 or 2+.
+message SaveCommand {
+  string request_id = 1;
+  optional string session_guid = 2;
+}
+
+// Studio backend → master: reply for an earlier SaveCommand. Master routes
+// by request_id. session_guid carries the resolved Studio identity for logs.
+message SaveResult {
+  string request_id = 1;
+  optional string session_guid = 2;
+  bool saved = 3;
+  optional string path = 4;
+  optional string error = 5;
+}
+
+// Master → Studio backend
+message LaunchStudioCommand {
+  optional string place_file = 1;
+  optional uint64 place_id = 2;
+  repeated string fflags = 3;
+  bool background = 4;
+  bool detached = 5;
+  optional string save_path = 6;       // if set, save place to this path on exit
+  optional string fflag_file = 7;      // path to JSON fflag file
+  string session_guid = 8;             // master-assigned session identity
+  optional string logs_dir = 9;        // if set, mirror Studio's log file continuously
+                                       // to <logs_dir>/<session_guid>.log for Studio's lifetime
+  bool no_hud = 10;                    // strip dock UI panels via plist patch (restored on exit)
+  bool profile = 11;                   // enable microprofiler auto-capture (backend injects fflags)
+}
+
+// Master → Studio backend (multiplayer-test mode). All messages carry a `session_guid`
+// (UUID) assigned by master — the one session identity shared across
+// MultiplayerTestServer + its MultiplayerTestClients, baked into the plugin and stamped on every
+// VM that connects for this session.
+message LaunchMultiplayerTestServerCommand {
+  optional string place_file = 1;
+  optional uint64 place_id = 2;
+  repeated string fflags = 3;
+  bool profile = 4;
+  optional string run_id = 5;
+  optional string fflag_file = 6;
+  bool background = 7;
+  string session_guid = 8;
+  bool no_hud = 9;  // strip Studio dock UI panels; restored on exit
+}
+
+message LaunchMultiplayerTestClientCommand {
+  uint32 server_port = 1;
+  uint32 server_pid = 2;
+  // RakNet/multiplayer session guid (from StartServer's stdout), distinct
+  // from the rodeo session_guid. Passed to StartClient as -parentSessionGuid.
+  string raknet_session_guid = 3;
+  string play_test_guid = 4;
+  uint32 index = 5;
+  string session_guid = 6;
+  bool no_hud = 7;  // strip Studio dock UI panels; restored on exit
+}
+
+message KillMultiplayerTestProcessCommand {
+  uint32 pid = 1;
+  string session_guid = 2;
+}
+
+// Backend → Master (multiplayer-test feedback). All carry `session_guid` so master can
+// keep its per-session mirror accurate.
+message MultiplayerTestServerReady {
+  uint32 pid = 1;
+  uint32 raknet_port = 2;
+  // RakNet/multiplayer session guid from StartServer's stdout — distinct
+  // from session_guid (the rodeo identity).
+  string raknet_session_guid = 3;
+  string play_test_guid = 4;
+  string session_guid = 5;
+}
+
+message MultiplayerTestClientReady {
+  uint32 pid = 1;
+  uint32 index = 2;
+  string session_guid = 3;
+}
+
+// Backend → Master: the host process for `session_guid` has exited.
+// Fires uniformly for edit Studios, MP test servers, and MP test clients.
+// `reason` is one of:
+//   "exited"               — process exited cleanly
+//   "killed"               — we killed it (close API or shutdown)
+//   "launch_failed: <msg>" — pre-handoff failure (Studio crashed during stdout-parse,
+//                            spawn returned Err, etc.)
+message SessionExited {
+  string session_guid = 1;
+  string reason = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Run client messages (client → master)
+// ---------------------------------------------------------------------------
+
+message RunClientMessage {
+  oneof msg {
+    SubmitRequest submit = 1;
+    rodeo.runtime.ClientRpcResponse rpc_response = 3;
+    KillCommand kill = 4;
+  }
+}
+
+message SubmitRequest {
+  string execution_id = 1;
+  string script = 2;
+  string target = 3;
+  optional string session = 4;
+  optional string vm_id = 5;
+  optional string job = 6;
+  reserved 7, 8, 9, 10, 11;  // old flat enable_warn/error/info/output/logs
+  optional bool cache_requires = 12;
+  repeated string script_args = 13;
+  optional string return_file = 14;
+  optional bool show_return = 15;
+  optional string output_file = 16;
+  optional bool verbose = 17;
+  optional string instance_path = 18;
+  optional string script_path = 19;
+  optional string process_name = 20;
+  optional bool profile = 22;
+  LogFilter log_filter = 23;
+  optional bool logs = 24;
+}
+
+// ---------------------------------------------------------------------------
+// Run events (master → client)
+// ---------------------------------------------------------------------------
+
+message RunEvent {
+  oneof event {
+    ProcessCreated created = 1;
+    string disconnect = 3;
+    FileChunk file_chunk = 4;
+    RunComplete complete = 5;
+    rodeo.runtime.ClientRpcCall rpc_call = 6;
+    ExecutionDone execution_done = 7;
+    ExecutionKilled execution_killed = 8;
+  }
+  // Field 2 (output_json) was deleted post-migration — all plugin output is now
+  // typed events (RpcCall for stream writes, ExecutionDone/Killed for lifecycle).
+}
+
+message RunComplete {}
+
+message ProcessCreated {
+  uint32 process_id = 1;
+  string execution_id = 2;
+}
+
+// ---------------------------------------------------------------------------
+// MasterService request/response types
+// ---------------------------------------------------------------------------
+
+message HealthRequest {}
+message GetStateRequest {}
+message ListProcessesRequest {}
+
+message KillProcessRequest {
+  uint32 process_id = 1;
+}
+
+message LaunchStudioRequest {
+  string backend = 1;           // backend ID or name
+  optional string place_file = 2;
+  optional uint64 place_id = 3;
+  repeated string fflags = 4;
+  bool background = 5;
+  bool detached = 6;
+  optional string save_path = 7;
+  optional string fflag_file = 8;
+  optional string logs_dir = 9; // if set, mirror Studio's log file continuously
+  bool no_hud = 10;             // strip Studio dock UI panels; restored on exit
+  bool profile = 11;            // enable microprofiler auto-capture (backend injects fflags)
+}
+
+message LaunchStudioEvent {
+  oneof event {
+    StudioLaunching launching = 1;
+    StudioReady ready = 2;
+    StudioLaunchError error = 3;
+  }
+}
+
+message StudioLaunching {}
+message StudioReady {
+  string backend_id = 1;
+  string session_guid = 2;
+}
+message StudioLaunchError {
+  string message = 1;
+}
+
+message SetStudioModeRequest {
+  string session_guid = 1;
+  string mode = 2;              // "edit", "run", "play"
+}
+
+message SetStudioModeResponse {
+  bool ok = 1;
+  string mode = 2;
+}
+
+message CloseStudioRequest {
+  string session_guid = 1;
+}
+
+message CloseStudioEvent {
+  oneof event {
+    StudioClosing closing = 1;
+    StudioClosed closed = 2;
+  }
+}
+
+message StudioClosing {}
+message StudioClosed {}
+
+message SavePlaceRequest {
+  optional string backend = 1;
+  // Scope the save to a specific Studio. If unset, server picks the only
+  // connected Studio (for the CLI case); rejected if 0 or >=2 are connected
+  // to prevent accidentally saving the wrong one.
+  optional string session_guid = 2;
+}
+
+message SavePlaceResponse {
+  bool saved = 1;
+  optional string path = 2;
+  optional string error = 3;
+}
+
+message LaunchMultiplayerTestServerRequest {
+  string backend = 1;
+  optional string place_file = 2;
+  optional uint64 place_id = 3;
+  repeated string fflags = 4;
+  bool profile = 5;
+  optional string run_id = 6;
+  optional string fflag_file = 7;
+  bool background = 8;
+  bool no_hud = 9;  // strip Studio dock UI panels; restored on exit
+}
+
+// Server-streaming launch event — mirrors LaunchStudioEvent's shape so both
+// launch RPCs are isomorphic. Pre-handoff failures (Studio crashes during
+// stdout-parse) surface as Error in <1s instead of forcing the client to
+// poll-and-timeout.
+message LaunchMultiplayerTestServerEvent {
+  oneof event {
+    MultiplayerTestServerLaunching launching = 1;
+    MultiplayerTestServerReadyEvent ready = 2;
+    MultiplayerTestServerLaunchError error = 3;
+  }
+}
+
+message MultiplayerTestServerLaunching {}
+message MultiplayerTestServerReadyEvent {
+  // Master-minted session GUID; use as `session_guid` in subsequent
+  // ConnectMultiplayerTestClient / DisconnectMultiplayerTestClient /
+  // CloseMultiplayerTestServer calls.
+  string session_guid = 1;
+  // The play:server VM's id, ready to dispatch runs to. Master fires Ready
+  // only after the plugin has connected and registered this VM, so callers
+  // can construct a Vm handle directly without polling.
+  string vm_id = 2;
+}
+message MultiplayerTestServerLaunchError {
+  string message = 1;
+}
+
+message ConnectMultiplayerTestClientRequest {
+  string session_guid = 1;
+}
+
+message ConnectMultiplayerTestClientResponse {
+  string client_id = 1;  // per-session client index as string
+}
+
+message DisconnectMultiplayerTestClientRequest {
+  string client_id = 1;
+  string session_guid = 2;  // required to disambiguate when multiple sessions exist
+}
+
+message DisconnectMultiplayerTestClientResponse {
+  bool ok = 1;
+}
+
+message CloseMultiplayerTestServerRequest {
+  string session_guid = 1;
+}
+
+message CloseMultiplayerTestServerResponse {
+  bool ok = 1;
+}
+
+message ListBackendsRequest {
+  optional string kind = 1;    // "studio", "player", or empty for all
+}
+
+message ListBackendsResponse {
+  repeated BackendInfo backends = 1;
+}
+
+message BackendInfo {
+  string id = 1;
+  string kind = 2;
+  string name = 3;
+}
+
+// Full state snapshot returned by GetState
+message RodeoSnapshot {
+  repeated BackendInfo backends = 1;
+  repeated VmSnapshot vms = 2;
+  repeated ProcessInfo processes = 3;
+  // Active multi-process multiplayer-test sessions, keyed implicitly by session_id.
+  repeated SnapshotMultiplayerTestSession multiplayer_test_sessions = 4;
+}
+
+message SnapshotMultiplayerTestSession {
+  string session_guid = 1;
+  SnapshotMultiplayerTestServer server = 2;
+  repeated SnapshotMultiplayerTestClient clients = 3;
+}
+
+message SnapshotMultiplayerTestServer {
+  uint32 pid = 1;
+  uint32 raknet_port = 2;
+  // RakNet/multiplayer session guid from StartServer's stdout — distinct
+  // from the rodeo session_guid at SnapshotMultiplayerTestSession.
+  string raknet_session_guid = 3;
+  string play_test_guid = 4;
+}
+
+message SnapshotMultiplayerTestClient {
+  uint32 index = 1;
+  uint32 pid = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
+
+enum ProcessState {
+  PROCESS_STATE_QUEUED = 0;
+  PROCESS_STATE_RUNNING = 1;
+  PROCESS_STATE_DONE = 2;
+  PROCESS_STATE_ERROR = 3;
+  PROCESS_STATE_KILLED = 4;
+  PROCESS_STATE_DISCONNECTED = 5;
+}
+
+message LogFilter {
+  bool enable_warn = 1;
+  bool enable_error = 2;
+  bool enable_info = 3;
+  bool enable_output = 4;
+  bool enable_logs = 5;
+}
+
+// ---------------------------------------------------------------------------
+// REST API types
+// ---------------------------------------------------------------------------
+
+message HealthResponse {
+  bool launched = 1;
+  uint32 context_count = 2;
+  uint32 total_vms = 3;
+  uint32 total_queued = 4;
+  repeated ContextInfo contexts = 5;
+}
+
+message ContextInfo {
+  uint32 bitset = 1;
+  uint32 vm_count = 2;
+  uint32 total_queued = 3;
+  repeated VmInfo vms = 4;
+}
+
+message VmInfo {
+  string rodeo_id = 1;
+  uint32 active_count = 2;
+  bool is_idle = 3;
+}
+
+message ProcessInfo {
+  uint32 process_id = 1;
+  optional string name = 2;
+  string execution_id = 3;
+  string state = 4;
+  string target = 5;
+  optional uint32 vm_bitset = 6;
+  double created_at = 7;
+}
+
+message ProcessListResponse {
+  repeated ProcessInfo processes = 1;
+}
+
+message KillResponse {
+  bool killed = 1;
+  uint32 process_id = 2;
+}
+
+message DisconnectMsg {
+  string execution_id = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Plugin ↔ Server messages (JSON over WebSocket)
+// These are not gRPC services — just message definitions for JSON serialization.
+// Both Rust (prost + serde) and Luau (protoc-gen-luau) generate types from these.
+// ---------------------------------------------------------------------------
+
+// Plugin → Server
+message PluginMessage {
+  oneof msg {
+    StudioStateMsg studio_state = 1;
+    rodeo.runtime.ClientRpcCall rpc = 2;
+    ExecutionDone done = 3;
+    ExecutionKilled killed = 4;
+  }
+}
+
+// Server → Plugin
+message ServerMessage {
+  oneof msg {
+    WelcomeMsg welcome = 1;
+    RunCommand run = 2;
+    rodeo.runtime.ClientRpcResponse rpc_response = 3;
+    KillCommand kill = 4;
+    SetTargetModeMsg set_target_mode = 5;
+  }
+}
+
+// Declarative target mode for the edit VM to converge toward.
+// Backend writes this whenever the pending-run queue's target changes;
+// the plugin fires the appropriate StudioTestService transition.
+message SetTargetModeMsg {
+  string target_mode = 1;   // "edit" | "run" | "test" | "play" | "" (clear)
+}
+
+message StudioStateMsg {
+  string vm_id = 1;
+  // The StudioMCP-assigned id for this Studio (propagated via reconciliation).
+  // Used only at the elevated-call boundary (set_active_studio). NOT the
+  // rodeo session identity — for that, see session_guid below.
+  optional string mcp_studio_id = 2;
+  bool is_server = 3;
+  bool is_client = 4;
+  bool is_running = 5;
+  bool is_edit = 6;
+  string mode = 7;
+  string dom = 8;
+  string game_name = 9;
+  int64 place_id = 10;
+  int64 game_id = 11;
+  optional ClientInfo client_info = 12;
+  optional string job_id = 13;
+  optional string client_vm_ids_json = 14;
+  // Rodeo session identity (baked into the plugin at install time as
+  // flags.SESSION_GUID). Sent on the plugin's first WS message so master can
+  // stamp VmConnection.session_guid synchronously. Absent for manually-
+  // installed plugins that weren't launched via a rodeo session.
+  optional string session_guid = 15;
+}
+
+message ClientInfo {
+  string name = 1;
+  int64 user_id = 2;
+}
+
+message WelcomeMsg {
+  string version = 1;
+}
+
+message RunCommand {
+  string execution_id = 1;
+  string script = 2;
+  string target = 3;
+  reserved 4, 5, 6, 7, 8;    // old flat enable_warn/error/info/output/logs
+  optional bool cache_requires = 9;
+  repeated string script_args = 10;
+  optional string return_file = 11;
+  optional bool show_return = 12;
+  optional string output_file = 13;
+  optional bool verbose = 14;
+  optional string instance_path = 15;
+  optional string script_path = 16;
+  optional bool profile = 18;
+  LogFilter log_filter = 19;
+  optional bool logs = 20;
+}
+
+message KillCommand {
+  string execution_id = 1;
+}
+
+message ExecutionDone {
+  string execution_id = 1;
+  bool success = 2;
+  optional string error = 3;
+}
+
+message ExecutionKilled {
+  string execution_id = 1;
+}

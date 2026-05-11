@@ -2,7 +2,7 @@ std = "roblox"
 exclude = ["*_packages/**", "out/**"]
 
 [config]
-include = ["plugin/**/*.luau"]
+include = ["rodeo-plugin/**/*.luau"]
 global_usage = { ignore_pattern = "__[a-zA-Z0-9_]+__" }
 
 [lints]

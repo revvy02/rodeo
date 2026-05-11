@@ -1,0 +1,288 @@
+syntax = "proto3";
+package rodeo.runtime;
+
+// ---------------------------------------------------------------------------
+// Common "success with no payload" sentinel.
+// Used in ClientRpcResponse oneof for methods that return bool-ok on success.
+// ---------------------------------------------------------------------------
+
+message Ok {}
+
+// ---------------------------------------------------------------------------
+// Stream operations
+// ---------------------------------------------------------------------------
+
+message StreamOpenRequest {
+  string handle = 1;
+  string path = 2;
+  string mode = 3;  // "r" | "w" | "a"
+}
+
+message StreamOpenResponse {
+  string handle = 1;
+}
+
+message StreamReadChunkRequest {
+  string handle = 1;
+  optional uint32 size = 2;  // max bytes to read; default 4096 if absent
+}
+
+message StreamReadChunkResponse {
+  string data = 1;
+  bool eof = 2;
+}
+
+message StreamReadLineRequest {
+  string handle = 1;
+}
+
+message StreamReadLineResponse {
+  string data = 1;
+  bool eof = 2;
+}
+
+message StreamReadAllRequest {
+  string handle = 1;
+}
+
+message StreamReadAllResponse {
+  string data = 1;
+}
+
+message StreamWriteRequest {
+  string handle = 1;
+  string data = 2;
+}
+
+message StreamCloseRequest {
+  string handle = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Filesystem operations
+// ---------------------------------------------------------------------------
+
+message FsExistsRequest {
+  string path = 1;
+}
+
+message FsExistsResponse {
+  bool exists = 1;
+}
+
+message FsStatRequest {
+  string path = 1;
+}
+
+// Timestamps are milliseconds since UNIX epoch. Unit is in the field name
+// to prevent silent cross-client drift (Rust was emitting ms, TS was emitting
+// seconds under the old `created`/`modified`/`accessed` names).
+message FsStatResponse {
+  string type = 1;  // "file" | "dir"
+  int64 size = 2;
+  optional int64 created_millis = 3;
+  optional int64 modified_millis = 4;
+  optional int64 accessed_millis = 5;
+}
+
+message FsTypeRequest {
+  string path = 1;
+}
+
+message FsTypeResponse {
+  optional string type = 1;  // "file" | "dir" | absent if unknown
+}
+
+message FsMkdirRequest {
+  string path = 1;
+}
+
+message FsListdirRequest {
+  string path = 1;
+}
+
+message FsListdirResponse {
+  repeated FsDirEntry entries = 1;
+}
+
+message FsDirEntry {
+  string name = 1;
+  string type = 2;  // "file" | "dir"
+}
+
+message FsRemoveRequest {
+  string path = 1;
+}
+
+message FsRmdirRequest {
+  string path = 1;
+}
+
+message FsCopyRequest {
+  string src = 1;
+  string dest = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Process operations
+// ---------------------------------------------------------------------------
+
+message ProcessOptions {
+  optional string cwd = 1;
+  optional string stdio = 2;  // "piped" | absent (inherited)
+}
+
+message ProcessGetInfoRequest {}
+
+message ProcessGetInfoResponse {
+  string cwd = 1;
+  string homedir = 2;
+  string execpath = 3;
+  map<string, string> env = 4;
+  optional string platform = 5;
+  optional string arch = 6;
+  optional string studio_content_path = 7;
+}
+
+message ProcessExitRequest {
+  int32 code = 1;
+}
+
+message ProcessRunRequest {
+  repeated string args = 1;
+  optional ProcessOptions options = 2;
+}
+
+message ProcessRunResponse {
+  bool ok = 1;
+  int32 exitcode = 2;
+  string out = 3;
+  string err = 4;
+}
+
+message ProcessSystemRequest {
+  string command = 1;
+  optional ProcessOptions options = 2;
+}
+
+message ProcessCreateRequest {
+  repeated string args = 1;
+  optional ProcessOptions options = 2;
+}
+
+message ProcessCreateResponse {
+  string pid = 1;
+  optional string stdin_handle = 2;
+  optional string stdout_handle = 3;
+  optional string stderr_handle = 4;
+}
+
+message ProcessRunHandleRequest {
+  string pid = 1;
+}
+
+message ProcessKillRequest {
+  string pid = 1;
+}
+
+// ---------------------------------------------------------------------------
+// MCP operations
+// ---------------------------------------------------------------------------
+
+message McpCallRequest {
+  string tool = 1;
+  string arguments_json = 2;
+  string mcp_studio_id = 3;
+}
+
+message McpCallResponse {
+  string result = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Typed client-side RPC envelopes.
+//
+// These are the wire format for RPCs flowing between the server and the
+// run-client (the machine that submitted the run). The plugin ↔ server wire
+// stays on JSON (plugin is single-impl in Luau); the server translates at
+// egress so both run-client implementations (Rust + TS) dispatch on typed
+// oneof cases instead of parallel string-based routing.
+// ---------------------------------------------------------------------------
+
+message ClientRpcCall {
+  string id = 1;
+  string execution_id = 2;
+  oneof req {
+    // fs: 10-19
+    FsExistsRequest  fs_exists  = 10;
+    FsStatRequest    fs_stat    = 11;
+    FsTypeRequest    fs_type    = 12;
+    FsMkdirRequest   fs_mkdir   = 13;
+    FsListdirRequest fs_listdir = 14;
+    FsRemoveRequest  fs_remove  = 15;
+    FsRmdirRequest   fs_rmdir   = 16;
+    FsCopyRequest    fs_copy    = 17;
+
+    // stream: 20-29
+    StreamOpenRequest      stream_open       = 20;
+    StreamReadChunkRequest stream_read_chunk = 21;
+    StreamReadLineRequest  stream_read_line  = 22;
+    StreamReadAllRequest   stream_read_all   = 23;
+    StreamWriteRequest     stream_write      = 24;
+    StreamCloseRequest     stream_close      = 25;
+
+    // process: 30-39
+    ProcessGetInfoRequest   process_get_info   = 30;
+    ProcessExitRequest      process_exit       = 31;
+    ProcessRunRequest       process_run        = 32;
+    ProcessSystemRequest    process_system     = 33;
+    ProcessCreateRequest    process_create     = 34;
+    ProcessRunHandleRequest process_run_handle = 35;
+    ProcessKillRequest      process_kill       = 36;
+
+    // mcp: 40-49 (server-context; handled server-side, not forwarded to run-client)
+    McpCallRequest          mcp_call           = 40;
+  }
+}
+
+message ClientRpcResponse {
+  string id = 1;
+  string execution_id = 2;
+  oneof res {
+    // error path — set when the handler returned an error.
+    string error = 3;
+
+    // success payloads — tag matches the corresponding ClientRpcCall.req tag.
+    // Methods with no meaningful success payload use `Ok`.
+
+    // fs: 10-19
+    FsExistsResponse  fs_exists  = 10;
+    FsStatResponse    fs_stat    = 11;
+    FsTypeResponse    fs_type    = 12;
+    Ok                fs_mkdir   = 13;
+    FsListdirResponse fs_listdir = 14;
+    Ok                fs_remove  = 15;
+    Ok                fs_rmdir   = 16;
+    Ok                fs_copy    = 17;
+
+    // stream: 20-29
+    StreamOpenResponse      stream_open       = 20;
+    StreamReadChunkResponse stream_read_chunk = 21;
+    StreamReadLineResponse  stream_read_line  = 22;
+    StreamReadAllResponse   stream_read_all   = 23;
+    Ok                      stream_write      = 24;
+    Ok                      stream_close      = 25;
+
+    // process: 30-39
+    ProcessGetInfoResponse  process_get_info   = 30;
+    Ok                      process_exit       = 31;
+    ProcessRunResponse      process_run        = 32;
+    ProcessRunResponse      process_system     = 33;
+    ProcessCreateResponse   process_create     = 34;
+    ProcessRunResponse      process_run_handle = 35;
+    Ok                      process_kill       = 36;
+
+    // mcp: 40-49
+    McpCallResponse         mcp_call           = 40;
+  }
+}

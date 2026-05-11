@@ -1,0 +1,4 @@
+{
+  "execute_luau": { "exclude": true },
+  "start_stop_play": { "exclude": true }
+}

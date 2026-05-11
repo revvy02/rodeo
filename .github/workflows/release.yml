@@ -2,99 +2,218 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
+  build-plugin:
+    name: Build Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Init launch-control submodule
+        # Only one cargo-workspace-member submodule is needed for the
+        # build; the rest are private/personal/reference forks that
+        # `submodules: recursive` would fail to clone. Force HTTPS
+        # since `.gitmodules` uses SSH URLs and CI has no SSH key.
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init submodules/launch-control
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Install Rust toolchain
+        # Needed to build protoc-gen-luau from source (the mise ubi binary
+        # of revvy02/protoc-gen-luau@1.1.2-fork.0 ships Mach-O only).
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protoc-gen-luau from source
+        run: cargo install --git https://github.com/revvy02/protoc-gen-luau --branch main protoc-gen-luau
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISE_DISABLE_TOOLS: "ubi:JohnnyMorganz/luau-lsp,ubi:Kampfkarren/selene,ubi:cloudflare/cloudflared,ubi:revvy02/protoc-gen-luau"
+
+      - name: Override mise's protoc-gen-luau shim with cargo's binary
+        # mise-action ran AFTER cargo install, so its shim dir ended up
+        # first on PATH. Append our cargo bin AFTER (which prepends in
+        # GITHUB_PATH semantics) so the Linux-native binary wins. Also
+        # nuke the Mach-O install dir so even the shim has nothing to
+        # dispatch to if the env-var disable failed.
+        run: |
+          rm -rf "$HOME/.local/share/mise/installs/ubi-revvy02-protoc-gen-luau"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install Pesde dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pesde install
+          cd rodeo-plugin && pesde install
+
+      - name: Install bun dependencies for rodeo-client-ts
+        run: cd rodeo-client-ts && bun install --frozen-lockfile
+
+      - name: Setup lune PATH
+        run: echo "$HOME/.pesde/engines/github/lune-org/lune/0.10.4" >> $GITHUB_PATH
+
+      - name: Build plugin
+        run: lune run .lune/build.luau
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin
+          # `include_bytes!` references paths relative to rodeo-cli/src,
+          # so we need to preserve the layout — plugin.rbxm at
+          # rodeo-plugin/build/, vluau_runtime.luau at rodeo-vluau/build/,
+          # and the mcp bundle at build/mcp/. download-artifact will
+          # extract preserving these paths in the cli matrix jobs.
+          path: |
+            rodeo-plugin/build/plugin.rbxm
+            rodeo-vluau/build/vluau_runtime.luau
+            build/mcp/
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+  build-cli:
+    name: Build CLI (${{ matrix.name }})
+    needs: build-plugin
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          # linux-x86_64 disabled: builds clean, but Roblox Studio doesn't
+          # run on Linux so the binary has no Studio to drive. Re-enable
+          # if a headless / remote-master use case appears.
+          # windows-x86_64 disabled: studio_backend/daemon/{client,server}.rs
+          # uses Unix-only libc::flock/kill/SIGTERM + as_raw_fd without cfg
+          # gates. Needs LockFileEx + Windows equivalents to port — out of
+          # scope for this RC. Will re-enable once daemon supports Windows.
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Init launch-control submodule
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init submodules/launch-control
+
+      - name: Download plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: plugin
+          # No path override — preserves rodeo-plugin/build/, rodeo-vluau/
+          # build/, build/mcp/ structure expected by the include_bytes!
+          # macros in rodeo-cli.
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install protoc
+        # rodeo-proto/build.rs invokes protoc to compile the .proto files.
+        # Cross-platform install — same action handles linux/macos/windows.
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ../../../rodeo-v${{ needs.build-plugin.outputs.version }}-${{ matrix.name }}.tar.gz rodeo
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../rodeo-v${{ needs.build-plugin.outputs.version }}-${{ matrix.name }}.zip rodeo.exe
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rodeo-${{ matrix.name }}
+          path: rodeo-v${{ needs.build-plugin.outputs.version }}-${{ matrix.name }}.*
+
   release:
-    name: Build and Release
+    name: Create Release
+    needs: [build-plugin, build-cli]
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for tag checking
+          fetch-depth: 0
 
-      - name: Extract version from pesde.toml
-        id: version
-        run: |
-          VERSION=$(grep '^version' pesde.toml | cut -d'"' -f2)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected version: $VERSION"
-
-      - name: Check if release already exists
-        id: check_release
-        run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          if git tag -l "$TAG" | grep -q "$TAG"; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Release $TAG already exists, skipping."
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Release $TAG does not exist, will create."
-          fi
-
-      - name: Install mise
-        if: steps.check_release.outputs.exists == 'false'
-        uses: jdx/mise-action@v2
-
-      - name: Install Pesde dependencies
-        if: steps.check_release.outputs.exists == 'false'
-        run: pesde install
-
-      - name: Setup lune PATH
-        if: steps.check_release.outputs.exists == 'false'
-        run: |
-          # Pesde installs lune to ~/.pesde/engines but doesn't add it to PATH
-          # We need to manually add it for the build step
-          echo "$HOME/.pesde/engines/github/lune-org/lune/0.10.4" >> $GITHUB_PATH
-
-      - name: Build binaries
-        if: steps.check_release.outputs.exists == 'false'
-        run: lune run .lune/build.luau
-
-      - name: Package binaries
-        if: steps.check_release.outputs.exists == 'false'
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          mkdir -p build/archives
-
-          # Package Unix binaries as tar.gz
-          for platform in macos-aarch64 macos-x86_64 linux-x86_64; do
-            cd build/releases
-            tar -czf "../archives/rodeo-v${VERSION}-${platform}.tar.gz" "rodeo_${platform}"
-            cd ../..
-          done
-
-          # Package Windows binary as zip
-          cd build/releases
-          zip "../archives/rodeo-v${VERSION}-windows-x86_64.zip" "rodeo_windows-x86_64.exe"
-          cd ../..
-
-      - name: Create release tag
-        if: steps.check_release.outputs.exists == 'false'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ steps.version.outputs.tag }}
-          git push origin ${{ steps.version.outputs.tag }}
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
 
       - name: Create GitHub Release
-        if: steps.check_release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           generate_release_notes: true
+          # Tags shaped like v1.0.0-rc.1 / v1.0.0-beta / etc. (any hyphen
+          # after the version core) are marked prerelease so GitHub keeps
+          # the previous stable release as Latest. Plain semver tags
+          # (v1.0.0) stay non-prerelease and the highest one becomes Latest.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            build/archives/rodeo-v${{ steps.version.outputs.version }}-macos-aarch64.tar.gz
-            build/archives/rodeo-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
-            build/archives/rodeo-v${{ steps.version.outputs.version }}-linux-x86_64.tar.gz
-            build/archives/rodeo-v${{ steps.version.outputs.version }}-windows-x86_64.zip
+            artifacts/rodeo-v${{ needs.build-plugin.outputs.version }}-macos-aarch64.tar.gz
+            artifacts/rodeo-v${{ needs.build-plugin.outputs.version }}-macos-x86_64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publish the Lune client to pesde under the same tag. The committed
+      # pesde.toml uses version = "0.0.0" as a placeholder; we overwrite it
+      # from the tag here so source-of-truth version lives in git tags, not
+      # in committed file state. RC tags (v1.0.0-rc.1) publish as pesde
+      # prerelease versions naturally.
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISE_DISABLE_TOOLS: "ubi:JohnnyMorganz/luau-lsp,ubi:Kampfkarren/selene,ubi:cloudflare/cloudflared,ubi:revvy02/protoc-gen-luau,github:luau-lang/lute,ubi:revvy02/rbx-microprofiler,ubi:rojo-rbx/rojo,ubi:seaofvoices/darklua,ubi:jacktabscode/asphalt,ubi:Sleitnick/rbxcloud"
+
+      - name: Set rodeo-client-lune version from tag
+        run: |
+          sed -i 's/^version = .*/version = "${{ needs.build-plugin.outputs.version }}"/' rodeo-client-lune/pesde.toml
+
+      - name: Publish rodeo-client-lune to pesde
+        env:
+          PESDE_TOKEN: ${{ secrets.PESDE_TOKEN }}
+        run: |
+          pesde auth login --token "$PESDE_TOKEN"
+          cd rodeo-client-lune && pesde publish -y

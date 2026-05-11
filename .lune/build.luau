@@ -1,24 +1,28 @@
--- Build script for creating self-contained rodeo binaries
--- Embeds plugin binary as a global variable in the bundled code
+-- Build script for rodeo
+-- 1. Builds the Roblox Studio plugin (.rbxm)
+-- 2. Bundles MCP scripts (inlines @pkg deps via darklua)
+-- 3. Builds the Rust CLI binary via cargo
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
-local serde = require("@lune/serde")
 
--- Extract version from pesde.toml
-local function getVersion(): string
-	local pesdeToml = fs.readFile("pesde.toml")
-	local version = string.match(pesdeToml, 'version%s*=%s*"([^"]+)"')
-	return version or "unknown"
+-- Exec a subprocess, abort the build if it exits non-zero. The historical
+-- bug: `process.exec` returns a result whose `.ok` is false on failure, but
+-- nothing in this script was checking it — so a failing `cargo build` would
+-- leave behind the previous successful binary at build/cargo/release/rodeo,
+-- we'd copy THAT stale binary to bin/rodeo, and print "Build complete!".
+-- Downstream tests then silently ran against code that never compiled.
+local function exec(cmd: string, args: { string }, opts: any?)
+	local result = process.exec(cmd, args, opts or { stdio = "forward" })
+	if not result.ok then
+		local joined = table.concat(args, " ")
+		error(
+			string.format("%s %s failed with exit code %d", cmd, joined, result.code),
+			0
+		)
+	end
+	return result
 end
-
--- Platform targets for cross-compilation
-local TARGETS = {
-	{ os = "macos", arch = "aarch64", ext = "" },
-	{ os = "macos", arch = "x86_64", ext = "" },
-	{ os = "linux", arch = "x86_64", ext = "" },
-	{ os = "windows", arch = "x86_64", ext = ".exe" },
-}
 
 local function ensureDir(path: string)
 	if not fs.isDir(path) then
@@ -27,84 +31,80 @@ local function ensureDir(path: string)
 end
 
 local function main()
-	if fs.isDir("build") then
-		fs.removeDir("build")
-	end
+	local isDev = table.find(process.args, "--dev") ~= nil
 
 	ensureDir("build")
 
-	-- Build plugin bundle, which needs sourcemap to exist first for darklua to work
-	process.exec("rojo", {
-		"sourcemap",
-		"plugin/default.project.json",
-		"-o",
-		"plugin/sourcemap.json",
-	}, { stdio = "forward" })
-
-	process.exec("darklua", {
-		"process",
-		"plugin/src",
-		"build/plugin_bundle/src",
-		"--config",
-		"plugin/.darklua.json",
-	}, { stdio = "forward" })
-
-	-- Copy roblox_packages to build directory
-	fs.copy("plugin/roblox_packages", "build/plugin_bundle/roblox_packages")
-
-	fs.writeFile(
-		"build/plugin_bundle/default.project.json",
-		serde.encode("json", {
-			name = "rodeo_plugin",
-			tree = {
-				["$className"] = "Folder",
-				plugin = {
-					["$path"] = "./src",
-				},
-				packages = {
-					["$path"] = "./roblox_packages",
-				},
-			},
-		})
-	)
-	process.exec("rojo", { "build", "build/plugin_bundle/default.project.json", "-o", "build/plugin.rbxmx" }, { stdio = "forward" })
-
-	-- Read plugin binary and create darklua config with embedded plugin
-	local pluginBinary = fs.readFile("build/plugin.rbxmx")
-
-	local templateConfig = fs.readFile(".darklua.json")
-	local config = serde.decode("json", templateConfig)
-
-	table.insert(config.rules, {
-		rule = "inject_global_value",
-		identifier = "RODEO_PLUGIN",
-		value = pluginBinary,
-	})
-
-	table.insert(config.rules, {
-		rule = "inject_global_value",
-		identifier = "RODEO_VERSION",
-		value = getVersion(),
-	})
-
-	fs.writeFile("build/release_bundle.darklua.json", serde.encode("json", config))
-
-	process.exec("darklua", { "process", "src", "build/release_bundle", "--config", "build/release_bundle.darklua.json" }, { stdio = "forward" })
-
-	ensureDir("build/releases")
-
-	for _, target in TARGETS do
-		local platformName = `{target.os}-{target.arch}`
-		local outputPath = `build/releases/rodeo_{platformName}{target.ext}`
-		local targetArg = `{target.os}-{target.arch}`
-
-		process.exec("lune", { "build", "build/release_bundle/init.luau", "-o", outputPath, "--target", targetArg }, { stdio = "forward" })
-
-		local fileSize = #fs.readFile(outputPath)
-		print(`  Created {outputPath} ({fileSize} bytes)`)
+	-- Clean root-level per-run artifacts (preserve cargo cache for
+	-- incremental builds; subproject builds clean their own output)
+	if fs.isDir("build/mcp") then
+		fs.removeDir("build/mcp")
 	end
 
-	print("Build complete! Binaries are in build/releases/")
+	-- Generate proto bindings (each language owned by its consumer subproject)
+	exec("lune", { "run", "rodeo-shared/build" })
+	exec("lune", { "run", "rodeo-client-ts/build" })
+
+	-- Build plugin .rbxm (delegates to rodeo-plugin/build.luau; output lands at
+	-- rodeo-plugin/build/plugin.rbxm)
+	exec("lune", { "run", "rodeo-plugin/build" })
+
+	-- Step 3: Bundle MCP scripts (inline @pkg deps, leave @rodeo for runtime)
+	print("Bundling MCP scripts...")
+	ensureDir("build/mcp")
+
+	for _, entry in fs.readDir("rodeo-mcp") do
+		if string.sub(entry, -5) == ".luau" then
+			exec("darklua", {
+				"process",
+				"rodeo-mcp/" .. entry,
+				"build/mcp/" .. entry,
+				"--config",
+				"rodeo-mcp/.darklua.json",
+			})
+		end
+	end
+
+	-- Step 4: Build Rust CLI binary
+	-- Resolve cargo path: mise may provide it, otherwise fall back to ~/.cargo/bin
+	local cargoPath = "cargo"
+	local home = process.env.HOME or ""
+	local localCargo = home .. "/.cargo/bin/cargo"
+	if home ~= "" and fs.isFile(localCargo) then
+		cargoPath = localCargo
+	end
+
+	local profile = if isDev then "debug" else "release"
+
+	print(`Building Rust CLI ({profile})...`)
+	local cargoArgs = { "build", "--manifest-path", "Cargo.toml" }
+	if not isDev then
+		table.insert(cargoArgs, "--release")
+	end
+	exec(cargoPath, cargoArgs, {
+		stdio = "forward",
+		env = { CARGO_TARGET_DIR = "build/cargo" },
+	})
+
+	-- Copy binary to bin/ for local use (mise prepends bin/ to PATH)
+	local ext = if process.os == "windows" then ".exe" else ""
+	local cargoBinary = `build/cargo/{profile}/rodeo{ext}`
+
+	if fs.isFile(cargoBinary) then
+		ensureDir("bin")
+		if fs.isFile("bin/rodeo") then
+			fs.removeFile("bin/rodeo")
+		end
+		fs.copy(cargoBinary, "bin/rodeo")
+		print(`Copied binary to bin/rodeo`)
+	end
+
+	-- launch-control helper is dispatched via rodeo's own __launch-control
+	-- subcommand (see rodeo-cli/src/main.rs early dispatch + the
+	-- set_helper_invocation call in async_main). No separate binary to
+	-- deploy — single-binary distribution.
+
+	print("Build complete!")
 end
 
 main()

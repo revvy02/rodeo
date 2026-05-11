@@ -8,4 +8,4 @@ strip_extensions = true
 
 [inputs.assets]
 path = "assets/plugin/**/*"
-output_path = "plugin/src/library"
+output_path = "rodeo-plugin/src/library"

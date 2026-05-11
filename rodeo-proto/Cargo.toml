@@ -1,0 +1,16 @@
+[package]
+name = "rodeo-proto"
+version = "0.1.0"
+edition = "2021"
+description = "Protobuf types and gRPC service definitions for rodeo"
+
+[dependencies]
+connectrpc = { version = "0.3.2", features = ["server", "streaming", "client"] }
+buffa = { version = "0.3.0", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+# Required by connectrpc-generated service code
+futures = "0.3"
+http-body = "1"
+
+[build-dependencies]
+connectrpc-build = "0.3.2"

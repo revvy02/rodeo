@@ -1,0 +1,23 @@
+import { describe, it, expect } from "bun:test";
+import { setupStudio } from "../helpers.js";
+const ctx = setupStudio();
+describe("script file", () => {
+  it("runs multi-line script and captures output", async () => {
+    const result = await ctx.editVm.runCode({
+      source: "print('from file')\nreturn 'ok'",
+      showReturn: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain("from file");
+    expect(result.output).toContain("ok");
+  });
+
+  it("runs script with show return", async () => {
+    const result = await ctx.editVm.runCode({
+      source: "return 'directive works'",
+      showReturn: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain("directive works");
+  });
+});
