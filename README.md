@@ -6,7 +6,7 @@
 
 `rodeo` is an automation tool for Roblox Studio. It lets you execute code in any Studio environment and control Studio from your terminal.
 
-> **Status:** macOS is fully supported. Windows and Linux are work-in-progress.
+> **Status:** macOS is fully supported. Windows and Linux currently are not but are a work-in-progress. Breaking changes to API may happen.
 
 ## Install
 
@@ -42,3 +42,7 @@ rodeo run --source 'print("hi from studio")'
 - **[docs/cli.md](docs/cli.md)** — full CLI reference. Every subcommand, targeting (`--target`), directives, log filtering, return values, bundling, FFlags.
 - **[docs/api.md](docs/api.md)** — using rodeo programmatically from Luau (Lune / Lute).
 - **[docs/runtime.md](docs/runtime.md)** — the `@rodeo/*` runtime library scripts get inside Studio (fs, io, stream, process, roblox).
+
+## Companion tools
+
+- **[rbx-microprofiler](https://github.com/revvy02/rbx-microprofiler)** — view + diff Roblox microprofiler dumps captured via `rodeo run --profile`.
