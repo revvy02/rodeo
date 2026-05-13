@@ -398,9 +398,18 @@ async fn async_main() {
                         .expect("matched Run subcommand but no 'run' in argv");
                     let user_after_run: &[String] = &argv[run_idx + 1..];
                     let filtered = filter_directive_for_overrides(&tokens.flag_args, user_after_run);
+                    // User argv first, then directive tokens. The user's
+                    // positional (script path) must be parsed before any
+                    // `num_args = 0..=1` flags in the directive (e.g.
+                    // `--place`), otherwise clap greedily consumes the
+                    // positional as the flag's value and downstream tries to
+                    // open the script as a place file ("failed to parse
+                    // binary place"). Override semantics still hold because
+                    // `filter_directive_for_overrides` already dropped any
+                    // directive flag the user also passed.
                     let mut spliced = argv[..=run_idx].to_vec();
-                    spliced.extend(filtered);
                     spliced.extend(user_after_run.iter().cloned());
+                    spliced.extend(filtered);
                     let re_parsed = Cli::command()
                         .before_help(banner)
                         .get_matches_from(spliced);
