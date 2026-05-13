@@ -4,7 +4,7 @@
 
 # rodeo
 
-`rodeo` is an automation tool for Roblox Studio. It lets you execute code in any Studio environment and control Studio from your terminal.
+`rodeo` is an automation tool for Roblox Studio. It lets you execute code in any Studio environment and control Studio from your terminal, while providing the complete studio luau runtime.
 
 > **Status:** macOS is fully supported. Windows and Linux currently are not but are a work-in-progress. Breaking changes to API may happen.
 
