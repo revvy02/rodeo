@@ -16,8 +16,6 @@ pub struct ProcessedSource {
     pub script_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub instance_path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub directives: Option<directive::DirectiveResult>,
 }
 
 /// Process source directly (no subprocess). Used by `run.rs`.
@@ -51,16 +49,13 @@ pub fn process(
             script,
             script_path: None,
             instance_path: None,
-            directives: None,
         })
     } else if let Some(ref file) = script {
-        // File: resolve path, parse directives, bundle, shim, ensure_return, resolve instance
+        // File: resolve path, bundle, shim, ensure_return, resolve instance.
+        // Directive parsing happens in the parent before subprocess invocation
+        // (see main.rs splice phase) — clap re-parses with directive tokens
+        // inlined into argv, so directives stay in lockstep with the CLI grammar.
         let resolved = directive::resolve_script_path(file);
-        let content = std::fs::read_to_string(&resolved)
-            .map_err(|e| anyhow::anyhow!("cannot read '{}': {}", resolved, e))?;
-
-        // Parse directives
-        let directives = directive::parse_directive(&content);
 
         // Bundle
         let opts = bundle::BundleOptions {
@@ -84,7 +79,6 @@ pub fn process(
             script,
             script_path,
             instance_path,
-            directives,
         })
     } else {
         bail!("either a script file or --source must be provided");

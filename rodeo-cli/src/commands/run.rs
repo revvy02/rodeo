@@ -209,10 +209,9 @@ fn resolve_script(args: &mut RunArgs) -> Result<ResolvedScript> {
         args.sourcemap.as_deref(),
     )?;
 
-    // Apply directives from file header to args
-    if let Some(ref directives) = processed.directives {
-        apply_processed_directives_to_args(args, directives);
-    }
+    // Directive merging is done in the parent at main.rs entry before clap
+    // even hands us the final RunArgs — by the time we get here, directive
+    // flags are already represented in `args` via clap's normal parse path.
 
     Ok(ResolvedScript {
         script_path: processed.script_path,
@@ -422,154 +421,6 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
     Ok(result)
 }
 
-/// Apply directive flags from __process_source to run args (directive values are defaults, CLI overrides)
-fn apply_processed_directives_to_args(args: &mut RunArgs, dir: &process_source::directive::DirectiveResult) {
-    for (key, value) in &dir.flags {
-        match key.as_str() {
-            "bundle" => {
-                // Ignored: bundling is always on
-            }
-            "cache-requires" => {
-                if !args.cache_requires {
-                    if let Some(true) = value.as_bool() {
-                        args.cache_requires = true;
-                    }
-                }
-            }
-            "target" => {
-                if args.target.is_none() {
-                    if let Some(s) = value.as_str() {
-                        args.target = Some(s.to_string());
-                    }
-                }
-            }
-            "show-return" => {
-                if !args.show_return {
-                    if let Some(true) = value.as_bool() {
-                        args.show_return = true;
-                    }
-                }
-            }
-            "place" | "launch" => {
-                if args.place.place.is_none() {
-                    args.place.place = Some(String::new());
-                }
-            }
-            "save" => {
-                if args.place.save.is_none() {
-                    args.place.save = Some(String::new());
-                }
-            }
-            "focus" => {
-                if !args.place.focus {
-                    if let Some(true) = value.as_bool() {
-                        args.place.focus = true;
-                    }
-                }
-            }
-            "detached" | "place.detached" => {
-                if !args.place.detached {
-                    if let Some(true) = value.as_bool() {
-                        args.place.detached = true;
-                    }
-                }
-            }
-            "host" => {
-                if args.server.host == "localhost" {
-                    if let Some(s) = value.as_str() {
-                        args.server.host = s.to_string();
-                    }
-                }
-            }
-            "port" => {
-                if args.server.port == config::SERVE_PORT {
-                    if let process_source::directive::DirectiveValue::Number(n) = value {
-                        args.server.port = *n as u16;
-                    }
-                }
-            }
-            "fflag.override" => {
-                match value {
-                    process_source::directive::DirectiveValue::List(overrides) => {
-                        for o in overrides {
-                            if !args.fflags.fflag_override.contains(o) {
-                                args.fflags.fflag_override.push(o.clone());
-                            }
-                        }
-                    }
-                    process_source::directive::DirectiveValue::String(s) => {
-                        if !args.fflags.fflag_override.contains(s) {
-                            args.fflags.fflag_override.push(s.clone());
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            "fflag.file" => {
-                if args.fflags.fflag_file.is_none() {
-                    if let Some(s) = value.as_str() {
-                        args.fflags.fflag_file = Some(s.to_string());
-                    }
-                }
-            }
-            "job" => {
-                if args.place.job.is_none() {
-                    if let Some(s) = value.as_str() {
-                        args.place.job = Some(s.to_string());
-                    }
-                }
-            }
-            "vm" => {
-                if args.place.vm.is_none() {
-                    if let Some(s) = value.as_str() {
-                        args.place.vm = Some(s.to_string());
-                    }
-                }
-            }
-            "backend" => {
-                if args.place.backend.is_none() {
-                    if let Some(s) = value.as_str() {
-                        args.place.backend = Some(s.to_string());
-                    }
-                }
-            }
-            "no-warn" => {
-                if !args.no_warn { if let Some(true) = value.as_bool() { args.no_warn = true; } }
-            }
-            "no-error" => {
-                if !args.no_error { if let Some(true) = value.as_bool() { args.no_error = true; } }
-            }
-            "no-info" => {
-                if !args.no_info { if let Some(true) = value.as_bool() { args.no_info = true; } }
-            }
-            "no-print" => {
-                if !args.no_print { if let Some(true) = value.as_bool() { args.no_print = true; } }
-            }
-            "no-output" => {
-                if !args.no_output { if let Some(true) = value.as_bool() { args.no_output = true; } }
-            }
-            "profile" => {
-                if args.place.profile.is_none() {
-                    match value {
-                        process_source::directive::DirectiveValue::Bool(true) => {
-                            args.place.profile = Some(String::new());
-                        }
-                        process_source::directive::DirectiveValue::String(s) => {
-                            args.place.profile = Some(s.clone());
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // Apply script args from directive if not provided via CLI
-    if args.script_args.is_empty() && !dir.script_args.is_empty() {
-        args.script_args = dir.script_args.clone();
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Play mode helpers

@@ -78,6 +78,52 @@ fn build_banner() -> String {
     out
 }
 
+/// Long flags clap parses as `Vec<T>` — directive and CLI both contribute, so
+/// these are exempt from the directive-token override filter. Keep in sync if
+/// new repeatable args are added to `Commands::Run` (or other commands that
+/// participate in the directive splice).
+const REPEATABLE_DIRECTIVE_FLAGS: &[&str] = &["--fflag.override"];
+
+/// Drop directive flag tokens whose long-name matches a user-supplied CLI
+/// flag, so clap's "argument cannot be used multiple times" rejection
+/// doesn't fire on directive↔CLI overlap. Scalar override semantics: user
+/// CLI wins for any flag they passed. Repeatable Vec flags (see
+/// `REPEATABLE_DIRECTIVE_FLAGS`) pass through unfiltered so values accumulate.
+fn filter_directive_for_overrides(directive: &[String], user_after_run: &[String]) -> Vec<String> {
+    let user_flags: std::collections::HashSet<&str> = user_after_run
+        .iter()
+        .filter(|t| t.starts_with("--") && t.len() > 2)
+        .map(|t| t.split('=').next().unwrap())
+        .collect();
+
+    let mut out = Vec::with_capacity(directive.len());
+    let mut i = 0;
+    while i < directive.len() {
+        let tok = &directive[i];
+        if tok.starts_with("--") && tok.len() > 2 {
+            let flag_name = tok.split('=').next().unwrap();
+            let repeatable = REPEATABLE_DIRECTIVE_FLAGS.contains(&flag_name);
+            if user_flags.contains(flag_name) && !repeatable {
+                // Drop the flag. If the next token doesn't itself start with
+                // `--`, it's the flag's value — drop that too. Inline `=`
+                // value (`--foo=bar`) is already part of `tok`, no extra skip.
+                i += 1;
+                let has_inline_value = tok.contains('=');
+                if !has_inline_value
+                    && i < directive.len()
+                    && !directive[i].starts_with("--")
+                {
+                    i += 1;
+                }
+                continue;
+            }
+        }
+        out.push(directive[i].clone());
+        i += 1;
+    }
+    out
+}
+
 #[derive(Parser)]
 #[command(name = "rodeo", about = "Command-line interface for Roblox Studio")]
 #[command(version, styles = STYLES)]
@@ -323,10 +369,50 @@ async fn async_main() {
 
     let banner = build_banner();
     let matches = Cli::command()
-        .before_help(banner)
+        .before_help(banner.clone())
         .get_matches();
     let cli = Cli::from_arg_matches(&matches)
         .unwrap_or_else(|e| e.exit());
+
+    // If this is `rodeo run <script>`, read the script's `@rodeo run …`
+    // directive (if any) and splice its flag tokens into argv right after
+    // the `run` subcommand. Then re-parse via clap so directive flags flow
+    // through the same arg pipeline as the CLI — no per-field merge code,
+    // adding a new CLI arg works in directives automatically.
+    //
+    // CLI precedence: any flag the user passed on the CLI is removed from
+    // the directive tokens before splicing, so clap doesn't see duplicate
+    // occurrences (which it rejects by default for scalar `Option<T>`).
+    // Vec-typed flags in `REPEATABLE_DIRECTIVE_FLAGS` are exempt — both
+    // directive and CLI values accumulate.
+    let (cli, directive_script_args) = match &cli.command {
+        Commands::Run { script: Some(script_arg), .. } => {
+            let resolved = commands::process_source::directive::resolve_script_path(script_arg);
+            match std::fs::read_to_string(&resolved)
+                .ok()
+                .and_then(|c| commands::process_source::directive::parse_directive(&c))
+            {
+                Some(tokens) if !tokens.flag_args.is_empty() || !tokens.script_args.is_empty() => {
+                    let argv: Vec<String> = std::env::args().collect();
+                    let run_idx = argv.iter().position(|a| a == "run")
+                        .expect("matched Run subcommand but no 'run' in argv");
+                    let user_after_run: &[String] = &argv[run_idx + 1..];
+                    let filtered = filter_directive_for_overrides(&tokens.flag_args, user_after_run);
+                    let mut spliced = argv[..=run_idx].to_vec();
+                    spliced.extend(filtered);
+                    spliced.extend(user_after_run.iter().cloned());
+                    let re_parsed = Cli::command()
+                        .before_help(banner)
+                        .get_matches_from(spliced);
+                    let cli = Cli::from_arg_matches(&re_parsed)
+                        .unwrap_or_else(|e| e.exit());
+                    (cli, tokens.script_args)
+                }
+                _ => (cli, Vec::new()),
+            }
+        }
+        _ => (cli, Vec::new()),
+    };
 
     let verbose = cli.verbose || std::env::var("RODEO_VERBOSE").is_ok();
     util::log::init();
@@ -424,6 +510,8 @@ async fn async_main() {
         }
         Commands::Run { script, source, sourcemap, output, return_file, show_return, target, studio: _, no_warn, no_error, no_info, no_print, no_output, cache_requires, script_args, ppid, server, place, fflags } => {
             if let Some(ppid) = ppid { parent_exit::on_parent_exit(ppid); }
+            // Directive's after-`--` script_args apply only if user didn't pass any.
+            let script_args = if script_args.is_empty() { directive_script_args } else { script_args };
             commands::run::main(commands::run::RunArgs {
                 script, source, sourcemap, output, return_file, show_return, target,
                 no_warn, no_error, no_info, no_print, no_output,
