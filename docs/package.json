@@ -3,6 +3,11 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
+    "gen:cli": "cd .. && cargo run --example docs-gen > docs/src/content/docs/cli.md",
+    "gen:api": "cd .. && lute run docs/docgen.luau",
+    "gen": "npm run gen:cli && npm run gen:api",
+    "predev": "npm run gen",
+    "prebuild": "npm run gen",
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build",

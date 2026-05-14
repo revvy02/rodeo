@@ -1,0 +1,71 @@
+---
+title: run
+---
+
+> _This page is auto-generated from `rodeo-client-lune/src/run.luau`._
+
+```luau
+local run = require("@rodeo-client-lune/run")
+```
+## Summary
+
+| Entry | Description |
+| :--- | :--- |
+| [LogFilter](#logfilter) |  |
+| [RunCodeOpts](#runcodeopts) |  |
+| [RunResult](#runresult) |  |
+
+---
+
+## Types
+
+### LogFilter
+
+```luau
+type LogFilter = {
+	enableWarn: boolean?,
+	enableError: boolean?,
+	enableInfo: boolean?,
+	enableOutput: boolean?,
+	enableLogs: boolean?,
+}
+```
+
+---
+
+### RunCodeOpts
+
+```luau
+type RunCodeOpts = {
+	source: string?,
+	file: string?,
+	sourcemap: string?,
+	target: string?,
+	showReturn: boolean?,
+	cacheRequires: boolean?,
+	verbose: boolean?,
+	scriptArgs: { string }?,
+	profile: string?,
+	logs: string?,
+	-- Write the script's return value to this host-side path. `.luau`/`.lua`
+	-- emits Luau source (e.g. `return { pos = Vector3.new(1,2,3) }`); any
+	-- other extension emits JSON-encoded tagged structs.
+	returnFile: string?,
+	processName: string?,
+	logFilter: LogFilter?,
+}
+```
+
+---
+
+### RunResult
+
+```luau
+type RunResult = {
+	ok: boolean,
+	output: string,
+	exitCode: number,
+}
+```
+
+---
