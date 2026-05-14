@@ -29,9 +29,16 @@ pub struct DirectiveTokens {
 /// Parse `@rodeo run --flag value -- arg1 arg2` from a script header into
 /// argv-style tokens. Returns None if no directive line is present.
 pub fn parse_directive(content: &str) -> Option<DirectiveTokens> {
-    let re = Regex::new(r"@rodeo\s+run\s+([^\n\]]+)").ok()?;
+    // Match `@rodeo run [args]` on a single line. Only horizontal whitespace
+    // (\t and space) between tokens — \s would let the regex jump to the next
+    // line and capture script code as directive args. The args group is
+    // optional so a bare `@rodeo run` directive parses to empty tokens.
+    let re = Regex::new(r"@rodeo[ \t]+run[ \t]*([^\n\]]*)").ok()?;
     let captures = re.captures(content)?;
     let directive_str = captures.get(1)?.as_str().trim();
+    if directive_str.is_empty() {
+        return Some(DirectiveTokens { flag_args: Vec::new(), script_args: Vec::new() });
+    }
 
     let mut flag_args = Vec::new();
     let mut script_args = Vec::new();

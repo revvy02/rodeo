@@ -7,14 +7,18 @@ static TYPEDEF_IO: &str = include_str!("../../../rodeo-pkg/src/io.luau");
 static TYPEDEF_PROCESS: &str = include_str!("../../../rodeo-pkg/src/process.luau");
 static TYPEDEF_STREAM: &str = include_str!("../../../rodeo-pkg/src/stream.luau");
 static TYPEDEF_ROBLOX: &str = include_str!("../../../rodeo-pkg/src/roblox.luau");
+static TYPEDEF_INTERNAL_SINGLETON: &str = include_str!("../../../rodeo-pkg/src/_internal/singleton.luau");
+static TYPEDEF_INTERNAL_TYPES: &str = include_str!("../../../rodeo-pkg/src/_internal/types.luau");
 
-static TYPEDEFS: [(&str, &str); 6] = [
+static TYPEDEFS: [(&str, &str); 8] = [
     ("init.luau", TYPEDEF_INIT),
     ("fs.luau", TYPEDEF_FS),
     ("io.luau", TYPEDEF_IO),
     ("process.luau", TYPEDEF_PROCESS),
     ("stream.luau", TYPEDEF_STREAM),
     ("roblox.luau", TYPEDEF_ROBLOX),
+    ("_internal/singleton.luau", TYPEDEF_INTERNAL_SINGLETON),
+    ("_internal/types.luau", TYPEDEF_INTERNAL_TYPES),
 ];
 
 pub fn main() -> Result<()> {
@@ -32,6 +36,10 @@ pub fn main() -> Result<()> {
 
     for (filename, content) in &TYPEDEFS {
         let path = typedefs_dir.join(filename);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .context(format!("failed to create parent dir for {filename}"))?;
+        }
         std::fs::write(&path, content)
             .context(format!("failed to write {filename}"))?;
     }
