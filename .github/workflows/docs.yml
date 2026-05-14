@@ -44,7 +44,7 @@ jobs:
         # empty stub is enough to satisfy compilation. Skipping the full
         # plugin build (lune + pesde + rojo + darklua) keeps this workflow
         # focused on docs and shaves minutes off CI.
-        run: mkdir -p rodeo-plugin/build && : > rodeo-plugin/build/plugin.rbxm
+        run: mkdir -p rodeo-plugin/build && touch rodeo-plugin/build/plugin.rbxm
       - name: Regenerate CLI reference + check for drift
         run: |
           cargo run --example docs-gen > docs/src/content/docs/cli.md
