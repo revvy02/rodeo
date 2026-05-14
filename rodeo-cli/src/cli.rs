@@ -1,4 +1,223 @@
 use crate::util::config;
+use clap::builder::styling::{AnsiColor, Effects, Styles};
+use clap::{Parser, Subcommand};
+
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Yellow.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Yellow.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Red.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Yellow.on_default());
+
+#[derive(Parser)]
+#[command(name = "rodeo", about = "Command-line interface for Roblox Studio")]
+#[command(version, styles = STYLES)]
+pub struct Cli {
+    /// Enable debug output
+    #[arg(short, long, global = true)]
+    pub verbose: bool,
+
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Start persistent server (no Studio launch — use `run --place` for that)
+    Serve {
+        /// Port number for server
+        #[arg(long)]
+        port: Option<u16>,
+
+        /// Run as master only (central orchestrator)
+        #[arg(long, conflicts_with = "studio_mode")]
+        master: bool,
+
+        /// Run as studio backend only (connects to master)
+        #[arg(long = "studio", conflicts_with = "master")]
+        studio_mode: bool,
+
+        /// Master host to connect to (for --studio)
+        #[arg(long = "master-host", default_value = "localhost")]
+        master_host: String,
+
+        /// Master port to connect to (for --studio)
+        #[arg(long = "master-port")]
+        master_port: Option<u16>,
+
+        /// Parent PID — exit when this process dies (wires the same graceful
+        /// teardown the internal master/backends use)
+        #[arg(long)]
+        ppid: Option<u32>,
+    },
+
+    /// Run a script in Studio
+    Run {
+        /// Path to the script to execute, or '-' for stdin
+        script: Option<String>,
+
+        /// Execute source code passed as string
+        #[arg(short, long)]
+        source: Option<String>,
+
+        /// Path to sourcemap.json for instance resolution
+        #[arg(long)]
+        sourcemap: Option<String>,
+
+        /// Path to file for execution output (prints/logs)
+        #[arg(long)]
+        output: Option<String>,
+
+        /// Path to file for return value JSON
+        #[arg(long = "return")]
+        return_file: Option<String>,
+
+        /// Print return value to stdout
+        #[arg(long)]
+        show_return: bool,
+
+        /// Target: mode:dom[:identity] (e.g. edit:plugin, test:server, play:client:plugin)
+        #[arg(long)]
+        target: Option<String>,
+
+        /// Studio instance to target (StudioMCP ID or "active")
+        #[arg(long)]
+        studio: Option<String>,
+
+        /// Disable warning output
+        #[arg(long)]
+        no_warn: bool,
+
+        /// Disable error output
+        #[arg(long)]
+        no_error: bool,
+
+        /// Disable info output
+        #[arg(long)]
+        no_info: bool,
+
+        /// Disable print statements
+        #[arg(long)]
+        no_print: bool,
+
+        /// Disable all output
+        #[arg(long)]
+        no_output: bool,
+
+        /// Enable module caching (skip reloader for better performance)
+        #[arg(long)]
+        cache_requires: bool,
+
+        /// Script arguments (passed after --)
+        #[arg(last = true)]
+        script_args: Vec<String>,
+
+        /// Parent PID — exit when this process dies
+        #[arg(long)]
+        ppid: Option<u32>,
+
+        #[command(flatten)]
+        server: ServerArgs,
+
+        #[command(flatten)]
+        place: PlaceArgs,
+
+        #[command(flatten)]
+        fflags: FflagArgs,
+    },
+
+    /// List active processes
+    Ps {
+        #[command(flatten)]
+        server: ServerArgs,
+    },
+
+    /// Kill a running process
+    Kill {
+        /// Process ID to kill
+        id: u32,
+
+        #[command(flatten)]
+        server: ServerArgs,
+    },
+
+    /// Save the Studio place (focus + Cmd/Ctrl+S)
+    Save {
+        /// Copy saved file to this output path
+        #[arg(long)]
+        out: Option<String>,
+
+        #[command(flatten)]
+        server: ServerArgs,
+    },
+
+    /// Build and install the rodeo plugin
+    Plugin,
+
+    /// Generate type definitions and configure .luaurc
+    Setup,
+
+    /// Start MCP server for AI agent integration
+    Mcp {
+        #[command(flatten)]
+        server: ServerArgs,
+    },
+
+    /// Internal: studio daemon process (auto-started by studio backends)
+    #[command(name = "__studio-daemon", hide = true)]
+    StudioDaemon,
+
+    /// Internal: master server process
+    #[command(name = "__master", hide = true)]
+    InternalMaster {
+        #[arg(long)]
+        port: u16,
+        /// Parent PID — exit when this process dies
+        #[arg(long)]
+        ppid: Option<u32>,
+    },
+
+    /// Internal: studio backend process
+    #[command(name = "__studio-backend", hide = true)]
+    InternalStudioBackend {
+        /// Local port for plugin WebSocket connections
+        #[arg(long)]
+        port: u16,
+        /// Master host to connect to
+        #[arg(long)]
+        master_host: String,
+        /// Master port to connect to
+        #[arg(long)]
+        master_port: u16,
+        /// Parent PID — exit when this process dies
+        #[arg(long)]
+        ppid: Option<u32>,
+    },
+
+    /// Internal: process source (bundle + shim + resolve)
+    #[command(name = "__process_source", hide = true)]
+    ProcessSource {
+        /// Script file to process
+        script: Option<String>,
+        /// Inline source to process
+        #[arg(long)]
+        source: Option<String>,
+        /// Path to rojo sourcemap.json
+        #[arg(long)]
+        sourcemap: Option<String>,
+    },
+
+    /// Internal: canonical JSON-RPC 2.0 client over NDJSON on stdin/stdout.
+    /// Spawned by language wrappers (rodeo-client-ts, rodeo-client-luau).
+    #[command(name = "__spawn_canonical_client", hide = true)]
+    SpawnCanonicalClient {
+        /// Master host
+        #[arg(long, default_value = "localhost")]
+        host: String,
+        /// Master port
+        #[arg(long)]
+        port: u16,
+    },
+}
 
 /// Shared args for connecting to a running rodeo server
 #[derive(clap::Args, Clone)]

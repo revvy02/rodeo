@@ -104,3 +104,7 @@ fd-lock = "4"
 # Keyboard simulation (Ctrl+S on Windows only; macOS uses osascript)
 [target.'cfg(target_os = "windows")'.dependencies]
 keybd_event = "0.1"
+
+[dev-dependencies]
+# Used only by `examples/docs-gen.rs` (CLI reference auto-generation)
+clap-markdown = "0.1"
