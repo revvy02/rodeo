@@ -16,7 +16,7 @@ export default defineConfig({
 				{ label: 'Getting started', link: '/' },
 				{ label: 'CLI reference', link: '/cli/' },
 				{ label: 'Luau API', items: [{ autogenerate: { directory: 'api' } }] },
-				{ label: '@rodeo runtime', link: '/runtime/' },
+				{ label: '@rodeo runtime', items: [{ autogenerate: { directory: 'runtime' } }] },
 			],
 		}),
 	],
