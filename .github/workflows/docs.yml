@@ -37,6 +37,14 @@ jobs:
         with:
           version: "25.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Stub plugin binary so cargo compile succeeds
+        # The rodeo lib `include_bytes!`s rodeo-plugin/build/plugin.rbxm,
+        # normally produced by `lune run .lune/build.luau`. The docs-gen
+        # example doesn't touch plugin content (only reads Cli), so an
+        # empty stub is enough to satisfy compilation. Skipping the full
+        # plugin build (lune + pesde + rojo + darklua) keeps this workflow
+        # focused on docs and shaves minutes off CI.
+        run: mkdir -p rodeo-plugin/build && : > rodeo-plugin/build/plugin.rbxm
       - name: Regenerate CLI reference + check for drift
         run: |
           cargo run --example docs-gen > docs/src/content/docs/cli.md
