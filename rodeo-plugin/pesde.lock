@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 format = 2
 name = "rvy/plugin"
-version = "0.0.0"
+version = "1.0.0-rc.3"
 target = "roblox"
 
 [graph."wally#jsdotlua/boolean@1.2.7 roblox".dependencies]

@@ -1,4 +1,7 @@
-# Runtime library (`@rodeo/*`)
+---
+title: '@rodeo runtime'
+description: Filesystem, IO, stream, process, and Roblox helpers available to scripts running inside Studio.
+---
 
 Scripts running inside Studio can `require("@rodeo/<module>")` for filesystem, IO, stream, process, and Roblox helpers.
 

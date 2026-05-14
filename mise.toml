@@ -10,7 +10,7 @@ stylua = "latest"
 "ubi:pesde-pkg/pesde" = "latest"
 "ubi:seaofvoices/darklua" = "0.18.0"
 "ubi:jacktabscode/asphalt" = "latest"
-"github:luau-lang/lute" = { version = "1.0.1-nightly.20260424", bin_path = "." }
+"github:luau-lang/lute" = "1.0.1-nightly.20260514"
 "github:lune-org/lune" = "latest"
 "ubi:cloudflare/cloudflared" = "latest"
 "ubi:Sleitnick/rbxcloud" = "latest"

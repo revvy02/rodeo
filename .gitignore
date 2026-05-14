@@ -29,3 +29,7 @@ node_modules
 /out
 
 /rodeo-cli/target
+
+# Local reference clones (Luau ecosystem projects pulled for docs reference)
+/submodules/lute/
+/submodules/lune/

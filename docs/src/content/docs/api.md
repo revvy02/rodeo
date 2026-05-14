@@ -1,4 +1,7 @@
-# Luau API
+---
+title: Luau API
+description: Drive rodeo programmatically from Luau (Lune today, Lute soon).
+---
 
 A Luau library for driving rodeo programmatically: launch Studio, run Luau in it, capture output and return values, save place files, run multiplayer tests. Same surface from [Lune](https://lune-org.github.io/docs) today and Lute soon.
 

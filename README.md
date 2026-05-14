@@ -39,9 +39,11 @@ rodeo run --source 'print("hi from studio")'
 
 ## Docs
 
-- **[docs/cli.md](docs/cli.md)** — full CLI reference. Every subcommand, targeting (`--target`), directives, log filtering, return values, bundling, FFlags.
-- **[docs/api.md](docs/api.md)** — using rodeo programmatically from Luau (Lune / Lute).
-- **[docs/runtime.md](docs/runtime.md)** — the `@rodeo/*` runtime library scripts get inside Studio (fs, io, stream, process, roblox).
+**[revvy02.github.io/rodeo](https://revvy02.github.io/rodeo/)** — full reference site with search.
+
+- [CLI reference](https://revvy02.github.io/rodeo/cli/) — every subcommand and flag (auto-generated from source).
+- [Luau API](https://revvy02.github.io/rodeo/api/) — drive rodeo programmatically from Luau (Lune / Lute).
+- [@rodeo runtime](https://revvy02.github.io/rodeo/runtime/) — the runtime library scripts get inside Studio (fs, io, stream, process, roblox).
 
 ## Companion tools
 
