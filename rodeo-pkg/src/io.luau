@@ -2,7 +2,7 @@
 -- Bundled require: `local io = require("@rodeo/io")`.
 
 local singleton = require("./_internal/singleton")
-local shared = require("./_internal/types")
+local shared = require("./types")
 
 local io = {}
 

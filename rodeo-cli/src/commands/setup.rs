@@ -7,8 +7,8 @@ static TYPEDEF_IO: &str = include_str!("../../../rodeo-pkg/src/io.luau");
 static TYPEDEF_PROCESS: &str = include_str!("../../../rodeo-pkg/src/process.luau");
 static TYPEDEF_STREAM: &str = include_str!("../../../rodeo-pkg/src/stream.luau");
 static TYPEDEF_ROBLOX: &str = include_str!("../../../rodeo-pkg/src/roblox.luau");
+static TYPEDEF_TYPES: &str = include_str!("../../../rodeo-pkg/src/types.luau");
 static TYPEDEF_INTERNAL_SINGLETON: &str = include_str!("../../../rodeo-pkg/src/_internal/singleton.luau");
-static TYPEDEF_INTERNAL_TYPES: &str = include_str!("../../../rodeo-pkg/src/_internal/types.luau");
 
 static TYPEDEFS: [(&str, &str); 8] = [
     ("init.luau", TYPEDEF_INIT),
@@ -17,8 +17,8 @@ static TYPEDEFS: [(&str, &str); 8] = [
     ("process.luau", TYPEDEF_PROCESS),
     ("stream.luau", TYPEDEF_STREAM),
     ("roblox.luau", TYPEDEF_ROBLOX),
+    ("types.luau", TYPEDEF_TYPES),
     ("_internal/singleton.luau", TYPEDEF_INTERNAL_SINGLETON),
-    ("_internal/types.luau", TYPEDEF_INTERNAL_TYPES),
 ];
 
 pub fn main() -> Result<()> {

@@ -13,21 +13,24 @@
 -- the plugin embeds and executes. This file is typedef-only — it's what
 -- `rodeo setup` writes into `~/.rodeo/typedefs/<version>/` for the IDE.
 
-local fs = require("./fs")
-local io = require("./io")
-local process = require("./process")
-local stream = require("./stream")
-local roblox = require("./roblox")
+-- Underscore-prefix on these locals: they're only referenced via `typeof()`
+-- to derive the type aliases below. Selene flags `local x = require(...); ...
+-- typeof(x)` as unused because type-level use doesn't count as runtime use.
+local _fs = require("./fs")
+local _io = require("./io")
+local _process = require("./process")
+local _stream = require("./stream")
+local _roblox = require("./roblox")
 
 local singleton = require("./_internal/singleton")
-local shared = require("./_internal/types")
+local shared = require("./types")
 
 -- Derive per-module types from the modules themselves (single source of truth).
-export type Fs = typeof(fs)
-export type Io = typeof(io)
-export type Process = typeof(process)
-export type Stream = typeof(stream)
-export type Roblox = typeof(roblox)
+export type Fs = typeof(_fs)
+export type Io = typeof(_io)
+export type Process = typeof(_process)
+export type Stream = typeof(_stream)
+export type Roblox = typeof(_roblox)
 
 -- Re-export shared types so consumers can use `rodeo.StreamHandle` etc.
 export type StreamHandle = shared.StreamHandle

@@ -8,7 +8,7 @@
 -- inside Studio.
 
 local singleton = require("./_internal/singleton")
-local shared = require("./_internal/types")
+local shared = require("./types")
 
 local fs = {}
 

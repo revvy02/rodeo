@@ -1,10 +1,12 @@
--- Internal: shared types referenced by multiple public module files.
--- Anything used by only one module lives in that module's file.
+-- Shared types referenced by multiple public module files. Surfaced at the
+-- top level (not under `_internal/`) because the contents — `StreamHandle`,
+-- `FileMetadata`, `ProcessResult`, etc. — are public API; consumers
+-- routinely write `let h: rodeo.StreamHandle = ...` against them.
 --
 -- The proto-generated types (FileMetadata, DirectoryEntry, ProcessResult)
 -- live here so the runtime proto import only happens once.
 
-local runtime = require(script.Parent.Parent.Parent.Parent.shared.proto.runtime)
+local runtime = require(script.Parent.Parent.Parent.shared.proto.runtime)
 
 -- Stream handle (opaque, used by fs.open, io stdio fields, stream.read/write/close)
 export type StreamHandle = {
