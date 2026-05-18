@@ -390,21 +390,6 @@ export class Studio {
     this.daemon = daemon;
   }
 
-  /** Poll master-wide VMs for a connected VM matching `pred`. Local polling —
-   * the daemon doesn't currently expose a wait-for-vm RPC because only open /
-   * setMode / startMultiplayerTest need it, and they already block in the
-   * daemon until their target VM is connected. */
-  async waitForVm(pred: (vm: Vm) => boolean, timeoutMs = 60_000): Promise<Vm> {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
-      const match = state.vms.map((s) => new Vm(s, this.daemon)).find((v) => v.connected && pred(v));
-      if (match) return match;
-      await sleep(200);
-    }
-    throw new Error("timed out waiting for VM to register");
-  }
-
   async setMode(mode: string): Promise<void> {
     const resp = await this.daemon.request<{
       serverVmId?: string | null;

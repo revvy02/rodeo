@@ -128,7 +128,6 @@ type Studio = {
 	save: () -> SaveResult,
 	close: () -> (),
 	getVms: () -> { vmMod.Vm },
-	waitForVm: (pred: (vmMod.Vm) -> boolean, timeoutMs: number?) -> vmMod.Vm,
 }
 ```
 

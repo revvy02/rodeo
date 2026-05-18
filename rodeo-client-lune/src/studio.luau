@@ -1,7 +1,6 @@
 -- StudioBackend + Studio + MultiplayerTestServer/Client.
 -- Mirrors the TS client's class hierarchy; dot-notation method surface.
 
-local task = require("@lune/task")
 local vmMod = require("./vm")
 
 type Daemon = {
@@ -105,7 +104,6 @@ export type Studio = {
 	save: () -> SaveResult,
 	close: () -> (),
 	getVms: () -> { vmMod.Vm },
-	waitForVm: (pred: (vmMod.Vm) -> boolean, timeoutMs: number?) -> vmMod.Vm,
 }
 
 local function createStudio(
@@ -129,20 +127,6 @@ local function createStudio(
 			table.insert(out, vmMod.create(s, daemon))
 		end
 		return out
-	end
-
-	function self.waitForVm(pred, timeoutMs)
-		local timeout = timeoutMs or 60000
-		local start = os.clock()
-		while (os.clock() - start) * 1000 < timeout do
-			for _, v in vmListFromState(daemon) do
-				if v.connected and pred(v) then
-					return v
-				end
-			end
-			task.wait(0.2)
-		end
-		error("timed out waiting for VM to register")
 	end
 
 	function self.setMode(mode)

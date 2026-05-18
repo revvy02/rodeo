@@ -88,16 +88,6 @@ local backend = client.getStudio("studio-a")
 
 `getLocalStudio` resolves the Studio on the same machine as `rodeo serve`.
 
-### Waiting for a specific VM
-
-`backend.open()` blocks until the edit VM is connected. For other VM modes (e.g. after `studio.setMode("run")`), use `waitForVm`:
-
-```luau
-local runVm = studio.waitForVm(function(vm)
-    return vm.mode == "run:server" and vm.connected
-end, 60000)
-```
-
 ## Opening a place
 
 By place ID:
