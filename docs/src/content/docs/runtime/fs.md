@@ -2,15 +2,15 @@
 title: fs
 ---
 
-> _This page is auto-generated from `rodeo-pkg/src/fs.luau`._
-
 ```luau
-local fs = require("@rodeo-pkg/fs")
+local fs = require("@rodeo/fs")
 ```
 ## Summary
 
 | Entry | Description |
 | :--- | :--- |
+| [DirectoryEntry](#directoryentry) | Name + type pair returned by `listdir` for each child of a directory. |
+| [FileMetadata](#filemetadata) | Metadata for a filesystem entry — size, type, timestamps. Returned by `stat`. |
 | [copy](#fscopy) | Copies the file at `src` to `dest`. Overwrites `dest` if it exists. |
 | [exists](#fsexists) | Returns `true` if a file or directory exists at `path`. |
 | [listdir](#fslistdir) | Returns directory entries (name + type) for the immediate children of `path`. |
@@ -20,6 +20,28 @@ local fs = require("@rodeo-pkg/fs")
 | [rmdir](#fsrmdir) | Removes the directory at `path`. Fails if non-empty. |
 | [stat](#fsstat) | Returns metadata (size, type, timestamps) for the file or directory at `path`. |
 | [type](#fstype) | Returns the type of the entry at `path` as a string — e.g. `"file"`, `"dir"`. |
+
+---
+
+## Types
+
+### DirectoryEntry
+
+Name + type pair returned by `listdir` for each child of a directory.
+
+```luau
+type DirectoryEntry = runtime.FsDirEntry
+```
+
+---
+
+### FileMetadata
+
+Metadata for a filesystem entry — size, type, timestamps. Returned by `stat`.
+
+```luau
+type FileMetadata = runtime.FsStatResponse
+```
 
 ---
 
@@ -50,7 +72,7 @@ Returns `true` if a file or directory exists at `path`.
 Returns directory entries (name + type) for the immediate children of `path`.
 
 ```luau
-(path: string) -> { shared.DirectoryEntry }
+(path: string) -> { DirectoryEntry }
 ```
 
 ---
@@ -72,7 +94,7 @@ Opens the file at `path` in `mode` (`"r"`, `"w"`, `"a"`, etc.). Returns a
 stream handle usable with `stream.read`, `stream.write`, `stream.close`.
 
 ```luau
-(path: string, mode: string?) -> shared.StreamHandle
+(path: string, mode: string?) -> stream.StreamHandle
 ```
 
 ---
@@ -102,7 +124,7 @@ Removes the directory at `path`. Fails if non-empty.
 Returns metadata (size, type, timestamps) for the file or directory at `path`.
 
 ```luau
-(path: string) -> shared.FileMetadata
+(path: string) -> FileMetadata
 ```
 
 ---

@@ -2,8 +2,6 @@
 title: vm
 ---
 
-> _This page is auto-generated from `rodeo-client-lune/src/vm.luau`._
-
 ```luau
 local vm = require("@rodeo-client-lune/vm")
 ```

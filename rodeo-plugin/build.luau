@@ -42,7 +42,7 @@ process.exec("darklua", {
 
 -- Assemble bundle tree
 fs.copy("rodeo-plugin/roblox_packages", BUNDLE_DIR .. "/roblox_packages")
-fs.copy("rodeo-pkg/src", BUNDLE_DIR .. "/rodeo_pkg_src")
+fs.copy("rodeo-pkg/rodeo/src", BUNDLE_DIR .. "/rodeo_pkg_src")
 fs.copy("rodeo-shared/proto", BUNDLE_DIR .. "/proto_luau")
 
 -- Bundle-local rojo project. Sibling paths (./X) stay the same because the

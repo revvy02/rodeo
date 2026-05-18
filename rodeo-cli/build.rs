@@ -1,7 +1,7 @@
-/// Build script: scans rodeo-pkg/shims/ and rodeo-adapters/ to generate adapters_gen.rs
+/// Build script: scans rodeo-pkg/rodeo/shims/ and rodeo-adapters/ to generate adapters_gen.rs
 ///
 /// Convention:
-///   rodeo-pkg/shims/<name>.luau              →  require("@rodeo/<name>")
+///   rodeo-pkg/rodeo/shims/<name>.luau         →  require("@rodeo/<name>")
 ///   rodeo-adapters/<alias>/src/<name>.luau    →  require("@<alias>/<name>")
 ///   init.luau in either                      →  require("@<alias>")  (bare alias)
 ///
@@ -22,10 +22,10 @@ fn main() {
 
     let mut adapters: Vec<(String, Vec<(String, PathBuf)>)> = Vec::new();
 
-    // @rodeo: source shims from rodeo-pkg/shims/
-    let rodeo_shims_dir = Path::new(&manifest_dir).join("../rodeo-pkg/shims");
+    // @rodeo: source shims from rodeo-pkg/rodeo/shims/
+    let rodeo_shims_dir = Path::new(&manifest_dir).join("../rodeo-pkg/rodeo/shims");
     let rodeo_shims_dir = fs::canonicalize(&rodeo_shims_dir)
-        .expect("rodeo-pkg/shims directory not found");
+        .expect("rodeo-pkg/rodeo/shims directory not found");
     println!("cargo:rerun-if-changed={}", rodeo_shims_dir.display());
     let shims = scan_shim_dir(&rodeo_shims_dir);
     adapters.push(("rodeo".to_string(), shims));

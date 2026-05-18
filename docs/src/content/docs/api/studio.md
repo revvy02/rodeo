@@ -2,8 +2,6 @@
 title: studio
 ---
 
-> _This page is auto-generated from `rodeo-client-lune/src/studio.luau`._
-
 ```luau
 local studio = require("@rodeo-client-lune/studio")
 ```

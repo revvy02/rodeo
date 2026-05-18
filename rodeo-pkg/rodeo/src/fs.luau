@@ -1,20 +1,23 @@
 -- Filesystem operations available inside Studio scripts.
 -- Bundled require: `local fs = require("@rodeo/fs")`.
 --
--- NOTE: this file is typedef-only. The runtime implementation lives in
--- rodeo-pkg/shims/fs.luau (embedded into the plugin at build time). The
--- wrapper bodies below exist so `lute doc` can extract per-method
--- documentation; they're not what executes when scripts call `fs.open(...)`
--- inside Studio.
+-- NOTE: typedef-only. Runtime lives in rodeo-pkg/rodeo/shims/fs.luau.
 
 local singleton = require("./_internal/singleton")
-local shared = require("./types")
+local stream = require("./stream")
+local runtime = require(script.Parent.Parent.Parent.shared.proto.runtime)
+
+--- Metadata for a filesystem entry — size, type, timestamps. Returned by `stat`.
+export type FileMetadata = runtime.FsStatResponse
+
+--- Name + type pair returned by `listdir` for each child of a directory.
+export type DirectoryEntry = runtime.FsDirEntry
 
 local fs = {}
 
 --- Opens the file at `path` in `mode` (`"r"`, `"w"`, `"a"`, etc.). Returns a
 --- stream handle usable with `stream.read`, `stream.write`, `stream.close`.
-function fs.open(path: string, mode: string?): shared.StreamHandle
+function fs.open(path: string, mode: string?): stream.StreamHandle
 	return (singleton :: any).fs.open(path, mode)
 end
 
@@ -24,7 +27,7 @@ function fs.remove(path: string)
 end
 
 --- Returns metadata (size, type, timestamps) for the file or directory at `path`.
-function fs.stat(path: string): shared.FileMetadata
+function fs.stat(path: string): FileMetadata
 	return (singleton :: any).fs.stat(path)
 end
 
@@ -49,7 +52,7 @@ function fs.copy(src: string, dest: string)
 end
 
 --- Returns directory entries (name + type) for the immediate children of `path`.
-function fs.listdir(path: string): { shared.DirectoryEntry }
+function fs.listdir(path: string): { DirectoryEntry }
 	return (singleton :: any).fs.listdir(path)
 end
 

@@ -8,7 +8,7 @@
         "packages": {
             "$path": "roblox_packages",
             "rodeo": {
-                "$path": "../rodeo-pkg/src"
+                "$path": "../rodeo-pkg/rodeo/src"
             }
         },
         "shared": {

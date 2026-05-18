@@ -2,8 +2,6 @@
 title: run
 ---
 
-> _This page is auto-generated from `rodeo-client-lune/src/run.luau`._
-
 ```luau
 local run = require("@rodeo-client-lune/run")
 ```

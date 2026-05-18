@@ -2,8 +2,6 @@
 title: daemon
 ---
 
-> _This page is auto-generated from `rodeo-client-lune/src/daemon.luau`._
-
 ```luau
 local daemon = require("@rodeo-client-lune/daemon")
 ```

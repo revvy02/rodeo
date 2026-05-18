@@ -4,7 +4,7 @@
 -- module graph stays acyclic.
 --
 -- NOTE: this is the typedef-side singleton. The actual runtime shims in
--- rodeo-pkg/shims/ read _G.__rodeo_procs directly and don't go through
+-- rodeo-pkg/rodeo/shims/ read _G.__rodeo_procs directly and don't go through
 -- this file at all — they're embedded into the plugin at build time.
 
 local rodeo = {}

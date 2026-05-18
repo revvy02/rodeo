@@ -2,15 +2,17 @@
 title: process
 ---
 
-> _This page is auto-generated from `rodeo-pkg/src/process.luau`._
-
 ```luau
-local process = require("@rodeo-pkg/process")
+local process = require("@rodeo/process")
 ```
 ## Summary
 
 | Entry | Description |
 | :--- | :--- |
+| [ProcessHandle](#processhandle) | Handle to a process started with `create`. Fields are populated when |
+| [ProcessResult](#processresult) | Result returned by `run` and `system` — exit code plus captured |
+| [ProcessRunOptions](#processrunoptions) | Options accepted by `run`, `system`, and `create`. All fields optional. |
+| [StdioKind](#stdiokind) | How a stdio stream should be wired for a spawned process. `"default"` |
 | [args](#processargs) | The command-line arguments passed to this rodeo execution after `--`. |
 | [create](#processcreate) | Spawns `args` as a child process without waiting. Returns a handle with |
 | [cwd](#processcwd) | Returns the current working directory. |
@@ -21,6 +23,72 @@ local process = require("@rodeo-pkg/process")
 | [kill](#processkill) | Terminates a process started with `create`. |
 | [run](#processrun) | Runs `args` (or an existing handle), blocking until completion. Returns |
 | [system](#processsystem) | Like `run`, but takes a single shell-style command string. |
+
+---
+
+## Types
+
+### ProcessHandle
+
+Handle to a process started with `create`. Fields are populated when
+
+the corresponding stdio is `"piped"`; otherwise `nil`.
+
+```luau
+type ProcessHandle = {
+	__rodeo_pid: string,
+	stdin: stream.StreamHandle?,
+	stdout: stream.StreamHandle?,
+	stderr: stream.StreamHandle?,
+}
+```
+
+---
+
+### ProcessResult
+
+Result returned by `run` and `system` — exit code plus captured
+
+stdout/stderr (when `piped`).
+
+```luau
+type ProcessResult = runtime.ProcessRunResponse
+```
+
+---
+
+### ProcessRunOptions
+
+Options accepted by `run`, `system`, and `create`. All fields optional.
+
+`stdio` applies to all three streams; per-stream overrides win.
+
+```luau
+type ProcessRunOptions = {
+	cwd: string?,
+	stdio: StdioKind?,
+	stdin: StdioKind?,
+	stdout: StdioKind?,
+	stderr: StdioKind?,
+	env: { [string]: string }?,
+}
+```
+
+---
+
+### StdioKind
+
+How a stdio stream should be wired for a spawned process. `"default"`
+
+uses the parent's stream, `"piped"` captures into a `StreamHandle`,
+
+`"inherit"` passes through, `"none"` discards, `"tee"` mirrors to both
+
+a capture and the parent's stream.
+
+```luau
+type StdioKind = "default" | "piped" | "inherit" | "none" | "tee"
+```
 
 ---
 
@@ -43,7 +111,7 @@ Spawns `args` as a child process without waiting. Returns a handle with
 stdin/stdout/stderr stream handles for live interaction.
 
 ```luau
-(args: { string }, options: shared.ProcessRunOptions?) -> shared.ProcessHandle
+(args: { string }, options: ProcessRunOptions?) -> ProcessHandle
 ```
 
 ---
@@ -103,7 +171,7 @@ Returns the user's home directory.
 Terminates a process started with `create`.
 
 ```luau
-(handle: shared.ProcessHandle) -> ()
+(handle: ProcessHandle) -> ()
 ```
 
 ---
@@ -115,7 +183,7 @@ Runs `args` (or an existing handle), blocking until completion. Returns
 captured stdout/stderr and exit code.
 
 ```luau
-(argsOrHandle: { string } | shared.ProcessHandle, options: shared.ProcessRunOptions?) -> shared.ProcessResult
+(argsOrHandle: { string } | ProcessHandle, options: ProcessRunOptions?) -> ProcessResult
 ```
 
 ---
@@ -125,7 +193,7 @@ captured stdout/stderr and exit code.
 Like `run`, but takes a single shell-style command string.
 
 ```luau
-(command: string, options: shared.ProcessRunOptions?) -> shared.ProcessResult
+(command: string, options: ProcessRunOptions?) -> ProcessResult
 ```
 
 ---

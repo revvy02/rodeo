@@ -2,18 +2,33 @@
 title: stream
 ---
 
-> _This page is auto-generated from `rodeo-pkg/src/stream.luau`._
-
 ```luau
-local stream = require("@rodeo-pkg/stream")
+local stream = require("@rodeo/stream")
 ```
 ## Summary
 
 | Entry | Description |
 | :--- | :--- |
+| [StreamHandle](#streamhandle) | Opaque stream identifier. Pass these to `stream.read`/`stream.write`/ |
 | [close](#streamclose) | Closes `handle`. Subsequent reads/writes error. |
 | [read](#streamread) | Reads from `handle`. Returns the next chunk as a string, or `nil` on EOF. |
 | [write](#streamwrite) | Writes `data` to `handle`. `data` is converted to a string via `tostring`. |
+
+---
+
+## Types
+
+### StreamHandle
+
+Opaque stream identifier. Pass these to `stream.read`/`stream.write`/
+
+`stream.close`; you don't access `__handle` directly.
+
+```luau
+type StreamHandle = {
+	__handle: string,
+}
+```
 
 ---
 
@@ -24,7 +39,7 @@ local stream = require("@rodeo-pkg/stream")
 Closes `handle`. Subsequent reads/writes error.
 
 ```luau
-(handle: shared.StreamHandle) -> ()
+(handle: StreamHandle) -> ()
 ```
 
 ---
@@ -34,7 +49,7 @@ Closes `handle`. Subsequent reads/writes error.
 Reads from `handle`. Returns the next chunk as a string, or `nil` on EOF.
 
 ```luau
-(handle: shared.StreamHandle) -> string?
+(handle: StreamHandle) -> string?
 ```
 
 ---
@@ -44,7 +59,7 @@ Reads from `handle`. Returns the next chunk as a string, or `nil` on EOF.
 Writes `data` to `handle`. `data` is converted to a string via `tostring`.
 
 ```luau
-(handle: shared.StreamHandle, data: any) -> ()
+(handle: StreamHandle, data: any) -> ()
 ```
 
 ---

@@ -2,10 +2,8 @@
 title: io
 ---
 
-> _This page is auto-generated from `rodeo-pkg/src/io.luau`._
-
 ```luau
-local io = require("@rodeo-pkg/io")
+local io = require("@rodeo/io")
 ```
 ## Summary
 
@@ -35,7 +33,7 @@ Reads a line from stdin (blocking). Returns the line without trailing newline.
 Standard error stream handle. Pass to `stream.write` to write to stderr.
 
 ```luau
-any) :: shared.StreamHandle
+any) :: stream.StreamHandle
 ```
 
 ---
@@ -45,7 +43,7 @@ any) :: shared.StreamHandle
 Standard input stream handle. Pass to `stream.read` to read from stdin.
 
 ```luau
-any) :: shared.StreamHandle
+any) :: stream.StreamHandle
 ```
 
 ---
@@ -55,7 +53,7 @@ any) :: shared.StreamHandle
 Standard output stream handle. Pass to `stream.write` to write to stdout.
 
 ```luau
-any) :: shared.StreamHandle
+any) :: stream.StreamHandle
 ```
 
 ---
