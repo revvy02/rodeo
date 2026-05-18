@@ -11,20 +11,40 @@ local stream = require("@rodeo-pkg/stream")
 
 | Entry | Description |
 | :--- | :--- |
-| [Stream](#stream) |  |
+| [close](#streamclose) | Closes `handle`. Subsequent reads/writes error. |
+| [read](#streamread) | Reads from `handle`. Returns the next chunk as a string, or `nil` on EOF. |
+| [write](#streamwrite) | Writes `data` to `handle`. `data` is converted to a string via `tostring`. |
 
 ---
 
-## Types
+## Functions and Properties
 
-### Stream
+### stream.close
+
+Closes `handle`. Subsequent reads/writes error.
 
 ```luau
-type Stream = {
-	read: (handle: shared.StreamHandle) -> string?,
-	write: (handle: shared.StreamHandle, data: any) -> (),
-	close: (handle: shared.StreamHandle) -> (),
-}
+(handle: shared.StreamHandle) -> ()
+```
+
+---
+
+### stream.read
+
+Reads from `handle`. Returns the next chunk as a string, or `nil` on EOF.
+
+```luau
+(handle: shared.StreamHandle) -> string?
+```
+
+---
+
+### stream.write
+
+Writes `data` to `handle`. `data` is converted to a string via `tostring`.
+
+```luau
+(handle: shared.StreamHandle, data: any) -> ()
 ```
 
 ---

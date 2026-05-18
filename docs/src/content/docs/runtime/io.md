@@ -11,21 +11,51 @@ local io = require("@rodeo-pkg/io")
 
 | Entry | Description |
 | :--- | :--- |
-| [Io](#io) |  |
+| [read](#ioread) | Reads a line from stdin (blocking). Returns the line without trailing newline. |
+| [stderr](#iostderr) | Standard error stream handle. Pass to `stream.write` to write to stderr. |
+| [stdin](#iostdin) | Standard input stream handle. Pass to `stream.read` to read from stdin. |
+| [stdout](#iostdout) | Standard output stream handle. Pass to `stream.write` to write to stdout. |
 
 ---
 
-## Types
+## Functions and Properties
 
-### Io
+### io.read
+
+Reads a line from stdin (blocking). Returns the line without trailing newline.
 
 ```luau
-type Io = {
-	stdin: shared.StreamHandle,
-	stdout: shared.StreamHandle,
-	stderr: shared.StreamHandle,
-	read: () -> string,
-}
+() -> string
+```
+
+---
+
+### io.stderr
+
+Standard error stream handle. Pass to `stream.write` to write to stderr.
+
+```luau
+any) :: shared.StreamHandle
+```
+
+---
+
+### io.stdin
+
+Standard input stream handle. Pass to `stream.read` to read from stdin.
+
+```luau
+any) :: shared.StreamHandle
+```
+
+---
+
+### io.stdout
+
+Standard output stream handle. Pass to `stream.write` to write to stdout.
+
+```luau
+any) :: shared.StreamHandle
 ```
 
 ---
