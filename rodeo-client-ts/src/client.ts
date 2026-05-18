@@ -149,12 +149,39 @@ export class Vm {
 // RodeoClient
 // ---------------------------------------------------------------------------
 
+export type ConnectOpts = {
+  /** Max time to wait for the server to come up. Default 30000ms. */
+  readyTimeoutMs?: number;
+  /** Poll interval while waiting for the server. Default 200ms. */
+  readyPollMs?: number;
+};
+
 export class RodeoClient {
   readonly daemon: Daemon;
 
-  constructor(url: string) {
+  private constructor(url: string) {
     const { host, port } = parseUrl(url);
     this.daemon = new Daemon(host, port);
+  }
+
+  /** Connect to a running `rodeo serve` and block until it's healthy.
+   *  Throws after `readyTimeoutMs` (default 30s) if the server never responds. */
+  static async connect(url: string, opts: ConnectOpts = {}): Promise<RodeoClient> {
+    const timeoutMs = opts.readyTimeoutMs ?? 30_000;
+    const pollMs = opts.readyPollMs ?? 200;
+    const client = new RodeoClient(url);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const ok = await client.daemon.request<boolean>("client.isHealthy");
+        if (ok) return client;
+      } catch {
+        // server not up yet — retry until deadline
+      }
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+    await client.daemon.shutdown().catch(() => {});
+    throw new Error(`RodeoClient.connect: timed out after ${timeoutMs}ms waiting for rodeo at ${url}`);
   }
 
   /** Call this in afterAll / teardown to shut down the daemon subprocess. */
@@ -162,15 +189,7 @@ export class RodeoClient {
     await this.daemon.shutdown();
   }
 
-  // Health & state
-
-  async isHealthy(): Promise<boolean> {
-    try {
-      return await this.daemon.request<boolean>("client.isHealthy");
-    } catch {
-      return false;
-    }
-  }
+  // State & discovery
 
   async getState(): Promise<StateSnapshotDTO> {
     return await this.daemon.request<StateSnapshotDTO>("client.getState");

@@ -1,6 +1,8 @@
 -- RodeoClient — top-level handle. Owns a Daemon subprocess and exposes
 -- discovery + backend accessors. Mirrors rodeo-client-ts/src/client.ts.
 
+local task = require("@lune/task")
+
 local daemonMod = require("./daemon")
 local studioMod = require("./studio")
 local vmMod = require("./vm")
@@ -16,10 +18,13 @@ export type ConnectOpts = {
 	host: string?,
 	port: number,
 	rodeoBin: string?,
+	-- Max time to wait for the server to come up. Default 30000ms.
+	readyTimeoutMs: number?,
+	-- Poll interval while waiting for the server. Default 200ms.
+	readyPollMs: number?,
 }
 
 export type RodeoClient = {
-	isHealthy: () -> boolean,
 	getState: () -> StateSnapshot,
 	listProcesses: () -> { ProcessInfo },
 	kill: (processId: number) -> (),
@@ -39,14 +44,6 @@ local function connect(opts: ConnectOpts): RodeoClient
 	})
 
 	local self = {} :: RodeoClient
-
-	function self.isHealthy()
-		local ok, result = pcall(daemon.call, "client.isHealthy", {})
-		if not ok then
-			return false
-		end
-		return result == true
-	end
 
 	function self.getState()
 		return daemon.call("client.getState", {})
@@ -97,7 +94,19 @@ local function connect(opts: ConnectOpts): RodeoClient
 		daemon.shutdown()
 	end
 
-	return self
+	-- Block until the server is reachable, or throw on timeout.
+	local timeoutMs = opts.readyTimeoutMs or 30000
+	local pollMs = opts.readyPollMs or 200
+	local deadline = os.clock() + timeoutMs / 1000
+	while os.clock() < deadline do
+		local ok, result = pcall(daemon.call, "client.isHealthy", {})
+		if ok and result == true then
+			return self
+		end
+		task.wait(pollMs / 1000)
+	end
+	pcall(daemon.shutdown)
+	error(`rodeo.connect: timed out after {timeoutMs}ms waiting for rodeo at {opts.host or "localhost"}:{opts.port}`)
 end
 
 return {

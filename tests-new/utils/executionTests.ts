@@ -94,15 +94,15 @@ export function errorHandling(run: RunFn): void {
 
   it("unconnected port is not ok", async () => {
     // Lute equivalent: `rodeo run --source "return 1" --port 59999`
-    // Spawn a client pointed at an unused port, assert it can't talk to anything.
-    const client = new RodeoClient("http://localhost:59999");
-    let healthy = true;
+    // Connect with a short deadline to an unused port; connect should throw.
+    let connected = true;
     try {
-      healthy = await client.isHealthy();
+      const client = await RodeoClient.connect("http://localhost:59999", { readyTimeoutMs: 1000 });
+      await client.close();
     } catch {
-      healthy = false;
+      connected = false;
     }
-    expect(healthy).toBe(false);
+    expect(connected).toBe(false);
   });
 }
 

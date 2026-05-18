@@ -46,8 +46,7 @@ describe("detached", () => {
 
     let newPid: number | undefined;
     try {
-      const client = new RodeoClient(`http://localhost:${port}`);
-      while (!(await client.isHealthy())) await Bun.sleep(500);
+      const client = await RodeoClient.connect(`http://localhost:${port}`);
 
       const backend = await client.getLocalStudio();
       const before = studioPids();

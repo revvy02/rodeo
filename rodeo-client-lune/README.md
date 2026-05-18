@@ -14,13 +14,9 @@ Requires the `rodeo` CLI on `PATH` (the client spawns / connects to it).
 
 ```luau
 local rodeo = require("@pkg/rodeo")
-local task = require("@lune/task")
 
+-- Blocks until rodeo serve is reachable (default 30s timeout).
 local client = rodeo.connect({ port = 44899 })
-for _ = 1, 20 do
-    if client.isHealthy() then break end
-    task.wait(0.5)
-end
 
 local studio = client.getLocalStudio().open({ background = true })
 local r = studio.editVm.runCode({ source = "return 1 + 1", showReturn = true })
@@ -32,8 +28,8 @@ client.close()
 
 ## API
 
-`rodeo.connect(opts)` returns a `RodeoClient` with:
-- `isHealthy()`, `getState()`, `listBackends()`, `listProcesses()`
+`rodeo.connect(opts)` blocks until the server is reachable, then returns a `RodeoClient` with:
+- `getState()`, `listBackends()`, `listProcesses()`
 - `getLocalStudio()` → `StudioBackend` for opening Studios
 - `close()`
 

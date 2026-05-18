@@ -37,8 +37,7 @@ export function setupStudio(port: number = nextPort++): StudioCtx {
       ["rodeo", "serve", "--port", String(port), "--ppid", String(process.pid)],
       { stderr: "inherit" },
     );
-    ctx.client = new RodeoClient(`http://localhost:${port}`);
-    while (!(await ctx.client.isHealthy())) await Bun.sleep(500);
+    ctx.client = await RodeoClient.connect(`http://localhost:${port}`);
     const rbxStudio = await ctx.client.getLocalStudio();
     ctx.studio = await rbxStudio.open({ background: true });
     ctx.editVm = ctx.studio.editVm;
@@ -72,8 +71,7 @@ export function setupBackend(port: number = nextPort++): BackendCtx {
       ["rodeo", "serve", "--port", String(port), "--ppid", String(process.pid)],
       { stderr: "inherit" },
     );
-    ctx.client = new RodeoClient(`http://localhost:${port}`);
-    while (!(await ctx.client.isHealthy())) await Bun.sleep(500);
+    ctx.client = await RodeoClient.connect(`http://localhost:${port}`);
     ctx.backend = await ctx.client.getLocalStudio();
   });
 
@@ -121,8 +119,7 @@ export function studioHandle(port: number): StudioHandle {
         ["rodeo", "serve", "--port", String(port), "--ppid", String(process.pid)],
         { stderr: "inherit" },
       );
-      ctx.client = new RodeoClient(`http://localhost:${port}`);
-      while (!(await ctx.client.isHealthy())) await Bun.sleep(500);
+      ctx.client = await RodeoClient.connect(`http://localhost:${port}`);
       const rbxStudio = await ctx.client.getLocalStudio();
       ctx.studio = await rbxStudio.open({ background: true });
       ctx.editVm = ctx.studio.editVm;

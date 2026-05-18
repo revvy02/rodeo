@@ -28,15 +28,10 @@ rodeo serve --port 44872
 Then:
 
 ```luau
-local task = require("@lune/task")
 local rodeo = require("@pkg/rodeo")
 
+-- Blocks until the server is reachable (default 30s timeout).
 local client = rodeo.connect({ port = 44872 })
-
--- Wait until the server is reachable.
-while not client.isHealthy() do
-    task.wait(0.5)
-end
 
 -- Snapshot of registered backends and VMs.
 local state = client.getState()
@@ -44,6 +39,12 @@ print(state.vms)
 
 -- Shut down the client (closes the daemon subprocess).
 client.close()
+```
+
+Override the wait with `readyTimeoutMs` if you need a different deadline:
+
+```luau
+local client = rodeo.connect({ port = 44872, readyTimeoutMs = 5000 })
 ```
 
 ## Launching Studio

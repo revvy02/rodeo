@@ -21,15 +21,17 @@ local function drain(reader)
 end
 task.spawn(drain, serve.stdout)
 task.spawn(drain, serve.stderr)
-local client = rodeo.connect({ port = PORT })
 
+local client: rodeo.RodeoClient? = nil
 local mpServer: rodeo.MultiplayerTestServer? = nil
 
 local function cleanup()
 	if mpServer then
-		pcall(mpServer.close)
+		pcall((mpServer :: any).close)
 	end
-	pcall(client.close)
+	if client then
+		pcall((client :: any).close)
+	end
 	pcall(function()
 		serve:kill()
 	end)
@@ -42,22 +44,17 @@ local function die(msg: string): never
 	error("unreachable")
 end
 
--- 1. Wait for serve to be healthy.
-local healthy = false
-for _ = 1, 20 do
-	if client.isHealthy() then
-		healthy = true
-		break
-	end
-	task.wait(0.5)
+-- 1. Connect — blocks until serve is reachable, or throws on timeout.
+local connectOk, connectResult = pcall(rodeo.connect, { port = PORT })
+if not connectOk then
+	die(`server never reported healthy: {connectResult}`)
 end
-if not healthy then
-	die("server never reported healthy")
-end
-print("✓ healthy")
+client = connectResult
+local c = connectResult :: rodeo.RodeoClient
+print("✓ connected")
 
 -- 2. Start MP server WITHOUT calling backend.open() first — that's the whole point.
-local backend = client.getLocalStudio()
+local backend = c.getLocalStudio()
 local ok, result = pcall(backend.startMultiplayerTest, {})
 if not ok then
 	die(`backend.startMultiplayerTest failed: {result}`)

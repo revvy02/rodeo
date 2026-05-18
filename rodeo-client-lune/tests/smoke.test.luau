@@ -26,31 +26,25 @@ end
 task.spawn(drain, serve.stdout)
 task.spawn(drain, serve.stderr)
 
--- 2. Poll for health over ~10s.
-local client = rodeo.connect({ port = PORT })
-
-local healthy = false
-for _ = 1, 20 do
-	if client.isHealthy() then
-		healthy = true
-		break
-	end
-	task.wait(0.5)
-end
+-- 2. Connect — blocks until the server is reachable (or throws on timeout).
+local connectOk, connectResult = pcall(rodeo.connect, { port = PORT })
 
 local function cleanup()
-	pcall(client.close)
+	if connectOk then
+		pcall((connectResult :: any).close)
+	end
 	pcall(function()
 		serve:kill()
 	end)
 end
 
-if not healthy then
+if not connectOk then
 	cleanup()
-	die("server never reported healthy")
+	die(`server never reported healthy: {connectResult}`)
 end
 
-print("✓ healthy")
+local client = connectResult :: rodeo.RodeoClient
+print("✓ connected")
 
 local state = client.getState()
 assert(type(state) == "table", "state should be a table")

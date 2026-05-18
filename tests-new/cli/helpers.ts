@@ -69,7 +69,7 @@ export async function waitForProcess(
   state: string,
   timeoutMs = 30_000,
 ): Promise<number | null> {
-  const client = new RodeoClient(`http://localhost:${port}`);
+  const client = await RodeoClient.connect(`http://localhost:${port}`);
   const start = Date.now();
   try {
     while (Date.now() - start < timeoutMs) {
@@ -91,7 +91,7 @@ export async function waitForProcess(
 // racing the studio-daemon's 4-slot pool can see `rodeo run` time out
 // waiting for a VM.
 export async function waitForVm(port: number, timeoutMs = 60_000): Promise<void> {
-  const client = new RodeoClient(`http://localhost:${port}`);
+  const client = await RodeoClient.connect(`http://localhost:${port}`);
   const start = Date.now();
   try {
     while (Date.now() - start < timeoutMs) {

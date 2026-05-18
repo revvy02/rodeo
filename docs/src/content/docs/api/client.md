@@ -33,6 +33,10 @@ type ConnectOpts = {
 	host: string?,
 	port: number,
 	rodeoBin: string?,
+	-- Max time to wait for the server to come up. Default 30000ms.
+	readyTimeoutMs: number?,
+	-- Poll interval while waiting for the server. Default 200ms.
+	readyPollMs: number?,
 }
 ```
 
@@ -50,7 +54,6 @@ type ProcessInfo = { [string]: any }
 
 ```luau
 type RodeoClient = {
-	isHealthy: () -> boolean,
 	getState: () -> StateSnapshot,
 	listProcesses: () -> { ProcessInfo },
 	kill: (processId: number) -> (),
