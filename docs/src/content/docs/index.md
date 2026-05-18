@@ -5,31 +5,13 @@ description: Automation tool for Roblox Studio. Execute code in any Studio envir
 
 `rodeo` is an automation tool for Roblox Studio. It lets you execute code in any Studio environment and control Studio from your terminal, with a developer experience closer to a language runtime than a build tool.
 
-## Install
-
-```bash
-mise use ubi:revvy02/rodeo
-# or
-rokit add revvy02/rodeo
-```
-
-## Quickstart
-
-```bash
-# 1. Install the companion plugin into Studio. (One-time.)
-rodeo plugin
-
-# 2. Open Studio (any place). The plugin auto-connects to localhost:44872.
-
-# 3. Start the rodeo server.
-rodeo serve
-
-# 4. Run scripts in another terminal.
-rodeo run --source 'print("hi from studio")'
-```
+Drive it from the shell (`rodeo run`) or programmatically from Lune via `rvy/rodeo`.
 
 ## Where to go next
 
-- **[CLI reference](/rodeo/cli/)** — every subcommand and flag, generated from the source.
-- **[Luau API](/rodeo/api/)** — drive rodeo programmatically from Lune or Lute.
+- **[Installation](/rodeo/getting-started/installation/)** — install rodeo and the companion Studio plugin.
+- **[CLI usage](/rodeo/getting-started/cli-usage/)** — `rodeo serve`, `rodeo run`, and friends.
+- **[Client usage](/rodeo/getting-started/client-usage/)** — drive rodeo from Luau via the `rvy/rodeo` Lune client.
+- **[CLI reference](/rodeo/cli/)** — every subcommand and flag, auto-generated from the source.
+- **[Luau API](/rodeo/api/)** — the full client API reference.
 - **[@rodeo runtime](/rodeo/runtime/)** — the `fs`, `io`, `stream`, `process`, and `roblox` modules your scripts get inside Studio.
