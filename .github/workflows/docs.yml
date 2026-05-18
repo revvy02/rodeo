@@ -51,6 +51,14 @@ jobs:
           git diff --exit-code -- docs/src/content/docs/cli.md \
             || (echo "::error::cli.md is stale. Run 'cargo run --example docs-gen > docs/src/content/docs/cli.md' and commit." && exit 1)
 
+      # `npm run build` triggers a prebuild hook that calls `lute run
+      # docs/docgen.luau` to regenerate the Luau API + @rodeo runtime pages
+      # from the source .luau files. mise installs lute (pinned in mise.toml)
+      # along with the rest of the project's toolchain.
+      - uses: jdx/mise-action@v2
+        with:
+          experimental: true
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
