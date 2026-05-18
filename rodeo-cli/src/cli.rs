@@ -44,8 +44,7 @@ pub enum Commands {
         #[arg(long = "master-port")]
         master_port: Option<u16>,
 
-        /// Parent PID — exit when this process dies (wires the same graceful
-        /// teardown the internal master/backends use)
+        /// Parent PID — exit when this process dies
         #[arg(long)]
         ppid: Option<u32>,
     },
@@ -140,7 +139,7 @@ pub enum Commands {
         server: ServerArgs,
     },
 
-    /// Save the Studio place (focus + Cmd/Ctrl+S)
+    /// Save the Studio place
     Save {
         /// Copy saved file to this output path
         #[arg(long)]

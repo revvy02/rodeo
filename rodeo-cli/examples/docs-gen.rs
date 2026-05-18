@@ -11,7 +11,15 @@ fn main() {
     println!("description: Every rodeo subcommand and flag (auto-generated).");
     println!("---");
     println!();
-    println!("> _This page is auto-generated from clap definitions. Edits will be overwritten — change the `#[arg(...)]` attributes in `rodeo-cli/src/cli.rs` instead._");
-    println!();
-    print!("{}", clap_markdown::help_markdown::<Cli>());
+
+    // clap-markdown emits a stock preamble + a "Command Overview" anchor list
+    // that duplicates Starlight's right-rail TOC. Skip everything until the
+    // first H2 (the root command's own section).
+    let md = clap_markdown::help_markdown::<Cli>();
+    let cleaned = md
+        .lines()
+        .skip_while(|line| !line.starts_with("## "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    print!("{}", cleaned);
 }

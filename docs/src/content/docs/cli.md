@@ -3,24 +3,6 @@ title: CLI reference
 description: Every rodeo subcommand and flag (auto-generated).
 ---
 
-> _This page is auto-generated from clap definitions. Edits will be overwritten — change the `#[arg(...)]` attributes in `rodeo-cli/src/cli.rs` instead._
-
-# Command-Line Help for `rodeo`
-
-This document contains the help content for the `rodeo` command-line program.
-
-**Command Overview:**
-
-* [`rodeo`↴](#rodeo)
-* [`rodeo serve`↴](#rodeo-serve)
-* [`rodeo run`↴](#rodeo-run)
-* [`rodeo ps`↴](#rodeo-ps)
-* [`rodeo kill`↴](#rodeo-kill)
-* [`rodeo save`↴](#rodeo-save)
-* [`rodeo plugin`↴](#rodeo-plugin)
-* [`rodeo setup`↴](#rodeo-setup)
-* [`rodeo mcp`↴](#rodeo-mcp)
-
 ## `rodeo`
 
 Command-line interface for Roblox Studio
@@ -33,7 +15,7 @@ Command-line interface for Roblox Studio
 * `run` — Run a script in Studio
 * `ps` — List active processes
 * `kill` — Kill a running process
-* `save` — Save the Studio place (focus + Cmd/Ctrl+S)
+* `save` — Save the Studio place
 * `plugin` — Build and install the rodeo plugin
 * `setup` — Generate type definitions and configure .luaurc
 * `mcp` — Start MCP server for AI agent integration
@@ -59,7 +41,7 @@ Start persistent server (no Studio launch — use `run --place` for that)
 
   Default value: `localhost`
 * `--master-port <MASTER_PORT>` — Master port to connect to (for --studio)
-* `--ppid <PPID>` — Parent PID — exit when this process dies (wires the same graceful teardown the internal master/backends use)
+* `--ppid <PPID>` — Parent PID — exit when this process dies
 
 
 
@@ -152,7 +134,7 @@ Kill a running process
 
 ## `rodeo save`
 
-Save the Studio place (focus + Cmd/Ctrl+S)
+Save the Studio place
 
 **Usage:** `rodeo save [OPTIONS]`
 
