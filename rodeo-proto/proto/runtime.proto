@@ -72,6 +72,15 @@ message StreamCloseRequest {
 }
 
 // ---------------------------------------------------------------------------
+// roblox: model/place serialization
+// ---------------------------------------------------------------------------
+
+message RobloxExportRequest {
+  string path = 1;
+  bytes data = 2;  // binary bytes from SerializeInstancesAsync
+}
+
+// ---------------------------------------------------------------------------
 // Filesystem operations
 // ---------------------------------------------------------------------------
 
@@ -257,6 +266,9 @@ message ClientRpcCall {
 
     // mcp: 40-49 (server-context; handled server-side, not forwarded to run-client)
     McpCallRequest          mcp_call           = 40;
+
+    // roblox: 50-59
+    RobloxExportRequest     roblox_export      = 50;
   }
 }
 
@@ -301,5 +313,8 @@ message ClientRpcResponse {
 
     // mcp: 40-49
     McpCallResponse         mcp_call           = 40;
+
+    // roblox: 50-59
+    Ok                      roblox_export      = 50;
   }
 }

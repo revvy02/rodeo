@@ -35,9 +35,8 @@ return function(rpc, hostInfo, executionId, fs, stream)
 
 	function roblox.export(path: string, instances: { Instance })
 		local buf = SerializationService:SerializeInstancesAsync(instances)
-		local h = fs.open(path, "w")
-		stream.writeBytes(h, buf)
-		stream.close(h)
+		local runtime = _G.__rodeo_runtime_proto
+		rpc.call("roblox_export", runtime.RobloxExportRequest.new({ path = path, data = buf }))
 	end
 
 	return roblox

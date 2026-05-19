@@ -518,12 +518,7 @@ export function roblox(run: RunFn): void {
     expect(result.output).toContain('"class":"Folder"');
   });
 
-  // KNOWN FAILING: SerializationService:SerializeInstancesAsync only emits the
-  // binary `.rbxm` format. There's no XML option exposed; the file extension
-  // is just a filename hint, not a format selector. Leave this test asserting
-  // the *desired* XML output so if Roblox ever adds XML serialization, the
-  // test starts passing and we know.
-  it("roblox: export with .rbxmx extension writes XML format (NOT YET SUPPORTED)", async () => {
+  it("roblox: export with .rbxmx extension writes XML format", async () => {
     const result = await run({
       showReturn: true,
       source: `local fs = require("@rodeo/fs")
@@ -537,13 +532,50 @@ export function roblox(run: RunFn): void {
         roblox.export(path, { folder })
 
         local r = fs.open(path, "r")
-        local head = stream.read(r):sub(1, 5)
+        local content = stream.read(r)
         stream.close(r)
         fs.remove(path)
 
-        return { head = head, isXml = head:sub(1, 5) == "<?xml" }`,
+        local head = content:sub(1, 7)
+        -- rbx-xml emits "<roblox version=..." (text); binary .rbxm starts with
+        -- "<roblox!\\x89\\xff..." (non-text after the literal "<roblox").
+        return { head = head, isXml = head == "<roblox" and content:sub(8, 8) ~= "!" }`,
     });
     expect(result.ok).toBe(true);
     expect(result.output).toContain('"isXml":true');
+  });
+
+  it("roblox: export to .rbxmx + import round-trips structure", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local roblox = require("@rodeo/roblox")
+        local fs = require("@rodeo/fs")
+
+        local folder = Instance.new("Folder")
+        folder.Name = "XmlRoundtrip"
+        local part = Instance.new("Part")
+        part.Name = "XmlChild"
+        part.Parent = folder
+
+        local path = "rodeo-test-xml-roundtrip.rbxmx"
+        roblox.export(path, { folder })
+
+        local imported = roblox.import(path)
+        fs.remove(path)
+
+        return {
+          count = #imported,
+          name = imported[1].Name,
+          class = imported[1].ClassName,
+          childName = imported[1]:FindFirstChild("XmlChild") and imported[1].XmlChild.Name or "missing",
+          childClass = imported[1]:FindFirstChild("XmlChild") and imported[1].XmlChild.ClassName or "missing",
+        }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('"count":1');
+    expect(result.output).toContain('"name":"XmlRoundtrip"');
+    expect(result.output).toContain('"class":"Folder"');
+    expect(result.output).toContain('"childName":"XmlChild"');
+    expect(result.output).toContain('"childClass":"Part"');
   });
 }

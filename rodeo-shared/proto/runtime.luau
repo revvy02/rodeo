@@ -21,6 +21,7 @@ type _Messages = {
 	StreamReadBytesResponse: _StreamReadBytesResponseMessage,
 	StreamWriteBytesRequest: _StreamWriteBytesRequestMessage,
 	StreamCloseRequest: _StreamCloseRequestMessage,
+	RobloxExportRequest: _RobloxExportRequestMessage,
 	FsExistsRequest: _FsExistsRequestMessage,
 	FsExistsResponse: _FsExistsResponseMessage,
 	FsStatRequest: _FsStatRequestMessage,
@@ -383,6 +384,29 @@ export type _StreamCloseRequestPartialFields = {
 
 export type StreamCloseRequest = typeof(setmetatable({} :: _StreamCloseRequestFields, {} :: _StreamCloseRequestImpl))
 type _StreamCloseRequestMessage = proto.Message<StreamCloseRequest, _StreamCloseRequestPartialFields>
+
+type _RobloxExportRequestImpl = {
+	__index: _RobloxExportRequestImpl,
+	new: (fields: _RobloxExportRequestPartialFields?) -> RobloxExportRequest,
+	encode: (self: RobloxExportRequest) -> buffer,
+	decode: (input: buffer) -> RobloxExportRequest,
+	jsonEncode: (self: RobloxExportRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxExportRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxExportRequestFields = {
+	path: string,
+	data: buffer,
+}
+
+export type _RobloxExportRequestPartialFields = {
+	path: string?,
+	data: buffer?,
+}
+
+export type RobloxExportRequest = typeof(setmetatable({} :: _RobloxExportRequestFields, {} :: _RobloxExportRequestImpl))
+type _RobloxExportRequestMessage = proto.Message<RobloxExportRequest, _RobloxExportRequestPartialFields>
 
 type _FsExistsRequestImpl = {
 	__index: _FsExistsRequestImpl,
@@ -1059,6 +1083,7 @@ type _ClientRpcCallFields = {
 		| { type: "processRunHandle", value: ProcessRunHandleRequest }
 		| { type: "processKill", value: ProcessKillRequest }
 		| { type: "mcpCall", value: McpCallRequest }
+		| { type: "robloxExport", value: RobloxExportRequest }
 	)?,
 }
 
@@ -1090,6 +1115,7 @@ export type _ClientRpcCallPartialFields = {
 		| { type: "processRunHandle", value: ProcessRunHandleRequest | _ProcessRunHandleRequestPartialFields }
 		| { type: "processKill", value: ProcessKillRequest | _ProcessKillRequestPartialFields }
 		| { type: "mcpCall", value: McpCallRequest | _McpCallRequestPartialFields }
+		| { type: "robloxExport", value: RobloxExportRequest | _RobloxExportRequestPartialFields }
 	)?,
 }
 
@@ -1135,6 +1161,7 @@ type _ClientRpcResponseFields = {
 		| { type: "processRunHandle", value: ProcessRunResponse }
 		| { type: "processKill", value: Ok }
 		| { type: "mcpCall", value: McpCallResponse }
+		| { type: "robloxExport", value: Ok }
 	)?,
 }
 
@@ -1167,6 +1194,7 @@ export type _ClientRpcResponsePartialFields = {
 		| { type: "processRunHandle", value: ProcessRunResponse | _ProcessRunResponsePartialFields }
 		| { type: "processKill", value: Ok | _OkPartialFields }
 		| { type: "mcpCall", value: McpCallResponse | _McpCallResponsePartialFields }
+		| { type: "robloxExport", value: Ok | _OkPartialFields }
 	)?,
 }
 
@@ -2642,6 +2670,122 @@ do
 	messages.StreamCloseRequest = _StreamCloseRequestImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.StreamCloseRequest)
+end
+
+do
+	local _RobloxExportRequestImpl = {}
+	_RobloxExportRequestImpl.__index = _RobloxExportRequestImpl
+
+	function _RobloxExportRequestImpl.new(data: _RobloxExportRequestPartialFields?): RobloxExportRequest
+		return setmetatable({
+			path = if data == nil or data.path == nil then "" else data.path,
+			data = if data == nil or data.data == nil then buffer.create(0) else data.data,
+		}, _RobloxExportRequestImpl :: _RobloxExportRequestImpl)
+	end
+
+	function _RobloxExportRequestImpl.encode(self: RobloxExportRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.path ~= nil and self.path ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.path)
+		end
+
+		if self.data ~= nil and buffer.len(self.data) > 0 then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeBuffer(output, cursor, self.data, buffer.len(self.data))
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxExportRequestImpl.decode(input: buffer): RobloxExportRequest
+		local self = _RobloxExportRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.path = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.data = value
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxExportRequestImpl.jsonEncode(self: RobloxExportRequest): any
+		local output = {}
+
+		if self.path ~= nil and self.path ~= "" then
+			output.path = self.path
+		end
+
+		if self.data ~= nil and buffer.len(self.data) > 0 then
+			output.data = proto.json.serializeBuffer(self.data)
+		end
+
+		return output
+	end
+
+	function _RobloxExportRequestImpl.jsonDecode(input: { [string]: any }): RobloxExportRequest
+		local self = _RobloxExportRequestImpl.new()
+
+		if input.path ~= nil then
+			self.path = input.path
+		end
+
+		if input.data ~= nil then
+			self.data = proto.json.deserializeBuffer(input.data)
+		end
+
+		return self
+	end
+
+	_RobloxExportRequestImpl.descriptor = {
+		name = "RobloxExportRequest",
+		fullName = "rodeo.runtime.RobloxExportRequest",
+	}
+
+	messages.RobloxExportRequest = _RobloxExportRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxExportRequest)
 end
 
 do
@@ -5992,6 +6136,12 @@ do
 					and getmetatable((v :: any).value) == nil
 				then
 					return { type = (v :: any).type, value = messages.McpCallRequest.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "robloxExport"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.RobloxExportRequest.new((v :: any).value) } :: any
 				end
 				return v :: any
 			end)(),
@@ -6108,6 +6258,10 @@ do
 			elseif self.req.type == "mcpCall" then
 				local encoded = self.req.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 40, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxExport" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 50, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -6261,6 +6415,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.req = { type = "mcpCall", value = messages.McpCallRequest.decode(value) }
 					continue
+				elseif field == 50 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = { type = "robloxExport", value = messages.RobloxExportRequest.decode(value) }
+					continue
 				end
 
 				local length
@@ -6345,6 +6504,8 @@ do
 				output.processKill = self.req.value:jsonEncode()
 			elseif self.req.type == "mcpCall" then
 				output.mcpCall = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxExport" then
+				output.robloxExport = self.req.value:jsonEncode()
 			end
 		end
 
@@ -6466,6 +6627,10 @@ do
 
 		if input.mcpCall ~= nil then
 			self.req = { type = "mcpCall", value = messages.McpCallRequest.jsonDecode(input.mcpCall) }
+		end
+
+		if input.robloxExport ~= nil then
+			self.req = { type = "robloxExport", value = messages.RobloxExportRequest.jsonDecode(input.robloxExport) }
 		end
 
 		return self
@@ -6656,6 +6821,12 @@ do
 					and getmetatable((v :: any).value) == nil
 				then
 					return { type = (v :: any).type, value = messages.McpCallResponse.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "robloxExport"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
 				end
 				return v :: any
 			end)(),
@@ -6775,6 +6946,10 @@ do
 			elseif self.res.type == "mcpCall" then
 				local encoded = self.res.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 40, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxExport" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 50, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -6933,6 +7108,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.res = { type = "mcpCall", value = messages.McpCallResponse.decode(value) }
 					continue
+				elseif field == 50 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "robloxExport", value = messages.Ok.decode(value) }
+					continue
 				end
 
 				local length
@@ -7019,6 +7199,8 @@ do
 				output.processKill = self.res.value:jsonEncode()
 			elseif self.res.type == "mcpCall" then
 				output.mcpCall = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxExport" then
+				output.robloxExport = self.res.value:jsonEncode()
 			end
 		end
 
@@ -7143,6 +7325,10 @@ do
 			self.res = { type = "mcpCall", value = messages.McpCallResponse.jsonDecode(input.mcpCall) }
 		end
 
+		if input.robloxExport ~= nil then
+			self.res = { type = "robloxExport", value = messages.Ok.jsonDecode(input.robloxExport) }
+		end
+
 		return self
 	end
 
@@ -7171,6 +7357,7 @@ return {
 	StreamReadBytesResponse = messages.StreamReadBytesResponse,
 	StreamWriteBytesRequest = messages.StreamWriteBytesRequest,
 	StreamCloseRequest = messages.StreamCloseRequest,
+	RobloxExportRequest = messages.RobloxExportRequest,
 	FsExistsRequest = messages.FsExistsRequest,
 	FsExistsResponse = messages.FsExistsResponse,
 	FsStatRequest = messages.FsStatRequest,

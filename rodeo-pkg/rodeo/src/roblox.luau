@@ -18,8 +18,9 @@ function roblox.import(path: string): { Instance }
 	return (singleton :: any).roblox.import(path)
 end
 
---- Serializes `instances` via `SerializationService:SerializeInstancesAsync`
---- and writes the resulting model bytes to `path`. Symmetric with `import`.
+--- Serializes `instances` and writes the model bytes to `path`. Extension
+--- selects the format: `.rbxm`/`.rbxl` write binary,
+--- `.rbxmx`/`.rbxlx` write XML. Symmetric with `import`.
 function roblox.export(path: string, instances: { Instance })
 	(singleton :: any).roblox.export(path, instances)
 end

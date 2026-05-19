@@ -1,5 +1,6 @@
 pub mod fs;
 pub mod process;
+pub mod roblox;
 pub mod stream;
 
 use rodeo_proto::runtime_types as rt;
@@ -205,6 +206,9 @@ pub async fn dispatch_client(
         // mcp.call is server-context; the server dispatches it directly before forwarding to run-client.
         // Getting here means the routing was wrong.
         Some(Req::McpCall(_)) => Some(Res::Error("mcp.call must be dispatched server-side".to_string())),
+
+        // roblox
+        Some(Req::RobloxExport(r)) => sync_arm("roblox.export", id, || roblox::roblox_export(r), Res::RobloxExport),
 
         None => Some(Res::Error("missing req".to_string())),
     };
