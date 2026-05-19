@@ -4,38 +4,12 @@
 
 # rodeo
 
+[![Latest release](https://img.shields.io/github/v/release/revvy02/rodeo?include_prereleases&label=latest)](https://github.com/revvy02/rodeo/releases)
+[![Latest stable](https://img.shields.io/github/v/release/revvy02/rodeo?label=stable)](https://github.com/revvy02/rodeo/releases)
+
 `rodeo` is an automation tool for Roblox Studio. It lets you execute code in any Studio environment and control Studio from your terminal, while providing the complete studio luau runtime.
 
 > **Status:** macOS is fully supported. Windows and Linux currently are not but are a work-in-progress. Breaking changes to API may happen.
-
-## Install
-
-### via mise
-
-```bash
-mise use ubi:revvy02/rodeo
-```
-
-### via rokit
-
-```bash
-rokit add revvy02/rodeo
-```
-
-## Quickstart
-
-```bash
-# 1. Install the companion plugin into Studio. (One-time.)
-rodeo plugin
-
-# 2. Open Studio (any place). The plugin auto-connects to localhost:44872.
-
-# 3. Start the rodeo server.
-rodeo serve
-
-# 4. Run scripts in another terminal.
-rodeo run --source 'print("hi from studio")'
-```
 
 ## Docs
 
