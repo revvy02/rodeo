@@ -166,10 +166,7 @@ for _, inst in roots do
 end
 ```
 
-`roblox.export` writes Instances back out as a model file. The destination extension selects the format:
-
-- `.rbxm` / `.rbxl` — binary (smaller, faster)
-- `.rbxmx` / `.rbxlx` — XML (human-readable, diff-friendly)
+`roblox.export` writes Instances back out as a `.rbxm` (binary) or `.rbxmx` (XML) model file — extension picks the format:
 
 ```luau
 local roblox = require("@rodeo/roblox")
@@ -178,8 +175,8 @@ local folder = Instance.new("Folder")
 folder.Name = "Snapshot"
 -- ...populate folder...
 
-roblox.export("out/snapshot.rbxm", { folder })   -- binary
-roblox.export("out/snapshot.rbxmx", { folder })  -- XML
+roblox.export("out/snapshot.rbxm", { folder })
+roblox.export("out/snapshot.rbxmx", { folder })
 ```
 
 Useful for staging test fixtures, snapshotting Studio state, or moving subtrees between sessions.

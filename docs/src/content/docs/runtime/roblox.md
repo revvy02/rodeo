@@ -9,8 +9,8 @@ local roblox = require("@rodeo/roblox")
 
 | Entry | Description |
 | :--- | :--- |
-| [export](#robloxexport) | Serializes `instances` and writes the model bytes to `path`. Extension |
-| [import](#robloximport) | Reads the model file at `path` and deserializes it via |
+| [export](#robloxexport) | Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`. |
+| [import](#robloximport) | Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances. |
 | [load](#robloxload) | Loads a Roblox model file (`.rbxm`/`.rbxmx`) at `path` and returns its |
 
 ---
@@ -19,11 +19,7 @@ local roblox = require("@rodeo/roblox")
 
 ### roblox.export
 
-Serializes `instances` and writes the model bytes to `path`. Extension
-
-selects the format: `.rbxm`/`.rbxl` write binary,
-
-`.rbxmx`/`.rbxlx` write XML. Symmetric with `import`.
+Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`.
 
 ```luau
 (path: string, instances: { Instance }) -> ()
@@ -33,11 +29,7 @@ selects the format: `.rbxm`/`.rbxl` write binary,
 
 ### roblox.import
 
-Reads the model file at `path` and deserializes it via
-
-`SerializationService:DeserializeInstancesAsync`. Returns the root
-
-Instances. Symmetric with `export`.
+Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances.
 
 ```luau
 (path: string) -> { Instance }

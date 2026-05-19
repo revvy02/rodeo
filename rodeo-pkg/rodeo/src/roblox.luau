@@ -11,16 +11,12 @@ function roblox.load(path: string): { Instance }
 	return (singleton :: any).roblox.load(path)
 end
 
---- Reads the model file at `path` and deserializes it via
---- `SerializationService:DeserializeInstancesAsync`. Returns the root
---- Instances. Symmetric with `export`.
+--- Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances.
 function roblox.import(path: string): { Instance }
 	return (singleton :: any).roblox.import(path)
 end
 
---- Serializes `instances` and writes the model bytes to `path`. Extension
---- selects the format: `.rbxm`/`.rbxl` write binary,
---- `.rbxmx`/`.rbxlx` write XML. Symmetric with `import`.
+--- Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`.
 function roblox.export(path: string, instances: { Instance })
 	(singleton :: any).roblox.export(path, instances)
 end
