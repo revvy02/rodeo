@@ -175,7 +175,7 @@ local folder = Instance.new("Folder")
 folder.Name = "Snapshot"
 -- ...populate folder...
 
-roblox.export({ folder }, "out/snapshot.rbxm")
+roblox.export("out/snapshot.rbxm", { folder })
 ```
 
 Useful for staging test fixtures, snapshotting Studio state, or moving subtrees between sessions.

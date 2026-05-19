@@ -24,7 +24,7 @@ Serializes `instances` via `SerializationService:SerializeInstancesAsync`
 and writes the resulting model bytes to `path`. Symmetric with `import`.
 
 ```luau
-(instances: { Instance }, path: string) -> ()
+(path: string, instances: { Instance }) -> ()
 ```
 
 ---

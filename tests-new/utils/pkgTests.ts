@@ -477,7 +477,7 @@ export function roblox(run: RunFn): void {
         part.Parent = folder
 
         local outPath = "rodeo-test-export.rbxm"
-        roblox.export({ folder }, outPath)
+        roblox.export(outPath, { folder })
 
         local imported = roblox.import(outPath)
         fs.remove(outPath)

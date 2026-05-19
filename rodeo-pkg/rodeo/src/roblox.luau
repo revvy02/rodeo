@@ -20,8 +20,8 @@ end
 
 --- Serializes `instances` via `SerializationService:SerializeInstancesAsync`
 --- and writes the resulting model bytes to `path`. Symmetric with `import`.
-function roblox.export(instances: { Instance }, path: string)
-	(singleton :: any).roblox.export(instances, path)
+function roblox.export(path: string, instances: { Instance })
+	(singleton :: any).roblox.export(path, instances)
 end
 
 return roblox

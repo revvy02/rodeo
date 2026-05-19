@@ -33,7 +33,7 @@ return function(rpc, hostInfo, executionId, fs, stream)
 		return SerializationService:DeserializeInstancesAsync(data)
 	end
 
-	function roblox.export(instances: { Instance }, path: string)
+	function roblox.export(path: string, instances: { Instance })
 		local buf = SerializationService:SerializeInstancesAsync(instances)
 		local h = fs.open(path, "w")
 		stream.writeBytes(h, buf)
