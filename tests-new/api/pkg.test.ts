@@ -13,5 +13,5 @@ describe("rodeo pkg", () => {
   describe("rodeo.fs", () => fs(run));
   describe("rodeo.io", () => io(run));
   describe("rodeo.process", () => processTests(run));
-  describe("roblox.load", () => roblox(run));
+  describe("rodeo.roblox", () => roblox(run));
 });

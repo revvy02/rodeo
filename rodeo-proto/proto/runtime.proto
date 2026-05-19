@@ -54,6 +54,19 @@ message StreamWriteRequest {
   string data = 2;
 }
 
+message StreamReadBytesRequest {
+  string handle = 1;
+}
+
+message StreamReadBytesResponse {
+  bytes data = 1;
+}
+
+message StreamWriteBytesRequest {
+  string handle = 1;
+  bytes data = 2;
+}
+
 message StreamCloseRequest {
   string handle = 1;
 }
@@ -224,12 +237,14 @@ message ClientRpcCall {
     FsCopyRequest    fs_copy    = 17;
 
     // stream: 20-29
-    StreamOpenRequest      stream_open       = 20;
-    StreamReadChunkRequest stream_read_chunk = 21;
-    StreamReadLineRequest  stream_read_line  = 22;
-    StreamReadAllRequest   stream_read_all   = 23;
-    StreamWriteRequest     stream_write      = 24;
-    StreamCloseRequest     stream_close      = 25;
+    StreamOpenRequest       stream_open        = 20;
+    StreamReadChunkRequest  stream_read_chunk  = 21;
+    StreamReadLineRequest   stream_read_line   = 22;
+    StreamReadAllRequest    stream_read_all    = 23;
+    StreamWriteRequest      stream_write       = 24;
+    StreamCloseRequest      stream_close       = 25;
+    StreamReadBytesRequest  stream_read_bytes  = 26;
+    StreamWriteBytesRequest stream_write_bytes = 27;
 
     // process: 30-39
     ProcessGetInfoRequest   process_get_info   = 30;
@@ -266,12 +281,14 @@ message ClientRpcResponse {
     Ok                fs_copy    = 17;
 
     // stream: 20-29
-    StreamOpenResponse      stream_open       = 20;
-    StreamReadChunkResponse stream_read_chunk = 21;
-    StreamReadLineResponse  stream_read_line  = 22;
-    StreamReadAllResponse   stream_read_all   = 23;
-    Ok                      stream_write      = 24;
-    Ok                      stream_close      = 25;
+    StreamOpenResponse      stream_open        = 20;
+    StreamReadChunkResponse stream_read_chunk  = 21;
+    StreamReadLineResponse  stream_read_line   = 22;
+    StreamReadAllResponse   stream_read_all    = 23;
+    Ok                      stream_write       = 24;
+    Ok                      stream_close       = 25;
+    StreamReadBytesResponse stream_read_bytes  = 26;
+    Ok                      stream_write_bytes = 27;
 
     // process: 30-39
     ProcessGetInfoResponse  process_get_info   = 30;

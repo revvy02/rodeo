@@ -9,11 +9,39 @@ local roblox = require("@rodeo/roblox")
 
 | Entry | Description |
 | :--- | :--- |
+| [export](#robloxexport) | Serializes `instances` via `SerializationService:SerializeInstancesAsync` |
+| [import](#robloximport) | Reads the model file at `path` and deserializes it via |
 | [load](#robloxload) | Loads a Roblox model file (`.rbxm`/`.rbxmx`) at `path` and returns its |
 
 ---
 
 ## Functions and Properties
+
+### roblox.export
+
+Serializes `instances` via `SerializationService:SerializeInstancesAsync`
+
+and writes the resulting model bytes to `path`. Symmetric with `import`.
+
+```luau
+(instances: { Instance }, path: string) -> ()
+```
+
+---
+
+### roblox.import
+
+Reads the model file at `path` and deserializes it via
+
+`SerializationService:DeserializeInstancesAsync`. Returns the root
+
+Instances. Symmetric with `export`.
+
+```luau
+(path: string) -> { Instance }
+```
+
+---
 
 ### roblox.load
 

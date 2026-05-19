@@ -67,11 +67,11 @@ pub enum StreamHandler {
     },
     FileWriter {
         path: String,
-        buffer: String,
+        buffer: Vec<u8>,
     },
     FileAppender {
         path: String,
-        buffer: String,
+        buffer: Vec<u8>,
     },
     Stdout,
     Stderr,
@@ -190,6 +190,8 @@ pub async fn dispatch_client(
         Some(Req::StreamReadAll(r))   => async_arm("stream.readAll",   id, stream::stream_read_all(state.clone(), r),   Res::StreamReadAll).await,
         Some(Req::StreamWrite(r))     => async_arm("stream.write",     id, stream::stream_write(state.clone(), r),      Res::StreamWrite).await,
         Some(Req::StreamClose(r))     => async_arm("stream.close",     id, stream::stream_close(state.clone(), r),      Res::StreamClose).await,
+        Some(Req::StreamReadBytes(r)) => async_arm("stream.readBytes", id, stream::stream_read_bytes(state.clone(), r), Res::StreamReadBytes).await,
+        Some(Req::StreamWriteBytes(r)) => async_arm("stream.writeBytes", id, stream::stream_write_bytes(state.clone(), r), Res::StreamWriteBytes).await,
 
         // process
         Some(Req::ProcessGetInfo(r))   => sync_arm ("process.getInfo",    id, || process::process_get_info(r),                          Res::ProcessGetInfo),

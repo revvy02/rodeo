@@ -1,10 +1,12 @@
--- @rodeo/roblox API: load .rbxm files into Studio.
--- Returns a factory: (rpc, hostInfo, executionId) -> roblox module.
+-- @rodeo/roblox API: load .rbxm files into Studio, import/export via
+-- SerializationService.
+-- Returns a factory: (rpc, hostInfo, executionId, fs, stream) -> roblox module.
 
-return function(rpc, hostInfo, executionId)
+return function(rpc, hostInfo, executionId, fs, stream)
 	local roblox = {}
 	local contentPath = hostInfo.studioContentPath
 	local cwd = hostInfo.cwd
+	local SerializationService = game:GetService("SerializationService")
 
 	function roblox.load(path: string): { Instance }
 		-- Resolve absolute source path
@@ -22,6 +24,20 @@ return function(rpc, hostInfo, executionId)
 
 		-- Load via Roblox API
 		return game:GetObjects("rbxasset://rodeo-temp/" .. executionId .. "/" .. filename)
+	end
+
+	function roblox.import(path: string): { Instance }
+		local h = fs.open(path, "r")
+		local data = stream.readBytes(h)
+		stream.close(h)
+		return SerializationService:DeserializeInstancesAsync(data)
+	end
+
+	function roblox.export(instances: { Instance }, path: string)
+		local buf = SerializationService:SerializeInstancesAsync(instances)
+		local h = fs.open(path, "w")
+		stream.writeBytes(h, buf)
+		stream.close(h)
 	end
 
 	return roblox

@@ -24,6 +24,18 @@ function stream.write(handle: StreamHandle, data: any)
 	(singleton :: any).stream.write(handle, data)
 end
 
+--- Reads all remaining bytes from `handle` as a `buffer`. Use for binary
+--- data; for text use `read`.
+function stream.readBytes(handle: StreamHandle): buffer
+	return (singleton :: any).stream.readBytes(handle)
+end
+
+--- Writes the bytes in `data` to `handle`. Use for binary data; for text
+--- use `write`.
+function stream.writeBytes(handle: StreamHandle, data: buffer)
+	(singleton :: any).stream.writeBytes(handle, data)
+end
+
 --- Closes `handle`. Subsequent reads/writes error.
 function stream.close(handle: StreamHandle)
 	(singleton :: any).stream.close(handle)

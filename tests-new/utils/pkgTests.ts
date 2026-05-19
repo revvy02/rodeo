@@ -190,6 +190,42 @@ export function fs(run: RunFn): void {
     expect(result.output).toContain('"hasElevation":true');
     expect(result.output).toContain('"width":454');
   });
+
+  it("stream: readBytes/writeBytes round-trip non-UTF-8 bytes", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local fs = require("@rodeo/fs")
+        local stream = require("@rodeo/stream")
+        local input = buffer.create(6)
+        buffer.writeu8(input, 0, 0x00); buffer.writeu8(input, 1, 0xFF)
+        buffer.writeu8(input, 2, 0xC0); buffer.writeu8(input, 3, 0xC1)
+        buffer.writeu8(input, 4, 0xFE); buffer.writeu8(input, 5, 0xFF)
+
+        local w = fs.open("rodeo-test-bytes.bin", "w")
+        stream.writeBytes(w, input)
+        stream.close(w)
+
+        local r = fs.open("rodeo-test-bytes.bin", "r")
+        local out = stream.readBytes(r)
+        stream.close(r)
+        fs.remove("rodeo-test-bytes.bin")
+
+        return {
+          len = buffer.len(out),
+          b0 = buffer.readu8(out, 0), b1 = buffer.readu8(out, 1),
+          b2 = buffer.readu8(out, 2), b3 = buffer.readu8(out, 3),
+          b4 = buffer.readu8(out, 4), b5 = buffer.readu8(out, 5),
+        }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('"len":6');
+    expect(result.output).toContain('"b0":0');
+    expect(result.output).toContain('"b1":255');
+    expect(result.output).toContain('"b2":192');
+    expect(result.output).toContain('"b3":193');
+    expect(result.output).toContain('"b4":254');
+    expect(result.output).toContain('"b5":255');
+  });
 }
 
 // ── io (3 tests) ──────────────────────────────────────────────────────────
@@ -413,6 +449,59 @@ export function roblox(run: RunFn): void {
     const result = await run({
       source: `local roblox = require("@rodeo/roblox")
         roblox.load("./nonexistent-file-12345.rbxm")`,
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("roblox: import returns instances from rbxm", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local roblox = require("@rodeo/roblox")
+        local instances = roblox.import("./tests-new/fixtures/pkg/test-folder.rbxm")
+        return { count = #instances, class = instances[1].ClassName }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('"count":1');
+    expect(result.output).toContain('"class":"Folder"');
+  });
+
+  it("roblox: export + import round-trips instance class+name", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local roblox = require("@rodeo/roblox")
+        local fs = require("@rodeo/fs")
+        local folder = Instance.new("Folder")
+        folder.Name = "RodeoTestExport"
+        local part = Instance.new("Part")
+        part.Name = "ChildPart"
+        part.Parent = folder
+
+        local outPath = "rodeo-test-export.rbxm"
+        roblox.export({ folder }, outPath)
+
+        local imported = roblox.import(outPath)
+        fs.remove(outPath)
+
+        return {
+          count = #imported,
+          name = imported[1].Name,
+          class = imported[1].ClassName,
+          childName = imported[1]:FindFirstChild("ChildPart") and imported[1].ChildPart.Name or "missing",
+          childClass = imported[1]:FindFirstChild("ChildPart") and imported[1].ChildPart.ClassName or "missing",
+        }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('"count":1');
+    expect(result.output).toContain('"name":"RodeoTestExport"');
+    expect(result.output).toContain('"class":"Folder"');
+    expect(result.output).toContain('"childName":"ChildPart"');
+    expect(result.output).toContain('"childClass":"Part"');
+  });
+
+  it("roblox: import nonexistent file errors", async () => {
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        roblox.import("./nonexistent-file-12345.rbxm")`,
     });
     expect(result.ok).toBe(false);
   });

@@ -17,6 +17,9 @@ type _Messages = {
 	StreamReadAllRequest: _StreamReadAllRequestMessage,
 	StreamReadAllResponse: _StreamReadAllResponseMessage,
 	StreamWriteRequest: _StreamWriteRequestMessage,
+	StreamReadBytesRequest: _StreamReadBytesRequestMessage,
+	StreamReadBytesResponse: _StreamReadBytesResponseMessage,
+	StreamWriteBytesRequest: _StreamWriteBytesRequestMessage,
 	StreamCloseRequest: _StreamCloseRequestMessage,
 	FsExistsRequest: _FsExistsRequestMessage,
 	FsExistsResponse: _FsExistsResponseMessage,
@@ -285,6 +288,80 @@ export type _StreamWriteRequestPartialFields = {
 
 export type StreamWriteRequest = typeof(setmetatable({} :: _StreamWriteRequestFields, {} :: _StreamWriteRequestImpl))
 type _StreamWriteRequestMessage = proto.Message<StreamWriteRequest, _StreamWriteRequestPartialFields>
+
+type _StreamReadBytesRequestImpl = {
+	__index: _StreamReadBytesRequestImpl,
+	new: (fields: _StreamReadBytesRequestPartialFields?) -> StreamReadBytesRequest,
+	encode: (self: StreamReadBytesRequest) -> buffer,
+	decode: (input: buffer) -> StreamReadBytesRequest,
+	jsonEncode: (self: StreamReadBytesRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> StreamReadBytesRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _StreamReadBytesRequestFields = {
+	handle: string,
+}
+
+export type _StreamReadBytesRequestPartialFields = {
+	handle: string?,
+}
+
+export type StreamReadBytesRequest = typeof(setmetatable(
+	{} :: _StreamReadBytesRequestFields,
+	{} :: _StreamReadBytesRequestImpl
+))
+type _StreamReadBytesRequestMessage = proto.Message<StreamReadBytesRequest, _StreamReadBytesRequestPartialFields>
+
+type _StreamReadBytesResponseImpl = {
+	__index: _StreamReadBytesResponseImpl,
+	new: (fields: _StreamReadBytesResponsePartialFields?) -> StreamReadBytesResponse,
+	encode: (self: StreamReadBytesResponse) -> buffer,
+	decode: (input: buffer) -> StreamReadBytesResponse,
+	jsonEncode: (self: StreamReadBytesResponse) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> StreamReadBytesResponse,
+	descriptor: proto.Descriptor,
+}
+
+type _StreamReadBytesResponseFields = {
+	data: buffer,
+}
+
+export type _StreamReadBytesResponsePartialFields = {
+	data: buffer?,
+}
+
+export type StreamReadBytesResponse = typeof(setmetatable(
+	{} :: _StreamReadBytesResponseFields,
+	{} :: _StreamReadBytesResponseImpl
+))
+type _StreamReadBytesResponseMessage = proto.Message<StreamReadBytesResponse, _StreamReadBytesResponsePartialFields>
+
+type _StreamWriteBytesRequestImpl = {
+	__index: _StreamWriteBytesRequestImpl,
+	new: (fields: _StreamWriteBytesRequestPartialFields?) -> StreamWriteBytesRequest,
+	encode: (self: StreamWriteBytesRequest) -> buffer,
+	decode: (input: buffer) -> StreamWriteBytesRequest,
+	jsonEncode: (self: StreamWriteBytesRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> StreamWriteBytesRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _StreamWriteBytesRequestFields = {
+	handle: string,
+	data: buffer,
+}
+
+export type _StreamWriteBytesRequestPartialFields = {
+	handle: string?,
+	data: buffer?,
+}
+
+export type StreamWriteBytesRequest = typeof(setmetatable(
+	{} :: _StreamWriteBytesRequestFields,
+	{} :: _StreamWriteBytesRequestImpl
+))
+type _StreamWriteBytesRequestMessage = proto.Message<StreamWriteBytesRequest, _StreamWriteBytesRequestPartialFields>
 
 type _StreamCloseRequestImpl = {
 	__index: _StreamCloseRequestImpl,
@@ -972,6 +1049,8 @@ type _ClientRpcCallFields = {
 		| { type: "streamReadAll", value: StreamReadAllRequest }
 		| { type: "streamWrite", value: StreamWriteRequest }
 		| { type: "streamClose", value: StreamCloseRequest }
+		| { type: "streamReadBytes", value: StreamReadBytesRequest }
+		| { type: "streamWriteBytes", value: StreamWriteBytesRequest }
 		| { type: "processGetInfo", value: ProcessGetInfoRequest }
 		| { type: "processExit", value: ProcessExitRequest }
 		| { type: "processRun", value: ProcessRunRequest }
@@ -1001,6 +1080,8 @@ export type _ClientRpcCallPartialFields = {
 		| { type: "streamReadAll", value: StreamReadAllRequest | _StreamReadAllRequestPartialFields }
 		| { type: "streamWrite", value: StreamWriteRequest | _StreamWriteRequestPartialFields }
 		| { type: "streamClose", value: StreamCloseRequest | _StreamCloseRequestPartialFields }
+		| { type: "streamReadBytes", value: StreamReadBytesRequest | _StreamReadBytesRequestPartialFields }
+		| { type: "streamWriteBytes", value: StreamWriteBytesRequest | _StreamWriteBytesRequestPartialFields }
 		| { type: "processGetInfo", value: ProcessGetInfoRequest | _ProcessGetInfoRequestPartialFields }
 		| { type: "processExit", value: ProcessExitRequest | _ProcessExitRequestPartialFields }
 		| { type: "processRun", value: ProcessRunRequest | _ProcessRunRequestPartialFields }
@@ -1044,6 +1125,8 @@ type _ClientRpcResponseFields = {
 		| { type: "streamReadAll", value: StreamReadAllResponse }
 		| { type: "streamWrite", value: Ok }
 		| { type: "streamClose", value: Ok }
+		| { type: "streamReadBytes", value: StreamReadBytesResponse }
+		| { type: "streamWriteBytes", value: Ok }
 		| { type: "processGetInfo", value: ProcessGetInfoResponse }
 		| { type: "processExit", value: Ok }
 		| { type: "processRun", value: ProcessRunResponse }
@@ -1074,6 +1157,8 @@ export type _ClientRpcResponsePartialFields = {
 		| { type: "streamReadAll", value: StreamReadAllResponse | _StreamReadAllResponsePartialFields }
 		| { type: "streamWrite", value: Ok | _OkPartialFields }
 		| { type: "streamClose", value: Ok | _OkPartialFields }
+		| { type: "streamReadBytes", value: StreamReadBytesResponse | _StreamReadBytesResponsePartialFields }
+		| { type: "streamWriteBytes", value: Ok | _OkPartialFields }
 		| { type: "processGetInfo", value: ProcessGetInfoResponse | _ProcessGetInfoResponsePartialFields }
 		| { type: "processExit", value: Ok | _OkPartialFields }
 		| { type: "processRun", value: ProcessRunResponse | _ProcessRunResponsePartialFields }
@@ -2150,6 +2235,316 @@ do
 	messages.StreamWriteRequest = _StreamWriteRequestImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.StreamWriteRequest)
+end
+
+do
+	local _StreamReadBytesRequestImpl = {}
+	_StreamReadBytesRequestImpl.__index = _StreamReadBytesRequestImpl
+
+	function _StreamReadBytesRequestImpl.new(data: _StreamReadBytesRequestPartialFields?): StreamReadBytesRequest
+		return setmetatable({
+			handle = if data == nil or data.handle == nil then "" else data.handle,
+		}, _StreamReadBytesRequestImpl :: _StreamReadBytesRequestImpl)
+	end
+
+	function _StreamReadBytesRequestImpl.encode(self: StreamReadBytesRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _StreamReadBytesRequestImpl.decode(input: buffer): StreamReadBytesRequest
+		local self = _StreamReadBytesRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.handle = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _StreamReadBytesRequestImpl.jsonEncode(self: StreamReadBytesRequest): any
+		local output = {}
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
+		end
+
+		return output
+	end
+
+	function _StreamReadBytesRequestImpl.jsonDecode(input: { [string]: any }): StreamReadBytesRequest
+		local self = _StreamReadBytesRequestImpl.new()
+
+		if input.handle ~= nil then
+			self.handle = input.handle
+		end
+
+		return self
+	end
+
+	_StreamReadBytesRequestImpl.descriptor = {
+		name = "StreamReadBytesRequest",
+		fullName = "rodeo.runtime.StreamReadBytesRequest",
+	}
+
+	messages.StreamReadBytesRequest = _StreamReadBytesRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.StreamReadBytesRequest)
+end
+
+do
+	local _StreamReadBytesResponseImpl = {}
+	_StreamReadBytesResponseImpl.__index = _StreamReadBytesResponseImpl
+
+	function _StreamReadBytesResponseImpl.new(data: _StreamReadBytesResponsePartialFields?): StreamReadBytesResponse
+		return setmetatable({
+			data = if data == nil or data.data == nil then buffer.create(0) else data.data,
+		}, _StreamReadBytesResponseImpl :: _StreamReadBytesResponseImpl)
+	end
+
+	function _StreamReadBytesResponseImpl.encode(self: StreamReadBytesResponse): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.data ~= nil and buffer.len(self.data) > 0 then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeBuffer(output, cursor, self.data, buffer.len(self.data))
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _StreamReadBytesResponseImpl.decode(input: buffer): StreamReadBytesResponse
+		local self = _StreamReadBytesResponseImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.data = value
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _StreamReadBytesResponseImpl.jsonEncode(self: StreamReadBytesResponse): any
+		local output = {}
+
+		if self.data ~= nil and buffer.len(self.data) > 0 then
+			output.data = proto.json.serializeBuffer(self.data)
+		end
+
+		return output
+	end
+
+	function _StreamReadBytesResponseImpl.jsonDecode(input: { [string]: any }): StreamReadBytesResponse
+		local self = _StreamReadBytesResponseImpl.new()
+
+		if input.data ~= nil then
+			self.data = proto.json.deserializeBuffer(input.data)
+		end
+
+		return self
+	end
+
+	_StreamReadBytesResponseImpl.descriptor = {
+		name = "StreamReadBytesResponse",
+		fullName = "rodeo.runtime.StreamReadBytesResponse",
+	}
+
+	messages.StreamReadBytesResponse = _StreamReadBytesResponseImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.StreamReadBytesResponse)
+end
+
+do
+	local _StreamWriteBytesRequestImpl = {}
+	_StreamWriteBytesRequestImpl.__index = _StreamWriteBytesRequestImpl
+
+	function _StreamWriteBytesRequestImpl.new(data: _StreamWriteBytesRequestPartialFields?): StreamWriteBytesRequest
+		return setmetatable({
+			handle = if data == nil or data.handle == nil then "" else data.handle,
+			data = if data == nil or data.data == nil then buffer.create(0) else data.data,
+		}, _StreamWriteBytesRequestImpl :: _StreamWriteBytesRequestImpl)
+	end
+
+	function _StreamWriteBytesRequestImpl.encode(self: StreamWriteBytesRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		if self.data ~= nil and buffer.len(self.data) > 0 then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeBuffer(output, cursor, self.data, buffer.len(self.data))
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _StreamWriteBytesRequestImpl.decode(input: buffer): StreamWriteBytesRequest
+		local self = _StreamWriteBytesRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.handle = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.data = value
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _StreamWriteBytesRequestImpl.jsonEncode(self: StreamWriteBytesRequest): any
+		local output = {}
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
+		end
+
+		if self.data ~= nil and buffer.len(self.data) > 0 then
+			output.data = proto.json.serializeBuffer(self.data)
+		end
+
+		return output
+	end
+
+	function _StreamWriteBytesRequestImpl.jsonDecode(input: { [string]: any }): StreamWriteBytesRequest
+		local self = _StreamWriteBytesRequestImpl.new()
+
+		if input.handle ~= nil then
+			self.handle = input.handle
+		end
+
+		if input.data ~= nil then
+			self.data = proto.json.deserializeBuffer(input.data)
+		end
+
+		return self
+	end
+
+	_StreamWriteBytesRequestImpl.descriptor = {
+		name = "StreamWriteBytesRequest",
+		fullName = "rodeo.runtime.StreamWriteBytesRequest",
+	}
+
+	messages.StreamWriteBytesRequest = _StreamWriteBytesRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.StreamWriteBytesRequest)
 end
 
 do
@@ -5520,6 +5915,24 @@ do
 				then
 					return { type = (v :: any).type, value = messages.StreamCloseRequest.new((v :: any).value) } :: any
 				elseif
+					(v :: any).type == "streamReadBytes"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.StreamReadBytesRequest.new((v :: any).value),
+						} :: any
+				elseif
+					(v :: any).type == "streamWriteBytes"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.StreamWriteBytesRequest.new((v :: any).value),
+						} :: any
+				elseif
 					(v :: any).type == "processGetInfo"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
@@ -5656,6 +6069,14 @@ do
 				local encoded = self.req.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 25, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "streamReadBytes" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 26, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "streamWriteBytes" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 27, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			elseif self.req.type == "processGetInfo" then
 				local encoded = self.req.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 30, proto.wireTypes.lengthDelimited)
@@ -5790,6 +6211,16 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.req = { type = "streamClose", value = messages.StreamCloseRequest.decode(value) }
 					continue
+				elseif field == 26 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = { type = "streamReadBytes", value = messages.StreamReadBytesRequest.decode(value) }
+					continue
+				elseif field == 27 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = { type = "streamWriteBytes", value = messages.StreamWriteBytesRequest.decode(value) }
+					continue
 				elseif field == 30 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
@@ -5894,6 +6325,10 @@ do
 				output.streamWrite = self.req.value:jsonEncode()
 			elseif self.req.type == "streamClose" then
 				output.streamClose = self.req.value:jsonEncode()
+			elseif self.req.type == "streamReadBytes" then
+				output.streamReadBytes = self.req.value:jsonEncode()
+			elseif self.req.type == "streamWriteBytes" then
+				output.streamWriteBytes = self.req.value:jsonEncode()
 			elseif self.req.type == "processGetInfo" then
 				output.processGetInfo = self.req.value:jsonEncode()
 			elseif self.req.type == "processExit" then
@@ -5983,6 +6418,18 @@ do
 
 		if input.streamClose ~= nil then
 			self.req = { type = "streamClose", value = messages.StreamCloseRequest.jsonDecode(input.streamClose) }
+		end
+
+		if input.streamReadBytes ~= nil then
+			self.req =
+				{ type = "streamReadBytes", value = messages.StreamReadBytesRequest.jsonDecode(input.streamReadBytes) }
+		end
+
+		if input.streamWriteBytes ~= nil then
+			self.req = {
+				type = "streamWriteBytes",
+				value = messages.StreamWriteBytesRequest.jsonDecode(input.streamWriteBytes),
+			}
 		end
 
 		if input.processGetInfo ~= nil then
@@ -6141,6 +6588,21 @@ do
 				then
 					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
 				elseif
+					(v :: any).type == "streamReadBytes"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.StreamReadBytesResponse.new((v :: any).value),
+						} :: any
+				elseif
+					(v :: any).type == "streamWriteBytes"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
+				elseif
 					(v :: any).type == "processGetInfo"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
@@ -6273,6 +6735,14 @@ do
 			elseif self.res.type == "streamClose" then
 				local encoded = self.res.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 25, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "streamReadBytes" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 26, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "streamWriteBytes" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 27, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			elseif self.res.type == "processGetInfo" then
 				local encoded = self.res.value:encode()
@@ -6413,6 +6883,16 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.res = { type = "streamClose", value = messages.Ok.decode(value) }
 					continue
+				elseif field == 26 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "streamReadBytes", value = messages.StreamReadBytesResponse.decode(value) }
+					continue
+				elseif field == 27 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "streamWriteBytes", value = messages.Ok.decode(value) }
+					continue
 				elseif field == 30 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
@@ -6519,6 +6999,10 @@ do
 				output.streamWrite = self.res.value:jsonEncode()
 			elseif self.res.type == "streamClose" then
 				output.streamClose = self.res.value:jsonEncode()
+			elseif self.res.type == "streamReadBytes" then
+				output.streamReadBytes = self.res.value:jsonEncode()
+			elseif self.res.type == "streamWriteBytes" then
+				output.streamWriteBytes = self.res.value:jsonEncode()
 			elseif self.res.type == "processGetInfo" then
 				output.processGetInfo = self.res.value:jsonEncode()
 			elseif self.res.type == "processExit" then
@@ -6615,6 +7099,15 @@ do
 			self.res = { type = "streamClose", value = messages.Ok.jsonDecode(input.streamClose) }
 		end
 
+		if input.streamReadBytes ~= nil then
+			self.res =
+				{ type = "streamReadBytes", value = messages.StreamReadBytesResponse.jsonDecode(input.streamReadBytes) }
+		end
+
+		if input.streamWriteBytes ~= nil then
+			self.res = { type = "streamWriteBytes", value = messages.Ok.jsonDecode(input.streamWriteBytes) }
+		end
+
 		if input.processGetInfo ~= nil then
 			self.res =
 				{ type = "processGetInfo", value = messages.ProcessGetInfoResponse.jsonDecode(input.processGetInfo) }
@@ -6674,6 +7167,9 @@ return {
 	StreamReadAllRequest = messages.StreamReadAllRequest,
 	StreamReadAllResponse = messages.StreamReadAllResponse,
 	StreamWriteRequest = messages.StreamWriteRequest,
+	StreamReadBytesRequest = messages.StreamReadBytesRequest,
+	StreamReadBytesResponse = messages.StreamReadBytesResponse,
+	StreamWriteBytesRequest = messages.StreamWriteBytesRequest,
 	StreamCloseRequest = messages.StreamCloseRequest,
 	FsExistsRequest = messages.FsExistsRequest,
 	FsExistsResponse = messages.FsExistsResponse,

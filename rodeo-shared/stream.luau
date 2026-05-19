@@ -56,6 +56,20 @@ return function(rpc)
 		}))
 	end
 
+	function stream.readBytes(handle): buffer
+		local r: runtime.StreamReadBytesResponse = rpc.call("stream_read_bytes", runtime.StreamReadBytesRequest.new({
+			handle = handle.__handle,
+		}))
+		return r.data
+	end
+
+	function stream.writeBytes(handle, data: buffer)
+		rpc.call("stream_write_bytes", runtime.StreamWriteBytesRequest.new({
+			handle = handle.__handle,
+			data = data,
+		}))
+	end
+
 	function stream.close(handle)
 		rpc.call("stream_close", runtime.StreamCloseRequest.new({
 			handle = handle.__handle,

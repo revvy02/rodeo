@@ -43,12 +43,13 @@ local hostInfo = rpc.call("process_get_info", runtime.ProcessGetInfoRequest.new(
 -- Create RPC-backed API implementations via factories
 local processApi = require(ref("process"))(rpc, scriptArgs, hostInfo)
 local streamApi = require(ref("stream"))(rpc)
+local fsApi = require(ref("fs"))(rpc)
 local apis = {
-	fs = require(ref("fs"))(rpc),
+	fs = fsApi,
 	io = require(ref("io"))(rpc),
 	process = processApi,
 	stream = streamApi,
-	roblox = require(ref("roblox"))(rpc, hostInfo, executionId),
+	roblox = require(ref("roblox"))(rpc, hostInfo, executionId, fsApi, streamApi),
 }
 
 -- Publish to _G so require("@rodeo/fs") etc. can find them

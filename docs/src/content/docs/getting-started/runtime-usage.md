@@ -62,6 +62,27 @@ end
 
 `fs.exists`, `fs.stat`, `fs.mkdir`, `fs.remove`, `fs.rmdir`, `fs.copy`, and `fs.type` round out the surface — see the [fs reference](/rodeo/runtime/fs/).
 
+### Binary files
+
+For non-text data, use `stream.readBytes` / `stream.writeBytes` instead of the string-based versions. They return / accept a Luau `buffer`:
+
+```luau
+local fs = require("@rodeo/fs")
+local stream = require("@rodeo/stream")
+
+local r = fs.open("sprite.png", "r")
+local data = stream.readBytes(r)  -- buffer
+stream.close(r)
+
+print(buffer.len(data), "bytes")
+
+local w = fs.open("copy.png", "w")
+stream.writeBytes(w, data)
+stream.close(w)
+```
+
+The string-based `stream.read`/`stream.write` corrupt non-UTF-8 bytes; always use the `Bytes` variants for binary files.
+
 ## Piping to stdout
 
 `io.stdout` (and `io.stderr`) are stream handles. Writing to them feeds the terminal that ran `rodeo run`, so your script becomes pipeable:
@@ -132,20 +153,34 @@ print(result.stdout)
 
 `process.create` spawns without blocking — use it for long-running children you want to talk to via stream handles. The [process reference](/rodeo/runtime/process/) covers the full options table (`cwd`, `env`, per-stream `stdio` overrides).
 
-## Loading `.rbxm` fixtures
+## Roblox models
 
-`roblox.load` reads a model file from disk and returns its root Instances:
+`roblox.import` reads a model file from disk via `SerializationService` and returns its root Instances:
 
 ```luau
 local roblox = require("@rodeo/roblox")
 
-local roots = roblox.load("fixtures/test-rig.rbxm")
+local roots = roblox.import("fixtures/test-rig.rbxm")
 for _, inst in roots do
     inst.Parent = workspace
 end
 ```
 
-Useful for staging tests: keep your fixtures on disk, load them into the DataModel at the start of each run.
+`roblox.export` writes Instances back out as a `.rbxm`:
+
+```luau
+local roblox = require("@rodeo/roblox")
+
+local folder = Instance.new("Folder")
+folder.Name = "Snapshot"
+-- ...populate folder...
+
+roblox.export({ folder }, "out/snapshot.rbxm")
+```
+
+Useful for staging test fixtures, snapshotting Studio state, or moving subtrees between sessions.
+
+`roblox.load` exists as a legacy alternative that loads via Studio's content asset system instead of `SerializationService` — prefer `import` for new code.
 
 ## Combining: snapshot game state to disk
 

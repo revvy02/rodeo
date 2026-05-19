@@ -14,13 +14,13 @@ pub async fn stream_open(state: SharedRpcState, req: &rt::StreamOpenRequest) -> 
         }
         "w" => StreamHandler::FileWriter {
             path: req.path.clone(),
-            buffer: String::new(),
+            buffer: Vec::new(),
         },
         "a" => {
             let existing = if std::path::Path::new(&req.path).is_file() {
-                std::fs::read_to_string(&req.path).unwrap_or_default()
+                std::fs::read(&req.path).unwrap_or_default()
             } else {
-                String::new()
+                Vec::new()
             };
             StreamHandler::FileAppender {
                 path: req.path.clone(),
@@ -182,10 +182,10 @@ pub async fn stream_write(state: SharedRpcState, req: &rt::StreamWriteRequest) -
                 let _ = captured_tx.send((super::CapturedStreamKind::Stderr, req.data.as_bytes().to_vec()));
             }
             StreamHandler::FileWriter { buffer, .. } => {
-                buffer.push_str(&req.data);
+                buffer.extend_from_slice(req.data.as_bytes());
             }
             StreamHandler::FileAppender { buffer, .. } => {
-                buffer.push_str(&req.data);
+                buffer.extend_from_slice(req.data.as_bytes());
             }
             StreamHandler::ProcessStdin { stdin } => {
                 use tokio::io::AsyncWriteExt;
@@ -200,6 +200,81 @@ pub async fn stream_write(state: SharedRpcState, req: &rt::StreamWriteRequest) -
         }
     } else {
         tracing::debug!("stream.write: no handler for '{}'", req.handle);
+    }
+    Ok(rt::Ok::default())
+}
+
+pub async fn stream_read_bytes(state: SharedRpcState, req: &rt::StreamReadBytesRequest) -> Result<rt::StreamReadBytesResponse, String> {
+    if req.handle == "stdin" {
+        return tokio::task::spawn_blocking(|| {
+            let mut buf = Vec::new();
+            std::io::stdin().lock().read_to_end(&mut buf).map_err(|e| format!("stdin read: {e}"))?;
+            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+        })
+        .await
+        .map_err(|e| format!("task error: {e}"))?;
+    }
+
+    let mut guard = state.lock().await;
+    let handler = guard
+        .stream_handlers
+        .get_mut(&req.handle)
+        .ok_or_else(|| format!("no reader for handle: {}", req.handle))?;
+
+    match handler {
+        StreamHandler::ProcessStdout { stdout } => {
+            use tokio::io::AsyncReadExt;
+            let reader = stdout.as_mut().ok_or("stdout not available")?;
+            let mut buf = Vec::new();
+            reader.read_to_end(&mut buf).await.map_err(|e| format!("read error: {e}"))?;
+            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+        }
+        StreamHandler::ProcessStderr { stderr } => {
+            use tokio::io::AsyncReadExt;
+            let reader = stderr.as_mut().ok_or("stderr not available")?;
+            let mut buf = Vec::new();
+            reader.read_to_end(&mut buf).await.map_err(|e| format!("read error: {e}"))?;
+            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+        }
+        StreamHandler::FileReader { reader } => {
+            let mut buf = Vec::new();
+            reader.read_to_end(&mut buf).map_err(|e| format!("read error: {e}"))?;
+            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+        }
+        _ => Err(format!("handle not readable: {}", req.handle)),
+    }
+}
+
+pub async fn stream_write_bytes(state: SharedRpcState, req: &rt::StreamWriteBytesRequest) -> Result<rt::Ok, String> {
+    let mut guard = state.lock().await;
+    let captured_tx = guard.captured_output_tx.clone();
+    if let Some(handler) = guard.stream_handlers.get_mut(&req.handle) {
+        match handler {
+            StreamHandler::Stdout => {
+                let _ = captured_tx.send((super::CapturedStreamKind::Stdout, req.data.clone()));
+            }
+            StreamHandler::Stderr => {
+                let _ = captured_tx.send((super::CapturedStreamKind::Stderr, req.data.clone()));
+            }
+            StreamHandler::FileWriter { buffer, .. } => {
+                buffer.extend_from_slice(&req.data);
+            }
+            StreamHandler::FileAppender { buffer, .. } => {
+                buffer.extend_from_slice(&req.data);
+            }
+            StreamHandler::ProcessStdin { stdin } => {
+                use tokio::io::AsyncWriteExt;
+                if let Some(writer) = stdin.as_mut() {
+                    let _ = writer.write_all(&req.data).await;
+                    let _ = writer.flush().await;
+                }
+            }
+            _ => {
+                tracing::debug!("stream.writeBytes: no writer for '{}'", req.handle);
+            }
+        }
+    } else {
+        tracing::debug!("stream.writeBytes: no handler for '{}'", req.handle);
     }
     Ok(rt::Ok::default())
 }
