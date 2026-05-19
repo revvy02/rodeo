@@ -50,3 +50,37 @@
 	border-radius: 0.5rem;
 	overflow: hidden;
 }
+
+/* CTA buttons — outlined block style, matching the terminal/plugin
+   aesthetic (think CONNECT button: bright accent border, transparent
+   background, monospace text, fills on hover). */
+.sl-link-button {
+	background: transparent;
+	border: 2px solid var(--sl-color-accent);
+	color: var(--sl-color-accent);
+	border-radius: 0.375rem;
+	font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	padding: 0.7em 1.4em;
+	transition: background-color 120ms ease, color 120ms ease;
+}
+
+.sl-link-button:hover,
+.sl-link-button:focus-visible {
+	background: var(--sl-color-accent);
+	color: var(--sl-color-black);
+}
+
+/* Secondary buttons (non-primary) use a muted variant. */
+.sl-link-button:not(.primary) {
+	border-color: var(--rodeo-gold);
+	color: var(--rodeo-gold);
+}
+
+.sl-link-button:not(.primary):hover,
+.sl-link-button:not(.primary):focus-visible {
+	background: var(--rodeo-gold);
+	color: var(--sl-color-black);
+}
