@@ -7,6 +7,11 @@
 
 .rodeo/.temp
 
+# pkgTests.ts artifacts in repo root (test bodies write here via fs.open and
+# rely on fs.remove to clean up — if a test errors before the cleanup line,
+# the file lingers; ignoring keeps it out of commits).
+/rodeo-test-*
+
 # Build artifacts
 /build
 /rodeo-plugin/build/
