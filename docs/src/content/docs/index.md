@@ -17,11 +17,17 @@ hero:
       icon: external
 ---
 
+:::danger
+**Don't use rodeo unless you know what you're doing.** It deliberately circumvents Roblox Studio's sandbox to give your scripts host system access: spawning processes, reading and writing files, running shell commands, etc. A malicious or buggy script becomes a full machine compromise vector. Only run scripts you wrote or fully trust.
+
+The plan is to introduce APIs designed with better security in mind and replace the way the runtime APIs are currently exposed with a more secure model.
+:::
+
 ## What rodeo is
 
 `rodeo`, in contrast to Lune, extends Roblox Studio's own Luau runtime with a canonical standard library, so the code is written and executed inside the actual Studio VMs. Lune runs Luau as a separate runtime and provides APIs to interface with Roblox files from the outside.
 
-The CLI is a workflow tool built around that runtime. It launches Studio, drives plugin and play-test contexts, and runs scripts in them, giving you headless Studio automation.
+The CLI is a workflow tool built around that runtime. It launches Studio, lets you orchestrate Studio and its modes, and runs scripts in different VMs with full host system access as a typical language runtime, giving you headless-like Studio workflows.
 
 ## Where to go next
 

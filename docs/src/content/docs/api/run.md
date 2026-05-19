@@ -5,6 +5,10 @@ title: run
 ```luau
 local run = require("@rodeo-client-lune/run")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

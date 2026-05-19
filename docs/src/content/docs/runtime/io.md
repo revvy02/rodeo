@@ -5,6 +5,10 @@ title: io
 ```luau
 local io = require("@rodeo/io")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

@@ -5,6 +5,10 @@ title: daemon
 ```luau
 local daemon = require("@rodeo-client-lune/daemon")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

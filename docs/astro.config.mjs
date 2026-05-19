@@ -26,6 +26,8 @@ export default defineConfig({
 					items: [
 						{ label: 'Installation', link: '/getting-started/installation/' },
 						{ label: 'CLI usage', link: '/getting-started/cli-usage/' },
+						{ label: 'Directives', link: '/getting-started/directives/' },
+						{ label: 'Bundling', link: '/getting-started/bundling/' },
 						{ label: 'Client usage', link: '/getting-started/client-usage/' },
 						{ label: 'Runtime usage', link: '/getting-started/runtime-usage/' },
 						{ label: 'Remote usage', link: '/getting-started/remote-usage/' },

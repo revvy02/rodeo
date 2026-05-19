@@ -5,6 +5,10 @@ title: stream
 ```luau
 local stream = require("@rodeo/stream")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

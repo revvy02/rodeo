@@ -5,6 +5,10 @@ title: studio
 ```luau
 local studio = require("@rodeo-client-lune/studio")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

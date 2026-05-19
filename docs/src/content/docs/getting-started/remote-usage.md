@@ -2,6 +2,10 @@
 title: Remote usage
 ---
 
+:::caution
+Distributed usage is implemented but not fully tested.
+:::
+
 `rodeo serve` can be split into a **master** (orchestrator) and one or more **studio backends** (each fronting the Studio plugin on its host machine). The client connects to the master; the master routes RPCs to whichever backend owns the target Studio.
 
 ```

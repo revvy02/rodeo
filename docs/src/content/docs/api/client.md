@@ -5,6 +5,10 @@ title: client
 ```luau
 local client = require("@rodeo-client-lune/client")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

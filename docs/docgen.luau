@@ -32,11 +32,18 @@ local function sh(args: { string })
 	assert(r.ok, `{args[1]} failed (exit {r.exitcode}): {r.stderr}`)
 end
 
--- Strip lute's stock ":::warning ... :::" callout — the README's Status
--- section already covers stability; surfacing it on every page is noise.
-local function stripWarningCallout(content: string): string
-	local pattern = ":::warning\n.-:::\n*"
-	return (string.gsub(content, pattern, ""))
+-- Lute emits `:::warning` containers with a stock body, but Starlight's
+-- aside syntax uses `:::caution` and the canned text mentions "major
+-- versions" which doesn't match our messaging. Remap the directive and
+-- substitute the body.
+local function remapWarningAside(content: string): string
+	local out = (string.gsub(content, ":::warning", ":::caution"))
+	out = (string.gsub(
+		out,
+		"These APIs are still open to future evolution%.%s*In new major versions, they may change in backwards incompatible ways%.",
+		"These APIs are not finalized and may change in backwards incompatible ways."
+	))
+	return out
 end
 
 -- Strip any entry whose name starts with `_` (e.g. `roblox._mcp.call`,
@@ -90,7 +97,7 @@ local function copyTree(srcDir: string, dstDir: string)
 		else
 			local moduleName = (string.gsub(entry.name, "%.md$", ""))
 			local content = fs.readFileToString(from)
-			content = stripWarningCallout(content)
+			content = remapWarningAside(content)
 			content = stripPrivateEntries(content)
 			content = injectFrontmatter(content, moduleName)
 			fs.writeStringToFile(to, content)

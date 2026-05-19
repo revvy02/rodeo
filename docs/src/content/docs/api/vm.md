@@ -5,6 +5,10 @@ title: vm
 ```luau
 local vm = require("@rodeo-client-lune/vm")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

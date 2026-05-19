@@ -5,6 +5,10 @@ title: fs
 ```luau
 local fs = require("@rodeo/fs")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |

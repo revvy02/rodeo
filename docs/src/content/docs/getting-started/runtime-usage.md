@@ -12,7 +12,7 @@ local stream = require("@rodeo/stream")
 local roblox = require("@rodeo/roblox")
 ```
 
-These modules let your in-Studio code touch the host machine — read/write files, run shell commands, pipe to stdout, load `.rbxm` fixtures, call MCP tools. Full reference is in [@rodeo runtime](/rodeo/runtime/); the examples below show common patterns.
+These modules let your in-Studio code touch the host machine: read/write files, run shell commands, pipe to stdout, load `.rbxm` fixtures. Full reference is in [@rodeo runtime](/rodeo/runtime/); the examples below show common patterns.
 
 ## Reading and writing files
 
@@ -80,8 +80,6 @@ local w = fs.open("copy.png", "w")
 stream.writeBytes(w, data)
 stream.close(w)
 ```
-
-The string-based `stream.read`/`stream.write` corrupt non-UTF-8 bytes; always use the `Bytes` variants for binary files.
 
 ## Piping to stdout
 
@@ -180,28 +178,6 @@ roblox.export("out/snapshot.rbxmx", { folder })
 ```
 
 Useful for staging test fixtures, snapshotting Studio state, or moving subtrees between sessions.
-
-`roblox.load` exists as a legacy alternative that loads via Studio's content asset system instead of `SerializationService` — prefer `import` for new code.
-
-## Combining: snapshot game state to disk
-
-```luau
-local fs = require("@rodeo/fs")
-local stream = require("@rodeo/stream")
-local process = require("@rodeo/process")
-local HttpService = game:GetService("HttpService")
-
-local snapshot = {
-    branch = string.gsub(process.run({ "git", "rev-parse", "--short", "HEAD" }, { stdio = "piped" }).stdout, "%s+$", ""),
-    placeId = game.PlaceId,
-    players = #game:GetService("Players"):GetPlayers(),
-    workspaceChildren = #workspace:GetChildren(),
-}
-
-local f = fs.open(`.rodeo/snapshots/{snapshot.branch}.json`, "w")
-stream.write(f, HttpService:JSONEncode(snapshot))
-stream.close(f)
-```
 
 ## Where to go next
 

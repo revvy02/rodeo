@@ -5,6 +5,10 @@ title: roblox
 ```luau
 local roblox = require("@rodeo/roblox")
 ```
+:::caution
+These APIs are not finalized and may change in backwards incompatible ways.
+:::
+
 ## Summary
 
 | Entry | Description |
