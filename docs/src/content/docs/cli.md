@@ -64,7 +64,7 @@ Run a script in Studio
 * `--return <RETURN_FILE>` — Path to file for return value JSON
 * `--show-return` — Print return value to stdout
 * `--target <TARGET>` — Target: mode:dom[:identity] (e.g. edit:plugin, test:server, play:client:plugin)
-* `--studio <STUDIO>` — Studio instance to target (StudioMCP ID or "active")
+* `--studio <STUDIO>` — Studio instance to target (id, name, or "active")
 * `--no-warn` — Disable warning output
 * `--no-error` — Disable error output
 * `--no-info` — Disable info output

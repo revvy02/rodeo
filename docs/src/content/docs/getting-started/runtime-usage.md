@@ -153,7 +153,7 @@ print(result.stdout)
 
 ## Roblox models
 
-`roblox.import` reads a model file from disk via `SerializationService` and returns its root Instances:
+`roblox.import` reads a model file from disk and returns its root Instances:
 
 ```luau
 local roblox = require("@rodeo/roblox")
@@ -164,7 +164,7 @@ for _, inst in roots do
 end
 ```
 
-`roblox.export` writes Instances back out as a `.rbxm` (binary) or `.rbxmx` (XML) model file — extension picks the format:
+`roblox.export` writes Instances back out as a `.rbxm` (binary) or `.rbxmx` (XML) model file. Extension picks the format:
 
 ```luau
 local roblox = require("@rodeo/roblox")

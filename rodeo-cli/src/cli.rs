@@ -78,7 +78,7 @@ pub enum Commands {
         #[arg(long)]
         target: Option<String>,
 
-        /// Studio instance to target (StudioMCP ID or "active")
+        /// Studio instance to target (id, name, or "active")
         #[arg(long)]
         studio: Option<String>,
 
