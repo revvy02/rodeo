@@ -419,23 +419,11 @@ export function process(run: RunFn): void {
 // ── roblox (3 tests, plugin-only) ─────────────────────────────────────────
 
 export function roblox(run: RunFn): void {
-  it("roblox: load returns instances from rbxm", async () => {
+  it("roblox: import can parent instances to workspace", async () => {
     const result = await run({
       showReturn: true,
       source: `local roblox = require("@rodeo/roblox")
-        local instances = roblox.load("./tests-new/fixtures/pkg/test-folder.rbxm")
-        return { count = #instances, class = instances[1].ClassName }`,
-    });
-    expect(result.ok).toBe(true);
-    expect(result.output).toContain('"count":1');
-    expect(result.output).toContain('"class":"Folder"');
-  });
-
-  it("roblox: load can parent instances to workspace", async () => {
-    const result = await run({
-      showReturn: true,
-      source: `local roblox = require("@rodeo/roblox")
-        local instances = roblox.load("./tests-new/fixtures/pkg/test-folder.rbxm")
+        local instances = roblox.import("./tests-new/fixtures/pkg/test-folder.rbxm")
         instances[1].Parent = workspace
         local found = workspace:FindFirstChild(instances[1].Name) ~= nil
         instances[1]:Destroy()
@@ -443,14 +431,6 @@ export function roblox(run: RunFn): void {
     });
     expect(result.ok).toBe(true);
     expect(result.output).toContain("true");
-  });
-
-  it("roblox: load nonexistent file errors", async () => {
-    const result = await run({
-      source: `local roblox = require("@rodeo/roblox")
-        roblox.load("./nonexistent-file-12345.rbxm")`,
-    });
-    expect(result.ok).toBe(false);
   });
 
   it("roblox: import returns instances from rbxm", async () => {
