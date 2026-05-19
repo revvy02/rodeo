@@ -20,7 +20,7 @@ hero:
 :::danger
 **Don't use rodeo unless you know what you're doing.** It deliberately circumvents Roblox Studio's sandbox to give your scripts host system access: spawning processes, reading and writing files, running shell commands, etc. A malicious or buggy script becomes a full machine compromise vector. Only run scripts you wrote or fully trust.
 
-The plan is to introduce APIs designed with better security in mind and replace the way the runtime APIs are currently exposed with a more secure model.
+The plan is to replace the way the runtime APIs are exposed with a more secure model once the APIs are more finalized.
 :::
 
 ## What rodeo is
