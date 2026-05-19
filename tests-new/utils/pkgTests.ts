@@ -505,4 +505,65 @@ export function roblox(run: RunFn): void {
     });
     expect(result.ok).toBe(false);
   });
+
+  it("roblox: import accepts .rbxmx (XML) format", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local fs = require("@rodeo/fs")
+        local stream = require("@rodeo/stream")
+        local roblox = require("@rodeo/roblox")
+
+        -- Hand-rolled minimal .rbxmx — a single Folder named XmlTest.
+        local xml = [==[<?xml version="1.0" encoding="utf-8"?>
+<roblox version="4">
+  <Item class="Folder" referent="RBX0">
+    <Properties>
+      <string name="Name">XmlTest</string>
+    </Properties>
+  </Item>
+</roblox>]==]
+
+        local w = fs.open("rodeo-test-import.rbxmx", "w")
+        stream.write(w, xml)
+        stream.close(w)
+
+        local instances = roblox.import("rodeo-test-import.rbxmx")
+        fs.remove("rodeo-test-import.rbxmx")
+
+        return { count = #instances, class = instances[1].ClassName, name = instances[1].Name }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('"count":1');
+    expect(result.output).toContain('"class":"Folder"');
+    expect(result.output).toContain('"name":"XmlTest"');
+  });
+
+  // KNOWN FAILING: SerializationService:SerializeInstancesAsync only emits the
+  // binary `.rbxm` format. There's no XML option exposed; the file extension
+  // is just a filename hint, not a format selector. Leave this test asserting
+  // the *desired* XML output so if Roblox ever adds XML serialization, the
+  // test starts passing and we know.
+  it("roblox: export with .rbxmx extension writes XML format (NOT YET SUPPORTED)", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local fs = require("@rodeo/fs")
+        local stream = require("@rodeo/stream")
+        local roblox = require("@rodeo/roblox")
+
+        local folder = Instance.new("Folder")
+        folder.Name = "XmlExportTest"
+
+        local path = "rodeo-test-xml-export.rbxmx"
+        roblox.export(path, { folder })
+
+        local r = fs.open(path, "r")
+        local head = stream.read(r):sub(1, 5)
+        stream.close(r)
+        fs.remove(path)
+
+        return { head = head, isXml = head:sub(1, 5) == "<?xml" }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('"isXml":true');
+  });
 }
