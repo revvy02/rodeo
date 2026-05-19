@@ -147,19 +147,6 @@ end
 
 Useful for staging tests: keep your fixtures on disk, load them into the DataModel at the start of each run.
 
-## Calling MCP tools
-
-If you've enabled StudioMCP in Studio's AI Assistant settings, `roblox.mcp.call` invokes any registered tool by name. Routes through the StudioMCP bridge automatically — no extra setup beyond `--target edit:elevated` (since MCP needs command-bar identity):
-
-```luau
-local roblox = require("@rodeo/roblox")
-
-local response = roblox.mcp.call("execute_luau", {
-    code = "return workspace:FindFirstChild('Baseplate')",
-})
-print(response)
-```
-
 ## Combining: snapshot game state to disk
 
 ```luau

@@ -10,7 +10,6 @@ local roblox = require("@rodeo/roblox")
 | Entry | Description |
 | :--- | :--- |
 | [load](#robloxload) | Loads a Roblox model file (`.rbxm`/`.rbxmx`) at `path` and returns its |
-| [mcp.call](#robloxmcpcall) | Invokes an MCP tool by name with optional arguments, returning the |
 
 ---
 
@@ -24,18 +23,6 @@ root Instances. Useful for staging fixtures into the DataModel.
 
 ```luau
 (path: string) -> { Instance }
-```
-
----
-
-### roblox.mcp.call
-
-Invokes an MCP tool by name with optional arguments, returning the
-
-string response. Routes through the StudioMCP bridge.
-
-```luau
-(tool: string, arguments: { [string]: any }?) -> string
 ```
 
 ---

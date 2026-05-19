@@ -48,7 +48,7 @@ local apis = {
 	io = require(ref("io"))(rpc),
 	process = processApi,
 	stream = streamApi,
-	roblox = require(ref("roblox"))(rpc, hostInfo, executionId, processApi, streamApi),
+	roblox = require(ref("roblox"))(rpc, hostInfo, executionId),
 }
 
 -- Publish to _G so require("@rodeo/fs") etc. can find them

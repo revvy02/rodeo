@@ -39,6 +39,25 @@ local function stripWarningCallout(content: string): string
 	return (string.gsub(content, pattern, ""))
 end
 
+-- Strip any entry whose name starts with `_` (e.g. `roblox._mcp.call`,
+-- `stream._internal`). Our convention is "underscore = private"; lute doc
+-- doesn't honor it natively (no @private directive support), so we filter
+-- post-hoc on the generated markdown.
+local function stripPrivateEntries(content: string): string
+	local out = content
+
+	-- Summary table rows: `| [_x](...) | desc |\n` (top-level underscore)
+	out = (string.gsub(out, "| %[_[^%]]*%]%([^%)]*%) | [^\n]*\n", ""))
+	-- Summary table rows: `| [foo._x](...) | desc |\n` (sub-table underscore)
+	out = (string.gsub(out, "| %[[%w]+%._[^%]]*%]%([^%)]*%) | [^\n]*\n", ""))
+
+	-- Per-method sections: `### module._x\n...\n---\n` (or end-of-file).
+	out = (string.gsub(out, "### [%w]+%._[%w%.]*[^\n]*\n.-\n%-%-%-\n*", ""))
+	out = (string.gsub(out, "### _[%w%.]+[^\n]*\n.-\n%-%-%-\n*", ""))
+
+	return out
+end
+
 -- Starlight requires `title` frontmatter. lute doc emits `# <module>` as the
 -- first line — promote that to frontmatter and drop the H1 so Starlight
 -- renders the page title from the front-matter slot only.
@@ -72,6 +91,7 @@ local function copyTree(srcDir: string, dstDir: string)
 			local moduleName = (string.gsub(entry.name, "%.md$", ""))
 			local content = fs.readFileToString(from)
 			content = stripWarningCallout(content)
+			content = stripPrivateEntries(content)
 			content = injectFrontmatter(content, moduleName)
 			fs.writeStringToFile(to, content)
 			print(`  generated {to}`)
