@@ -1,0 +1,52 @@
+/* Show the splash hero image in full without cropping. */
+.hero img {
+	object-fit: contain;
+	max-height: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Brand palette — matches the rodeo CLI: red on near-black, with
+ * mustard-gold for frames/dividers. Applied to both theme selectors because
+ * the light-mode toggle is hidden via component override; the site stays
+ * dark regardless of localStorage state.
+ * ------------------------------------------------------------------------ */
+:root,
+:root[data-theme='dark'],
+:root[data-theme='light'] {
+	/* Grayscale — dark base, slightly warm. */
+	--sl-color-white:   #f5f5f5;
+	--sl-color-gray-1:  #e0e0e0;
+	--sl-color-gray-2:  #b8b8b8;
+	--sl-color-gray-3:  #888888;
+	--sl-color-gray-4:  #555555;
+	--sl-color-gray-5:  #2f2f2f;
+	--sl-color-gray-6:  #1f1f1f;
+	--sl-color-gray-7:  #141414;
+	--sl-color-black:   #0d0d0d;
+
+	/* Brand accent: muted brick red — desaturated and lighter than red-600,
+	   easier on the eyes than the flat-UI Pomegranate. */
+	--sl-color-accent-low:  #3a1612;
+	--sl-color-accent:      #b85d54;
+	--sl-color-accent-high: #e0b5af;
+
+	/* Override the derived tokens so the active sidebar pill is red + white
+	   text. Starlight defaults to bg = text-accent (which is accent-high),
+	   producing a pale pill on the dark theme — we want the bg to be the
+	   primary brand red and the text to be light. */
+	--sl-color-text-accent: var(--sl-color-accent);
+	--sl-color-text-invert: var(--sl-color-white);
+	--sl-color-bg-accent:   var(--sl-color-accent);
+
+	/* Custom — mustard gold, matches CLI ANSI Yellow. Used for hr and code
+	   block borders below. Not a Starlight token; referenced directly. */
+	--rodeo-gold: #d4a14a;
+}
+
+/* Gold borders around code blocks — the CLI's framed-box aesthetic, applied
+   only to code so prose dividers stay neutral. */
+.expressive-code {
+	border: 1px solid var(--rodeo-gold);
+	border-radius: 0.5rem;
+	overflow: hidden;
+}

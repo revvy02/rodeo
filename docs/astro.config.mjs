@@ -9,6 +9,14 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'rodeo',
+			logo: {
+				src: './src/assets/logo.png',
+				replacesTitle: true,
+			},
+			customCss: ['./src/styles/custom.css'],
+			components: {
+				ThemeSelect: './src/components/EmptyThemeSelect.astro',
+			},
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/revvy02/rodeo' },
 			],
@@ -19,6 +27,8 @@ export default defineConfig({
 						{ label: 'Installation', link: '/getting-started/installation/' },
 						{ label: 'CLI usage', link: '/getting-started/cli-usage/' },
 						{ label: 'Client usage', link: '/getting-started/client-usage/' },
+						{ label: 'Runtime usage', link: '/getting-started/runtime-usage/' },
+						{ label: 'Remote usage', link: '/getting-started/remote-usage/' },
 					],
 				},
 				{ label: 'CLI reference', link: '/cli/' },
