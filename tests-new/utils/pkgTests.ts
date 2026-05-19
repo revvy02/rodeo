@@ -558,4 +558,37 @@ export function roblox(run: RunFn): void {
     expect(result.output).toContain('"childName":"XmlChild"');
     expect(result.output).toContain('"childClass":"Part"');
   });
+
+  it("roblox: export creates nested parent directories", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local roblox = require("@rodeo/roblox")
+        local fs = require("@rodeo/fs")
+
+        local dir = "rodeo-test-nested-" .. tostring(math.random(1, 1e9))
+        local path = dir .. "/sub/leaf/snapshot.rbxm"
+
+        local function cleanup()
+            if fs.exists(path) then fs.remove(path) end
+            if fs.exists(dir .. "/sub/leaf") then fs.rmdir(dir .. "/sub/leaf") end
+            if fs.exists(dir .. "/sub") then fs.rmdir(dir .. "/sub") end
+            if fs.exists(dir) then fs.rmdir(dir) end
+        end
+
+        -- Defensive: clear leftover state from a prior crashed run.
+        cleanup()
+
+        local folder = Instance.new("Folder")
+        folder.Name = "NestedDirsTest"
+        roblox.export(path, { folder })
+
+        local existed = fs.exists(path)
+
+        cleanup()
+
+        return { existed = existed }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('"existed":true');
+  });
 }

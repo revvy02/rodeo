@@ -22,6 +22,13 @@ pub fn roblox_export(req: &rt::RobloxExportRequest) -> Result<rt::Ok, String> {
         req.data.clone()
     };
 
+    if let Some(parent) = std::path::Path::new(&req.path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("create parent dirs for {}: {e}", parent.display()))?;
+        }
+    }
+
     std::fs::write(&req.path, &bytes_to_write)
         .map_err(|e| format!("write {}: {e}", req.path))?;
 
