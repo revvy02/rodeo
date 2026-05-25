@@ -1,7 +1,23 @@
 --[[
     @rodeo run --target edit:plugin
 
-    Capture a screenshot from Roblox Studio
+    Capture a screenshot from Roblox Studio.
+
+    @rodeo annotations
+    { "destructiveHint": false, "idempotentHint": true, "readOnlyHint": false }
+
+    @rodeo schema
+    {
+        "type": "object",
+        "properties": {
+            "cframe":   { "type": "string", "description": "Camera CFrame expression (Luau)" },
+            "fov":      { "type": "number", "description": "Field of view" },
+            "settle":   { "type": "number", "description": "Settle time in seconds", "default": 0 },
+            "focus":    { "type": "string", "description": "Focus CFrame expression (Luau)" },
+            "skew":     { "type": "string", "description": "Per-frame CFrame skew expression (Luau)" },
+            "output":   { "type": "string", "description": "Output file path" }
+        }
+    }
 ]]
 
 local argparse = require("@pkg/argparse")
