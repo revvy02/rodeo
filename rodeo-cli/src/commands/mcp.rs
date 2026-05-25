@@ -118,6 +118,7 @@ struct ToolDef {
     name: String,
     description: String,
     input_schema: serde_json::Value,
+    annotations: Option<serde_json::Value>,
     kind: ToolKind,
 }
 
@@ -137,12 +138,34 @@ fn build_builtin_tools() -> Vec<ToolDef> {
     vec![
         ToolDef {
             name: "run_code".into(),
-            description: "Execute Luau code in Roblox Studio. Can launch Studio if needed.".into(),
+            description: "Execute Luau code in a Roblox Studio VM matched by `target`. \
+                If no live VM matches the requested target, Studio will transition into \
+                that mode first (e.g. entering play test) before running — this mutates \
+                Studio state and may take several seconds. Append `:elevated` to a target \
+                (e.g. `edit:elevated`) to run at command-bar identity instead of plugin \
+                identity; required for privileged Roblox APIs like `DebuggerManager`. \
+                Use `get_studios` to see what VMs are currently alive.".into(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "code": { "type": "string", "description": "Luau code to execute. Can return a value." },
-                    "target": { "type": "string", "description": "VM target: edit:plugin (default), run:server, test:client, etc." },
+                    "target": {
+                        "type": "string",
+                        "description": "VM target. Grammar: <mode>:<dom>[:plugin|:elevated]. \
+                            Modes: edit, run, test, play. Doms: plugin, server, client. \
+                            Requesting a mode that isn't currently active will transition Studio into it. \
+                            Append :elevated for command-bar identity (privileged Roblox APIs).",
+                        "examples": [
+                            "edit:plugin",
+                            "edit:elevated",
+                            "run:server",
+                            "run:server:elevated",
+                            "test:server",
+                            "test:client",
+                            "test:server:elevated",
+                            "play:client"
+                        ]
+                    },
                     "vm": { "type": "string", "description": "Direct VM ID (bypasses target matching)" },
                     "job": { "type": "string", "description": "Filter by game server job ID" },
                     "backend": { "type": "string", "description": "Target specific backend device (name or ID)" },
@@ -153,34 +176,59 @@ fn build_builtin_tools() -> Vec<ToolDef> {
                     "return_file": { "type": "string", "description": "Write return value to file path" },
                     "detached": { "type": "boolean", "description": "Keep Studio alive after execution" },
                     "sourcemap": { "type": "string", "description": "Path to sourcemap.json for require resolution" },
-                    "instance_path": { "type": "string", "description": "Instance path for the script" }
+                    "instance_path": { "type": "string", "description": "Instance path for the script" },
+                    "profile": { "type": "boolean", "description": "Capture a microprofiler dump for this run" },
+                    "profile_dir": { "type": "string", "description": "Directory to write the profile dump into (implies profile=true)" },
+                    "logs": { "type": "boolean", "description": "Capture Studio log_*.txt files for this run" },
+                    "logs_dir": { "type": "string", "description": "Directory to write captured logs into (implies logs=true)" }
                 },
                 "required": ["code"]
             }),
+            annotations: Some(serde_json::json!({
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true
+            })),
             kind: ToolKind::RunCode,
         },
         ToolDef {
             name: "get_state".into(),
             description: "Get the full canonical rodeo state: studios, backends, VMs, and processes.".into(),
             input_schema: serde_json::json!({ "type": "object" }),
+            annotations: Some(serde_json::json!({
+                "readOnlyHint": true,
+                "idempotentHint": true
+            })),
             kind: ToolKind::GetState,
         },
         ToolDef {
             name: "get_studios".into(),
             description: "Get connected Studio instances with mode, VMs, and place info.".into(),
             input_schema: serde_json::json!({ "type": "object" }),
+            annotations: Some(serde_json::json!({
+                "readOnlyHint": true,
+                "idempotentHint": true
+            })),
             kind: ToolKind::GetStudios,
         },
         ToolDef {
             name: "get_backends".into(),
             description: "Get connected backend devices with names and VM counts.".into(),
             input_schema: serde_json::json!({ "type": "object" }),
+            annotations: Some(serde_json::json!({
+                "readOnlyHint": true,
+                "idempotentHint": true
+            })),
             kind: ToolKind::GetBackends,
         },
         ToolDef {
             name: "get_processes".into(),
             description: "List all processes (queued, running, completed).".into(),
             input_schema: serde_json::json!({ "type": "object" }),
+            annotations: Some(serde_json::json!({
+                "readOnlyHint": true,
+                "idempotentHint": true
+            })),
             kind: ToolKind::GetProcesses,
         },
         ToolDef {
@@ -191,6 +239,10 @@ fn build_builtin_tools() -> Vec<ToolDef> {
                 "properties": { "id": { "type": "integer", "description": "Process ID (from get_processes)" } },
                 "required": ["id"]
             }),
+            annotations: Some(serde_json::json!({
+                "destructiveHint": true,
+                "idempotentHint": true
+            })),
             kind: ToolKind::KillProcess,
         },
         ToolDef {
@@ -200,6 +252,10 @@ fn build_builtin_tools() -> Vec<ToolDef> {
                 "type": "object",
                 "properties": { "out": { "type": "string", "description": "Copy saved file to this path" } }
             }),
+            annotations: Some(serde_json::json!({
+                "destructiveHint": false,
+                "idempotentHint": true
+            })),
             kind: ToolKind::SavePlace,
         },
     ]
@@ -210,6 +266,7 @@ fn build_luau_tools(luau_tools: Vec<LuauTool>) -> Vec<ToolDef> {
         name: lt.name,
         description: lt.description,
         input_schema: serde_json::json!({ "type": "object" }),
+        annotations: None,
         kind: ToolKind::Luau { script: lt.script, target: lt.target },
     }).collect()
 }
@@ -252,6 +309,7 @@ async fn add_studio_proxy_tools(tools: &mut Vec<ToolDef>, studio_mcp: &mut Optio
             name: tool_name,
             description,
             input_schema: tool_value["inputSchema"].clone(),
+            annotations: tool_value.get("annotations").cloned(),
             kind: ToolKind::StudioProxy { original_name },
         });
     }
@@ -354,11 +412,15 @@ pub async fn main(host: &str, port: u16) -> Result<()> {
             }
             "tools/list" => {
                 let tool_list: Vec<serde_json::Value> = tools.iter().map(|t| {
-                    serde_json::json!({
+                    let mut entry = serde_json::json!({
                         "name": t.name,
                         "description": t.description,
                         "inputSchema": t.input_schema
-                    })
+                    });
+                    if let Some(annotations) = &t.annotations {
+                        entry["annotations"] = annotations.clone();
+                    }
+                    entry
                 }).collect();
 
                 let resp = serde_json::json!({
@@ -427,6 +489,10 @@ async fn handle_run_code(host: &str, port: u16, args: &serde_json::Value) -> Res
     let cache_requires = args["cache_requires"].as_bool().unwrap_or(false);
     let sourcemap = args["sourcemap"].as_str().map(String::from);
     let instance_path = args["instance_path"].as_str().map(String::from);
+    let profile_dir = args["profile_dir"].as_str().map(std::path::PathBuf::from);
+    let profile = args["profile"].as_bool().unwrap_or(false) || profile_dir.is_some();
+    let logs_dir = args["logs_dir"].as_str().map(std::path::PathBuf::from);
+    let logs = args["logs"].as_bool().unwrap_or(false) || logs_dir.is_some();
 
     if !target.is_empty() {
         crate::shared::target::parse(&target).map_err(|e| e.to_string())?;
@@ -476,10 +542,10 @@ async fn handle_run_code(host: &str, port: u16, args: &serde_json::Value) -> Res
         instance_path,
         script_path: sourcemap,
         process_name: None,
-        profile: false,
-        profile_dir: None,
-        logs: false,
-        logs_dir: None,
+        profile,
+        profile_dir,
+        logs,
+        logs_dir,
     };
 
     let result = cli_run::run_piped(host, port, request).await.map_err(|e| e.to_string())?;

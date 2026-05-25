@@ -40,16 +40,6 @@ pub struct RunRequest {
     pub created_at: f64,
 }
 
-/// Completed process record for the `/processes` API.
-#[derive(Debug, Clone)]
-pub struct CompletedProcess {
-    pub process_id: u32,
-    pub name: Option<String>,
-    pub execution_id: String,
-    pub state: ProcessState,
-    pub created_at: f64,
-}
-
 /// Produce a human-readable diff between two StudioStateMsg snapshots.
 /// Returns None if nothing meaningful changed.
 pub fn diff_state(new: &StudioStateMsg, old: &StudioStateMsg) -> Option<String> {

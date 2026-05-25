@@ -4,7 +4,7 @@ use crate::studio_backend as studio_crate;
 use rbx_control::studio::mcp_client::StudioMcpClient;
 use rodeo_proto::ProcessState;
 use tracing::info;
-use crate::studio_backend::connection::{CompletedProcess, RunRequest, StudioInstance, VmConnection};
+use crate::studio_backend::connection::{RunRequest, StudioInstance, VmConnection};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
@@ -80,7 +80,6 @@ pub struct BackendState {
     /// Registered remote backends, keyed by backend ID
     pub backends: HashMap<String, grpc::BackendConnection>,
     pub pending_runs: Vec<RunRequest>,
-    pub completed: Vec<CompletedProcess>,
     /// Studio instances managed by this backend, keyed by master-assigned studio_id
     pub studio_instances: HashMap<String, StudioInstanceInfo>,
     pub mcp: Arc<Mutex<Option<StudioMcpClient>>>,
@@ -120,7 +119,6 @@ impl BackendState {
             studios: HashMap::new(),
             backends: HashMap::new(),
             pending_runs: Vec::new(),
-            completed: Vec::new(),
             studio_instances: HashMap::new(),
             mcp: Arc::new(Mutex::new(None)),
             snapshot_trigger: None,
@@ -262,16 +260,8 @@ impl BackendState {
         } else {
             // Non-profiled: remove and send Complete
             if let Some(vm) = self.vms.get_mut(vm_id) {
-                if let Some(mut run) = vm.complete_run(execution_id, &new_state) {
+                if let Some(run) = vm.complete_run(execution_id, &new_state) {
                     let _ = run.client_tx.send(ClientMsg::Complete);
-                    run.state = new_state;
-                    self.completed.push(CompletedProcess {
-                        process_id: run.process_id,
-                        name: run.process_name,
-                        execution_id: run.execution_id,
-                        state: run.state,
-                        created_at: run.created_at,
-                    });
                 }
             }
         }
@@ -326,8 +316,6 @@ pub struct MasterState {
     pub active_runs: HashMap<String, ActiveRun>,
     /// Pending run requests waiting for a matching VM
     pub pending_runs: Vec<RunRequest>,
-    /// Completed processes
-    pub completed: Vec<CompletedProcess>,
     pub next_process_id: u32,
     /// Active multiplayer test sessions, keyed by session_id. Master mirrors
     /// backend's per-session state via MultiplayerTestServerReady/MultiplayerTestClientReady and
@@ -392,7 +380,6 @@ impl MasterState {
             backends: HashMap::new(),
             active_runs: HashMap::new(),
             pending_runs: Vec::new(),
-            completed: Vec::new(),
             next_process_id: 0,
             multiplayer_test_session_meta: HashMap::new(),
             multiplayer_test_no_hud: HashMap::new(),
@@ -669,13 +656,6 @@ impl MasterState {
                     session = &scope_session[..8.min(scope_session.len())],
                     "pending run dropped: target session no longer alive",
                 );
-                self.completed.push(CompletedProcess {
-                    execution_id: run.execution_id,
-                    process_id: run.process_id,
-                    name: run.process_name,
-                    state: ProcessState::PROCESS_STATE_KILLED,
-                    created_at: run.created_at,
-                });
             }
         }
     }
@@ -847,13 +827,6 @@ impl MasterState {
                     _ => "unknown",
                 };
                 info!(pid = run.process_id, label = run.execution_id[..8.min(run.execution_id.len())].to_string().as_str(), state = state_str, "completed");
-                self.completed.push(CompletedProcess {
-                    execution_id: execution_id.to_string(),
-                    process_id: run.process_id,
-                    name: run.process_name.clone(),
-                    state: new_state,
-                    created_at: run.created_at,
-                });
             }
         }
 
@@ -865,13 +838,6 @@ impl MasterState {
         if let Some(run) = self.active_runs.remove(execution_id) {
             let _ = run.client_tx.send(ClientMsg::Complete);
             tracing::debug!(execution_id, "sent Complete after files drained");
-            self.completed.push(CompletedProcess {
-                execution_id: execution_id.to_string(),
-                process_id: run.process_id,
-                name: run.process_name,
-                state: run.state,
-                created_at: run.created_at,
-            });
         }
     }
 
@@ -960,19 +926,6 @@ impl MasterState {
                 state: "queued".to_string(),
                 name: r.process_name.clone(),
                 created_at: r.created_at,
-                ..Default::default()
-            }))
-            .chain(self.completed.iter().map(|c| rodeo_proto::ProcessInfo {
-                process_id: c.process_id,
-                execution_id: c.execution_id.clone(),
-                state: match c.state {
-                    ProcessState::PROCESS_STATE_DONE => "done",
-                    ProcessState::PROCESS_STATE_ERROR => "error",
-                    ProcessState::PROCESS_STATE_KILLED => "killed",
-                    _ => "unknown",
-                }.to_string(),
-                name: c.name.clone(),
-                created_at: c.created_at,
                 ..Default::default()
             }))
             .collect();
