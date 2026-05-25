@@ -53,6 +53,16 @@ pub struct MultiplayerTestSessionMeta {
     /// `--no-hud` setting for this session — propagated to every client launch.
     #[serde(default)]
     pub no_hud: bool,
+    /// Resolved published identifiers (only populated when the session was
+    /// launched against a published place). Cached here so subsequent
+    /// `LaunchMultiplayerTestClient` dispatches forward the same ids without
+    /// re-resolving. 0 = anonymous / no published place.
+    #[serde(default)]
+    pub place_id: u64,
+    #[serde(default)]
+    pub universe_id: u64,
+    #[serde(default)]
+    pub place_version: u32,
 }
 
 /// Shared server state

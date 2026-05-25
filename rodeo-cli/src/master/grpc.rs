@@ -272,7 +272,15 @@ async fn handle_backend_msg(
         Msg::MultiplayerTestServerReady(ps) => {
             let mut guard = state.lock().await;
             let session_guid = ps.session_guid.clone();
-            tracing::info!(pid = ps.pid, raknet_port = ps.raknet_port, session_guid = %session_guid, "play server ready");
+            tracing::info!(
+                pid = ps.pid,
+                raknet_port = ps.raknet_port,
+                session_guid = %session_guid,
+                place_id = ps.place_id,
+                universe_id = ps.universe_id,
+                place_version = ps.place_version,
+                "play server ready"
+            );
             let no_hud = guard.multiplayer_test_no_hud.get(&session_guid).copied().unwrap_or(false);
             guard.multiplayer_test_session_meta.insert(session_guid.clone(), crate::master::MultiplayerTestSessionMeta {
                 session_guid,
@@ -284,6 +292,9 @@ async fn handle_backend_msg(
                 },
                 clients: HashMap::new(),
                 no_hud,
+                place_id: ps.place_id,
+                universe_id: ps.universe_id,
+                place_version: ps.place_version,
             });
         }
         Msg::MultiplayerTestClientReady(pc) => {
@@ -900,6 +911,9 @@ impl proto::MasterService for RodeoServices {
                     index: next_index,
                     session_guid: session_guid.clone(),
                     no_hud,
+                    place_id: session_meta.place_id,
+                    universe_id: session_meta.universe_id,
+                    place_version: session_meta.place_version,
                     ..Default::default()
                 }))),
                 ..Default::default()

@@ -253,6 +253,12 @@ message LaunchMultiplayerTestClientCommand {
   uint32 index = 5;
   string session_guid = 6;
   bool no_hud = 7;  // strip Studio dock UI panels; restored on exit
+  // Real published identifiers forwarded to Studio's StartClient `-placeId` /
+  // `-universeId` / `-placeVersion` flags so the client process reports the
+  // correct `game.PlaceId` / `game.GameId`. 0 = anonymous/unset.
+  uint64 place_id = 8;
+  uint64 universe_id = 9;
+  uint32 place_version = 10;
 }
 
 message KillMultiplayerTestProcessCommand {
@@ -270,6 +276,12 @@ message MultiplayerTestServerReady {
   string raknet_session_guid = 3;
   string play_test_guid = 4;
   string session_guid = 5;
+  // Resolved published identifiers for this session (passed back so master can
+  // forward them when launching MultiplayerTestClients without re-resolving).
+  // 0 = anonymous / no published place.
+  uint64 place_id = 6;
+  uint64 universe_id = 7;
+  uint32 place_version = 8;
 }
 
 message MultiplayerTestClientReady {

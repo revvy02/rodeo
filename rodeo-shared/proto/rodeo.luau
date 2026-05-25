@@ -737,6 +737,9 @@ type _LaunchMultiplayerTestClientCommandFields = {
 	index: number,
 	sessionGuid: string,
 	noHud: boolean,
+	placeId: number,
+	universeId: number,
+	placeVersion: number,
 }
 
 export type _LaunchMultiplayerTestClientCommandPartialFields = {
@@ -747,6 +750,9 @@ export type _LaunchMultiplayerTestClientCommandPartialFields = {
 	index: number?,
 	sessionGuid: string?,
 	noHud: boolean?,
+	placeId: number?,
+	universeId: number?,
+	placeVersion: number?,
 }
 
 export type LaunchMultiplayerTestClientCommand = typeof(setmetatable(
@@ -803,6 +809,9 @@ type _MultiplayerTestServerReadyFields = {
 	raknetSessionGuid: string,
 	playTestGuid: string,
 	sessionGuid: string,
+	placeId: number,
+	universeId: number,
+	placeVersion: number,
 }
 
 export type _MultiplayerTestServerReadyPartialFields = {
@@ -811,6 +820,9 @@ export type _MultiplayerTestServerReadyPartialFields = {
 	raknetSessionGuid: string?,
 	playTestGuid: string?,
 	sessionGuid: string?,
+	placeId: number?,
+	universeId: number?,
+	placeVersion: number?,
 }
 
 export type MultiplayerTestServerReady = typeof(setmetatable(
@@ -6072,6 +6084,9 @@ do
 			index = if data == nil or data.index == nil then 0 else data.index,
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
 			noHud = if data == nil or data.noHud == nil then false else data.noHud,
+			placeId = if data == nil or data.placeId == nil then 0 else data.placeId,
+			universeId = if data == nil or data.universeId == nil then 0 else data.universeId,
+			placeVersion = if data == nil or data.placeVersion == nil then 0 else data.placeVersion,
 		}, _LaunchMultiplayerTestClientCommandImpl :: _LaunchMultiplayerTestClientCommandImpl)
 	end
 
@@ -6114,6 +6129,21 @@ do
 			output, cursor = proto.writeVarInt(output, cursor, if self.noHud then 1 else 0)
 		end
 
+		if self.placeId ~= nil and self.placeId ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
+		end
+
+		if self.universeId ~= nil and self.universeId ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.universeId)
+		end
+
+		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.placeVersion)
+		end
+
 		local shrunkBuffer = buffer.create(cursor)
 		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
 		return shrunkBuffer
@@ -6147,6 +6177,21 @@ do
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
 					self.noHud = value ~= 0
+					continue
+				elseif field == 8 then
+					local value
+					value, cursor = proto.readVarIntU64(input, cursor)
+					self.placeId = value
+					continue
+				elseif field == 9 then
+					local value
+					value, cursor = proto.readVarIntU64(input, cursor)
+					self.universeId = value
+					continue
+				elseif field == 10 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.placeVersion = value
 					continue
 				end
 
@@ -6223,6 +6268,18 @@ do
 			output.noHud = self.noHud
 		end
 
+		if self.placeId ~= nil and self.placeId ~= 0 then
+			output.placeId = self.placeId
+		end
+
+		if self.universeId ~= nil and self.universeId ~= 0 then
+			output.universeId = self.universeId
+		end
+
+		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
+			output.placeVersion = self.placeVersion
+		end
+
 		return output
 	end
 
@@ -6257,6 +6314,18 @@ do
 
 		if input.noHud ~= nil then
 			self.noHud = input.noHud
+		end
+
+		if input.placeId ~= nil then
+			self.placeId = input.placeId
+		end
+
+		if input.universeId ~= nil then
+			self.universeId = input.universeId
+		end
+
+		if input.placeVersion ~= nil then
+			self.placeVersion = input.placeVersion
 		end
 
 		return self
@@ -6405,6 +6474,9 @@ do
 			raknetSessionGuid = if data == nil or data.raknetSessionGuid == nil then "" else data.raknetSessionGuid,
 			playTestGuid = if data == nil or data.playTestGuid == nil then "" else data.playTestGuid,
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
+			placeId = if data == nil or data.placeId == nil then 0 else data.placeId,
+			universeId = if data == nil or data.universeId == nil then 0 else data.universeId,
+			placeVersion = if data == nil or data.placeVersion == nil then 0 else data.placeVersion,
 		}, _MultiplayerTestServerReadyImpl :: _MultiplayerTestServerReadyImpl)
 	end
 
@@ -6437,6 +6509,21 @@ do
 			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
 		end
 
+		if self.placeId ~= nil and self.placeId ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
+		end
+
+		if self.universeId ~= nil and self.universeId ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.universeId)
+		end
+
+		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.placeVersion)
+		end
+
 		local shrunkBuffer = buffer.create(cursor)
 		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
 		return shrunkBuffer
@@ -6460,6 +6547,21 @@ do
 					local value
 					value, cursor = proto.readVarIntU32(input, cursor)
 					self.raknetPort = value
+					continue
+				elseif field == 6 then
+					local value
+					value, cursor = proto.readVarIntU64(input, cursor)
+					self.placeId = value
+					continue
+				elseif field == 7 then
+					local value
+					value, cursor = proto.readVarIntU64(input, cursor)
+					self.universeId = value
+					continue
+				elseif field == 8 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.placeVersion = value
 					continue
 				end
 
@@ -6528,6 +6630,18 @@ do
 			output.sessionGuid = self.sessionGuid
 		end
 
+		if self.placeId ~= nil and self.placeId ~= 0 then
+			output.placeId = self.placeId
+		end
+
+		if self.universeId ~= nil and self.universeId ~= 0 then
+			output.universeId = self.universeId
+		end
+
+		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
+			output.placeVersion = self.placeVersion
+		end
+
 		return output
 	end
 
@@ -6552,6 +6666,18 @@ do
 
 		if input.sessionGuid ~= nil then
 			self.sessionGuid = input.sessionGuid
+		end
+
+		if input.placeId ~= nil then
+			self.placeId = input.placeId
+		end
+
+		if input.universeId ~= nil then
+			self.universeId = input.universeId
+		end
+
+		if input.placeVersion ~= nil then
+			self.placeVersion = input.placeVersion
 		end
 
 		return self

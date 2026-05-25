@@ -35,6 +35,13 @@ pub struct MultiplayerTestServerOptions {
     pub fflags: FflagConfig,
     pub user_id: u64,
     pub no_hud: bool,
+    /// Real `placeId` to pass on the StartServer command line. 0 = legacy
+    /// "anonymous test" mode (in-VM `game.PlaceId` reads as 0).
+    pub place_id: u64,
+    /// Real `universeId` for `-universeId`. 0 = unset.
+    pub universe_id: u64,
+    /// Real `placeVersion` for `-placeVersion`. 0 = unset.
+    pub place_version: u32,
 }
 
 /// Handle to a StartServer process — the host side of a multiplayer test.
@@ -93,11 +100,15 @@ impl MultiplayerTestServer {
         let parent_guid = uuid::Uuid::new_v4().to_string();
         let launched_at = SystemTime::now();
 
+        let place_id_str = opts.place_id.to_string();
+        let universe_id_str = opts.universe_id.to_string();
+        let place_version_str = opts.place_version.to_string();
+
         let mut handle = launch_control::Command::new(&studio_path)
             .args([
                 "-task", "StartServer",
-                "-placeId", "0",
-                "-universeId", "0",
+                "-placeId", &place_id_str,
+                "-universeId", &universe_id_str,
                 "-creatorType", "0",
                 "-creatorId", "0",
                 "-userid", &opts.user_id.to_string(),
@@ -107,7 +118,7 @@ impl MultiplayerTestServer {
                 "-playTestSessionGuid", &play_test_guid,
                 "-numTestServerPlayersUponStartup", "0",
                 "-port", &opts.raknet_port.to_string(),
-                "-placeVersion", "0",
+                "-placeVersion", &place_version_str,
             ])
             .background(opts.background)
             .stdout(std::process::Stdio::piped())
@@ -252,6 +263,14 @@ pub struct MultiplayerTestClientOptions {
     /// If true, skip killing the client on cleanup.
     pub detached: bool,
     pub no_hud: bool,
+    /// Real `placeId` (matches the server's `placeId`). 0 = legacy mode.
+    pub place_id: u64,
+    /// Real `universeId` (matches the server's `universeId`). 0 = unset.
+    pub universe_id: u64,
+    /// Real `placeVersion` (matches the server's `placeVersion`). Studio's
+    /// `StartClient` may or may not honor `-placeVersion`; we pass it
+    /// optimistically and watch the log on first run.
+    pub place_version: u32,
 }
 
 /// Handle to a StartClient process connected to a running server.
@@ -295,11 +314,20 @@ impl MultiplayerTestClient {
             "launching StartClient"
         );
 
+        let place_id_str = opts.place_id.to_string();
+        let universe_id_str = opts.universe_id.to_string();
+        let place_version_str = opts.place_version.to_string();
+
         let handle = launch_control::Command::new(&studio_path)
             .args([
                 "-task", "StartClient",
-                "-placeId", "0",
-                "-universeId", "0",
+                "-placeId", &place_id_str,
+                "-universeId", &universe_id_str,
+                // Studio's StartClient may reject -placeVersion. If so we'll see
+                // it in the Studio log on first run with a real id and can drop
+                // these two args. Passing them keeps the client identity in
+                // sync with the server when supported.
+                "-placeVersion", &place_version_str,
                 "-userid", &opts.user_id.to_string(),
                 "-parentPid", &opts.server_pid.to_string(),
                 "-parentSessionGuid", &opts.raknet_session_guid,

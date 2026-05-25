@@ -540,7 +540,7 @@ async fn launch_play_processes(
         let (place_file_arg, place_id_arg): (Option<String>, Option<u64>) = match place.cloned() {
             Some(PlaceTarget::File(p)) => (Some(p), None),
             Some(PlaceTarget::PlaceId { place_id, .. }) => (None, Some(place_id)),
-            Some(PlaceTarget::Empty) | None => (None, None),
+            Some(PlaceTarget::Empty) | Some(PlaceTarget::Content(_)) | None => (None, None),
         };
 
         tracing::info!("launching play server via master...");
@@ -600,6 +600,13 @@ async fn launch_play_processes(
                     user_id,
                     detached: false,
                     no_hud,
+                    // CLI inline-client path: state snapshot doesn't surface the
+                    // session's published-place ids today, so the client launches
+                    // anonymous. The canonical path (LaunchMultiplayerTestClient
+                    // dispatched by the backend) DOES forward them.
+                    place_id: 0,
+                    universe_id: 0,
+                    place_version: 0,
                 })?;
                 tracing::info!(index = i, pid = client.pid(), "play client running");
                 launched_clients.push(client);

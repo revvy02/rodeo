@@ -39,6 +39,10 @@ pub enum PlaceTarget {
     Empty,
     /// Local `.rbxl`/`.rbxlx` file. Studio opens this as a local file.
     File(String),
+    /// In-memory place bytes (rodeo downloaded them itself for the
+    /// multiplayer-test path). Edit-mode launch doesn't support this; caller
+    /// should use `File` or `PlaceId` instead.
+    Content(Vec<u8>),
     /// Published place by ID. `universe_id` resolved via Roblox API if `None`.
     PlaceId { place_id: u64, universe_id: Option<u64> },
 }
@@ -193,6 +197,9 @@ impl Studio {
                     detached: opts.detached,
                     launched_at: SystemTime::now(),
                 })
+            }
+            PlaceTarget::Content(_) => {
+                bail!("Content variant is for the multiplayer-test flow; use File or PlaceId for edit-mode launch");
             }
             PlaceTarget::Empty => {
                 tracing::info!("launching Studio with no place file");

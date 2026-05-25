@@ -821,19 +821,28 @@ async fn handle_master_msg(
                     });
                 };
 
+                // Resolved published-place identifiers; 0 means "not a published
+                // place" (file path or empty launch). These are forwarded into
+                // the StartServer args and persisted into session meta so
+                // LaunchMultiplayerTestClient can reuse them without re-resolving.
+                let mut resolved_place_id: u64 = 0;
+                let mut resolved_universe_id: u64 = 0;
+                let mut resolved_place_version: u32 = 0;
+
                 let place_target = if let Some(file) = cmd.place_file {
                     PlaceTarget::File(file)
                 } else if cmd.place_id.unwrap_or(0) > 0 {
                     let place_id = cmd.place_id.unwrap();
                     tracing::info!(place_id, "downloading place for play server...");
-                    match rbx_control::place::download_place(place_id).await {
-                        Ok(content) => {
-                            if let Err(e) = rbx_control::place::stage_server_place(&content) {
-                                tracing::error!("failed to stage published place: {e}");
-                                send_launch_failed(format!("stage_server_place failed: {e}"));
-                                return;
-                            }
-                            PlaceTarget::Empty  // already staged; signal via Empty
+                    match rbx_control::place::download_published_place(place_id).await {
+                        Ok(result) => {
+                            resolved_place_id = place_id;
+                            resolved_universe_id = result.universe_id;
+                            resolved_place_version = result.place_version;
+                            // Hand bytes to launch.rs directly — it stages and
+                            // patches the GUID attribute in one place. No temp
+                            // file, no double-write.
+                            PlaceTarget::Content(result.content)
                         }
                         Err(e) => {
                             tracing::error!(place_id, "failed to download place: {e}");
@@ -868,6 +877,9 @@ async fn handle_master_msg(
                     user_id,
                     session_guid: session_guid.clone(),
                     no_hud: cmd.no_hud,
+                    place_id: resolved_place_id,
+                    universe_id: resolved_universe_id,
+                    place_version: resolved_place_version,
                 }) {
                     Ok(server) => {
                         let pid = server.pid();
@@ -891,6 +903,9 @@ async fn handle_master_msg(
                             },
                             clients: std::collections::HashMap::new(),
                             no_hud: cmd.no_hud,
+                            place_id: resolved_place_id,
+                            universe_id: resolved_universe_id,
+                            place_version: resolved_place_version,
                         };
 
                         let launched_at = server.launched_at();
@@ -934,6 +949,9 @@ async fn handle_master_msg(
                                 raknet_session_guid,
                                 play_test_guid,
                                 session_guid: session_guid.clone(),
+                                place_id: resolved_place_id,
+                                universe_id: resolved_universe_id,
+                                place_version: resolved_place_version,
                                 ..Default::default()
                             }))),
                             ..Default::default()
@@ -987,6 +1005,9 @@ async fn handle_master_msg(
                     user_id,
                     detached: false,
                     no_hud: cmd.no_hud,
+                    place_id: cmd.place_id,
+                    universe_id: cmd.universe_id,
+                    place_version: cmd.place_version,
                 }) {
                     Ok(client) => {
                         let pid = client.pid();

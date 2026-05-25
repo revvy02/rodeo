@@ -148,7 +148,10 @@ impl Studio {
         // downloads the file from Roblox.
         let prepared_target = match &target {
             PlaceTarget::PlaceId { .. } => target.clone(),
-            _ => {
+            PlaceTarget::Content(_) => {
+                bail!("Content variant is for the multiplayer-test flow; edit-mode launch should receive File or PlaceId");
+            }
+            PlaceTarget::File(_) | PlaceTarget::Empty => {
                 let place_str = match &target {
                     PlaceTarget::File(p) => Some(p.as_str()),
                     _ => None,
@@ -269,6 +272,12 @@ pub struct MultiplayerTestServerOptions {
     /// MultiplayerTestServer + its MultiplayerTestClients share this one guid.
     pub session_guid: String,
     pub no_hud: bool,
+    /// Real `placeId` to seed Studio's `-placeId` flag. 0 = anonymous.
+    pub place_id: u64,
+    /// Real `universeId` to seed Studio's `-universeId` flag. 0 = unset.
+    pub universe_id: u64,
+    /// Real `placeVersion` to seed Studio's `-placeVersion` flag. 0 = unset.
+    pub place_version: u32,
 }
 
 /// Rodeo's play-mode server handle — delegates process + client-container
@@ -288,28 +297,38 @@ impl MultiplayerTestServer {
     pub fn launch(opts: MultiplayerTestServerOptions) -> Result<Self> {
         let session_guid = opts.session_guid.clone();
 
-        // Stage the place with __RODEO_SESSION_GUID__ so the plugin's activation
-        // gate lets it mount in this DataModel.
-        match &opts.place {
+        // Stage the place at ~/Documents/Roblox/server.rbxl in one place; each
+        // variant only needs to produce the bytes/copy. The session_guid attr
+        // patch is a single tail call so the plugin's activation gate matches.
+        let staged_path = match &opts.place {
             PlaceTarget::File(path) => {
-                let staged = rbx_control::place::stage_local_place(Path::new(path))?;
-                patch_place_session_guid(&staged, &session_guid)?;
+                rbx_control::place::stage_local_place(Path::new(path))?
+            }
+            PlaceTarget::Content(bytes) => {
+                rbx_control::place::stage_server_place(bytes)?
             }
             PlaceTarget::Empty => {
                 let place = create_minimal_place_with_session_guid(&session_guid);
                 let bytes = rbx_control::studio::launch::serialize_place(&place)?;
-                rbx_control::place::stage_server_place(&bytes)?;
+                rbx_control::place::stage_server_place(&bytes)?
             }
             PlaceTarget::PlaceId { .. } => {
-                bail!("published place must be downloaded and staged before launching MultiplayerTestServer");
+                bail!("published place must be downloaded by the backend before launching MultiplayerTestServer; pass Content instead")
             }
-        }
+        };
+        patch_place_session_guid(&staged_path, &session_guid)?;
 
-        // Install rodeo plugin (match criteria set to Empty — play server doesn't
-        // filter by place; the session_guid attribute on the staged place is
-        // what gates activation).
+        // Install rodeo plugin. Match config has to agree with what Studio will
+        // actually see: if we passed real placeId/universeId on the CLI, the
+        // plugin's MATCH check must use those real values (not 0/0), or its
+        // gate fails before the session_guid attr is even checked.
+        let plugin_target = if opts.place_id > 0 {
+            PlaceTarget::PlaceId { place_id: opts.place_id, universe_id: Some(opts.universe_id) }
+        } else {
+            PlaceTarget::Empty
+        };
         let plugin_path =
-            install_launch_plugin(&PlaceTarget::Empty, opts.rodeo_port, &session_guid)?;
+            install_launch_plugin(&plugin_target, opts.rodeo_port, &session_guid)?;
 
         let inner = rbx_control::studio::multiplayer_test::MultiplayerTestServer::launch(
             rbx_control::studio::multiplayer_test::MultiplayerTestServerOptions {
@@ -318,6 +337,9 @@ impl MultiplayerTestServer {
                 fflags: opts.fflags,
                 user_id: opts.user_id,
                 no_hud: opts.no_hud,
+                place_id: opts.place_id,
+                universe_id: opts.universe_id,
+                place_version: opts.place_version,
             },
         )?;
 
@@ -398,9 +420,10 @@ fn install_launch_plugin(target: &PlaceTarget, port: u16, session_guid: &str) ->
             // so skip the attribute gate. MATCH (placeId + universeId) gates.
             (Some(*place_id), *universe_id, false)
         }
-        PlaceTarget::File(_) | PlaceTarget::Empty => {
-            // Local file / empty place — we stamped __RODEO_SESSION_GUID__
-            // when preparing the place, so the plugin enforces the match.
+        PlaceTarget::File(_) | PlaceTarget::Empty | PlaceTarget::Content(_) => {
+            // Local file / empty place / downloaded bytes — we stamped
+            // __RODEO_SESSION_GUID__ when preparing the place, so the plugin
+            // enforces the match.
             (Some(0), Some(0), true)
         }
     };
