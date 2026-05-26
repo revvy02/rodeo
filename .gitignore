@@ -19,6 +19,7 @@
 /.claude/
 /.plans
 /.vscode
+/.scratch/
 
 # Rust
 /target/
