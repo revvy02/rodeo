@@ -1,5 +1,5 @@
 name = "rvy/rodeo"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 description = "Lune client for rodeo — execute Luau in Roblox Studio over the rodeo gRPC API"
 authors = ["rvy"]
 license = "MIT"
