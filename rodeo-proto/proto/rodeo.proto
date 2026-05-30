@@ -712,6 +712,11 @@ message ExecutionDone {
   string execution_id = 1;
   bool success = 2;
   optional string error = 3;
+  // JSON-encoded script return value. Present iff the script returned a
+  // non-nil value. Carried in-memory over the wire so clients can surface
+  // it as `result.return` without round-tripping through a file. Note: no
+  // size cap — very large return values (>256KB) are out of scope.
+  optional string return_value = 4;
 }
 
 message ExecutionKilled {

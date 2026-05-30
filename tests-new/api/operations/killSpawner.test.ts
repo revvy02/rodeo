@@ -26,9 +26,8 @@ describe("kill spawner", () => {
     // Verify the VM is actually free by running a second script
     const result = await ctx.editVm.runCode({
       source: "return 'freed'",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("freed");
+    expect(result.return).toBe("freed");
   });
 });

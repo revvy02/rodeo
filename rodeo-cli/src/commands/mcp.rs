@@ -882,10 +882,6 @@ async fn handle_run_code(
         }
     }
 
-    let return_file = std::env::temp_dir()
-        .join(format!("rodeo-mcp-{}.json", uuid::Uuid::new_v4()))
-        .to_string_lossy()
-        .to_string();
     let output_file = args["output"]
         .as_str()
         .map(String::from)
@@ -895,6 +891,10 @@ async fn handle_run_code(
                 .to_string_lossy()
                 .to_string()
         });
+    // The MCP handler used to mint its own UUID temp file to round-trip the
+    // return value via disk. Now the return value rides on `ExecutionDone`
+    // (read straight from `result.return_value`), so we only thread
+    // `return_file` to the RunRequest when the caller explicitly asked for it.
     let custom_return = args["return_file"].as_str().map(String::from);
 
     let request = RunRequest {
@@ -924,7 +924,7 @@ async fn handle_run_code(
         },
         cache_requires,
         script_args,
-        return_file: Some(custom_return.as_ref().unwrap_or(&return_file).clone()),
+        return_file: custom_return.clone(),
         show_return: false,
         output_file: Some(output_file.clone()),
         verbose: false,
@@ -953,14 +953,10 @@ async fn handle_run_code(
         }
     }
 
-    let ret_path = custom_return.as_ref().unwrap_or(&return_file);
-    let return_value = match std::fs::read_to_string(ret_path) {
-        Ok(ret) if !ret.is_empty() => Some(ret),
-        _ => None,
-    };
-    if custom_return.is_none() {
-        let _ = std::fs::remove_file(ret_path);
-    }
+    // Return value now flows over the wire — no disk read or temp file
+    // management here. If the caller explicitly passed `return_file`, the
+    // plugin already wrote JSON to that path as a side effect.
+    let return_value = result.return_value.clone();
 
     let error = if result.exit_code != 0 {
         Some(if stdout.is_empty() {

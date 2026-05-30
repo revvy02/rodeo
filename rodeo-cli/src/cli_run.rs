@@ -102,7 +102,7 @@ pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<Run
     }
 
     let mut result = final_result.unwrap_or(RunResult {
-        exit_code: 2, ok: false, output: String::new(), files: HashMap::new(),
+        exit_code: 2, ok: false, output: String::new(), files: HashMap::new(), return_value: None,
     });
     if result.output.is_empty() { result.output = buffered_output; }
     for (k, v) in files { result.files.entry(k).or_insert(v); }

@@ -20,57 +20,51 @@ describe("isolated play mode (multi-process)", () => {
     it("server — IsRunning is true", async () => {
       const r = await server.runCode({
         source: "return game:GetService('RunService'):IsRunning()",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("server — no LocalPlayer on server", async () => {
       const r = await server.runCode({
         source: "return game:GetService('Players').LocalPlayer == nil",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("first client — spawns with LocalPlayer", async () => {
       client1 = await server.connectClient();
       const r = await client1.runCode({
         source: "return game:GetService('Players').LocalPlayer ~= nil",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("server — sees connected player", async () => {
       const r = await server.runCode({
         source: "return #game:GetService('Players'):GetPlayers() > 0",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("second client — append spawns another", async () => {
       client2 = await server.connectClient();
       const r = await client2.runCode({
         source: "task.wait(3); return game:GetService('Players').LocalPlayer ~= nil",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("server — sees two players", async () => {
       const r = await server.runCode({
         source: "return #game:GetService('Players'):GetPlayers() >= 2",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
   });
 
@@ -100,46 +94,41 @@ describe("isolated play mode (multi-process)", () => {
     it("server — IsRunning is true", async () => {
       const r = await server.runCode({
         source: "return game:GetService('RunService'):IsRunning()",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("server — no LocalPlayer on server", async () => {
       const r = await server.runCode({
         source: "return game:GetService('Players').LocalPlayer == nil",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("server — game.PlaceId matches the requested placeId", async () => {
       const r = await server.runCode({
         source: "return game.PlaceId",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain(String(PLACE_ID));
+      expect(r.return).toBe(PLACE_ID);
     });
 
     it("server — game.GameId is the resolved universeId", async () => {
       const r = await server.runCode({
         source: "return game.GameId",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain(String(UNIVERSE_ID));
+      expect(r.return).toBe(UNIVERSE_ID);
     });
 
     it("server — game.PlaceVersion is non-zero", async () => {
       const r = await server.runCode({
         source: "return game.PlaceVersion ~= 0",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("server — universe-scoped DataStoreService round-trip succeeds", async () => {
@@ -151,57 +140,51 @@ describe("isolated play mode (multi-process)", () => {
           ds:SetAsync("ping", stamp)
           return ds:GetAsync("ping") == stamp
         `,
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("first client — spawns with LocalPlayer", async () => {
       client1 = await server.connectClient();
       const r = await client1.runCode({
         source: "return game:GetService('Players').LocalPlayer ~= nil",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("first client — game.PlaceId matches the published placeId", async () => {
       const r = await client1.runCode({
         source: "return game.PlaceId",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain(String(PLACE_ID));
+      expect(r.return).toBe(PLACE_ID);
     });
 
     it("server — sees connected player", async () => {
       const r = await server.runCode({
         source: "return #game:GetService('Players'):GetPlayers() > 0",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("second client — append spawns another", async () => {
       client2 = await server.connectClient();
       const r = await client2.runCode({
         source: "task.wait(3); return game:GetService('Players').LocalPlayer ~= nil",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
 
     it("server — sees two players", async () => {
       const r = await server.runCode({
         source: "return #game:GetService('Players'):GetPlayers() >= 2",
-        showReturn: true,
       });
       expect(r.ok).toBe(true);
-      expect(r.output).toContain("true");
+      expect(r.return).toBe(true);
     });
   });
 });

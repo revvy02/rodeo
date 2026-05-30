@@ -33,4 +33,8 @@ export type RunResult = {
   ok: boolean;
   output: string;
   exitCode: number;
+  /** JSON-parsed script return value. `undefined` if the script returned
+   *  nothing or if the return payload failed to parse (the latter is
+   *  swallowed defensively — never throws at the consumer). */
+  return?: unknown;
 };

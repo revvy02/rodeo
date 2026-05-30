@@ -106,11 +106,26 @@ export class Vm {
           ok?: boolean;
           output?: string;
           exitCode?: number;
+          returnValue?: string | null;
         };
+        // The daemon ships the script's return value as a JSON string
+        // (or null when the script didn't return anything). Parse here
+        // so consumers can write `result.return` directly. Parse errors
+        // are swallowed — we never throw at the consumer because the
+        // script returned something non-JSON-encodable.
+        let parsedReturn: unknown = undefined;
+        if (typeof r.returnValue === "string" && r.returnValue.length > 0) {
+          try {
+            parsedReturn = JSON.parse(r.returnValue);
+          } catch {
+            parsedReturn = undefined;
+          }
+        }
         resolveRun({
           ok: r.ok ?? false,
           output: (r.output && r.output.length > 0) ? r.output : bufferedOutput,
           exitCode: r.exitCode ?? 0,
+          return: parsedReturn,
         });
       } else if (method === "stream.error") {
         this.daemon.unregisterStream(streamId);

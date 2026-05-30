@@ -18,9 +18,8 @@ describe("place id", () => {
     });
     const result = await extraStudio.editVm.runCode({
       source: "return game.PlaceId",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("72824109308551");
+    expect(result.return).toBe(72824109308551);
   });
 });

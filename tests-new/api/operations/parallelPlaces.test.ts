@@ -32,10 +32,9 @@ describe("parallel places", () => {
     for (let i = 0; i < 3; i++) {
       const result = await studios[i].editVm.runCode({
         source: 'return game.Workspace:GetAttribute("__test_marker")',
-        showReturn: true,
       });
       expect(result.ok).toBe(true);
-      expect(result.output).toContain(markers[i]);
+      expect(result.return).toBe(markers[i]);
     }
   });
 });

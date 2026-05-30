@@ -517,6 +517,10 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
                                     "ok": result.ok,
                                     "exitCode": result.exit_code,
                                     "output": result.output,
+                                    // JSON-encoded return value (as emitted by the
+                                    // plugin runner). Carried through verbatim;
+                                    // clients parse it as `result.return`.
+                                    "returnValue": result.return_value,
                                 },
                             })).await;
                             break;

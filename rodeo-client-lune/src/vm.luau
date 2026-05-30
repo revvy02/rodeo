@@ -119,10 +119,21 @@ local function create(snap: VmSnapshot, daemon: Daemon): Vm
 				done = true
 				local r = params.result or {}
 				local output = (type(r.output) == "string" and #r.output > 0) and r.output or table.concat(bufferedOutput)
+				-- Daemon ships return value as a JSON string. Parse here so
+				-- consumers can write `result["return"]` directly. Parse
+				-- failures are swallowed — never throw at the consumer.
+				local parsedReturn: any = nil
+				if type(r.returnValue) == "string" and #r.returnValue > 0 then
+					local ok, decoded = pcall(serde.decode, "json", r.returnValue)
+					if ok then
+						parsedReturn = decoded
+					end
+				end
 				finalResult = {
 					ok = r.ok == true,
 					output = output,
 					exitCode = r.exitCode or 0,
+					["return"] = parsedReturn,
 				}
 				task.spawn(co)
 			elseif method == "stream.error" then

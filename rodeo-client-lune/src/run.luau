@@ -31,6 +31,11 @@ export type RunResult = {
 	ok: boolean,
 	output: string,
 	exitCode: number,
+	-- JSON-parsed script return value. `nil` if the script returned nothing
+	-- or if the return payload failed to parse (the latter is swallowed
+	-- defensively). Access via bracket notation because `return` is a Luau
+	-- reserved keyword: `result["return"]`.
+	["return"]: any?,
 }
 
 return {}

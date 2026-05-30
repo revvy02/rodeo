@@ -99,6 +99,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 							executionId = executionId,
 							success = result and result.success or false,
 							error = result and result.error,
+							returnValue = result and result.returnValue,
 						}) },
 					})
 					client:Send(HttpService:JSONEncode(msg:jsonEncode()))

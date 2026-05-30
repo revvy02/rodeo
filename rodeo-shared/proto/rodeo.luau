@@ -2413,12 +2413,14 @@ type _ExecutionDoneFields = {
 	executionId: string,
 	success: boolean,
 	error: string?,
+	returnValue: string?,
 }
 
 export type _ExecutionDonePartialFields = {
 	executionId: string?,
 	success: boolean?,
 	error: string?,
+	returnValue: string?,
 }
 
 export type ExecutionDone = typeof(setmetatable({} :: _ExecutionDoneFields, {} :: _ExecutionDoneImpl))
@@ -15064,6 +15066,7 @@ do
 			executionId = if data == nil or data.executionId == nil then "" else data.executionId,
 			success = if data == nil or data.success == nil then false else data.success,
 			error = if data == nil or data.error == nil then nil else data.error,
+			returnValue = if data == nil or data.returnValue == nil then nil else data.returnValue,
 		}, _ExecutionDoneImpl :: _ExecutionDoneImpl)
 	end
 
@@ -15084,6 +15087,11 @@ do
 		if self.error ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.error)
+		end
+
+		if self.returnValue ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.returnValue)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -15119,6 +15127,11 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.error = proto.decodeString(value)
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.returnValue = proto.decodeString(value)
 					continue
 				end
 
@@ -15159,6 +15172,10 @@ do
 			output.error = self.error
 		end
 
+		if self.returnValue ~= nil then
+			output.returnValue = self.returnValue
+		end
+
 		return output
 	end
 
@@ -15175,6 +15192,10 @@ do
 
 		if input.error ~= nil then
 			self.error = input.error
+		end
+
+		if input.returnValue ~= nil then
+			self.returnValue = input.returnValue
 		end
 
 		return self

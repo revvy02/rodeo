@@ -5,6 +5,10 @@
 // so the shared factories can run against the CLI unchanged.
 
 import type { Subprocess } from "bun";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { RodeoClient } from "../../rodeo-client-ts/src/index.js";
 import type { RunCodeOpts, RunResult } from "../../rodeo-client-ts/src/run.js";
 
@@ -119,6 +123,17 @@ export function makeCliRunFn(
     if (opts.showReturn) args.push("--show-return");
     if (opts.cacheRequires) args.push("--cache-requires");
 
+    // CLI subprocesses don't see the wire-level ExecutionDone, so to give
+    // tests a `result.return` to assert against we shadow it via the same
+    // `--return <path>` mechanism the CLI already supports: write to a temp
+    // JSON file unless the caller already passed their own `returnFile`,
+    // then parse it back into the JS `RunResult.return`. The temp file is
+    // cleaned up regardless of the run outcome.
+    let autoReturnFile: string | undefined;
+    if (opts.returnFile === undefined) {
+      autoReturnFile = join(tmpdir(), `rodeo-cli-return-${randomUUID()}.json`);
+    }
+
     const target = opts.target ?? baseTarget;
     if (target !== undefined) args.push("--target", target);
 
@@ -153,6 +168,8 @@ export function makeCliRunFn(
 
     if (opts.returnFile !== undefined) {
       args.push("--return", opts.returnFile);
+    } else if (autoReturnFile !== undefined) {
+      args.push("--return", autoReturnFile);
     }
 
     // File script goes positionally (matches `rodeo run script.luau`).
@@ -178,10 +195,25 @@ export function makeCliRunFn(
     // but case asserts contain substring matches, not line ordering.
     const output = stdout + stderr;
 
+    // Read back the auto-allocated `--return <path>` JSON, parse it into
+    // `result.return`, then delete the temp file. If the caller passed their
+    // own returnFile we leave it alone — they manage that file themselves.
+    let parsedReturn: unknown = undefined;
+    if (autoReturnFile !== undefined && existsSync(autoReturnFile)) {
+      try {
+        const raw = readFileSync(autoReturnFile, "utf-8");
+        if (raw.length > 0) parsedReturn = JSON.parse(raw);
+      } catch {
+        parsedReturn = undefined;
+      }
+      try { unlinkSync(autoReturnFile); } catch {}
+    }
+
     return {
       ok: proc.exitCode === 0,
       output,
       exitCode: proc.exitCode ?? -1,
+      return: parsedReturn,
     };
   };
 }

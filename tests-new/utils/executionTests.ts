@@ -18,17 +18,16 @@ export type RunFn = (opts: RunCodeOpts) => Promise<RunResult>;
 // ── inlineSource (4 tests) ───────────────────────────────────────────────
 
 export function inlineSource(run: RunFn): void {
-  it("inline source returns value with show return", async () => {
-    const result = await run({ source: "return 42", showReturn: true });
+  it("inline source returns value", async () => {
+    const result = await run({ source: "return 42" });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("42");
+    expect(result.return).toBe(42);
   });
 
   it("inline source returns table", async () => {
-    const result = await run({ source: 'return {a=1, b="hello"}', showReturn: true });
+    const result = await run({ source: 'return {a=1, b="hello"}' });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("hello");
-    expect(result.output).toContain("1");
+    expect(result.return).toEqual({ a: 1, b: "hello" });
   });
 
   it("inline source captures print output", async () => {
@@ -53,9 +52,9 @@ export function ensureReturn(run: RunFn): void {
   });
 
   it("script with return still works", async () => {
-    const result = await run({ source: "return 42", showReturn: true });
+    const result = await run({ source: "return 42" });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("42");
+    expect(result.return).toBe(42);
   });
 
   it("script with only assignments succeeds", async () => {
@@ -147,16 +146,9 @@ export function outputFlags(run: RunFn): void {
 }
 
 // ── returnFile (2 tests) ─────────────────────────────────────────────────
-// TS client has no `--return <path>` analogue; we reproduce the behavior by
-// capturing the return via showReturn and writing it to disk ourselves. The
-// assertions (file exists, content contains expected text) are unchanged.
-
-function parseShownReturn(output: string): string {
-  // Lute's --show-return prints the return value as one line (JSON-ish tostring).
-  // We take the last non-empty line as the return payload.
-  const lines = output.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-  return lines[lines.length - 1] ?? "";
-}
+// Tests below exercise the explicit `returnFile` path (disk side-effect via the
+// plugin). For the reload-from-file roundtrip case we read the script's return
+// value straight from `result.return` (now in-memory on the wire).
 
 // User-facing Luau source returning one value of each of the eight Roblox
 // types that rodeo-shared/normalize.luau + serialize.luau know how to
@@ -271,10 +263,9 @@ export function returnFile(run: RunFn): void {
 
       const reloaded = await run({
         source: `return require("./${relPathNoExt}")`,
-        showReturn: true,
       });
       expect(reloaded.ok).toBe(true);
-      const parsed = JSON.parse(parseShownReturn(reloaded.output));
+      const parsed = reloaded.return as Record<string, { type: string; value: unknown }>;
       expect(parsed.vec3.type).toBe("Vector3");
       expect(parsed.vec3.value).toEqual([1, 2, 3]);
       expect(parsed.cf.type).toBe("CFrame");
@@ -292,10 +283,10 @@ export function scriptFile(run: RunFn): void {
     const path = "rodeo-test-script-tmp.luau";
     writeFileSync(path, "print('from file')\nreturn 'ok'");
     try {
-      const result = await run({ file: path, showReturn: true });
+      const result = await run({ file: path });
       expect(result.ok).toBe(true);
       expect(result.output).toContain("from file");
-      expect(result.output).toContain("ok");
+      expect(result.return).toBe("ok");
     } finally {
       unlinkSync(path);
     }
@@ -303,13 +294,14 @@ export function scriptFile(run: RunFn): void {
 
   it("directive enables show return", async () => {
     // Relies on __process_source honoring `--@rodeo run --show-return`
-    // header directive so show-return is auto-applied.
+    // header directive so show-return is auto-applied. The return value
+    // also rides on the wire, so we assert against `.return` directly.
     const path = "rodeo-test-directive-tmp.luau";
     writeFileSync(path, "--@rodeo run --show-return\nreturn 'directive works'");
     try {
       const result = await run({ file: path });
       expect(result.ok).toBe(true);
-      expect(result.output).toContain("directive works");
+      expect(result.return).toBe("directive works");
     } finally {
       unlinkSync(path);
     }
@@ -325,30 +317,27 @@ export function targetIdentity(run: RunFn): void {
     const result = await run({
       target: "edit:elevated",
       source: "return tostring(DebuggerManager())",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("DebuggerManager");
+    expect(String(result.return)).toContain("DebuggerManager");
   });
 
   it("edit:elevated can use @rodeo/fs", async () => {
     const result = await run({
       target: "edit:elevated",
       source: 'return require("@rodeo/fs").exists(".")',
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("edit:elevated can use @rodeo/process", async () => {
     const result = await run({
       target: "edit:elevated",
       source: 'local r = require("@rodeo/process").run({"echo", "hi"}) return r.ok',
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("edit:elevated propagates errors", async () => {
@@ -359,40 +348,36 @@ export function targetIdentity(run: RunFn): void {
   it("plugin identity works in edit mode (no target)", async () => {
     const result = await run({
       source: "return typeof(game) == 'Instance'",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("run:server can access ServerStorage", async () => {
     const result = await run({
       target: "run:server",
       source: "return game:GetService('ServerStorage') ~= nil",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("test:client can access LocalPlayer", async () => {
     const result = await run({
       target: "test:client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("run:server cannot access LocalPlayer", async () => {
     const result = await run({
       target: "run:server",
       source: "return game:GetService('Players').LocalPlayer == nil",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 }
 
@@ -404,10 +389,9 @@ export function cacheRequires(run: RunFn): void {
       target: "run:server",
       cacheRequires: true,
       source: "return require(game.ReplicatedStorage.globalState).value",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mutated");
+    expect(result.return).toBe("mutated");
   });
 
   it("test:client sees mutated global state with cache-requires", async () => {
@@ -415,10 +399,9 @@ export function cacheRequires(run: RunFn): void {
       target: "test:client",
       cacheRequires: true,
       source: "return require(game.ReplicatedStorage.globalState).value",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mutated");
+    expect(result.return).toBe("mutated");
   });
 }
 
@@ -449,95 +432,99 @@ export function execFiltering(run: RunFn): void {
   // Edit mode tests
 
   it("edit:plugin targets edit VM", async () => {
-    const result = await run({ target: "edit:plugin", source: SOURCE_PLUGIN, showReturn: true });
+    const result = await run({ target: "edit:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"edit":true');
-    expect(result.output).toContain('"running":false');
+    const r = result.return as Record<string, boolean>;
+    expect(r.edit).toBe(true);
+    expect(r.running).toBe(false);
   });
 
   it("edit:plugin can call IsEdit", async () => {
     const result = await run({
       target: "edit:plugin",
       source: "return game:GetService('RunService'):IsEdit()",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("no target matches any VM", async () => {
-    const result = await run({ source: SOURCE_PLUGIN, showReturn: true });
+    const result = await run({ source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"studio":true');
+    expect((result.return as Record<string, boolean>).studio).toBe(true);
   });
 
   // Run mode tests
 
   it("run:server targets server VM in run mode", async () => {
-    const result = await run({ target: "run:server", source: SOURCE_VM, showReturn: true });
+    const result = await run({ target: "run:server", source: SOURCE_VM });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"running":true');
-    expect(result.output).toContain('"server":true');
+    const r = result.return as Record<string, boolean>;
+    expect(r.running).toBe(true);
+    expect(r.server).toBe(true);
   });
 
   it("run:server runs as Script (can access ServerStorage)", async () => {
     const result = await run({
       target: "run:server",
       source: "return game:GetService('ServerStorage') ~= nil",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("run:server:plugin runs as ModuleScript on server VM", async () => {
-    const result = await run({ target: "run:server:plugin", source: SOURCE_PLUGIN, showReturn: true });
+    const result = await run({ target: "run:server:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"running":true');
-    expect(result.output).toContain('"server":true');
-    expect(result.output).toContain('"edit":');
+    const r = result.return as Record<string, boolean>;
+    expect(r.running).toBe(true);
+    expect(r.server).toBe(true);
+    expect(r).toHaveProperty("edit");
   });
 
   // Play/test mode tests
 
   it("test:server targets server VM in play mode", async () => {
-    const result = await run({ target: "test:server", source: SOURCE_VM, showReturn: true });
+    const result = await run({ target: "test:server", source: SOURCE_VM });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"running":true');
-    expect(result.output).toContain('"server":true');
+    const r = result.return as Record<string, boolean>;
+    expect(r.running).toBe(true);
+    expect(r.server).toBe(true);
   });
 
   it("test:server:plugin runs as ModuleScript on server VM", async () => {
-    const result = await run({ target: "test:server:plugin", source: SOURCE_PLUGIN, showReturn: true });
+    const result = await run({ target: "test:server:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"running":true');
-    expect(result.output).toContain('"server":true');
-    expect(result.output).toContain('"edit":');
+    const r = result.return as Record<string, boolean>;
+    expect(r.running).toBe(true);
+    expect(r.server).toBe(true);
+    expect(r).toHaveProperty("edit");
   });
 
   it("test:client targets client VM in play mode", async () => {
-    const result = await run({ target: "test:client", source: SOURCE_VM, showReturn: true });
+    const result = await run({ target: "test:client", source: SOURCE_VM });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"client":true');
-    expect(result.output).toContain('"running":true');
+    const r = result.return as Record<string, boolean>;
+    expect(r.client).toBe(true);
+    expect(r.running).toBe(true);
   });
 
   it("test:client runs as LocalScript (can access LocalPlayer)", async () => {
     const result = await run({
       target: "test:client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("test:client:plugin runs as ModuleScript on client VM", async () => {
-    const result = await run({ target: "test:client:plugin", source: SOURCE_PLUGIN, showReturn: true });
+    const result = await run({ target: "test:client:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain('"running":true');
-    expect(result.output).toContain('"client":true');
-    expect(result.output).toContain('"edit":');
+    const r = result.return as Record<string, boolean>;
+    expect(r.running).toBe(true);
+    expect(r.client).toBe(true);
+    expect(r).toHaveProperty("edit");
   });
 }
 
@@ -548,44 +535,43 @@ export function uncachedRequireTraversal(run: RunFn): void {
     run({
       target: "run:server",
       source,
-      showReturn: true,
       verbose: true,
     });
 
   it("leaf require gets fresh state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.leaf).value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("original");
+    expect(result.return).toBe("original");
   });
 
   it("sibling require gets fresh state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.mid).value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("original");
+    expect(result.return).toBe("original");
   });
 
   it("sibling transitive dep gets fresh state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.mid).leaf.value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("original");
+    expect(result.return).toBe("original");
   });
 
   it("@self require gets fresh state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.deep).value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("original");
+    expect(result.return).toBe("original");
   });
 
   it("ancestor require gets fresh state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.deep).child.value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("original");
+    expect(result.return).toBe("original");
   });
 
   it("ancestor transitive dep gets fresh state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.deep).child.leaf.value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("original");
+    expect(result.return).toBe("original");
   });
 }
 
@@ -596,7 +582,6 @@ export function cachedRequireTraversal(run: RunFn): void {
     run({
       target: "run:server",
       source,
-      showReturn: true,
       verbose: true,
       cacheRequires: true,
     });
@@ -604,25 +589,25 @@ export function cachedRequireTraversal(run: RunFn): void {
   it("leaf require sees mutated state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.leaf).value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mutated");
+    expect(result.return).toBe("mutated");
   });
 
   it("sibling require sees mutated state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.mid).value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mutated");
+    expect(result.return).toBe("mutated");
   });
 
   it("@self require sees mutated state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.deep).value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mutated");
+    expect(result.return).toBe("mutated");
   });
 
   it("ancestor transitive dep sees mutated state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.deep).child.leaf.value");
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mutated");
+    expect(result.return).toBe("mutated");
   });
 }
 
@@ -635,61 +620,55 @@ export function autoTransition(run: RunFn): void {
   it("edit → run:server auto-enters run mode", async () => {
     const result = await run({
       target: "run:server",
-      showReturn: true,
       source: "return game:GetService('RunService'):IsRunning() and game.Players.LocalPlayer == nil",
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("run → test:client auto-transitions to play mode", async () => {
     const result = await run({
       target: "test:client",
-      showReturn: true,
       source: "return game:GetService('Players').LocalPlayer ~= nil",
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("test → run:server auto-transitions back to run mode", async () => {
     const result = await run({
       target: "run:server",
-      showReturn: true,
       source: "return game:GetService('RunService'):IsRunning() and game:GetService('ServerStorage') ~= nil",
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("no transition when already in correct mode", async () => {
     const result = await run({
       target: "run:server",
-      showReturn: true,
       source: "return game:GetService('RunService'):IsRunning()",
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("run → test:server auto-transitions to play mode", async () => {
     const result = await run({
       target: "test:server",
-      showReturn: true,
       source: "return game:GetService('RunService'):IsRunning() and #game:GetService('Players'):GetPlayers() > 0",
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("true");
+    expect(result.return).toBe(true);
   });
 
   it("test → run:server auto-transitions to run mode", async () => {
     const result = await run({
       target: "run:server",
-      showReturn: true,
       source: "return game:GetService('RunService'):IsRunning() and #game:GetService('Players'):GetPlayers() == 0 and 'PASS' or 'FAIL'",
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("PASS");
+    expect(result.return).toBe("PASS");
   });
 }
 
@@ -703,66 +682,71 @@ export function bundle(run: RunFn): void {
   const FIXTURES = "tests-new/fixtures/resolve";
 
   it("resolves @rodeo/* requires", async () => {
-    const result = await run({ file: `${FIXTURES}/rodeo-alias.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/rodeo-alias.luau` });
     expect(result.ok).toBe(true);
+    // "resolved" is written to stdout via stream.write, "alias_ok" is the
+    // script's return value.
     expect(result.output).toContain("resolved");
-    expect(result.output).toContain("alias_ok");
+    expect(result.return).toBe("alias_ok");
   });
 
   it("resolves external local dep", async () => {
-    const result = await run({ file: `${FIXTURES}/ext-main.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/ext-main.luau` });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("from_helper");
+    expect(result.return).toBe("from_helper");
   });
 
   it("resolves nested external dep", async () => {
-    const result = await run({ file: `${FIXTURES}/nested-main.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/nested-main.luau` });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("nested_ok");
+    expect(result.return).toBe("nested_ok");
   });
 
   it("resolves package with internal requires", async () => {
-    const result = await run({ file: `${FIXTURES}/pkg-internal.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/pkg-internal.luau` });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("5");
+    expect(result.return).toBe("5");
   });
 
   it("resolves cross-directory require", async () => {
-    const result = await run({ file: `${FIXTURES}/cross-dir.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/cross-dir.luau` });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("cross_dir_ok");
+    expect(result.return).toBe("cross_dir_ok");
   });
 
   it("resolves deep transitive chain", async () => {
-    const result = await run({ file: `${FIXTURES}/transitive.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/transitive.luau` });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("transitive_ok");
+    expect(result.return).toBe("transitive_ok");
   });
 
   it("resolves @lune/* shims", async () => {
-    const result = await run({ file: `${FIXTURES}/lune-shim.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/lune-shim.luau` });
     expect(result.ok).toBe(true);
+    // "lune_shim_ok" is written to stdout, "cwd:..." is the return value.
     expect(result.output).toContain("lune_shim_ok");
-    expect(result.output).toContain("cwd:");
+    expect(String(result.return ?? "")).toContain("cwd:");
   });
 
   it("resolves mixed @rodeo + relative + @lune requires", async () => {
-    const result = await run({ file: `${FIXTURES}/mixed-requires.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/mixed-requires.luau` });
     expect(result.ok).toBe(true);
+    // stdout has the assembled "mixed:from_helper:..." line; return is "mixed_ok".
     expect(result.output).toContain("mixed:from_helper:");
-    expect(result.output).toContain("mixed_ok");
+    expect(result.return).toBe("mixed_ok");
   });
 
   it("bundles script with no requires", async () => {
-    const result = await run({ file: `${FIXTURES}/no-deps.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/no-deps.luau` });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("no_deps_ok");
+    expect(result.return).toBe("no_deps_ok");
   });
 
   it("bundles via @rodeo run directive", async () => {
-    const result = await run({ file: `${FIXTURES}/directive-bundle.luau`, showReturn: true });
+    const result = await run({ file: `${FIXTURES}/directive-bundle.luau` });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("directive_ok");
+    // The script writes "directive_ok" to stdout and also returns it.
+    expect(result.return).toBe("directive_ok");
   });
 
   it("excludes in-game deps via sourcemap", async () => {
@@ -771,11 +755,11 @@ export function bundle(run: RunFn): void {
     const result = await run({
       file: `${smDir}/main.luau`,
       sourcemap: `${smDir}/sourcemap.json`,
-      showReturn: true,
     });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("sm:");
-    expect(result.output).toContain("from_helper");
+    const r = String(result.return ?? "");
+    expect(r).toContain("sm:");
+    expect(r).toContain("from_helper");
   });
 
   it("fails on missing script", async () => {

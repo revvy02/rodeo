@@ -78,23 +78,35 @@ local success, result = xpcall(function()
 		-- Wrapper xpcall's the require so StudioMCP's outer script frame ("AssistantCommand")
 		-- never becomes part of the trace. On failure, return the trace as data with a sentinel
 		-- prefix; the runner re-raises it below with level=0 so only inner frames surface.
+		-- On success, JSON-encode the result inside the elevated wrapper so callers
+		-- receive the original typed value (boolean, number, table, etc.) instead of
+		-- StudioMCP's lossy string stringification. The runner decodes it back on
+		-- receipt before normalize+wire-encode.
 		local code = [[
+			local HttpService = game:GetService("HttpService")
 			local ref = game:GetService("TestService"):FindFirstChild("]] .. refName .. [[")
 			local ok, result = xpcall(function()
 				return require(ref.Value)
 			end, function(err)
 				return tostring(err) .. "\n" .. debug.traceback(nil, 2)
 			end)
-			if ok then return result end
-			return "__RODEO_ELEVATED_ERROR__" .. tostring(result)
+			if not ok then return "__RODEO_ELEVATED_ERROR__" .. tostring(result) end
+			local jsonOk, jsonResult = pcall(HttpService.JSONEncode, HttpService, result)
+			if jsonOk then return "__RODEO_ELEVATED_JSON__" .. jsonResult end
+			return tostring(result) -- non-JSON-encodable (Instance, Vector3, etc.) → string fallback
 		]]
 		local r: runtime.McpCallResponse = rpc.call("mcp_call", runtime.McpCallRequest.new({
 			tool = "execute_luau",
 			argumentsJson = HttpService:JSONEncode({ code = code }),
 		}))
 		ref:Destroy()
-		if typeof(r.result) == "string" and string.sub(r.result, 1, 24) == "__RODEO_ELEVATED_ERROR__" then
-			error(string.sub(r.result, 25), 0)
+		if typeof(r.result) == "string" then
+			if string.sub(r.result, 1, 24) == "__RODEO_ELEVATED_ERROR__" then
+				error(string.sub(r.result, 25), 0)
+			end
+			if string.sub(r.result, 1, 23) == "__RODEO_ELEVATED_JSON__" then
+				return HttpService:JSONDecode(string.sub(r.result, 24))
+			end
 		end
 		return r.result
 	end
@@ -107,20 +119,25 @@ if outputFileStream then
 	apis.stream.close(outputFileStream)
 end
 
--- Handle return value output
+-- Handle return value output. `returnValueJson` is the canonical wire-format
+-- (JSON-encoded normalized result); we compute it once and reuse it for both
+-- the optional file write and the resultsEvent payload so it can flow over
+-- the WS as `ExecutionDone.return_value`.
+local returnValueJson: string? = nil
 if success and result ~= nil then
 	local normalized = normalize(result)
+	returnValueJson = HttpService:JSONEncode(normalized)
 	if returnFile ~= "" then
 		local f = apis.fs.open(returnFile, "w")
 		if string.match(returnFile, "%.luau?$") then
 			apis.stream.write(f, serializeToLuau(normalized))
 		else
-			apis.stream.write(f, HttpService:JSONEncode(normalized))
+			apis.stream.write(f, returnValueJson)
 		end
 		apis.stream.close(f)
 	end
 	if showReturn then
-		apis.stream.write(apis.io.stdout, HttpService:JSONEncode(normalized) .. "\n")
+		apis.stream.write(apis.io.stdout, returnValueJson .. "\n")
 	end
 end
 
@@ -131,6 +148,7 @@ _G.__rodeo_procs[executionId] = nil
 resultsEvent:Fire({
 	success = success,
 	error = not success and tostring(result) or nil,
+	returnValue = returnValueJson,
 })
 
 return nil

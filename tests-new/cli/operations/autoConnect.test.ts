@@ -14,8 +14,8 @@ describe("auto-connect (CLI)", () => {
   afterAll(async () => { bg.kill(); await bg.exited; });
 
   it("plugin auto-connects on launch", async () => {
-    const result = await run({ source: "return 'auto-connected'", showReturn: true });
+    const result = await run({ source: "return 'auto-connected'" });
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("auto-connected");
+    expect(result.return).toBe("auto-connected");
   });
 });

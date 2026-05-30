@@ -35,7 +35,7 @@ export type ExecutionParams = {
 }
 
 export type ExecutionCallbacks = {
-	onComplete: (result: { success: boolean, error: string? }?) -> (),
+	onComplete: (result: { success: boolean, error: string?, returnValue: string? }?) -> (),
 	onRpc: (msg: any) -> (),
 }
 

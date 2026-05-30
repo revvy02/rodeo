@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 format = 2
 name = "rvy/rodeo"
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 target = "lune"
 
 [graph."caveful_games/argparse@0.1.2 lune"]

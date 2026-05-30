@@ -39,6 +39,10 @@ pub struct RunResult {
     pub ok: bool,
     pub output: String,
     pub files: HashMap<String, Vec<u8>>,
+    /// JSON-encoded return value from the script, untouched. `None` if the
+    /// script didn't return anything. Clients are expected to `JSON.parse` /
+    /// `json.deserialize` and surface as `result.return`.
+    pub return_value: Option<String>,
 }
 
 /// Streaming event emitted by `Vm::run_code_stream`. Mirrors the JSON-RPC
@@ -160,6 +164,7 @@ pub(crate) async fn run_buffered(
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
     let mut exit_code = 0;
     let mut ok = true;
+    let mut return_value: Option<String> = None;
     while let Some(ev) = rx.recv().await {
         match ev {
             RunStreamEvent::Output { kind: _, chunk } => output.push_str(&chunk),
@@ -171,13 +176,14 @@ pub(crate) async fn run_buffered(
                 exit_code = result.exit_code;
                 ok = result.ok;
                 for (k, v) in result.files { files.insert(k, v); }
+                return_value = result.return_value;
                 break;
             }
             RunStreamEvent::RpcCall { .. } => {}
         }
     }
     let _ = task.await;
-    Ok(RunResult { exit_code, ok, output, files })
+    Ok(RunResult { exit_code, ok, output, files, return_value })
 }
 
 /// The bidi message loop — drains incoming events, forwards them as
@@ -213,6 +219,7 @@ async fn message_loop(
     let mut file_buffers: HashMap<String, Vec<u8>> = HashMap::new();
     let mut exit_code = 0;
     let mut ok = true;
+    let mut return_value: Option<String> = None;
 
     let (response_tx, mut response_rx) = mpsc::unbounded_channel::<proto::RunClientMessage>();
 
@@ -246,6 +253,7 @@ async fn message_loop(
                                     if !done.success { exit_code = 1; ok = false; }
                                     let rpc_exit = rpc_state.lock().await.exit_code;
                                     if rpc_exit != 0 { exit_code = rpc_exit; ok = false; }
+                                    return_value = done.return_value.clone();
                                     for task in rpc_tasks.drain(..) { let _ = task.await; }
                                     // After every in-flight stream.write RPC has
                                     // resolved, drain any captured bytes they
@@ -280,6 +288,7 @@ async fn message_loop(
                                             ok: false,
                                             output: String::new(),
                                             files: files_out,
+                                            return_value: return_value.take(),
                                         },
                                     });
                                     break;
@@ -297,6 +306,7 @@ async fn message_loop(
                                             ok,
                                             output: String::new(),
                                             files: files_out,
+                                            return_value: return_value.take(),
                                         },
                                     });
                                     break;
