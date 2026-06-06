@@ -1071,8 +1071,8 @@ async fn handle_master_msg(
                     meta.clients.remove(&idx);
                 }
             } else {
-                tracing::warn!(pid, session_guid = %session_guid, "kill_multiplayer_test: no handle found in session; falling back to libc::kill");
-                unsafe { libc::kill(pid as i32, libc::SIGKILL); }
+                tracing::warn!(pid, session_guid = %session_guid, "kill_multiplayer_test: no handle found in session; falling back to platform kill");
+                crate::platform::kill_process(pid, true);
             }
         }
         proto::master_message::Msg::CloseStudio(cmd) => {

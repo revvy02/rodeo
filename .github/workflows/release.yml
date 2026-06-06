@@ -103,13 +103,12 @@ jobs:
           - name: macos-x86_64
             os: macos-latest
             target: x86_64-apple-darwin
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
           # linux-x86_64 disabled: builds clean, but Roblox Studio doesn't
           # run on Linux so the binary has no Studio to drive. Re-enable
           # if a headless / remote-master use case appears.
-          # windows-x86_64 disabled: studio_backend/daemon/{client,server}.rs
-          # uses Unix-only libc::flock/kill/SIGTERM + as_raw_fd without cfg
-          # gates. Needs LockFileEx + Windows equivalents to port — out of
-          # scope for this RC. Will re-enable once daemon supports Windows.
 
     steps:
       - name: Checkout code
@@ -193,6 +192,7 @@ jobs:
           files: |
             artifacts/rodeo-v${{ needs.build-plugin.outputs.version }}-macos-aarch64.tar.gz
             artifacts/rodeo-v${{ needs.build-plugin.outputs.version }}-macos-x86_64.tar.gz
+            artifacts/rodeo-v${{ needs.build-plugin.outputs.version }}-windows-x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

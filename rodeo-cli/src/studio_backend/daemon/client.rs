@@ -2,9 +2,8 @@
 //! acquire/release slots. Auto-starts the daemon if not running.
 
 use anyhow::{bail, Context, Result};
+use interprocess::local_socket::{prelude::*, Stream};
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::UnixStream;
-use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use super::{DaemonPaths, Request, Response};
@@ -12,7 +11,7 @@ use super::{DaemonPaths, Request, Response};
 /// Handle to an acquired launch slot. Sends `release_slot` on drop.
 pub struct SlotHandle {
     slot_id: String,
-    stream: Option<UnixStream>,
+    stream: Option<Stream>,
     next_id: u64,
 }
 
@@ -85,15 +84,15 @@ pub fn acquire_slot(paths: &DaemonPaths, subcommand: &str) -> Result<SlotHandle>
 
 /// Try to connect to existing daemon, or spawn one.
 /// Uses a file lock to prevent multiple processes from spawning daemons simultaneously.
-fn connect_or_spawn(paths: &DaemonPaths, subcommand: &str) -> Result<UnixStream> {
-    let sock = paths.socket();
-
+fn connect_or_spawn(paths: &DaemonPaths, subcommand: &str) -> Result<Stream> {
     // Fast path: try existing daemon
-    if let Ok(stream) = UnixStream::connect(&sock) {
+    if let Ok(stream) = Stream::connect(super::daemon_socket_name(paths)?) {
         return Ok(stream);
     }
 
-    // Acquire spawn lock to prevent multiple daemons
+    // Acquire spawn lock to prevent multiple daemons. fd-lock is cross-platform
+    // (flock on Unix, LockFileEx on Windows); the guard releases the lock on
+    // drop, so every early return below unlocks automatically.
     let daemon_dir = paths.dir();
     std::fs::create_dir_all(daemon_dir).ok();
     let lock_path = paths.lock();
@@ -102,14 +101,13 @@ fn connect_or_spawn(paths: &DaemonPaths, subcommand: &str) -> Result<UnixStream>
         .write(true)
         .open(&lock_path)
         .context("failed to open daemon spawn lock")?;
-
-    use std::os::unix::io::AsRawFd;
-    let fd = lock_file.as_raw_fd();
-    unsafe { libc::flock(fd, libc::LOCK_EX); }
+    let mut spawn_lock = fd_lock::RwLock::new(lock_file);
+    let _spawn_guard = spawn_lock
+        .write()
+        .context("failed to acquire daemon spawn lock")?;
 
     // Re-check after acquiring lock — another process may have started the daemon
-    if let Ok(stream) = UnixStream::connect(&sock) {
-        unsafe { libc::flock(fd, libc::LOCK_UN); }
+    if let Ok(stream) = Stream::connect(super::daemon_socket_name(paths)?) {
         return Ok(stream);
     }
 
@@ -121,45 +119,20 @@ fn connect_or_spawn(paths: &DaemonPaths, subcommand: &str) -> Result<UnixStream>
         .open(paths.log())
         .context("failed to create daemon log")?;
     tracing::debug!("spawning studio daemon: {:?}", exe);
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        unsafe {
-            Command::new(&exe)
-                .arg(subcommand)
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::from(log_file))
-                .pre_exec(|| { libc::setsid(); Ok(()) })
-                .spawn()
-                .context("failed to spawn studio daemon")?;
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        Command::new(&exe)
-            .arg(subcommand)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::from(log_file))
-            .spawn()
-            .context("failed to spawn studio daemon")?;
-    }
+    crate::platform::spawn_daemon_detached(&exe, subcommand, log_file)?;
 
     // Poll until socket appears
     for _ in 0..60 {
         std::thread::sleep(Duration::from_millis(100));
-        if let Ok(stream) = UnixStream::connect(&sock) {
-            unsafe { libc::flock(fd, libc::LOCK_UN); }
+        if let Ok(stream) = Stream::connect(super::daemon_socket_name(paths)?) {
             return Ok(stream);
         }
     }
 
-    unsafe { libc::flock(fd, libc::LOCK_UN); }
     bail!("studio daemon did not start within 6s")
 }
 
-fn send(stream: &mut UnixStream, request: &Request) -> Result<()> {
+fn send(stream: &mut Stream, request: &Request) -> Result<()> {
     let mut msg = serde_json::to_string(request)?;
     msg.push('\n');
     stream.write_all(msg.as_bytes())?;
@@ -167,7 +140,7 @@ fn send(stream: &mut UnixStream, request: &Request) -> Result<()> {
     Ok(())
 }
 
-fn recv(stream: &mut UnixStream) -> Result<Response> {
+fn recv(stream: &mut Stream) -> Result<Response> {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     reader.read_line(&mut line)?;

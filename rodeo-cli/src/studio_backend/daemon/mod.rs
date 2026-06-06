@@ -1,7 +1,9 @@
 //! Studio launch slot supervisor.
 //!
 //! Runs as a hidden subprocess that gates concurrent Studio launches via a
-//! Unix socket. Callers acquire a slot before spawning Studio, hold it
+//! local socket (a Unix-domain socket on macOS/Linux, a named pipe on
+//! Windows — see `daemon_socket_name`). Callers acquire a slot before
+//! spawning Studio, hold it
 //! through the login handshake, then release when Studio exits.
 //!
 //! Two invariants the daemon enforces:
@@ -13,6 +15,8 @@
 //! The filesystem layout (socket/pid/log/lock paths) is supplied by the
 //! caller via `DaemonPaths` — nothing here hardcodes a directory or env var.
 
+use anyhow::{Context, Result};
+use interprocess::local_socket::Name;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -21,6 +25,40 @@ pub mod server;
 
 pub use client::{acquire_slot, SlotHandle};
 pub use server::main;
+
+/// Build the interprocess local-socket name for this daemon instance.
+///
+/// On Unix this is the filesystem path of the `.sock` file, preserving the
+/// existing socket-file semantics (stale-file cleanup, existence checks). On
+/// Windows std exposes no AF_UNIX, so we use a named pipe whose name is
+/// derived (hashed) from the daemon directory — stable per directory so
+/// distinct rodeo workspaces get distinct daemons rather than colliding.
+#[cfg(unix)]
+pub(crate) fn daemon_socket_name(paths: &DaemonPaths) -> Result<Name<'static>> {
+    use interprocess::local_socket::{GenericFilePath, ToFsName};
+    paths
+        .socket()
+        .into_os_string()
+        .to_fs_name::<GenericFilePath>()
+        .context("invalid daemon socket path")
+}
+
+#[cfg(windows)]
+pub(crate) fn daemon_socket_name(paths: &DaemonPaths) -> Result<Name<'static>> {
+    use interprocess::local_socket::{GenericNamespaced, ToNsName};
+    // FNV-1a over the directory path bytes. A *stable* hash matters here:
+    // std's DefaultHasher is explicitly not guaranteed stable across compiler
+    // versions, so a rebuilt CLI could compute a different pipe name, miss a
+    // still-running daemon, and spawn a duplicate. FNV-1a is fixed forever.
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in paths.dir().to_string_lossy().as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    let name = format!("rodeo-studio-daemon-{hash:016x}");
+    name.to_ns_name::<GenericNamespaced>()
+        .context("invalid daemon pipe name")
+}
 
 /// Filesystem layout for a daemon instance.
 ///
@@ -73,7 +111,7 @@ pub struct DaemonRunOpts {
 }
 
 // ---------------------------------------------------------------------------
-// Protocol — newline-delimited JSON over Unix socket
+// Protocol — newline-delimited JSON over the local socket
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize)]

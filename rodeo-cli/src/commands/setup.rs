@@ -21,7 +21,9 @@ static TYPEDEFS: [(&str, &str); 7] = [
 
 pub fn main() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
-    let home = PathBuf::from(std::env::var("HOME").context("HOME not set")?);
+    // dirs::home_dir() resolves %USERPROFILE% on Windows and $HOME on Unix —
+    // `rodeo setup` was previously Unix-only because it read HOME directly.
+    let home = dirs::home_dir().context("could not determine home directory")?;
 
     // Write typedefs to ~/.rodeo/typedefs/{version}/
     let typedefs_dir = home.join(".rodeo").join("typedefs").join(version);

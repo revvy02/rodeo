@@ -6,6 +6,7 @@ mod studio_backend;
 mod shared;
 mod runtime;
 mod util;
+mod platform;
 
 use clap::{CommandFactory, FromArgMatches};
 use cli::{Cli, Commands};

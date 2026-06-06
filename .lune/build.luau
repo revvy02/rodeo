@@ -89,14 +89,19 @@ local function main()
 	-- Copy binary to bin/ for local use (mise prepends bin/ to PATH)
 	local ext = if process.os == "windows" then ".exe" else ""
 	local cargoBinary = `build/cargo/{profile}/rodeo{ext}`
+	-- Preserve the extension on the destination too: on Windows an
+	-- extensionless file isn't executable (PATHEXT), so `rodeo` on PATH and
+	-- the `bin/rodeo` MCP server spawn both fail — Explorer even pops an
+	-- "open with" dialog when something tries to ShellExecute it.
+	local binTarget = `bin/rodeo{ext}`
 
 	if fs.isFile(cargoBinary) then
 		ensureDir("bin")
-		if fs.isFile("bin/rodeo") then
-			fs.removeFile("bin/rodeo")
+		if fs.isFile(binTarget) then
+			fs.removeFile(binTarget)
 		end
-		fs.copy(cargoBinary, "bin/rodeo")
-		print(`Copied binary to bin/rodeo`)
+		fs.copy(cargoBinary, binTarget)
+		print(`Copied binary to {binTarget}`)
 	end
 
 	-- launch-control helper is dispatched via rodeo's own __launch-control

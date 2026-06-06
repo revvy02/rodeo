@@ -8,7 +8,11 @@ use std::process::Stdio;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use process_wrap::tokio::{CommandWrap, ChildWrapper, ProcessGroup};
+use process_wrap::tokio::{CommandWrap, ChildWrapper};
+#[cfg(unix)]
+use process_wrap::tokio::ProcessGroup;
+#[cfg(windows)]
+use process_wrap::tokio::JobObject;
 
 /// Which role(s) this serve instance runs.
 pub enum ServeMode {
@@ -254,14 +258,21 @@ impl Drop for ServeHandle {
 }
 
 fn spawn_in_group(exe: &std::path::Path, args: &[&str]) -> Result<Box<dyn ChildWrapper>> {
-    let child = CommandWrap::with_new(exe, |cmd| {
+    let mut wrap = CommandWrap::with_new(exe, |cmd| {
         cmd.args(args)
             .stdin(Stdio::null())
             .stderr(Stdio::inherit());
-    })
-    .wrap(ProcessGroup::leader())
-    .spawn()
-    .context("failed to spawn child process")?;
+    });
+    // Put each child in its own kill group so termination cascades to
+    // grandchildren (e.g. Studio): a Unix process group, or a Windows job
+    // object (which kills the whole tree when the job handle is closed).
+    #[cfg(unix)]
+    wrap.wrap(ProcessGroup::leader());
+    #[cfg(windows)]
+    wrap.wrap(JobObject);
+    let child = wrap
+        .spawn()
+        .context("failed to spawn child process")?;
     Ok(child)
 }
 

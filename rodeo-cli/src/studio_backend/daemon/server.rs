@@ -2,9 +2,11 @@
 //! and gates Studio launches via the slot queue.
 
 use anyhow::Result;
+use interprocess::local_socket::{
+    prelude::*, ListenerNonblockingMode, ListenerOptions, SendHalf, Stream,
+};
 use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -36,7 +38,7 @@ struct DaemonState {
     launch_in_progress: bool,
     serialize_launches: bool,
     next_client_id: u64,
-    clients: HashMap<u64, UnixStream>,
+    clients: HashMap<u64, SendHalf>,
 }
 
 impl DaemonState {
@@ -71,25 +73,30 @@ pub fn main(opts: DaemonRunOpts) -> Result<()> {
     }
 
     // Check if another daemon is already running
-    if std::os::unix::net::UnixStream::connect(&sock_path).is_ok() {
+    if Stream::connect(super::daemon_socket_name(&paths)?).is_ok() {
         // Another daemon is alive — exit silently
         return Ok(());
     }
 
-    // Remove stale socket (from a crashed daemon)
-    let _ = std::fs::remove_file(&sock_path);
+    // Remove stale socket (from a crashed daemon); no-op on Windows.
+    crate::platform::cleanup_stale_socket(&sock_path);
 
     // Write PID file
     std::fs::write(&pid_file, std::process::id().to_string())?;
 
-    let listener = match UnixListener::bind(&sock_path) {
+    let listener = match ListenerOptions::new()
+        .name(super::daemon_socket_name(&paths)?)
+        .create_sync()
+    {
         Ok(l) => l,
         Err(_) => {
             // Another daemon won the race — exit silently
             return Ok(());
         }
     };
-    listener.set_nonblocking(true)?;
+    // Only the accept call is non-blocking; accepted streams stay blocking,
+    // matching the old `set_nonblocking(false)` per-connection behavior.
+    listener.set_nonblocking(ListenerNonblockingMode::Accept)?;
 
     eprintln!("studio-daemon: listening (max {max_slots} studios)");
 
@@ -98,9 +105,7 @@ pub fn main(opts: DaemonRunOpts) -> Result<()> {
 
     loop {
         match listener.accept() {
-            Ok((stream, _)) => {
-                // Accepted sockets inherit non-blocking from listener — set back to blocking
-                let _ = stream.set_nonblocking(false);
+            Ok(stream) => {
                 last_activity = Instant::now();
                 let client_id = {
                     let mut guard = state.lock().unwrap();
@@ -138,7 +143,7 @@ pub fn main(opts: DaemonRunOpts) -> Result<()> {
         std::thread::sleep(Duration::from_millis(50));
     }
 
-    let _ = std::fs::remove_file(&sock_path);
+    crate::platform::cleanup_stale_socket(&sock_path);
     let _ = std::fs::remove_file(&pid_file);
     Ok(())
 }
@@ -147,31 +152,15 @@ pub fn main(opts: DaemonRunOpts) -> Result<()> {
 // Client handler
 // ---------------------------------------------------------------------------
 
-fn handle_client(stream: UnixStream, client_id: u64, state: Arc<Mutex<DaemonState>>) {
+fn handle_client(stream: Stream, client_id: u64, state: Arc<Mutex<DaemonState>>) {
     eprintln!("studio-daemon: client {client_id} connected");
-    let reader_stream = match stream.try_clone() {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("studio-daemon: client {client_id} clone failed: {e}");
-            return;
-        }
-    };
+    // Split into independent read/write halves: the send half goes into the
+    // shared client map so other threads (try_dequeue / cleanup) can push
+    // responses, while this thread owns the recv half for the read loop.
+    let (recv_half, send_half) = stream.split();
+    state.lock().unwrap().clients.insert(client_id, send_half);
 
-    {
-        let writer = match stream.try_clone() {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("studio-daemon: client {client_id} writer clone failed: {e}");
-                return;
-            }
-        };
-        state.lock().unwrap().clients.insert(client_id, writer);
-    }
-
-    // Drop the original stream — clones have their own fds
-    drop(stream);
-
-    let reader = BufReader::new(reader_stream);
+    let reader = BufReader::new(recv_half);
     eprintln!("studio-daemon: client {client_id} reading lines...");
     for line in reader.lines() {
         let line = match line {
@@ -374,5 +363,7 @@ fn send_response(client_id: u64, state: &Arc<Mutex<DaemonState>>, response: Resp
 }
 
 fn kill_process(pid: u32) -> bool {
-    unsafe { libc::kill(pid as i32, libc::SIGTERM) == 0 }
+    // Graceful (SIGTERM) on Unix; Windows has no graceful arbitrary-process
+    // kill, so this maps to `taskkill /F` there. See crate::platform.
+    crate::platform::kill_process(pid, false)
 }

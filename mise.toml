@@ -3,6 +3,7 @@ _.path = ["./bin"]
 _.file = ".env"
 
 [tools]
+rust = "stable"
 stylua = "latest"
 "ubi:Kampfkarren/selene" = "latest"
 "ubi:rojo-rbx/rojo" = "latest"
