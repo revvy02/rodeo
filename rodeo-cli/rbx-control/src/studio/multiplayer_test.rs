@@ -130,8 +130,13 @@ impl MultiplayerTestServer {
             .stdout
             .take()
             .context("no stdout from StartServer")?;
+        let stderr = handle
+            .stderr
+            .take()
+            .context("no stderr from StartServer")?;
 
-        let (raknet_session_guid, raknet_port) = read_server_startup(&stdout, opts.raknet_port)?;
+        let (raknet_session_guid, raknet_port) =
+            read_server_startup(&stdout, &stderr, opts.raknet_port)?;
 
         Ok(MultiplayerTestServer {
             handle,
@@ -425,10 +430,14 @@ impl Drop for MultiplayerTestClient {
 // StartServer stdout parser
 // ---------------------------------------------------------------------------
 
-/// Read the server's RakNet session GUID and port from its stdout line channel.
+/// Read the server's RakNet session GUID and port from its stdio line channels.
 /// Blocks until both are found or 30s timeout.
+///
+/// These are Roblox FLog lines, which land on stderr (Windows) or stdout
+/// (macOS), so both streams are polled.
 fn read_server_startup(
     stdout: &launch_control::ChildStdout,
+    stderr: &launch_control::ChildStderr,
     specified_port: u16,
 ) -> Result<(String, u16)> {
     let mut session_guid: Option<String> = None;
@@ -436,14 +445,16 @@ fn read_server_startup(
     let deadline = Instant::now() + Duration::from_secs(30);
 
     loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
+        if Instant::now() >= deadline {
             break;
         }
 
-        let line = match stdout.recv_timeout(remaining) {
+        let line = match stdout.try_recv().or_else(|_| stderr.try_recv()) {
             Ok(l) => l,
-            Err(_) => break,
+            Err(_) => {
+                std::thread::sleep(Duration::from_millis(20));
+                continue;
+            }
         };
 
         // Session GUID: "Session GUID is <uuid>"
