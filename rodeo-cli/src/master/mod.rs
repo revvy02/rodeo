@@ -1029,9 +1029,20 @@ pub async fn run_reconciliation(state: SharedBackendState) {
                                 r#"local u = game:GetService("ReplicatedStorage"):FindFirstChild("RODEO_UNIFIER") if not u then return end local RunService = game:GetService("RunService") if RunService:IsServer() then u.RemoteEvent:FireAllClients("studio_id_from_server", "{msid}") end if RunService:IsClient() then u.RemoteEvent:FireServer("studio_id_from_client", "{msid}") end u.BindableEvent:Fire("{msid}")"#,
                                 msid = studio.mcp_studio_id,
                             );
-                            match mcp.execute_luau(&unify_code).await {
-                                Ok(r) => tracing::debug!(result = ?r, "execute_luau ok"),
-                                Err(e) => tracing::debug!("execute_luau failed: {e}"),
+                            // StudioMCP requires a datamodel_type ("Edit" /
+                            // "Server" / "Client") and only runs in types
+                            // available in the Studio's current mode. The
+                            // unifier self-branches on RunService, so fire it
+                            // into every type; types not present in the current
+                            // mode just error and are ignored. This is what
+                            // distinguishes a play session's Server/Client VMs
+                            // (otherwise they stay unresolved and `test:*`
+                            // targets never route to them).
+                            for datamodel_type in ["Edit", "Server", "Client"] {
+                                match mcp.execute_luau(&unify_code, datamodel_type).await {
+                                    Ok(r) => tracing::debug!(datamodel_type, result = ?r, "execute_luau ok"),
+                                    Err(e) => tracing::trace!(datamodel_type, "execute_luau skipped: {e}"),
+                                }
                             }
                         }
                     }

@@ -181,35 +181,36 @@ fn convert_require_rule(
     sourcemap: Option<&Path>,
     use_luau_config: bool,
 ) -> Result<Box<dyn darklua_core::rules::Rule>> {
+    // Build the rule config with serde_json (not string interpolation): the
+    // sourcemap path is interpolated as a JSON string, and on Windows it
+    // contains backslashes (`C:\...`, often a `\\?\` verbatim prefix) which are
+    // invalid JSON escapes — `format!` produced malformed JSON that failed to
+    // deserialize. serde_json escapes the path correctly.
     let current_json = match current {
-        "luau" => format!(
-            r#"{{ "name": "luau", "use_luau_configuration": {} }}"#,
-            use_luau_config
-        ),
-        "path" => r#"{ "name": "path" }"#.to_string(),
+        "luau" => serde_json::json!({ "name": "luau", "use_luau_configuration": use_luau_config }),
+        "path" => serde_json::json!({ "name": "path" }),
         other => bail!("unknown require mode: {other}"),
     };
 
     let target_json = match target {
-        "path" => r#"{ "name": "path" }"#.to_string(),
-        "roblox" => {
-            if let Some(sm) = sourcemap {
-                format!(
-                    r#"{{ "name": "roblox", "rojo_sourcemap": "{}", "indexing_style": "wait_for_child" }}"#,
-                    sm.display()
-                )
-            } else {
-                r#"{ "name": "roblox" }"#.to_string()
-            }
-        }
+        "path" => serde_json::json!({ "name": "path" }),
+        "roblox" => match sourcemap {
+            Some(sm) => serde_json::json!({
+                "name": "roblox",
+                "rojo_sourcemap": sm.display().to_string(),
+                "indexing_style": "wait_for_child",
+            }),
+            None => serde_json::json!({ "name": "roblox" }),
+        },
         other => bail!("unknown target require mode: {other}"),
     };
 
-    let json = format!(
-        r#"{{ "rule": "convert_require", "current": {}, "target": {} }}"#,
-        current_json, target_json
-    );
+    let rule = serde_json::json!({
+        "rule": "convert_require",
+        "current": current_json,
+        "target": target_json,
+    });
 
-    serde_json::from_str::<Box<dyn darklua_core::rules::Rule>>(&json)
+    serde_json::from_value::<Box<dyn darklua_core::rules::Rule>>(rule)
         .context("failed to create convert_require rule")
 }

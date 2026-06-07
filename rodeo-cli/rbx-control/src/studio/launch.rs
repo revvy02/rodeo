@@ -128,6 +128,18 @@ impl Studio {
 
         let studio_path = studio_application_path()?;
 
+        // `-parentPid` tells Studio to self-exit when the launching process
+        // dies. On Windows it also forces a launch mode that does NOT load user
+        // plugins — so the rodeo plugin never loads and no VM ever connects.
+        // Omit it there and rely on explicit kill-on-drop (+ the JobObject the
+        // serve supervisor wraps children in) for teardown. macOS/Linux keep
+        // the parent-death behavior.
+        #[cfg(target_os = "windows")]
+        let parent_args: Vec<String> = Vec::new();
+        #[cfg(not(target_os = "windows"))]
+        let parent_args: Vec<String> =
+            vec!["-parentPid".to_string(), std::process::id().to_string()];
+
         match target {
             PlaceTarget::PlaceId { place_id, universe_id } => {
                 if !matches!(opts.save, SaveMode::NoSave) {
@@ -144,8 +156,8 @@ impl Studio {
                         "-task", "EditPlace",
                         "-placeId", &place_id.to_string(),
                         "-universeId", &uid.to_string(),
-                        "-parentPid", &std::process::id().to_string(),
                     ])
+                    .args(&parent_args)
                     .background(opts.background)
                     .detached(opts.detached)
                     .stdout(std::process::Stdio::piped())
@@ -171,12 +183,23 @@ impl Studio {
                 let place_path = PathBuf::from(path);
                 let abs_place = std::fs::canonicalize(&place_path)
                     .unwrap_or_else(|_| std::env::current_dir().unwrap().join(&place_path));
+                // Windows `canonicalize` yields an extended-length path
+                // (`\\?\C:\...`). Roblox Studio's launcher doesn't recognize
+                // that form as a place file to open — it reports "Launch Intent
+                // is None" and opens a blank place, so the rodeo plugin's
+                // session-guid gate never matches and it never connects. Strip
+                // the prefix to a normal absolute path. No-op on macOS/Linux,
+                // where the prefix never appears.
                 let place_str = abs_place.to_string_lossy().to_string();
+                let place_str = place_str
+                    .strip_prefix(r"\\?\")
+                    .map(str::to_string)
+                    .unwrap_or(place_str);
 
                 tracing::info!(place = %place_str, "launching Studio");
                 let handle = launch_control::Command::new(&studio_path)
                     .arg(&place_str)
-                    .args(["-parentPid", &std::process::id().to_string()])
+                    .args(&parent_args)
                     .background(opts.background)
                     .detached(opts.detached)
                     .stdout(std::process::Stdio::piped())
@@ -204,7 +227,7 @@ impl Studio {
             PlaceTarget::Empty => {
                 tracing::info!("launching Studio with no place file");
                 let handle = launch_control::Command::new(&studio_path)
-                    .args(["-parentPid", &std::process::id().to_string()])
+                    .args(&parent_args)
                     .background(opts.background)
                     .detached(opts.detached)
                     .stdout(std::process::Stdio::piped())

@@ -332,9 +332,16 @@ export function targetIdentity(run: RunFn): void {
   });
 
   it("edit:elevated can use @rodeo/process", async () => {
+    // `echo` is a real program on Unix but a cmd.exe builtin on Windows (there
+    // is no echo.exe), so route it through `cmd /c` there. @rodeo/process.run
+    // execs on the host, so the host platform is what matters.
+    const argv =
+      process.platform === "win32"
+        ? '{"cmd", "/c", "echo", "hi"}'
+        : '{"echo", "hi"}';
     const result = await run({
       target: "edit:elevated",
-      source: 'local r = require("@rodeo/process").run({"echo", "hi"}) return r.ok',
+      source: `local r = require("@rodeo/process").run(${argv}) return r.ok`,
     });
     expect(result.ok).toBe(true);
     expect(result.return).toBe(true);

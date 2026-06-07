@@ -70,6 +70,15 @@ local target = script:GetAttribute("target") or "plugin"
 local success, result = xpcall(function()
 	if target == "elevated" then
 		local TestService = game:GetService("TestService")
+		local RunService = game:GetService("RunService")
+		-- StudioMCP's execute_luau requires the datamodel_type its command bar
+		-- should run in. This VM knows its own DataModel via RunService; map it
+		-- to StudioMCP's enum (Edit / Server / Client). Without it the call is
+		-- rejected with "datamodel_type is required".
+		local datamodelType = if RunService:IsEdit()
+			then "Edit"
+			elseif RunService:IsClient() then "Client"
+			else "Server"
 		local refName = "RODEO_" .. executionId
 		local ref = Instance.new("ObjectValue")
 		ref.Name = refName
@@ -97,7 +106,7 @@ local success, result = xpcall(function()
 		]]
 		local r: runtime.McpCallResponse = rpc.call("mcp_call", runtime.McpCallRequest.new({
 			tool = "execute_luau",
-			argumentsJson = HttpService:JSONEncode({ code = code }),
+			argumentsJson = HttpService:JSONEncode({ code = code, datamodel_type = datamodelType }),
 		}))
 		ref:Destroy()
 		if typeof(r.result) == "string" then

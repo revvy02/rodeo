@@ -172,10 +172,20 @@ impl StudioMcpClient {
         Ok(())
     }
 
-    /// Execute Luau code via StudioMCP's execute_luau tool.
-    pub async fn execute_luau(&mut self, code: &str) -> Result<String, String> {
-        self.call_tool("execute_luau", &serde_json::json!({ "code": code }))
-            .await
+    /// Execute Luau code via StudioMCP's execute_luau tool in a specific
+    /// DataModel. `datamodel_type` must be one of "Edit", "Server", "Client"
+    /// (StudioMCP requires it; the target type must be available in the
+    /// Studio's current mode or the call errors).
+    pub async fn execute_luau(
+        &mut self,
+        code: &str,
+        datamodel_type: &str,
+    ) -> Result<String, String> {
+        self.call_tool(
+            "execute_luau",
+            &serde_json::json!({ "code": code, "datamodel_type": datamodel_type }),
+        )
+        .await
     }
 
 }

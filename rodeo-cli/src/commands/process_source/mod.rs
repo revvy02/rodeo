@@ -19,7 +19,26 @@ pub struct ProcessedSource {
 }
 
 /// Process source directly (no subprocess). Used by `run.rs`.
+///
+/// Runs on a thread with a large stack: both darklua's bundler and full_moon's
+/// parser recurse with the require-graph / AST depth, which overflows Windows'
+/// 1 MB default main-thread stack (macOS/Linux default to 8 MB) — a
+/// STATUS_STACK_OVERFLOW process crash, not a catchable error. The generous
+/// stack makes deep-but-finite scripts bundle identically on every platform.
 pub fn process(
+    script: Option<String>,
+    source_arg: Option<String>,
+    sourcemap: Option<String>,
+) -> Result<ProcessedSource> {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(move || process_impl(script, source_arg, sourcemap))
+        .map_err(|e| anyhow::anyhow!("failed to spawn process_source thread: {e}"))?
+        .join()
+        .map_err(|_| anyhow::anyhow!("process_source thread panicked"))?
+}
+
+fn process_impl(
     script: Option<String>,
     source_arg: Option<String>,
     sourcemap: Option<String>,
