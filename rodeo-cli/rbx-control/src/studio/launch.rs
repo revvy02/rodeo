@@ -340,8 +340,14 @@ impl Studio {
                 focus_to_keystroke_ms = started.elapsed().as_millis() as u64,
                 "save: sending Cmd+S keystroke",
             );
+            // Save shortcut is Cmd+S on macOS, Ctrl+S elsewhere (META is the
+            // Windows key on Windows, which would not trigger save).
+            #[cfg(target_os = "macos")]
+            let save_modifier = launch_control::Modifiers::META;
+            #[cfg(not(target_os = "macos"))]
+            let save_modifier = launch_control::Modifiers::CONTROL;
             let ks_result = handle
-                .send_keystroke(launch_control::Code::KeyS, launch_control::Modifiers::META);
+                .send_keystroke(launch_control::Code::KeyS, save_modifier);
             match &ks_result {
                 Ok(()) => tracing::info!(pid = handle.id(), "save: send_keystroke returned Ok"),
                 Err(e) => tracing::warn!(pid = handle.id(), "save: send_keystroke failed: {e}"),
