@@ -42,6 +42,76 @@ export function runRodeo(args: string[], opts: { timeout?: number } = {}): ProcR
   };
 }
 
+// Cross-platform process matchers. Unix uses pgrep/pkill with `-f` (match the
+// full command line); Windows has neither, so shell to PowerShell's CIM process
+// query, whose `CommandLine` field gives the same match surface. `pattern` is a
+// regex in both worlds (pgrep -f and PowerShell -match both take regex).
+const IS_WINDOWS = process.platform === "win32";
+
+/** True if any running process's command line matches `pattern`. */
+export function processMatches(pattern: string): boolean {
+  if (IS_WINDOWS) {
+    const r = Bun.spawnSync([
+      "powershell", "-NoProfile", "-Command",
+      `@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '${pattern}' }).Count`,
+    ]);
+    return parseInt(r.stdout.toString().trim() || "0", 10) > 0;
+  }
+  return Bun.spawnSync(["pgrep", "-f", pattern]).exitCode === 0;
+}
+
+/** Force-kill every process whose command line matches `pattern`. */
+export function killMatching(pattern: string): void {
+  if (IS_WINDOWS) {
+    Bun.spawnSync([
+      "powershell", "-NoProfile", "-Command",
+      `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '${pattern}' } | ` +
+        `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+    ]);
+    return;
+  }
+  Bun.spawnSync(["pkill", "-f", pattern]);
+}
+
+/** PIDs of processes whose command line matches `pattern`. */
+export function pidsMatching(pattern: string): number[] {
+  const r = IS_WINDOWS
+    ? Bun.spawnSync([
+        "powershell", "-NoProfile", "-Command",
+        `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '${pattern}' } | ForEach-Object { $_.ProcessId }`,
+      ])
+    : Bun.spawnSync(["pgrep", "-f", pattern]);
+  return r.stdout.toString().split(/\s+/).map((s) => parseInt(s, 10)).filter((n) => n > 0);
+}
+
+/**
+ * Wait for every pid in `pids` to exit, up to `timeoutMs`; returns true if all
+ * are gone. This is EVENT-DRIVEN, not name-polling: Windows blocks on the
+ * process handles via `Wait-Process` (woken the instant they exit, one call —
+ * not a slow per-tick CIM query), and other platforms early-return off the
+ * cheap native `process.kill(pid, 0)` liveness check. Empty `pids` ⇒ true.
+ */
+export async function waitForPidsGone(pids: number[], timeoutMs: number): Promise<boolean> {
+  if (pids.length === 0) return true;
+  if (IS_WINDOWS) {
+    const sec = Math.max(1, Math.ceil(timeoutMs / 1000));
+    const idList = pids.join(",");
+    const r = Bun.spawnSync([
+      "powershell", "-NoProfile", "-Command",
+      `Wait-Process -Id ${idList} -Timeout ${sec} -ErrorAction SilentlyContinue; ` +
+        `if (@(${idList}) | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }) { exit 1 } else { exit 0 }`,
+    ]);
+    return r.exitCode === 0;
+  }
+  const alive = () => pids.some((pid) => { try { process.kill(pid, 0); return true; } catch { return false; } });
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!alive()) return true;
+    await Bun.sleep(200);
+  }
+  return !alive();
+}
+
 export type BackgroundProcess = {
   kill: () => void;
   exited: Promise<number>;

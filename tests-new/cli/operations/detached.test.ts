@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { runRodeo } from "../helpers.js";
+import { runRodeo, processMatches, killMatching } from "../helpers.js";
 
 const PORT = 46202;
 
@@ -15,11 +15,10 @@ describe("--detached flag (CLI)", () => {
     await Bun.sleep(1000);
 
     // Studio process should still be running.
-    const pgrep = Bun.spawnSync(["pgrep", "-f", "RobloxStudio"]);
-    expect(pgrep.exitCode === 0).toBe(true);
+    expect(processMatches("RobloxStudio")).toBe(true);
 
     // Clean up: kill the orphaned Studio launched on this port's temp place.
-    Bun.spawnSync(["pkill", "-f", "rodeo-.*\\.rbxl"]);
+    killMatching("rodeo-.*\\.rbxl");
     await Bun.sleep(2000);
   });
 });

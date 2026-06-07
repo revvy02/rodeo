@@ -1,9 +1,34 @@
 import { describe, it, expect } from "bun:test";
 import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { runRodeo } from "../helpers.js";
 
-const CLIENT_SETTINGS_DIR = "/Applications/RobloxStudio.app/Contents/MacOS/ClientSettings";
-const SETTINGS_FILE = `${CLIENT_SETTINGS_DIR}/ClientAppSettings.json`;
+// Resolve the Studio ClientSettings dir the same way rodeo does (fflags.rs:
+// `client_settings_dir`): it sits beside the Studio executable. macOS keeps it
+// inside the .app bundle; Windows puts it under
+// %LOCALAPPDATA%\Roblox\Versions\<hash>\ — the version dir that actually
+// contains RobloxStudioBeta.exe. Hardcoding the macOS path made the restore
+// assertions check a non-existent dir on Windows (trivial pass).
+function resolveClientSettingsDir(): string {
+  if (process.platform === "darwin") {
+    return "/Applications/RobloxStudio.app/Contents/MacOS/ClientSettings";
+  }
+  if (process.platform === "win32") {
+    const versions = join(process.env.LOCALAPPDATA ?? "", "Roblox", "Versions");
+    let exeDir: string | undefined;
+    try {
+      for (const name of readdirSync(versions)) {
+        if (existsSync(join(versions, name, "RobloxStudioBeta.exe"))) exeDir = join(versions, name);
+      }
+    } catch {}
+    if (!exeDir) throw new Error("RobloxStudioBeta.exe not found under %LOCALAPPDATA%\\Roblox\\Versions");
+    return join(exeDir, "ClientSettings");
+  }
+  throw new Error(`unsupported platform for fflags test: ${process.platform}`);
+}
+
+const CLIENT_SETTINGS_DIR = resolveClientSettingsDir();
+const SETTINGS_FILE = join(CLIENT_SETTINGS_DIR, "ClientAppSettings.json");
 const LOCK_PREFIX = "ClientAppSettings.json.lock.";
 
 function findLockFiles(): string[] {

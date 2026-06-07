@@ -18,13 +18,26 @@ describe("ps (CLI)", () => {
   });
   afterAll(async () => { bg.kill(); await bg.exited; });
 
-  it("lists completed processes", () => {
-    // Run a quick script so there's a completed process to list.
-    runRodeo(["run", "--port", String(PORT), "--source", "return nil"]);
+  it("lists active processes by id", async () => {
+    // ps is live-only: a normal run is removed from the process table the moment
+    // it finishes (only --profile/--logs runs linger for file transfer), so a
+    // just-completed run can't be observed. Assert against a still-present
+    // process instead — spawn a long run and confirm ps lists its id.
+    const scriptProc = spawnBackground([
+      "run", "--port", String(PORT), "--source", "task.wait(30) return nil",
+    ]);
 
-    const result = runRodeo(["ps", "--port", String(PORT)]);
-    expect(result.ok).toBe(true);
-    expect(result.stdout + result.stderr).toContain("done");
+    try {
+      const pid = await waitForProcess(PORT, "running");
+      expect(pid).not.toBeNull();
+
+      const result = runRodeo(["ps", "--port", String(PORT)]);
+      expect(result.ok).toBe(true);
+      expect(result.stdout + result.stderr).toContain(`#${pid}`);
+    } finally {
+      scriptProc.kill();
+      await scriptProc.exited;
+    }
   });
 
   it("shows running process", async () => {
