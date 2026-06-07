@@ -23,10 +23,16 @@ pub fn kill_process(pid: u32, force: bool) -> bool {
 
 #[cfg(windows)]
 pub fn kill_process(pid: u32, _force: bool) -> bool {
+    use std::os::windows::process::CommandExt;
+    // taskkill.exe is a console program; without CREATE_NO_WINDOW a console
+    // window briefly flashes on every kill (e.g. tearing down Studio at the
+    // end of a run).
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     Command::new("taskkill")
         .args(["/PID", &pid.to_string(), "/T", "/F"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
