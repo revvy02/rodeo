@@ -3,14 +3,37 @@
 // some VM. No case names or script sources are modified from the lute version.
 
 import { it, expect } from "bun:test";
+import { rmSync } from "node:fs";
 import type { RunCodeOpts, RunResult } from "../../rodeo-client-ts/src/run.js";
 
 export type RunFn = (opts: RunCodeOpts) => Promise<RunResult>;
 
-// Remove a directory and everything under it, ignoring errors (for idempotent fixtures)
+// Remove a directory and everything under it, ignoring errors (for idempotent
+// fixtures). Uses node's fs so it works without a Unix `rm` on Windows.
 function rmrf(path: string): void {
-  Bun.spawnSync(["rm", "-rf", path], { stdio: ["ignore", "inherit", "inherit"] });
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch {}
 }
+
+// Cross-platform Luau table-literal sources for spawning test programs. The
+// @rodeo/process API execs on the host, so the program must exist there — but
+// Unix `echo`/`cat`/`sleep`/`false` have no stock-Windows equivalents. Rather
+// than branch per OS, drive every program through the JS runtime already
+// running these tests: its absolute path needs no PATH lookup and is
+// guaranteed present, and the `-e` snippets are plain node-compatible JS that
+// behaves identically on every platform.
+//
+// `process.execPath` is read off globalThis because the `process()` factory
+// exported below is a function declaration: it hoists and shadows the global
+// `process` binding for the entire module, so a bare `process.execPath` here
+// would resolve to that function (and be undefined).
+const RT = globalThis.process.execPath.replace(/\\/g, "\\\\");
+const echoArgs = (msg: string) =>
+  `{ "${RT}", "-e", "process.stdout.write('${msg}')" }`;
+const catArgs = `{ "${RT}", "-e", "process.stdin.pipe(process.stdout)" }`;
+const sleepArgs = `{ "${RT}", "-e", "setTimeout(function(){}, 999000)" }`;
+const falseArgs = `{ "${RT}", "-e", "process.exit(1)" }`;
 
 // ── smoke (1 test) ────────────────────────────────────────────────────────
 
@@ -310,7 +333,7 @@ export function process(run: RunFn): void {
     const result = await run({
       showReturn: true,
       source: `local p = require("@rodeo/process")
-        local homeExists = p.env.HOME ~= nil
+        local homeExists = p.env.HOME ~= nil or p.env.USERPROFILE ~= nil
         local writeBlocked = not pcall(function() p.env.TEST = "x" end)
         return { homeExists = homeExists, writeBlocked = writeBlocked }`,
     });
@@ -323,7 +346,7 @@ export function process(run: RunFn): void {
     const result = await run({
       showReturn: true,
       source: `local p = require("@rodeo/process")
-        local r = p.run({ "echo", "hello" })
+        local r = p.run(${echoArgs("hello")})
         return { ok = r.ok, exitcode = r.exitcode, hasHello = string.find(r.out, "hello") ~= nil }`,
     });
     expect(result.ok).toBe(true);
@@ -336,7 +359,7 @@ export function process(run: RunFn): void {
     const result = await run({
       showReturn: true,
       source: `local p = require("@rodeo/process")
-        local r = p.run({ "false" })
+        local r = p.run(${falseArgs})
         return { ok = r.ok }`,
     });
     expect(result.ok).toBe(true);
@@ -344,15 +367,19 @@ export function process(run: RunFn): void {
   });
 
   it("process: system runs shell command", async () => {
+    // `echo` is a builtin in both cmd.exe and POSIX sh, so this exercises
+    // system()'s shell without platform-specific syntax. (On Windows it also
+    // proves the shell path specifically: `echo` is not a standalone program
+    // there, so p.run({"echo",...}) would fail where p.system succeeds.)
     const result = await run({
       showReturn: true,
       source: `local p = require("@rodeo/process")
-        local r = p.system("echo $HOME")
-        return { ok = r.ok, noLiteral = string.find(r.out, "$HOME") == nil }`,
+        local r = p.system("echo hello")
+        return { ok = r.ok, hasOut = string.find(r.out, "hello") ~= nil }`,
     });
     expect(result.ok).toBe(true);
     expect(result.output).toContain('"ok":true');
-    expect(result.output).toContain('"noLiteral":true');
+    expect(result.output).toContain('"hasOut":true');
   });
 
   it("process: create + stream read", async () => {
@@ -360,7 +387,7 @@ export function process(run: RunFn): void {
       showReturn: true,
       source: `local p = require("@rodeo/process")
         local stream = require("@rodeo/stream")
-        local child = p.create({ "echo", "piped output" }, { stdio = "piped" })
+        local child = p.create(${echoArgs("piped output")}, { stdio = "piped" })
         local output = stream.read(child.stdout)
         return string.find(output, "piped output") ~= nil`,
     });
@@ -373,7 +400,7 @@ export function process(run: RunFn): void {
       showReturn: true,
       source: `local p = require("@rodeo/process")
         local stream = require("@rodeo/stream")
-        local child = p.create({ "cat" }, { stdio = "piped" })
+        local child = p.create(${catArgs}, { stdio = "piped" })
         stream.write(child.stdin, "first\\n")
         local r1 = stream.read(child.stdout)
         stream.write(child.stdin, "second\\n")
@@ -392,7 +419,7 @@ export function process(run: RunFn): void {
       showReturn: true,
       source: `local p = require("@rodeo/process")
         local stream = require("@rodeo/stream")
-        local child = p.create({ "cat" }, { stdio = "piped" })
+        local child = p.create(${catArgs}, { stdio = "piped" })
         stream.write(child.stdin, "hello from stdin\\n")
         stream.close(child.stdin)
         local output = stream.read(child.stdout)
@@ -406,7 +433,7 @@ export function process(run: RunFn): void {
     const result = await run({
       showReturn: true,
       source: `local p = require("@rodeo/process")
-        local sleeper = p.create({ "sleep", "10" }, { stdio = "piped" })
+        local sleeper = p.create(${sleepArgs}, { stdio = "piped" })
         p.kill(sleeper)
         local status = p.run(sleeper)
         return status.ok == false`,

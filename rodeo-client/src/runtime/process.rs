@@ -25,7 +25,10 @@ pub fn process_get_info(_req: &rt::ProcessGetInfoRequest) -> Result<rt::ProcessG
         cwd: std::env::current_dir()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default(),
-        homedir: std::env::var("HOME").unwrap_or_default(),
+        // HOME on Unix; Windows normally has no HOME, so fall back to USERPROFILE.
+        homedir: std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .unwrap_or_default(),
         execpath: std::env::current_exe()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default(),
@@ -67,7 +70,10 @@ pub async fn process_run(req: &rt::ProcessRunRequest) -> Result<rt::ProcessRunRe
 }
 
 pub async fn process_system(req: &rt::ProcessSystemRequest) -> Result<rt::ProcessRunResponse, String> {
-    let mut cmd = build_command("sh", &["-c".to_string(), req.command.clone()], req.options.as_option());
+    // Shell out via the platform's shell: `sh -c` on Unix, `cmd /C` on Windows
+    // (there is no `sh` on a stock Windows install).
+    let (shell, flag) = if cfg!(windows) { ("cmd", "/C") } else { ("sh", "-c") };
+    let mut cmd = build_command(shell, &[flag.to_string(), req.command.clone()], req.options.as_option());
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
     let output = cmd.output().await.map_err(|e| format!("system error: {e}"))?;
