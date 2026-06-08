@@ -331,24 +331,46 @@ async fn resolve_place_version_fallback(
     }
 }
 
-/// Stage a place file to `~/Documents/Roblox/server.rbxl` for StartServer.
+/// Directory the `StartServer` task reads its `server.rbxl` from. This is a
+/// Studio convention that differs by platform — staging to the wrong one means
+/// StartServer silently loads a stale/previous `server.rbxl` instead of ours
+/// (so the `__RODEO_SESSION_GUID__` stamp is missing and the plugin gate fails).
+///   - macOS:   `~/Documents/Roblox`
+///   - Windows: `%LOCALAPPDATA%\Roblox`
+fn server_place_dir() -> Result<std::path::PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        Ok(dirs::document_dir()
+            .context("could not find Documents directory")?
+            .join("Roblox"))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Ok(dirs::data_local_dir()
+            .context("could not find LocalAppData directory")?
+            .join("Roblox"))
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        anyhow::bail!("StartServer place staging is not supported on this platform")
+    }
+}
+
+/// Stage a place file to the platform's StartServer `server.rbxl` location.
 /// Returns the path to the staged file.
 pub fn stage_server_place(content: &[u8]) -> Result<std::path::PathBuf> {
-    let dir = dirs::document_dir()
-        .context("could not find Documents directory")?
-        .join("Roblox");
-    std::fs::create_dir_all(&dir).context("failed to create ~/Documents/Roblox")?;
+    let dir = server_place_dir()?;
+    std::fs::create_dir_all(&dir).context("failed to create server place dir")?;
     let path = dir.join("server.rbxl");
     std::fs::write(&path, content).context("failed to write server.rbxl")?;
     Ok(path)
 }
 
-/// Stage a local .rbxl file by copying it to `~/Documents/Roblox/server.rbxl`.
+/// Stage a local .rbxl file by copying it to the platform's StartServer
+/// `server.rbxl` location.
 pub fn stage_local_place(source: &std::path::Path) -> Result<std::path::PathBuf> {
-    let dir = dirs::document_dir()
-        .context("could not find Documents directory")?
-        .join("Roblox");
-    std::fs::create_dir_all(&dir).context("failed to create ~/Documents/Roblox")?;
+    let dir = server_place_dir()?;
+    std::fs::create_dir_all(&dir).context("failed to create server place dir")?;
     let dest = dir.join("server.rbxl");
     std::fs::copy(source, &dest).context("failed to copy place to server.rbxl")?;
     Ok(dest)
