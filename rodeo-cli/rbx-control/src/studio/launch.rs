@@ -252,14 +252,28 @@ impl Studio {
         }
     }
 
-    /// Block until Studio's login flow completes (FetchUserInfo marker on stdout).
-    /// Returns after the marker fires or on a 30s timeout.
+    /// Block until Studio's login flow completes. Returns after login is detected
+    /// or on a 30s timeout.
+    ///
+    /// macOS launches Studio under a pty, so the login marker
+    /// (`Exit stage 'FetchUserInfo'`) lands on stdout. Windows has no tty, so the
+    /// login markers go only to the log file — there we wait on `Authenticated :
+    /// YES` in the log instead. Reading the stdout gate on Windows would just burn
+    /// its full 30s timeout, holding the daemon launch slot and serializing
+    /// parallel launches.
     pub fn wait_for_ready(&self) {
         let pid = self.pid;
-        tracing::debug!(pid, "wait_for_ready: waiting on login gate stdout");
-        let mut handle_guard = self.handle.lock().unwrap();
-        if let Some(ref mut handle) = *handle_guard {
-            wait_for_login_stdout(handle);
+        tracing::debug!(pid, "wait_for_ready: waiting on login gate");
+        #[cfg(target_os = "macos")]
+        {
+            let mut handle_guard = self.handle.lock().unwrap();
+            if let Some(ref mut handle) = *handle_guard {
+                wait_for_login_stdout(handle);
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            wait_for_login_via_log(self.place_path.as_deref(), self.launched_at);
         }
         tracing::debug!(pid, "wait_for_ready: complete");
     }
@@ -565,14 +579,15 @@ pub fn studio_content_path() -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
-// Login gate: detect login completion via stdout
+// Login gate: detect login completion
 // ---------------------------------------------------------------------------
 
-/// Wait for Studio to finish its login flow by scanning stdout.
+/// macOS: wait for Studio to finish its login flow by scanning stdout.
 /// Returns on the `Exit stage 'FetchUserInfo'` marker or 30s timeout.
 ///
 /// Pipes are auto-drained by `launch_control`'s background threads; no manual
 /// drain needed.
+#[cfg(target_os = "macos")]
 pub fn wait_for_login_stdout(child: &mut launch_control::Child) {
     let stdout = match child.stdout.as_ref() {
         Some(stdout) => stdout,
@@ -604,4 +619,98 @@ pub fn wait_for_login_stdout(child: &mut launch_control::Child) {
             }
         }
     }
+}
+
+/// Windows (and other non-macOS): Studio has no tty, so its login markers go only
+/// to the log file. Wait for `Authenticated : YES` in the Studio's own log.
+/// Returns when login completes or after a 30s timeout. The Studio's log is
+/// identified by the unique temp place filename echoed in the log's command-line
+/// header (robust under concurrent launches); with no place file (PlaceId
+/// targets) fall back to the newest log created at/after `launched_at`.
+#[cfg(not(target_os = "macos"))]
+fn wait_for_login_via_log(place_path: Option<&Path>, launched_at: SystemTime) {
+    let logs_dir = match crate::paths::roblox_logs_dir() {
+        Some(d) => d,
+        None => {
+            tracing::debug!("login gate(log): no Roblox logs dir");
+            return;
+        }
+    };
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let since = launched_at
+        .checked_sub(Duration::from_secs(5))
+        .unwrap_or(launched_at);
+    let id_marker = place_path
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .map(|s| s.to_string());
+
+    // Phase 1: locate our Studio's log.
+    let log = loop {
+        if let Some(p) = find_login_log(&logs_dir, since, id_marker.as_deref()) {
+            break p;
+        }
+        if Instant::now() >= deadline {
+            tracing::debug!("login gate(log): timeout locating Studio log");
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    };
+
+    // Phase 2: wait for login completion.
+    loop {
+        if let Ok(content) = std::fs::read_to_string(&log) {
+            if content.contains("Authenticated : YES") {
+                tracing::debug!("login gate(log): authenticated");
+                return;
+            }
+        }
+        if Instant::now() >= deadline {
+            tracing::debug!("login gate(log): timeout waiting for Authenticated");
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// Find the `*_Studio_*_last.log` for our launch: if `id_marker` is set (the temp
+/// place filename), require the log's contents to contain it; otherwise take the
+/// newest log modified at/after `since`.
+#[cfg(not(target_os = "macos"))]
+fn find_login_log(logs_dir: &Path, since: SystemTime, id_marker: Option<&str>) -> Option<PathBuf> {
+    let mut best: Option<(SystemTime, PathBuf)> = None;
+    for entry in std::fs::read_dir(logs_dir).ok()?.flatten() {
+        let path = entry.path();
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+        if !name.contains("_Studio_") || !name.ends_with("_last.log") {
+            continue;
+        }
+        let mtime = match entry.metadata().and_then(|m| m.modified()) {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if mtime < since {
+            continue;
+        }
+        match id_marker {
+            Some(marker) => {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if content.contains(marker)
+                        && best.as_ref().map_or(true, |(t, _)| mtime > *t)
+                    {
+                        best = Some((mtime, path));
+                    }
+                }
+            }
+            None => {
+                if best.as_ref().map_or(true, |(t, _)| mtime > *t) {
+                    best = Some((mtime, path));
+                }
+            }
+        }
+    }
+    best.map(|(_, p)| p)
 }
