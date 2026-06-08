@@ -18,6 +18,7 @@
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 
 use crate::fflags::{self, FflagConfig, FflagHandle, FflagTarget};
@@ -292,6 +293,12 @@ pub struct MultiplayerTestClientOptions {
 /// its role (server vs client) via RunService.
 pub struct MultiplayerTestClient {
     pid: u32,
+    /// launch_control handle for the adopted client Studio. Held so `kill()`
+    /// can terminate it on Windows, where the raw-pid path is a no-op:
+    /// launch_control adopted the real grandchild Studio at launch, and its
+    /// `Child::kill` opens a `TerminateProcess`-capable handle to it. Without
+    /// this the client Studio leaks on close. Mirrors `studio::launch::Studio`.
+    handle: Mutex<Option<launch_control::Child>>,
     index: u32,
     detached: bool,
     layout_handle: Option<filepatch::Handle>,
@@ -352,6 +359,10 @@ impl MultiplayerTestClient {
                 r#"{"EmulatedCountryCode":"","EmulatedGameLocale":"","CustomPoliciesEnabled":false,"TextElongationFactor":0,"PseudolocalizationEnabled":false,"PlayerEmulationEnabled":false}"#,
             ])
             .background(opts.background)
+            // Propagate detached so launch_control both decouples the process
+            // and (on Windows) skips binding it to the lifetime job — a detached
+            // client must survive this process's exit.
+            .detached(opts.detached)
             .spawn()
             .context("failed to launch StartClient")?;
 
@@ -359,6 +370,7 @@ impl MultiplayerTestClient {
 
         Ok(MultiplayerTestClient {
             pid: handle.id(),
+            handle: Mutex::new(Some(handle)),
             index: opts.index,
             detached: opts.detached,
             layout_handle,
@@ -391,25 +403,31 @@ impl MultiplayerTestClient {
     }
 
     pub fn is_running(&self) -> bool {
-        if self.pid == 0 {
-            return false;
-        }
-        #[cfg(unix)]
-        unsafe {
-            libc::kill(self.pid as i32, 0) == 0
-        }
-        #[cfg(not(unix))]
-        {
+        // Liveness through launch_control (cross-platform): it polls process
+        // state on macOS and uses WaitForSingleObject on Windows — the same
+        // abstraction the server uses, rather than a hand-rolled per-platform
+        // check (the old `#[cfg(unix)] libc::kill(pid, 0)` returned a hardcoded
+        // `false` on Windows).
+        if let Some(ref mut handle) = *self.handle.lock().unwrap() {
+            handle.try_wait().ok().flatten().is_none()
+        } else {
             false
         }
     }
 
     pub fn kill(&self) {
-        if self.pid > 0 {
-            #[cfg(unix)]
-            unsafe {
-                libc::kill(self.pid as i32, libc::SIGKILL);
-            }
+        // Kill through the launch_control handle on every platform. It adopted
+        // the real grandchild Studio at launch and terminates it correctly
+        // (libc::kill on macOS, TerminateProcess on Windows) — exactly what the
+        // server already does via its own `Child`.
+        //
+        // The client used to hand-roll a raw-pid `libc::kill` guarded by
+        // `#[cfg(unix)]` with no `else`, which compiled to a silent no-op on
+        // Windows and leaked the client Studio. Discarding the `Child` (keeping
+        // only `handle.id()`) and reimplementing kill with raw libc was the bug;
+        // using the cross-platform abstraction is the fix.
+        if let Some(ref mut handle) = *self.handle.lock().unwrap() {
+            let _ = handle.kill();
         }
     }
 

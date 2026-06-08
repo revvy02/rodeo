@@ -54,6 +54,9 @@ impl Player {
 
         let handle = launch_control::Command::new(&app_path)
             .url(&url)
+            // Propagate detached so a detached Player survives this process's
+            // exit (and on Windows isn't bound to the lifetime job).
+            .detached(opts.detached)
             .spawn()
             .context("failed to launch Roblox Player")?;
 
