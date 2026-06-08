@@ -66,8 +66,10 @@ describe("token prevents cross-connection (CLI)", () => {
   }
 
   it("each server sees exactly 1 VM", async () => {
-    // Wait for both to have a VM (max 10s).
-    for (let i = 0; i < 20; i++) {
+    // Wait for both to have a VM. Windows Studio boots slower than macOS and
+    // the two launches serialize through the daemon login-gate slot, so allow
+    // up to 45s (macOS breaks out of this loop in a few seconds).
+    for (let i = 0; i < 90; i++) {
       if ((await getVmCount(portA)) >= 1 && (await getVmCount(portB)) >= 1) break;
       await Bun.sleep(500);
     }
