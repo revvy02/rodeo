@@ -104,8 +104,8 @@ impl MultiplayerTestServer {
         let universe_id_str = opts.universe_id.to_string();
         let place_version_str = opts.place_version.to_string();
 
-        let mut handle = launch_control::Command::new(&studio_path)
-            .args([
+        let mut cmd = launch_control::Command::new(&studio_path);
+        cmd.args([
                 "-task", "StartServer",
                 "-placeId", &place_id_str,
                 "-universeId", &universe_id_str,
@@ -120,23 +120,30 @@ impl MultiplayerTestServer {
                 "-port", &opts.raknet_port.to_string(),
                 "-placeVersion", &place_version_str,
             ])
-            .background(opts.background)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .context("failed to launch StartServer")?;
+            .background(opts.background);
+        // How the server's "Session GUID is" / "Started Raknet" markers are
+        // captured differs by platform. On macOS, launch-control gives piped
+        // stdio a pty, so Studio sees a terminal and routes its FLog output to
+        // the app's stdout/stderr — read from there. On Windows there is no
+        // working tty equivalent (a ConPTY doesn't survive Studio's bootstrapper
+        // relaunch — the real server runs as an unattached grandchild), so Studio
+        // writes those lines only to its log file; read them from there instead
+        // and don't pipe stdio at all.
+        #[cfg(target_os = "macos")]
+        cmd.stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        #[allow(unused_mut)]
+        let mut handle = cmd.spawn().context("failed to launch StartServer")?;
 
-        let stdout = handle
-            .stdout
-            .take()
-            .context("no stdout from StartServer")?;
-        let stderr = handle
-            .stderr
-            .take()
-            .context("no stderr from StartServer")?;
-
+        #[cfg(target_os = "macos")]
+        let (raknet_session_guid, raknet_port) = {
+            let stdout = handle.stdout.take().context("no stdout from StartServer")?;
+            let stderr = handle.stderr.take().context("no stderr from StartServer")?;
+            read_server_startup(&stdout, &stderr, opts.raknet_port)?
+        };
+        #[cfg(not(target_os = "macos"))]
         let (raknet_session_guid, raknet_port) =
-            read_server_startup(&stdout, &stderr, opts.raknet_port)?;
+            read_server_startup_from_log(launched_at, &play_test_guid, opts.raknet_port)?;
 
         Ok(MultiplayerTestServer {
             handle,
@@ -427,14 +434,45 @@ impl Drop for MultiplayerTestClient {
 }
 
 // ---------------------------------------------------------------------------
-// StartServer stdout parser
+// StartServer startup-marker parsing
 // ---------------------------------------------------------------------------
 
-/// Read the server's RakNet session GUID and port from its stdio line channels.
-/// Blocks until both are found or 30s timeout.
+/// Parse one log/stdio line for the server's RakNet session GUID
+/// (`Session GUID is <uuid>`) and port (`Started Raknet network server
+/// 127.0.0.1|<port>`), filling `session_guid` / `raknet_port` in place.
+fn parse_server_marker_line(
+    line: &str,
+    session_guid: &mut Option<String>,
+    raknet_port: &mut Option<u16>,
+) {
+    if session_guid.is_none() {
+        if let Some(rest) = line.split("Session GUID is ").nth(1) {
+            let guid = rest.trim();
+            if guid.len() >= 36 {
+                *session_guid = Some(guid[..36].to_string());
+            }
+        }
+    }
+    if raknet_port.is_none() {
+        if let Some(idx) = line.find("Started Raknet network server") {
+            if let Some(pipe_idx) = line[idx..].find('|') {
+                let after = line[idx + pipe_idx + 1..].trim_start();
+                let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+                if let Ok(port) = digits.parse::<u16>() {
+                    *raknet_port = Some(port);
+                }
+            }
+        }
+    }
+}
+
+/// macOS: read the server's RakNet session GUID and port from its stdio line
+/// channels. Blocks until both are found or 30s timeout.
 ///
-/// These are Roblox FLog lines, which land on stderr (Windows) or stdout
-/// (macOS), so both streams are polled.
+/// These are Roblox FLog lines. launch-control runs the app under a pty for
+/// piped stdio, so Studio (seeing a terminal) routes FLog to the app's stdout;
+/// stderr is polled too for robustness.
+#[cfg(target_os = "macos")]
 fn read_server_startup(
     stdout: &launch_control::ChildStdout,
     stderr: &launch_control::ChildStderr,
@@ -444,11 +482,7 @@ fn read_server_startup(
     let mut raknet_port: Option<u16> = if specified_port > 0 { Some(specified_port) } else { None };
     let deadline = Instant::now() + Duration::from_secs(30);
 
-    loop {
-        if Instant::now() >= deadline {
-            break;
-        }
-
+    while Instant::now() < deadline {
         let line = match stdout.try_recv().or_else(|_| stderr.try_recv()) {
             Ok(l) => l,
             Err(_) => {
@@ -456,30 +490,7 @@ fn read_server_startup(
                 continue;
             }
         };
-
-        // Session GUID: "Session GUID is <uuid>"
-        if session_guid.is_none() && line.contains("Session GUID is ") {
-            if let Some(guid) = line.split("Session GUID is ").nth(1) {
-                let guid = guid.trim();
-                if guid.len() >= 36 {
-                    session_guid = Some(guid[..36].to_string());
-                }
-            }
-        }
-
-        // RakNet port: "Started Raknet network server 127.0.0.1|<port>"
-        if raknet_port.is_none() {
-            if let Some(idx) = line.find("Started Raknet network server") {
-                if let Some(pipe_idx) = line[idx..].find('|') {
-                    let port_str = &line[idx + pipe_idx + 1..];
-                    let port_str = port_str.trim();
-                    if let Ok(port) = port_str.parse::<u16>() {
-                        raknet_port = Some(port);
-                    }
-                }
-            }
-        }
-
+        parse_server_marker_line(&line, &mut session_guid, &mut raknet_port);
         if session_guid.is_some() && raknet_port.is_some() {
             break;
         }
@@ -491,4 +502,103 @@ fn read_server_startup(
     tracing::info!(guid = &session_guid[..8], port = raknet_port, "play server started");
 
     Ok((session_guid, raknet_port))
+}
+
+/// Windows (and other non-macOS): Studio has no tty, so it writes its FLog
+/// output (the markers) only to its `*_Studio_*_last.log` file. Identify THIS
+/// server's log by the unique `playTestSessionGuid` echoed in the log's launch
+/// command-line header (robust under concurrent parallel-place launches — no
+/// timing race), then scan it for the markers. Blocks until both are found or
+/// 30s timeout.
+#[cfg(not(target_os = "macos"))]
+fn read_server_startup_from_log(
+    launched_at: SystemTime,
+    play_test_guid: &str,
+    specified_port: u16,
+) -> Result<(String, u16)> {
+    let logs_dir =
+        crate::paths::roblox_logs_dir().context("could not determine Roblox logs dir")?;
+    let deadline = Instant::now() + Duration::from_secs(30);
+    // The log file is created at/after launch; allow a small clock-skew window.
+    let since = launched_at
+        .checked_sub(Duration::from_secs(5))
+        .unwrap_or(launched_at);
+
+    // Phase 1: locate our log by the unique guid in its command-line header.
+    let log_path = loop {
+        if let Some(p) = find_server_log(&logs_dir, since, play_test_guid) {
+            break p;
+        }
+        if Instant::now() >= deadline {
+            anyhow::bail!("timeout locating StartServer log (playTestSessionGuid {play_test_guid})");
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    };
+
+    // Phase 2: scan our log for the markers as Studio appends them.
+    let mut session_guid: Option<String> = None;
+    let mut raknet_port: Option<u16> = if specified_port > 0 { Some(specified_port) } else { None };
+    while Instant::now() < deadline {
+        if let Ok(content) = std::fs::read_to_string(&log_path) {
+            for line in content.lines() {
+                parse_server_marker_line(line, &mut session_guid, &mut raknet_port);
+                if session_guid.is_some() && raknet_port.is_some() {
+                    break;
+                }
+            }
+        }
+        if session_guid.is_some() && raknet_port.is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+
+    let session_guid =
+        session_guid.context("timeout waiting for server session GUID in log")?;
+    let raknet_port = raknet_port.context("timeout waiting for server RakNet port in log")?;
+
+    tracing::info!(
+        guid = &session_guid[..8],
+        port = raknet_port,
+        log = %log_path.display(),
+        "play server started (from log)"
+    );
+
+    Ok((session_guid, raknet_port))
+}
+
+/// Find the `*_Studio_*_last.log` whose contents contain `marker` (our unique
+/// `playTestSessionGuid`), considering only files modified at/after `since`.
+#[cfg(not(target_os = "macos"))]
+fn find_server_log(
+    logs_dir: &std::path::Path,
+    since: SystemTime,
+    marker: &str,
+) -> Option<std::path::PathBuf> {
+    let mut best: Option<(SystemTime, std::path::PathBuf)> = None;
+    for entry in std::fs::read_dir(logs_dir).ok()?.flatten() {
+        let path = entry.path();
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+        if !name.contains("_Studio_") || !name.ends_with("_last.log") {
+            continue;
+        }
+        let mtime = match entry.metadata().and_then(|m| m.modified()) {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if mtime < since {
+            continue;
+        }
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            if content.contains(marker)
+                && best.as_ref().map_or(true, |(t, _)| mtime > *t)
+            {
+                best = Some((mtime, path));
+            }
+        }
+    }
+    best.map(|(_, p)| p)
 }
