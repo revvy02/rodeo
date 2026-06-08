@@ -60,7 +60,20 @@ fn process_impl(
         };
         let bundle_result = bundle::bundle(tmp_path.to_str().unwrap_or(""), &opts);
         let _ = std::fs::remove_file(&tmp_path);
-        let bundled = bundle_result?;
+        // Bundling only inlines filesystem requires; inline `--source` runs
+        // rarely have any, so a bundle failure shouldn't abort the run. darklua
+        // emits no output for source it can't parse (e.g. a syntax error), and
+        // that failure differs by platform: macOS passes the invalid source
+        // through, Windows produces nothing. Fall back to the raw source so
+        // Studio runs it and reports the real error (syntax error, unresolved
+        // require, ...) as a not-ok result — identically on every platform.
+        let bundled = match bundle_result {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!("bundle failed, running raw source: {e:#}");
+                src.clone()
+            }
+        };
 
         let shimmed = bundle::inline_shims(&bundled)?;
         let script = source::ensure_return(&shimmed);
