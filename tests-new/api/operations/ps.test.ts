@@ -2,13 +2,26 @@ import { describe, it, expect } from "bun:test";
 import { setupStudio } from "../helpers.js";
 const ctx = setupStudio();
 describe("ps", () => {
-  it("lists completed processes", async () => {
-    // Run a quick script so there's a completed process
-    await ctx.editVm.runCode({ source: "return nil" });
-
-    const processes = await ctx.client.listProcesses();
-    const done = processes.find((p) => p.state === "done");
-    expect(done).toBeDefined();
+  it("lists active processes by id", async () => {
+    // ps is live-only: a normal run is removed from the process table the moment
+    // it finishes (only --profile/--logs runs linger for file transfer), so a
+    // just-completed run can't be observed. Assert against a still-running run
+    // instead — start a long one and confirm listProcesses lists it by id.
+    const runPromise = ctx.editVm.runCode({ source: "task.wait(30) return nil" });
+    try {
+      let pid: number | undefined;
+      for (let i = 0; i < 30; i++) {
+        const running = (await ctx.client.listProcesses()).find((p) => p.state === "running");
+        if (running) { pid = running.processId; break; }
+        await Bun.sleep(500);
+      }
+      expect(pid).toBeDefined();
+      expect(pid!).toBeGreaterThan(0);
+    } finally {
+      const running = (await ctx.client.listProcesses()).find((p) => p.state === "running");
+      if (running) await ctx.client.kill(running.processId);
+      await runPromise.catch(() => {});
+    }
   });
 
   it("shows running process", async () => {
