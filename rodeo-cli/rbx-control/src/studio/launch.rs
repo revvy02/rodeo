@@ -140,6 +140,14 @@ impl Studio {
         let parent_args: Vec<String> =
             vec!["-parentPid".to_string(), std::process::id().to_string()];
 
+        // Capture the launch time BEFORE spawning. On Windows the bootstrapper
+        // creates Studio's log file during the spawn (before launch_control's
+        // adopt-the-real-process handoff returns), so a launched_at recorded
+        // after spawn() would be *later* than the log's creation — and the log
+        // scanner's claim_new_log(launched_at) would then never match it, so
+        // process_log stays unresolved and --logs capture produces nothing.
+        let launched_at = SystemTime::now();
+
         match target {
             PlaceTarget::PlaceId { place_id, universe_id } => {
                 if !matches!(opts.save, SaveMode::NoSave) {
@@ -176,7 +184,7 @@ impl Studio {
                     saved: AtomicBool::new(false),
                     cleaned: AtomicBool::new(false),
                     detached: opts.detached,
-                    launched_at: SystemTime::now(),
+                    launched_at,
                 })
             }
             PlaceTarget::File(ref path) => {
@@ -218,7 +226,7 @@ impl Studio {
                     saved: AtomicBool::new(false),
                     cleaned: AtomicBool::new(false),
                     detached: opts.detached,
-                    launched_at: SystemTime::now(),
+                    launched_at,
                 })
             }
             PlaceTarget::Content(_) => {
@@ -246,7 +254,7 @@ impl Studio {
                     saved: AtomicBool::new(false),
                     cleaned: AtomicBool::new(false),
                     detached: opts.detached,
-                    launched_at: SystemTime::now(),
+                    launched_at,
                 })
             }
         }
