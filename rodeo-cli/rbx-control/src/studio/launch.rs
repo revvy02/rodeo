@@ -210,6 +210,12 @@ impl Studio {
                     .args(&parent_args)
                     .background(opts.background)
                     .detached(opts.detached)
+                    // When detached, open the place through the shell so Studio
+                    // is rooted at explorer (persistent) rather than the daemon —
+                    // otherwise Studio's launcher-watch reaps it when the daemon
+                    // dies. No effect when not detached. (File launches only; the
+                    // first arg is the place file explorer opens.)
+                    .shell_open(true)
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::piped())
                     .spawn()
@@ -343,6 +349,14 @@ impl Studio {
     /// handle the key equivalent.
     pub fn save(&self) -> Result<()> {
         let started = std::time::Instant::now();
+        // On Windows, foregrounding happens inside `send_keystroke` under the
+        // global keystroke lock. We must NOT pre-focus here: a `focus()` call
+        // outside that lock races with a concurrent save's locked injection and
+        // steals its foreground mid-chord, dropping the Ctrl+S (the place's
+        // mtime never changes and the save hangs to timeout). On macOS,
+        // CGEvent delivery wants the window frontmost first and has no
+        // foreground-steal race, so keep the pre-focus there.
+        #[cfg(target_os = "macos")]
         match self.focus() {
             Ok(()) => tracing::info!(
                 pid = self.pid,

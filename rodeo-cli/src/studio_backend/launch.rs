@@ -193,7 +193,7 @@ impl Studio {
         self.inner.wait_for_ready();
         tracing::info!(session_guid = sg_short, pid, "wait_for_ready: login gate passed, notifying daemon");
         if let Some(ref mut slot) = *self.daemon_slot.lock().unwrap() {
-            let _ = slot.launch_complete(pid);
+            let _ = slot.launch_complete(pid, self.inner.detached());
         }
         tracing::info!(session_guid = sg_short, pid, "wait_for_ready: complete");
     }

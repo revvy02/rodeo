@@ -17,12 +17,17 @@ pub struct SlotHandle {
 
 impl SlotHandle {
     /// Notify daemon that Studio has launched and login is complete.
-    pub fn launch_complete(&mut self, pid: u32) -> Result<()> {
+    ///
+    /// `detached` propagates the launch's detached flag so the daemon records
+    /// it on the slot and never reaps the pid (detached Studios outlive their
+    /// backend).
+    pub fn launch_complete(&mut self, pid: u32, detached: bool) -> Result<()> {
         let stream = self.stream.as_mut().context("daemon connection lost")?;
         let req = Request::LaunchComplete {
             id: self.next_id,
             slot_id: self.slot_id.clone(),
             pid,
+            detached,
         };
         self.next_id += 1;
         send(stream, &req)?;

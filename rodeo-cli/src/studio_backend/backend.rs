@@ -453,36 +453,57 @@ async fn handle_master_msg(
                     place = ?place_path.as_ref().map(|p| p.display().to_string()),
                     "save: triggering studio.save()"
                 );
-                let save_outcome = studio.save();
-                let (saved, path, error) = match save_outcome {
-                    Err(e) => {
-                        tracing::error!(session_guid = sg_short.as_str(), "save: studio.save() failed: {e}");
-                        (false, place_path.map(|p| p.to_string_lossy().into_owned()), Some(e.to_string()))
-                    }
-                    Ok(()) => match (place_path, mtime_before) {
-                        (Some(path), Some(before)) => {
-                            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-                            let mut changed = false;
-                            let mut ticks = 0u32;
-                            loop {
+                // Confirm the save by watching the place file's mtime, re-firing
+                // the Ctrl+S keystroke until it lands. On Windows a concurrent or
+                // background keystroke save can silently drop the chord (foreground
+                // is a single system-wide resource — see launch-control's
+                // send_keystroke), so a single fire is unreliable; retry until the
+                // mtime changes or we hit the overall deadline.
+                let (saved, path, error) = match (place_path, mtime_before) {
+                    (Some(path), Some(before)) => {
+                        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+                        let mut changed = false;
+                        let mut ticks = 0u32;
+                        let mut attempts = 0u32;
+                        let mut last_err: Option<String> = None;
+                        'retry: while std::time::Instant::now() < deadline {
+                            attempts += 1;
+                            if let Err(e) = studio.save() {
+                                last_err = Some(e.to_string());
+                                tracing::warn!(session_guid = sg_short.as_str(), attempts, "save: keystroke attempt failed: {e}");
+                            }
+                            // Give this attempt up to ~6s to land, bounded by the
+                            // overall deadline, before re-firing.
+                            let attempt_deadline = (std::time::Instant::now()
+                                + std::time::Duration::from_secs(6))
+                                .min(deadline);
+                            while std::time::Instant::now() < attempt_deadline {
                                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                                 ticks += 1;
-                                if std::time::Instant::now() > deadline { break; }
                                 if let Ok(meta) = std::fs::metadata(&path) {
                                     if let Ok(now) = meta.modified() {
-                                        if now != before { changed = true; break; }
+                                        if now != before { changed = true; break 'retry; }
                                     }
                                 }
                             }
-                            if changed {
-                                tracing::info!(session_guid = sg_short.as_str(), ticks, "save: mtime changed, success");
-                                (true, Some(path.to_string_lossy().into_owned()), None)
-                            } else {
-                                tracing::warn!(session_guid = sg_short.as_str(), ticks, "save: timed out waiting for mtime change");
-                                (false, Some(path.to_string_lossy().into_owned()), Some("mtime did not change within 30s".to_string()))
-                            }
                         }
-                        _ => (true, None, None),
+                        if changed {
+                            tracing::info!(session_guid = sg_short.as_str(), ticks, attempts, "save: mtime changed, success");
+                            (true, Some(path.to_string_lossy().into_owned()), None)
+                        } else {
+                            tracing::warn!(session_guid = sg_short.as_str(), ticks, attempts, "save: timed out waiting for mtime change");
+                            (false, Some(path.to_string_lossy().into_owned()),
+                             last_err.or_else(|| Some("mtime did not change within 30s".to_string())))
+                        }
+                    }
+                    // No place path / no baseline mtime — can't confirm via mtime.
+                    // Fire once and report the keystroke's own result.
+                    (maybe_path, _) => match studio.save() {
+                        Ok(()) => (true, maybe_path.map(|p| p.to_string_lossy().into_owned()), None),
+                        Err(e) => {
+                            tracing::error!(session_guid = sg_short.as_str(), "save: studio.save() failed: {e}");
+                            (false, maybe_path.map(|p| p.to_string_lossy().into_owned()), Some(e.to_string()))
+                        }
                     },
                 };
                 let _ = outgoing.send(proto::BackendMessage {

@@ -120,7 +120,8 @@ pub enum Request {
     /// Request permission to launch a Studio. Blocks until granted.
     AcquireSlot { id: u64 },
     /// Studio has launched and completed login. Unblocks the next queued launch.
-    LaunchComplete { id: u64, slot_id: String, pid: u32 },
+    /// `detached` tells the daemon not to reap this pid on release/disconnect.
+    LaunchComplete { id: u64, slot_id: String, pid: u32, detached: bool },
     /// Release a slot (Studio exiting). Frees capacity for queued requests.
     ReleaseSlot { id: u64, slot_id: String },
     /// Query daemon status.

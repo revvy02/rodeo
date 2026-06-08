@@ -22,6 +22,11 @@ struct ActiveSlot {
     id: String,
     pid: u32,
     client_id: u64,
+    /// When true, the Studio launched in this slot is meant to outlive the
+    /// backend that launched it. The daemon still tracks the slot for
+    /// concurrency accounting, but never reaps the pid on release or on the
+    /// owning client disconnecting — that's the whole point of `--detached`.
+    detached: bool,
 }
 
 struct PendingLaunch {
@@ -194,6 +199,7 @@ fn handle_client(stream: Stream, client_id: u64, state: Arc<Mutex<DaemonState>>)
                             id: slot_id.clone(),
                             pid: 0,
                             client_id,
+                            detached: false,
                         });
                         eprintln!(
                             "studio-daemon: granted slot {slot_id} (active: {}, max: {})",
@@ -224,11 +230,12 @@ fn handle_client(stream: Stream, client_id: u64, state: Arc<Mutex<DaemonState>>)
                 }
                 // If not granted, client blocks — response sent when dequeued
             }
-            Request::LaunchComplete { id, slot_id, pid } => {
+            Request::LaunchComplete { id, slot_id, pid, detached } => {
                 let mut guard = state.lock().unwrap();
                 // Record the PID and mark launch complete
                 if let Some(slot) = guard.active.iter_mut().find(|s| s.id == slot_id) {
                     slot.pid = pid;
+                    slot.detached = detached;
                 }
                 guard.launch_in_progress = false;
                 eprintln!("studio-daemon: launch complete, pid {pid} (active: {})", guard.active.len());
@@ -247,10 +254,13 @@ fn handle_client(stream: Stream, client_id: u64, state: Arc<Mutex<DaemonState>>)
                 let mut guard = state.lock().unwrap();
                 if let Some(pos) = guard.active.iter().position(|s| s.id == slot_id) {
                     let slot = guard.active.remove(pos);
-                    if slot.pid > 0 {
+                    // Detached Studios are meant to outlive their backend — never
+                    // reap them. Non-detached ones get killed so an explicit
+                    // release (handle drop) tears Studio down.
+                    if slot.pid > 0 && !slot.detached {
                         let _ = kill_process(slot.pid);
                     }
-                    eprintln!("studio-daemon: released slot (active: {})", guard.active.len());
+                    eprintln!("studio-daemon: released slot (active: {}, detached: {})", guard.active.len(), slot.detached);
                 }
                 drop(guard);
 
@@ -297,6 +307,7 @@ fn try_dequeue(state: &Arc<Mutex<DaemonState>>) {
                     id: slot_id.clone(),
                     pid: 0,
                     client_id: pending.client_id,
+                    detached: false,
                 });
                 eprintln!(
                     "studio-daemon: dequeued slot {slot_id} (active: {}, max: {})",
@@ -325,10 +336,13 @@ fn cleanup_client(client_id: u64, state: &Arc<Mutex<DaemonState>>) {
     let mut guard = state.lock().unwrap();
     guard.clients.remove(&client_id);
 
+    // Reap only non-detached studios owned by this client. Detached studios
+    // are meant to survive their backend dying/disconnecting — leaving them
+    // running is the entire point of `--detached`.
     let pids: Vec<u32> = guard
         .active
         .iter()
-        .filter(|s| s.client_id == client_id && s.pid > 0)
+        .filter(|s| s.client_id == client_id && s.pid > 0 && !s.detached)
         .map(|s| s.pid)
         .collect();
 
