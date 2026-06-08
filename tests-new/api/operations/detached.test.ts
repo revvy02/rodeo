@@ -66,20 +66,7 @@ describe("detached", () => {
     expect(isAlive(newPid)).toBe(false);
   }, 60_000);
 
-  // Windows-skipped: this asserts a detached Studio outlives a *hard kill of
-  // the daemon*. On macOS that holds because NSWorkspace reparents Studios to
-  // launchd — they are never children of `rodeo serve`, so SIGKILL can't reach
-  // them. On Windows the daemon supervises its children with a Job Object
-  // (KILL_ON_JOB_CLOSE): when `rodeo serve` dies the OS tears down the whole
-  // tree, including the editor (which — unlike StartServer/StartClient — does
-  // not break away from the inherited job). That teardown is exactly what
-  // prevents the orphaned-Studio leaks fixed elsewhere in this branch, so
-  // "detached survives a daemon hard-kill" is in direct tension with "no
-  // orphans on daemon death". Detached still survives the managing *client*'s
-  // exit, and close() still kills regardless (test above). Making this case
-  // pass on Windows needs a daemon job-breakaway refactor (SILENT_BREAKAWAY_OK
-  // + per-Studio job ownership) — deferred as a deliberate design decision.
-  it.skipIf(IS_WINDOWS)("detached: true → Studio survives rodeo serve dying", async () => {
+  it("detached: true → Studio survives rodeo serve dying", async () => {
     // Spin up a sibling rodeo serve subprocess so we can kill it mid-test
     // without affecting `ctx`. detached's whole point is "outlive the parent" —
     // exercise that path explicitly.

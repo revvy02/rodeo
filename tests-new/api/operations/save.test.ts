@@ -123,8 +123,15 @@ describe("save targets correct studio with multiple places open", () => {
   });
 
   it("A and B save to distinct paths", async () => {
-    // Cheap structural check — runs fast; catches routing bugs where A and B
-    // would share a path by accident.
+    // Routing check: A and B must save to their own distinct files. The tests
+    // above already saved A and B, and re-saving an *unchanged* place is a
+    // no-op whose mtime never moves — so save() can't confirm it and times out.
+    // Dirty both first so each save is a real write with a confirmable mtime
+    // bump. (This also exercises the genuinely-concurrent save path.)
+    await Promise.all([
+      studioA.editVm.runCode({ source: "game.Workspace:SetAttribute('save_routing', 'A')" }),
+      studioB.editVm.runCode({ source: "game.Workspace:SetAttribute('save_routing', 'B')" }),
+    ]);
     const [saveA, saveB] = await Promise.all([studioA.save(), studioB.save()]);
     expect(saveA.path).toBeDefined();
     expect(saveB.path).toBeDefined();
