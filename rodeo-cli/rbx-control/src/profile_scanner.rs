@@ -45,6 +45,12 @@ pub fn start(label_prefix: &str) -> ProfileScannerHandle {
             }
         };
 
+        // Ensure the dir exists so the watcher can subscribe. Roblox doesn't
+        // create ProfilerCaptures until its first dump, so without this the
+        // watch fails on a fresh machine ("path is neither a file nor a
+        // directory"), the scanner task exits, and no dumps are ever captured.
+        let _ = std::fs::create_dir_all(&scan_dir);
+
         let (fs_tx, mut fs_rx) = mpsc::unbounded_channel::<PathBuf>();
         let _debouncer = {
             let tx = fs_tx.clone();
