@@ -155,7 +155,18 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
     match method {
         // client.*
         "client.isHealthy" => Ok(json!(state.client.is_healthy().await)),
-        "client.getState" => Ok(serde_json::to_value(state.client.get_state().await?)?),
+        "client.getState" => {
+            let mut snapshot = serde_json::to_value(state.client.get_state().await?)?;
+            // proto3 JSON omits empty `repeated` fields, but the wire contract
+            // (StateSnapshotDTO) is "vms is always an array" — every consumer
+            // does state.vms.{find,filter,map} unguarded. Materialize it so an
+            // empty snapshot (e.g. right after the last Studio closes) doesn't
+            // crash callers with "undefined is not an object".
+            if let Some(obj) = snapshot.as_object_mut() {
+                obj.entry("vms").or_insert_with(|| Value::Array(Vec::new()));
+            }
+            Ok(snapshot)
+        }
         "client.listBackends" => {
             let kind = params.get("kind").and_then(|v| v.as_str()).map(String::from);
             let list = state.client.list_backends(kind.as_deref()).await?;
