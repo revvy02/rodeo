@@ -118,13 +118,14 @@ impl RodeoClient {
     // -----------------------------------------------------------------------
 
     pub async fn get_vms(&self) -> Result<Vec<Vm>> {
-        Ok(self
-            .get_state()
-            .await?
-            .vms
-            .into_iter()
-            .map(|s| Vm::from_snapshot(s, self.transport.clone()))
-            .collect())
+        let state = self.get_state().await?;
+        let mut out = Vec::new();
+        for s in &state.studios {
+            for v in &s.vms {
+                out.push(Vm::from_studio_vm(s, v, self.transport.clone()));
+            }
+        }
+        Ok(out)
     }
 
     pub async fn get_vm(&self, vm_id: &str) -> Result<Vm> {

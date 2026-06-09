@@ -1,4 +1,4 @@
--- StudioBackend + Studio + MultiplayerTestServer/Client.
+-- StudioBackend + Studio + MultiplayerTest.
 -- Mirrors the TS client's class hierarchy; dot-notation method surface.
 
 local vmMod = require("./vm")
@@ -12,85 +12,69 @@ type Daemon = {
 
 type BackendInfo = { id: string, name: string }
 
+-- Build a full VmSnapshot-shaped table from a parent studio + one of its
+-- minimal (vmId/dom/clientName) vm entries.
+local function vmSnapshotFromStudio(studio: any, sv: any): vmMod.VmSnapshot
+	return {
+		vmId = sv.vmId,
+		dom = sv.dom,
+		mode = if sv.dom == "edit" then "edit" else studio.mode,
+		backendId = studio.backendId,
+		sessionGuid = studio.id,
+		placeId = studio.placeId,
+		gameName = studio.name,
+		connected = true,
+		activeRuns = 0,
+		clientName = sv.clientName,
+	}
+end
+
+-- Find a vmId across state.studios[].vms and return the built VmSnapshot table,
+-- or nil if not present.
+local function vmFromStudios(state: any, vmId: string): vmMod.VmSnapshot?
+	for _, studio in state.studios or {} do
+		for _, sv in studio.vms or {} do
+			if sv.vmId == vmId then
+				return vmSnapshotFromStudio(studio, sv)
+			end
+		end
+	end
+	return nil
+end
+
 local function vmListFromState(daemon: Daemon): { vmMod.Vm }
 	local state = daemon.call("client.getState", {})
 	local vms = {}
-	for _, s in state.vms or {} do
-		table.insert(vms, vmMod.create(s, daemon))
+	for _, studio in state.studios or {} do
+		for _, sv in studio.vms or {} do
+			table.insert(vms, vmMod.create(vmSnapshotFromStudio(studio, sv), daemon))
+		end
 	end
 	return vms
-end
-
--- ---------------------------------------------------------------------------
--- MultiplayerTestClient — a Vm with .disconnect() (lifecycle) glued on.
--- The data plane (runCode etc) is the underlying Vm; only the session
--- lifecycle is bonus.
--- ---------------------------------------------------------------------------
-
-export type MultiplayerTestClient = vmMod.Vm & {
-	disconnect: () -> (),
-}
-
-local function decorateMultiplayerTestClient(vm: vmMod.Vm, daemon: Daemon): MultiplayerTestClient
-	local self = vm :: any
-	function self.disconnect()
-		daemon.call("vm.disconnectClient", { vmId = vm.vmId })
-	end
-	return self :: MultiplayerTestClient
-end
-
--- ---------------------------------------------------------------------------
--- MultiplayerTestServer — a Vm with .close() / .connectClient() glued on.
--- ---------------------------------------------------------------------------
-
-export type MultiplayerTestServer = vmMod.Vm & {
-	connectClient: () -> MultiplayerTestClient,
-	close: () -> (),
-}
-
-local function decorateMultiplayerTestServer(vm: vmMod.Vm, daemon: Daemon): MultiplayerTestServer
-	local self = vm :: any
-
-	function self.connectClient()
-		local resp = daemon.call("vm.connectClient", { vmId = vm.vmId })
-		local state = daemon.call("client.getState", {})
-		local clientVm: vmMod.Vm? = nil
-		for _, s in state.vms or {} do
-			if s.vmId == resp.vmId then
-				clientVm = vmMod.create(s, daemon)
-				break
-			end
-		end
-		if not clientVm then
-			error(`client VM {resp.vmId} not found`)
-		end
-		return decorateMultiplayerTestClient(clientVm :: vmMod.Vm, daemon)
-	end
-
-	function self.close()
-		daemon.call("vm.closeServer", { vmId = vm.vmId })
-	end
-
-	return self :: MultiplayerTestServer
 end
 
 -- ---------------------------------------------------------------------------
 -- Studio
 -- ---------------------------------------------------------------------------
 
-export type StartMultiplayerTestOpts = {
-	placeFile: string?,
-	placeId: number?,
-	fflags: { string }?,
-	profile: boolean?,
-	runId: string?,
-	noHud: boolean?,
-}
-
 export type SaveResult = {
 	saved: boolean,
 	path: string?,
 	error: string?,
+}
+
+-- ---------------------------------------------------------------------------
+-- MultiplayerTest — an in-Studio multiplayer test session (server + N clients).
+-- The server/client VMs are ordinary Vms (run via vm.runCode); the session
+-- lifecycle (addPlayers/leave/end) is layered on top.
+-- ---------------------------------------------------------------------------
+
+export type MultiplayerTest = {
+	server: vmMod.Vm,
+	clients: { vmMod.Vm },
+	addPlayers: (numPlayers: number) -> (),
+	leave: (index: number) -> (),
+	["end"]: () -> (),
 }
 
 export type Studio = {
@@ -104,6 +88,7 @@ export type Studio = {
 	save: () -> SaveResult,
 	close: () -> (),
 	getVms: () -> { vmMod.Vm },
+	startMultiplayerTest: (numPlayers: number) -> MultiplayerTest,
 }
 
 local function createStudio(
@@ -164,6 +149,50 @@ local function createStudio(
 		daemon.call("studio.close", { studioHandle = handle })
 	end
 
+	function self.startMultiplayerTest(numPlayers)
+		local resp = daemon.call("studio.startMultiplayerTest", {
+			studioHandle = handle,
+			numPlayers = numPlayers,
+		})
+		local mpHandle = resp.mpHandle
+
+		local function buildVm(vmId: string): vmMod.Vm
+			local state = daemon.call("client.getState", {})
+			local snap = vmFromStudios(state, vmId)
+			if not snap then
+				error(`multiplayer VM {vmId} not found`)
+			end
+			return vmMod.create(snap, daemon)
+		end
+
+		local function buildClients(vmIds: { string }): { vmMod.Vm }
+			local clients = {}
+			for _, vmId in vmIds do
+				table.insert(clients, buildVm(vmId))
+			end
+			return clients
+		end
+
+		local mp = {} :: MultiplayerTest
+		mp.server = buildVm(resp.serverVmId)
+		mp.clients = buildClients(resp.clientVmIds or {})
+
+		function mp.addPlayers(n)
+			local r = daemon.call("mp.addPlayers", { mpHandle = mpHandle, numPlayers = n })
+			mp.clients = buildClients(r.clientVmIds or {})
+		end
+
+		function mp.leave(index)
+			daemon.call("mp.leave", { mpHandle = mpHandle, index = index })
+		end
+
+		mp["end"] = function()
+			daemon.call("mp.end", { mpHandle = mpHandle })
+		end
+
+		return mp
+	end
+
 	return self
 end
 
@@ -202,7 +231,6 @@ export type StudioBackend = {
 	open: (opts: OpenOpts?) -> Studio,
 	openPlace: (opts: OpenPlaceOpts) -> Studio,
 	openFile: (path: string, opts: OpenFileOpts?) -> Studio,
-	startMultiplayerTest: (opts: StartMultiplayerTestOpts?) -> MultiplayerTestServer,
 }
 
 local function createStudioBackend(handle: string, info: BackendInfo, daemon: Daemon): StudioBackend
@@ -265,31 +293,6 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			noHud = opts.noHud == true,
 			detached = opts.detached == true,
 		})
-	end
-
-	function self.startMultiplayerTest(opts)
-		opts = opts or {}
-		local resp = daemon.call("backend.startMultiplayerTest", {
-			backendHandle = handle,
-			placeFile = opts.placeFile,
-			placeId = opts.placeId,
-			fflags = opts.fflags or {},
-			profile = opts.profile == true,
-			runId = opts.runId,
-			noHud = opts.noHud == true,
-		})
-		local all = vmListFromState(daemon)
-		local serverVm: vmMod.Vm? = nil
-		for _, v in all do
-			if v.vmId == resp.vmId then
-				serverVm = v
-				break
-			end
-		end
-		if not serverVm then
-			error(`server VM {resp.vmId} not found`)
-		end
-		return decorateMultiplayerTestServer(serverVm :: vmMod.Vm, daemon)
 	end
 
 	return self

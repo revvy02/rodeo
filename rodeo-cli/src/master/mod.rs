@@ -19,52 +19,6 @@ pub enum ClientMsg {
     Disconnect(String),
 }
 
-/// Play-mode server state (multi-process StartServer).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MultiplayerTestServerState {
-    pub pid: u32,
-    pub raknet_port: u16,
-    /// RakNet/multiplayer session guid from StartServer's stdout. Distinct
-    /// from the rodeo `session_guid` at `MultiplayerTestSessionMeta.session_guid`.
-    pub raknet_session_guid: String,
-    pub play_test_guid: String,
-}
-
-/// Play-mode client state (multi-process StartClient).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MultiplayerTestClientState {
-    pub pid: u32,
-    pub index: u32,
-}
-
-/// Serializable metadata for one active multi-process play session. Mirrors
-/// `studio::MultiplayerTestServer` + its clients in a form that can be sent to master
-/// and exposed via GetState without carrying process handles.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MultiplayerTestSessionMeta {
-    /// Master-minted session identity shared by MultiplayerTestServer + its MultiplayerTestClients.
-    pub session_guid: String,
-    pub server: MultiplayerTestServerState,
-    /// Keyed by per-session client index (1-based).
-    pub clients: HashMap<u32, MultiplayerTestClientState>,
-    /// `--no-hud` setting for this session — propagated to every client launch.
-    #[serde(default)]
-    pub no_hud: bool,
-    /// Resolved published identifiers (only populated when the session was
-    /// launched against a published place). Cached here so subsequent
-    /// `LaunchMultiplayerTestClient` dispatches forward the same ids without
-    /// re-resolving. 0 = anonymous / no published place.
-    #[serde(default)]
-    pub place_id: u64,
-    #[serde(default)]
-    pub universe_id: u64,
-    #[serde(default)]
-    pub place_version: u32,
-}
-
 /// Shared server state
 /// A Studio instance managed by a backend.
 pub struct StudioInstanceInfo {
@@ -105,13 +59,6 @@ pub struct BackendState {
     pub log_runs: HashMap<String, (std::path::PathBuf, u64)>,
     /// Channel to trigger log dumps from plugin_ws relay path to run_master_loop
     pub log_dump_tx: Option<mpsc::UnboundedSender<LogDumpTask>>,
-    /// Active multiplayer test sessions, keyed by session_id (UUID). Each
-    /// `MultiplayerTestServer` owns its `clients` HashMap so dropping a session entry
-    /// cascades to all its client processes via launch_control::Child's Drop.
-    pub multiplayer_test_sessions: HashMap<String, studio_crate::MultiplayerTestServer>,
-    /// Serializable metadata mirror of `multiplayer_test_sessions`, kept in sync so state
-    /// snapshots don't need to reach into process handles.
-    pub multiplayer_test_session_meta: HashMap<String, MultiplayerTestSessionMeta>,
     /// Local port this backend listens on (for Studio plugin connections)
     pub port: u16,
     /// Cancellation token for graceful shutdown — SIGTERM cancels this
@@ -133,8 +80,6 @@ impl BackendState {
             mcp: Arc::new(Mutex::new(None)),
             snapshot_trigger: None,
             relay_tx: None,
-            multiplayer_test_sessions: HashMap::new(),
-            multiplayer_test_session_meta: HashMap::new(),
             port: 0,
             shutdown_token: tokio_util::sync::CancellationToken::new(),
             profile_scanner: None,
@@ -327,14 +272,6 @@ pub struct MasterState {
     /// Pending run requests waiting for a matching VM
     pub pending_runs: Vec<RunRequest>,
     pub next_process_id: u32,
-    /// Active multiplayer test sessions, keyed by session_id. Master mirrors
-    /// backend's per-session state via MultiplayerTestServerReady/MultiplayerTestClientReady and
-    /// MultiplayerTestServerExited messages.
-    pub multiplayer_test_session_meta: HashMap<String, MultiplayerTestSessionMeta>,
-    /// `--no-hud` setting recorded at LaunchStudioServer time so that subsequent
-    /// ConnectClient RPCs can forward it into LaunchMultiplayerTestClientCommand.
-    /// Keyed by session_guid; cleared on session exit.
-    pub multiplayer_test_no_hud: HashMap<String, bool>,
     /// In-flight save RPCs: master sends a typed SaveCommand on the control
     /// stream, studio backend replies with SaveResult, and this map routes the
     /// reply back to the awaiting save_place handler via a one-shot channel
@@ -343,13 +280,6 @@ pub struct MasterState {
     /// is optional on the wire (CLI saves without specifying one), so it
     /// can't serve as the routing key.
     pub pending_saves: HashMap<String, tokio::sync::oneshot::Sender<rodeo_proto::SaveResult>>,
-    /// In-flight `launch_multiplayer_test_server` streams: keyed by session_guid,
-    /// fired with Ready once the VM registers, or Error if `SessionExited` arrives
-    /// first (pre-handoff Studio crash). Removing the entry implicitly closes the
-    /// stream from master's side. Exists symmetrically to how launch_studio
-    /// watches studio_instances; using a sender map (rather than polling state_rx)
-    /// makes the failure event point-to-point and zero-latency.
-    pub pending_mp_launches: HashMap<String, tokio::sync::mpsc::UnboundedSender<rodeo_proto::LaunchMultiplayerTestServerEvent>>,
     /// Declarative per-studio target mode, paired with the studio's VM set
     /// fingerprint at last broadcast. We re-broadcast whenever either changes:
     /// target change is obvious; VM-set change covers the exit→enter handoff
@@ -391,10 +321,7 @@ impl MasterState {
             active_runs: HashMap::new(),
             pending_runs: Vec::new(),
             next_process_id: 0,
-            multiplayer_test_session_meta: HashMap::new(),
-            multiplayer_test_no_hud: HashMap::new(),
             pending_saves: HashMap::new(),
-            pending_mp_launches: HashMap::new(),
             target_modes: HashMap::new(),
         }
     }
@@ -906,6 +833,8 @@ impl MasterState {
         }).collect();
 
         let mut vms = Vec::new();
+        let mut instances: std::collections::HashMap<String, rodeo_proto::StudioInstanceState> =
+            std::collections::HashMap::new();
         for (backend_id, backend) in &self.backends {
             let snap = backend.state_rx.borrow();
             for vm in &snap.vms {
@@ -913,7 +842,12 @@ impl MasterState {
                 vm.backend_id = Some(backend_id.clone());
                 vms.push(vm);
             }
+            for inst in &snap.studio_instances {
+                instances.insert(inst.session_guid.clone(), inst.clone());
+            }
         }
+        // Canonical studio-first state, grouped from the collected VMs + lifecycle.
+        let studios = build_studios(&vms, &instances);
 
         let processes: Vec<rodeo_proto::ProcessInfo> = self.active_runs.values()
             .map(|r| rodeo_proto::ProcessInfo {
@@ -940,31 +874,81 @@ impl MasterState {
             }))
             .collect();
 
-        let multiplayer_test_sessions = self.multiplayer_test_session_meta.values().map(|m| rodeo_proto::SnapshotMultiplayerTestSession {
-            session_guid: m.session_guid.clone(),
-            server: buffa::MessageField::some(rodeo_proto::SnapshotMultiplayerTestServer {
-                pid: m.server.pid,
-                raknet_port: m.server.raknet_port as u32,
-                raknet_session_guid: m.server.raknet_session_guid.clone(),
-                play_test_guid: m.server.play_test_guid.clone(),
-                ..Default::default()
-            }),
-            clients: m.clients.values().map(|c| rodeo_proto::SnapshotMultiplayerTestClient {
-                index: c.index,
-                pid: c.pid,
-                ..Default::default()
-            }).collect(),
-            ..Default::default()
-        }).collect();
-
+        // `vms` is consumed only to derive `studios` (studio-first state); the
+        // flat list is no longer part of the client-facing snapshot.
+        let _ = &vms;
         rodeo_proto::RodeoSnapshot {
             backends,
-            vms,
             processes,
-            multiplayer_test_sessions,
+            studios,
             ..Default::default()
         }
     }
+}
+
+/// Derive the canonical studio-first state from the flat VM list + per-Studio
+/// lifecycle. VMs are grouped by `session_guid` (a session_guid-less VM — e.g. a
+/// manually-installed plugin — becomes its own single-VM studio keyed by vmId).
+fn build_studios(
+    vms: &[rodeo_proto::VmSnapshot],
+    instances: &std::collections::HashMap<String, rodeo_proto::StudioInstanceState>,
+) -> Vec<rodeo_proto::StudioState> {
+    // BTreeMap for a stable, deterministic studio ordering across snapshots.
+    let mut groups: std::collections::BTreeMap<String, Vec<&rodeo_proto::VmSnapshot>> =
+        std::collections::BTreeMap::new();
+    for vm in vms {
+        if !vm.connected {
+            continue;
+        }
+        let key = vm
+            .session_guid
+            .clone()
+            .unwrap_or_else(|| format!("vm:{}", vm.vm_id));
+        groups.entry(key).or_default().push(vm);
+    }
+
+    groups
+        .into_iter()
+        .map(|(id, members)| {
+            let edit = members.iter().copied().find(|v| v.dom.as_deref() == Some("edit"));
+            // Studio mode: a non-edit VM's mode (run/test/play) if present, else
+            // the edit VM's mode.
+            let active_mode_vm = members
+                .iter()
+                .copied()
+                .find(|v| matches!(v.dom.as_deref(), Some("server") | Some("client")));
+            let mode = active_mode_vm
+                .or(edit)
+                .and_then(|v| v.mode.clone())
+                .unwrap_or_default();
+            // Representative VM for place/name/backend: prefer the edit VM.
+            let rep = edit.or_else(|| members.first().copied());
+            let inst = instances.get(&id);
+
+            rodeo_proto::StudioState {
+                id: id.clone(),
+                backend_id: rep.and_then(|v| v.backend_id.clone()).unwrap_or_default(),
+                mcp_studio_id: inst.and_then(|i| i.mcp_studio_id.clone()),
+                name: rep.and_then(|v| v.game_name.clone()).unwrap_or_default(),
+                place_id: rep.and_then(|v| v.place_id).unwrap_or(0),
+                active: false,
+                status: inst
+                    .map(|i| i.status.clone())
+                    .unwrap_or_else(|| "connected".to_string()),
+                mode,
+                vms: members
+                    .iter()
+                    .map(|v| rodeo_proto::StudioVm {
+                        vm_id: v.vm_id.clone(),
+                        dom: v.dom.clone().unwrap_or_default(),
+                        client_name: v.client_name.clone(),
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            }
+        })
+        .collect()
 }
 
 pub type SharedMasterState = Arc<Mutex<MasterState>>;

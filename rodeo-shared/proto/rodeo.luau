@@ -19,6 +19,8 @@ type _Messages = {
 	StateSnapshot: _StateSnapshotMessage,
 	StudioInstanceState: _StudioInstanceStateMessage,
 	VmSnapshot: _VmSnapshotMessage,
+	StudioState: _StudioStateMessage,
+	StudioVm: _StudioVmMessage,
 	StudioSnapshot: _StudioSnapshotMessage,
 	PlayerStatus: _PlayerStatusMessage,
 	MasterMessage: _MasterMessageMessage,
@@ -28,11 +30,6 @@ type _Messages = {
 	SaveCommand: _SaveCommandMessage,
 	SaveResult: _SaveResultMessage,
 	LaunchStudioCommand: _LaunchStudioCommandMessage,
-	LaunchMultiplayerTestServerCommand: _LaunchMultiplayerTestServerCommandMessage,
-	LaunchMultiplayerTestClientCommand: _LaunchMultiplayerTestClientCommandMessage,
-	KillMultiplayerTestProcessCommand: _KillMultiplayerTestProcessCommandMessage,
-	MultiplayerTestServerReady: _MultiplayerTestServerReadyMessage,
-	MultiplayerTestClientReady: _MultiplayerTestClientReadyMessage,
 	SessionExited: _SessionExitedMessage,
 	RunClientMessage: _RunClientMessageMessage,
 	SubmitRequest: _SubmitRequestMessage,
@@ -56,24 +53,10 @@ type _Messages = {
 	StudioClosed: _StudioClosedMessage,
 	SavePlaceRequest: _SavePlaceRequestMessage,
 	SavePlaceResponse: _SavePlaceResponseMessage,
-	LaunchMultiplayerTestServerRequest: _LaunchMultiplayerTestServerRequestMessage,
-	LaunchMultiplayerTestServerEvent: _LaunchMultiplayerTestServerEventMessage,
-	MultiplayerTestServerLaunching: _MultiplayerTestServerLaunchingMessage,
-	MultiplayerTestServerReadyEvent: _MultiplayerTestServerReadyEventMessage,
-	MultiplayerTestServerLaunchError: _MultiplayerTestServerLaunchErrorMessage,
-	ConnectMultiplayerTestClientRequest: _ConnectMultiplayerTestClientRequestMessage,
-	ConnectMultiplayerTestClientResponse: _ConnectMultiplayerTestClientResponseMessage,
-	DisconnectMultiplayerTestClientRequest: _DisconnectMultiplayerTestClientRequestMessage,
-	DisconnectMultiplayerTestClientResponse: _DisconnectMultiplayerTestClientResponseMessage,
-	CloseMultiplayerTestServerRequest: _CloseMultiplayerTestServerRequestMessage,
-	CloseMultiplayerTestServerResponse: _CloseMultiplayerTestServerResponseMessage,
 	ListBackendsRequest: _ListBackendsRequestMessage,
 	ListBackendsResponse: _ListBackendsResponseMessage,
 	BackendInfo: _BackendInfoMessage,
 	RodeoSnapshot: _RodeoSnapshotMessage,
-	SnapshotMultiplayerTestSession: _SnapshotMultiplayerTestSessionMessage,
-	SnapshotMultiplayerTestServer: _SnapshotMultiplayerTestServerMessage,
-	SnapshotMultiplayerTestClient: _SnapshotMultiplayerTestClientMessage,
 	LogFilter: _LogFilterMessage,
 	HealthResponse: _HealthResponseMessage,
 	ContextInfo: _ContextInfoMessage,
@@ -117,8 +100,6 @@ type _BackendMessageFields = {
 		| { type: "stateSnapshot", value: StateSnapshot }
 		| { type: "playerStatus", value: PlayerStatus }
 		| { type: "filesComplete", value: FilesComplete }
-		| { type: "multiplayerTestServerReady", value: MultiplayerTestServerReady }
-		| { type: "multiplayerTestClientReady", value: MultiplayerTestClientReady }
 		| { type: "sessionExited", value: SessionExited }
 		| { type: "saveResult", value: SaveResult }
 	)?,
@@ -133,14 +114,6 @@ export type _BackendMessagePartialFields = {
 		| { type: "stateSnapshot", value: StateSnapshot | _StateSnapshotPartialFields }
 		| { type: "playerStatus", value: PlayerStatus | _PlayerStatusPartialFields }
 		| { type: "filesComplete", value: FilesComplete | _FilesCompletePartialFields }
-		| {
-			type: "multiplayerTestServerReady",
-			value: MultiplayerTestServerReady | _MultiplayerTestServerReadyPartialFields,
-		}
-		| {
-			type: "multiplayerTestClientReady",
-			value: MultiplayerTestClientReady | _MultiplayerTestClientReadyPartialFields,
-		}
 		| { type: "sessionExited", value: SessionExited | _SessionExitedPartialFields }
 		| { type: "saveResult", value: SaveResult | _SaveResultPartialFields }
 	)?,
@@ -368,12 +341,14 @@ type _StudioInstanceStateFields = {
 	sessionGuid: string,
 	status: string,
 	error: string?,
+	mcpStudioId: string?,
 }
 
 export type _StudioInstanceStatePartialFields = {
 	sessionGuid: string?,
 	status: string?,
 	error: string?,
+	mcpStudioId: string?,
 }
 
 export type StudioInstanceState = typeof(setmetatable({} :: _StudioInstanceStateFields, {} :: _StudioInstanceStateImpl))
@@ -399,6 +374,7 @@ type _VmSnapshotFields = {
 	gameName: string?,
 	activeRuns: number,
 	connected: boolean,
+	clientName: string?,
 }
 
 export type _VmSnapshotPartialFields = {
@@ -411,10 +387,73 @@ export type _VmSnapshotPartialFields = {
 	gameName: string?,
 	activeRuns: number?,
 	connected: boolean?,
+	clientName: string?,
 }
 
 export type VmSnapshot = typeof(setmetatable({} :: _VmSnapshotFields, {} :: _VmSnapshotImpl))
 type _VmSnapshotMessage = proto.Message<VmSnapshot, _VmSnapshotPartialFields>
+
+type _StudioStateImpl = {
+	__index: _StudioStateImpl,
+	new: (fields: _StudioStatePartialFields?) -> StudioState,
+	encode: (self: StudioState) -> buffer,
+	decode: (input: buffer) -> StudioState,
+	jsonEncode: (self: StudioState) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> StudioState,
+	descriptor: proto.Descriptor,
+}
+
+type _StudioStateFields = {
+	id: string,
+	backendId: string,
+	mcpStudioId: string?,
+	name: string,
+	placeId: number,
+	active: boolean,
+	status: string,
+	mode: string,
+	vms: { StudioVm },
+}
+
+export type _StudioStatePartialFields = {
+	id: string?,
+	backendId: string?,
+	mcpStudioId: string?,
+	name: string?,
+	placeId: number?,
+	active: boolean?,
+	status: string?,
+	mode: string?,
+	vms: { StudioVm | _StudioVmPartialFields }?,
+}
+
+export type StudioState = typeof(setmetatable({} :: _StudioStateFields, {} :: _StudioStateImpl))
+type _StudioStateMessage = proto.Message<StudioState, _StudioStatePartialFields>
+
+type _StudioVmImpl = {
+	__index: _StudioVmImpl,
+	new: (fields: _StudioVmPartialFields?) -> StudioVm,
+	encode: (self: StudioVm) -> buffer,
+	decode: (input: buffer) -> StudioVm,
+	jsonEncode: (self: StudioVm) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> StudioVm,
+	descriptor: proto.Descriptor,
+}
+
+type _StudioVmFields = {
+	vmId: string,
+	dom: string,
+	clientName: string?,
+}
+
+export type _StudioVmPartialFields = {
+	vmId: string?,
+	dom: string?,
+	clientName: string?,
+}
+
+export type StudioVm = typeof(setmetatable({} :: _StudioVmFields, {} :: _StudioVmImpl))
+type _StudioVmMessage = proto.Message<StudioVm, _StudioVmPartialFields>
 
 type _StudioSnapshotImpl = {
 	__index: _StudioSnapshotImpl,
@@ -485,9 +524,6 @@ type _MasterMessageFields = {
 		| { type: "save", value: SaveCommand }
 		| { type: "runCompleted", value: RunCompleted }
 		| { type: "launchStudio", value: LaunchStudioCommand }
-		| { type: "launchMultiplayerTestServer", value: LaunchMultiplayerTestServerCommand }
-		| { type: "launchMultiplayerTestClient", value: LaunchMultiplayerTestClientCommand }
-		| { type: "killMultiplayerTest", value: KillMultiplayerTestProcessCommand }
 		| { type: "closeStudio", value: CloseStudioCommand }
 	)?,
 }
@@ -499,18 +535,6 @@ export type _MasterMessagePartialFields = {
 		| { type: "save", value: SaveCommand | _SaveCommandPartialFields }
 		| { type: "runCompleted", value: RunCompleted | _RunCompletedPartialFields }
 		| { type: "launchStudio", value: LaunchStudioCommand | _LaunchStudioCommandPartialFields }
-		| {
-			type: "launchMultiplayerTestServer",
-			value: LaunchMultiplayerTestServerCommand | _LaunchMultiplayerTestServerCommandPartialFields,
-		}
-		| {
-			type: "launchMultiplayerTestClient",
-			value: LaunchMultiplayerTestClientCommand | _LaunchMultiplayerTestClientCommandPartialFields,
-		}
-		| {
-			type: "killMultiplayerTest",
-			value: KillMultiplayerTestProcessCommand | _KillMultiplayerTestProcessCommandPartialFields,
-		}
 		| { type: "closeStudio", value: CloseStudioCommand | _CloseStudioCommandPartialFields }
 	)?,
 }
@@ -675,195 +699,6 @@ export type _LaunchStudioCommandPartialFields = {
 
 export type LaunchStudioCommand = typeof(setmetatable({} :: _LaunchStudioCommandFields, {} :: _LaunchStudioCommandImpl))
 type _LaunchStudioCommandMessage = proto.Message<LaunchStudioCommand, _LaunchStudioCommandPartialFields>
-
-type _LaunchMultiplayerTestServerCommandImpl = {
-	__index: _LaunchMultiplayerTestServerCommandImpl,
-	new: (fields: _LaunchMultiplayerTestServerCommandPartialFields?) -> LaunchMultiplayerTestServerCommand,
-	encode: (self: LaunchMultiplayerTestServerCommand) -> buffer,
-	decode: (input: buffer) -> LaunchMultiplayerTestServerCommand,
-	jsonEncode: (self: LaunchMultiplayerTestServerCommand) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> LaunchMultiplayerTestServerCommand,
-	descriptor: proto.Descriptor,
-}
-
-type _LaunchMultiplayerTestServerCommandFields = {
-	placeFile: string?,
-	placeId: number?,
-	fflags: { string },
-	profile: boolean,
-	runId: string?,
-	fflagFile: string?,
-	background: boolean,
-	sessionGuid: string,
-	noHud: boolean,
-}
-
-export type _LaunchMultiplayerTestServerCommandPartialFields = {
-	placeFile: string?,
-	placeId: number?,
-	fflags: { string }?,
-	profile: boolean?,
-	runId: string?,
-	fflagFile: string?,
-	background: boolean?,
-	sessionGuid: string?,
-	noHud: boolean?,
-}
-
-export type LaunchMultiplayerTestServerCommand = typeof(setmetatable(
-	{} :: _LaunchMultiplayerTestServerCommandFields,
-	{} :: _LaunchMultiplayerTestServerCommandImpl
-))
-type _LaunchMultiplayerTestServerCommandMessage = proto.Message<
-	LaunchMultiplayerTestServerCommand,
-	_LaunchMultiplayerTestServerCommandPartialFields
->
-
-type _LaunchMultiplayerTestClientCommandImpl = {
-	__index: _LaunchMultiplayerTestClientCommandImpl,
-	new: (fields: _LaunchMultiplayerTestClientCommandPartialFields?) -> LaunchMultiplayerTestClientCommand,
-	encode: (self: LaunchMultiplayerTestClientCommand) -> buffer,
-	decode: (input: buffer) -> LaunchMultiplayerTestClientCommand,
-	jsonEncode: (self: LaunchMultiplayerTestClientCommand) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> LaunchMultiplayerTestClientCommand,
-	descriptor: proto.Descriptor,
-}
-
-type _LaunchMultiplayerTestClientCommandFields = {
-	serverPort: number,
-	serverPid: number,
-	raknetSessionGuid: string,
-	playTestGuid: string,
-	index: number,
-	sessionGuid: string,
-	noHud: boolean,
-	placeId: number,
-	universeId: number,
-	placeVersion: number,
-}
-
-export type _LaunchMultiplayerTestClientCommandPartialFields = {
-	serverPort: number?,
-	serverPid: number?,
-	raknetSessionGuid: string?,
-	playTestGuid: string?,
-	index: number?,
-	sessionGuid: string?,
-	noHud: boolean?,
-	placeId: number?,
-	universeId: number?,
-	placeVersion: number?,
-}
-
-export type LaunchMultiplayerTestClientCommand = typeof(setmetatable(
-	{} :: _LaunchMultiplayerTestClientCommandFields,
-	{} :: _LaunchMultiplayerTestClientCommandImpl
-))
-type _LaunchMultiplayerTestClientCommandMessage = proto.Message<
-	LaunchMultiplayerTestClientCommand,
-	_LaunchMultiplayerTestClientCommandPartialFields
->
-
-type _KillMultiplayerTestProcessCommandImpl = {
-	__index: _KillMultiplayerTestProcessCommandImpl,
-	new: (fields: _KillMultiplayerTestProcessCommandPartialFields?) -> KillMultiplayerTestProcessCommand,
-	encode: (self: KillMultiplayerTestProcessCommand) -> buffer,
-	decode: (input: buffer) -> KillMultiplayerTestProcessCommand,
-	jsonEncode: (self: KillMultiplayerTestProcessCommand) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> KillMultiplayerTestProcessCommand,
-	descriptor: proto.Descriptor,
-}
-
-type _KillMultiplayerTestProcessCommandFields = {
-	pid: number,
-	sessionGuid: string,
-}
-
-export type _KillMultiplayerTestProcessCommandPartialFields = {
-	pid: number?,
-	sessionGuid: string?,
-}
-
-export type KillMultiplayerTestProcessCommand = typeof(setmetatable(
-	{} :: _KillMultiplayerTestProcessCommandFields,
-	{} :: _KillMultiplayerTestProcessCommandImpl
-))
-type _KillMultiplayerTestProcessCommandMessage = proto.Message<
-	KillMultiplayerTestProcessCommand,
-	_KillMultiplayerTestProcessCommandPartialFields
->
-
-type _MultiplayerTestServerReadyImpl = {
-	__index: _MultiplayerTestServerReadyImpl,
-	new: (fields: _MultiplayerTestServerReadyPartialFields?) -> MultiplayerTestServerReady,
-	encode: (self: MultiplayerTestServerReady) -> buffer,
-	decode: (input: buffer) -> MultiplayerTestServerReady,
-	jsonEncode: (self: MultiplayerTestServerReady) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> MultiplayerTestServerReady,
-	descriptor: proto.Descriptor,
-}
-
-type _MultiplayerTestServerReadyFields = {
-	pid: number,
-	raknetPort: number,
-	raknetSessionGuid: string,
-	playTestGuid: string,
-	sessionGuid: string,
-	placeId: number,
-	universeId: number,
-	placeVersion: number,
-}
-
-export type _MultiplayerTestServerReadyPartialFields = {
-	pid: number?,
-	raknetPort: number?,
-	raknetSessionGuid: string?,
-	playTestGuid: string?,
-	sessionGuid: string?,
-	placeId: number?,
-	universeId: number?,
-	placeVersion: number?,
-}
-
-export type MultiplayerTestServerReady = typeof(setmetatable(
-	{} :: _MultiplayerTestServerReadyFields,
-	{} :: _MultiplayerTestServerReadyImpl
-))
-type _MultiplayerTestServerReadyMessage = proto.Message<
-	MultiplayerTestServerReady,
-	_MultiplayerTestServerReadyPartialFields
->
-
-type _MultiplayerTestClientReadyImpl = {
-	__index: _MultiplayerTestClientReadyImpl,
-	new: (fields: _MultiplayerTestClientReadyPartialFields?) -> MultiplayerTestClientReady,
-	encode: (self: MultiplayerTestClientReady) -> buffer,
-	decode: (input: buffer) -> MultiplayerTestClientReady,
-	jsonEncode: (self: MultiplayerTestClientReady) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> MultiplayerTestClientReady,
-	descriptor: proto.Descriptor,
-}
-
-type _MultiplayerTestClientReadyFields = {
-	pid: number,
-	index: number,
-	sessionGuid: string,
-}
-
-export type _MultiplayerTestClientReadyPartialFields = {
-	pid: number?,
-	index: number?,
-	sessionGuid: string?,
-}
-
-export type MultiplayerTestClientReady = typeof(setmetatable(
-	{} :: _MultiplayerTestClientReadyFields,
-	{} :: _MultiplayerTestClientReadyImpl
-))
-type _MultiplayerTestClientReadyMessage = proto.Message<
-	MultiplayerTestClientReady,
-	_MultiplayerTestClientReadyPartialFields
->
 
 type _SessionExitedImpl = {
 	__index: _SessionExitedImpl,
@@ -1434,327 +1269,6 @@ export type _SavePlaceResponsePartialFields = {
 export type SavePlaceResponse = typeof(setmetatable({} :: _SavePlaceResponseFields, {} :: _SavePlaceResponseImpl))
 type _SavePlaceResponseMessage = proto.Message<SavePlaceResponse, _SavePlaceResponsePartialFields>
 
-type _LaunchMultiplayerTestServerRequestImpl = {
-	__index: _LaunchMultiplayerTestServerRequestImpl,
-	new: (fields: _LaunchMultiplayerTestServerRequestPartialFields?) -> LaunchMultiplayerTestServerRequest,
-	encode: (self: LaunchMultiplayerTestServerRequest) -> buffer,
-	decode: (input: buffer) -> LaunchMultiplayerTestServerRequest,
-	jsonEncode: (self: LaunchMultiplayerTestServerRequest) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> LaunchMultiplayerTestServerRequest,
-	descriptor: proto.Descriptor,
-}
-
-type _LaunchMultiplayerTestServerRequestFields = {
-	backend: string,
-	placeFile: string?,
-	placeId: number?,
-	fflags: { string },
-	profile: boolean,
-	runId: string?,
-	fflagFile: string?,
-	background: boolean,
-	noHud: boolean,
-}
-
-export type _LaunchMultiplayerTestServerRequestPartialFields = {
-	backend: string?,
-	placeFile: string?,
-	placeId: number?,
-	fflags: { string }?,
-	profile: boolean?,
-	runId: string?,
-	fflagFile: string?,
-	background: boolean?,
-	noHud: boolean?,
-}
-
-export type LaunchMultiplayerTestServerRequest = typeof(setmetatable(
-	{} :: _LaunchMultiplayerTestServerRequestFields,
-	{} :: _LaunchMultiplayerTestServerRequestImpl
-))
-type _LaunchMultiplayerTestServerRequestMessage = proto.Message<
-	LaunchMultiplayerTestServerRequest,
-	_LaunchMultiplayerTestServerRequestPartialFields
->
-
-type _LaunchMultiplayerTestServerEventImpl = {
-	__index: _LaunchMultiplayerTestServerEventImpl,
-	new: (fields: _LaunchMultiplayerTestServerEventPartialFields?) -> LaunchMultiplayerTestServerEvent,
-	encode: (self: LaunchMultiplayerTestServerEvent) -> buffer,
-	decode: (input: buffer) -> LaunchMultiplayerTestServerEvent,
-	jsonEncode: (self: LaunchMultiplayerTestServerEvent) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> LaunchMultiplayerTestServerEvent,
-	descriptor: proto.Descriptor,
-}
-
-type _LaunchMultiplayerTestServerEventFields = {
-	event: (
-		{ type: "launching", value: MultiplayerTestServerLaunching }
-		| { type: "ready", value: MultiplayerTestServerReadyEvent }
-		| { type: "error", value: MultiplayerTestServerLaunchError }
-	)?,
-}
-
-export type _LaunchMultiplayerTestServerEventPartialFields = {
-	event: (
-		{ type: "launching", value: MultiplayerTestServerLaunching | _MultiplayerTestServerLaunchingPartialFields }
-		| { type: "ready", value: MultiplayerTestServerReadyEvent | _MultiplayerTestServerReadyEventPartialFields }
-		| { type: "error", value: MultiplayerTestServerLaunchError | _MultiplayerTestServerLaunchErrorPartialFields }
-	)?,
-}
-
-export type LaunchMultiplayerTestServerEvent = typeof(setmetatable(
-	{} :: _LaunchMultiplayerTestServerEventFields,
-	{} :: _LaunchMultiplayerTestServerEventImpl
-))
-type _LaunchMultiplayerTestServerEventMessage = proto.Message<
-	LaunchMultiplayerTestServerEvent,
-	_LaunchMultiplayerTestServerEventPartialFields
->
-
-type _MultiplayerTestServerLaunchingImpl = {
-	__index: _MultiplayerTestServerLaunchingImpl,
-	new: (fields: _MultiplayerTestServerLaunchingPartialFields?) -> MultiplayerTestServerLaunching,
-	encode: (self: MultiplayerTestServerLaunching) -> buffer,
-	decode: (input: buffer) -> MultiplayerTestServerLaunching,
-	jsonEncode: (self: MultiplayerTestServerLaunching) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> MultiplayerTestServerLaunching,
-	descriptor: proto.Descriptor,
-}
-
-type _MultiplayerTestServerLaunchingFields = {}
-
-export type _MultiplayerTestServerLaunchingPartialFields = {}
-
-export type MultiplayerTestServerLaunching = typeof(setmetatable(
-	{} :: _MultiplayerTestServerLaunchingFields,
-	{} :: _MultiplayerTestServerLaunchingImpl
-))
-type _MultiplayerTestServerLaunchingMessage = proto.Message<
-	MultiplayerTestServerLaunching,
-	_MultiplayerTestServerLaunchingPartialFields
->
-
-type _MultiplayerTestServerReadyEventImpl = {
-	__index: _MultiplayerTestServerReadyEventImpl,
-	new: (fields: _MultiplayerTestServerReadyEventPartialFields?) -> MultiplayerTestServerReadyEvent,
-	encode: (self: MultiplayerTestServerReadyEvent) -> buffer,
-	decode: (input: buffer) -> MultiplayerTestServerReadyEvent,
-	jsonEncode: (self: MultiplayerTestServerReadyEvent) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> MultiplayerTestServerReadyEvent,
-	descriptor: proto.Descriptor,
-}
-
-type _MultiplayerTestServerReadyEventFields = {
-	sessionGuid: string,
-	vmId: string,
-}
-
-export type _MultiplayerTestServerReadyEventPartialFields = {
-	sessionGuid: string?,
-	vmId: string?,
-}
-
-export type MultiplayerTestServerReadyEvent = typeof(setmetatable(
-	{} :: _MultiplayerTestServerReadyEventFields,
-	{} :: _MultiplayerTestServerReadyEventImpl
-))
-type _MultiplayerTestServerReadyEventMessage = proto.Message<
-	MultiplayerTestServerReadyEvent,
-	_MultiplayerTestServerReadyEventPartialFields
->
-
-type _MultiplayerTestServerLaunchErrorImpl = {
-	__index: _MultiplayerTestServerLaunchErrorImpl,
-	new: (fields: _MultiplayerTestServerLaunchErrorPartialFields?) -> MultiplayerTestServerLaunchError,
-	encode: (self: MultiplayerTestServerLaunchError) -> buffer,
-	decode: (input: buffer) -> MultiplayerTestServerLaunchError,
-	jsonEncode: (self: MultiplayerTestServerLaunchError) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> MultiplayerTestServerLaunchError,
-	descriptor: proto.Descriptor,
-}
-
-type _MultiplayerTestServerLaunchErrorFields = {
-	message: string,
-}
-
-export type _MultiplayerTestServerLaunchErrorPartialFields = {
-	message: string?,
-}
-
-export type MultiplayerTestServerLaunchError = typeof(setmetatable(
-	{} :: _MultiplayerTestServerLaunchErrorFields,
-	{} :: _MultiplayerTestServerLaunchErrorImpl
-))
-type _MultiplayerTestServerLaunchErrorMessage = proto.Message<
-	MultiplayerTestServerLaunchError,
-	_MultiplayerTestServerLaunchErrorPartialFields
->
-
-type _ConnectMultiplayerTestClientRequestImpl = {
-	__index: _ConnectMultiplayerTestClientRequestImpl,
-	new: (fields: _ConnectMultiplayerTestClientRequestPartialFields?) -> ConnectMultiplayerTestClientRequest,
-	encode: (self: ConnectMultiplayerTestClientRequest) -> buffer,
-	decode: (input: buffer) -> ConnectMultiplayerTestClientRequest,
-	jsonEncode: (self: ConnectMultiplayerTestClientRequest) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> ConnectMultiplayerTestClientRequest,
-	descriptor: proto.Descriptor,
-}
-
-type _ConnectMultiplayerTestClientRequestFields = {
-	sessionGuid: string,
-}
-
-export type _ConnectMultiplayerTestClientRequestPartialFields = {
-	sessionGuid: string?,
-}
-
-export type ConnectMultiplayerTestClientRequest = typeof(setmetatable(
-	{} :: _ConnectMultiplayerTestClientRequestFields,
-	{} :: _ConnectMultiplayerTestClientRequestImpl
-))
-type _ConnectMultiplayerTestClientRequestMessage = proto.Message<
-	ConnectMultiplayerTestClientRequest,
-	_ConnectMultiplayerTestClientRequestPartialFields
->
-
-type _ConnectMultiplayerTestClientResponseImpl = {
-	__index: _ConnectMultiplayerTestClientResponseImpl,
-	new: (fields: _ConnectMultiplayerTestClientResponsePartialFields?) -> ConnectMultiplayerTestClientResponse,
-	encode: (self: ConnectMultiplayerTestClientResponse) -> buffer,
-	decode: (input: buffer) -> ConnectMultiplayerTestClientResponse,
-	jsonEncode: (self: ConnectMultiplayerTestClientResponse) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> ConnectMultiplayerTestClientResponse,
-	descriptor: proto.Descriptor,
-}
-
-type _ConnectMultiplayerTestClientResponseFields = {
-	clientId: string,
-}
-
-export type _ConnectMultiplayerTestClientResponsePartialFields = {
-	clientId: string?,
-}
-
-export type ConnectMultiplayerTestClientResponse = typeof(setmetatable(
-	{} :: _ConnectMultiplayerTestClientResponseFields,
-	{} :: _ConnectMultiplayerTestClientResponseImpl
-))
-type _ConnectMultiplayerTestClientResponseMessage = proto.Message<
-	ConnectMultiplayerTestClientResponse,
-	_ConnectMultiplayerTestClientResponsePartialFields
->
-
-type _DisconnectMultiplayerTestClientRequestImpl = {
-	__index: _DisconnectMultiplayerTestClientRequestImpl,
-	new: (fields: _DisconnectMultiplayerTestClientRequestPartialFields?) -> DisconnectMultiplayerTestClientRequest,
-	encode: (self: DisconnectMultiplayerTestClientRequest) -> buffer,
-	decode: (input: buffer) -> DisconnectMultiplayerTestClientRequest,
-	jsonEncode: (self: DisconnectMultiplayerTestClientRequest) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> DisconnectMultiplayerTestClientRequest,
-	descriptor: proto.Descriptor,
-}
-
-type _DisconnectMultiplayerTestClientRequestFields = {
-	clientId: string,
-	sessionGuid: string,
-}
-
-export type _DisconnectMultiplayerTestClientRequestPartialFields = {
-	clientId: string?,
-	sessionGuid: string?,
-}
-
-export type DisconnectMultiplayerTestClientRequest = typeof(setmetatable(
-	{} :: _DisconnectMultiplayerTestClientRequestFields,
-	{} :: _DisconnectMultiplayerTestClientRequestImpl
-))
-type _DisconnectMultiplayerTestClientRequestMessage = proto.Message<
-	DisconnectMultiplayerTestClientRequest,
-	_DisconnectMultiplayerTestClientRequestPartialFields
->
-
-type _DisconnectMultiplayerTestClientResponseImpl = {
-	__index: _DisconnectMultiplayerTestClientResponseImpl,
-	new: (fields: _DisconnectMultiplayerTestClientResponsePartialFields?) -> DisconnectMultiplayerTestClientResponse,
-	encode: (self: DisconnectMultiplayerTestClientResponse) -> buffer,
-	decode: (input: buffer) -> DisconnectMultiplayerTestClientResponse,
-	jsonEncode: (self: DisconnectMultiplayerTestClientResponse) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> DisconnectMultiplayerTestClientResponse,
-	descriptor: proto.Descriptor,
-}
-
-type _DisconnectMultiplayerTestClientResponseFields = {
-	ok: boolean,
-}
-
-export type _DisconnectMultiplayerTestClientResponsePartialFields = {
-	ok: boolean?,
-}
-
-export type DisconnectMultiplayerTestClientResponse = typeof(setmetatable(
-	{} :: _DisconnectMultiplayerTestClientResponseFields,
-	{} :: _DisconnectMultiplayerTestClientResponseImpl
-))
-type _DisconnectMultiplayerTestClientResponseMessage = proto.Message<
-	DisconnectMultiplayerTestClientResponse,
-	_DisconnectMultiplayerTestClientResponsePartialFields
->
-
-type _CloseMultiplayerTestServerRequestImpl = {
-	__index: _CloseMultiplayerTestServerRequestImpl,
-	new: (fields: _CloseMultiplayerTestServerRequestPartialFields?) -> CloseMultiplayerTestServerRequest,
-	encode: (self: CloseMultiplayerTestServerRequest) -> buffer,
-	decode: (input: buffer) -> CloseMultiplayerTestServerRequest,
-	jsonEncode: (self: CloseMultiplayerTestServerRequest) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> CloseMultiplayerTestServerRequest,
-	descriptor: proto.Descriptor,
-}
-
-type _CloseMultiplayerTestServerRequestFields = {
-	sessionGuid: string,
-}
-
-export type _CloseMultiplayerTestServerRequestPartialFields = {
-	sessionGuid: string?,
-}
-
-export type CloseMultiplayerTestServerRequest = typeof(setmetatable(
-	{} :: _CloseMultiplayerTestServerRequestFields,
-	{} :: _CloseMultiplayerTestServerRequestImpl
-))
-type _CloseMultiplayerTestServerRequestMessage = proto.Message<
-	CloseMultiplayerTestServerRequest,
-	_CloseMultiplayerTestServerRequestPartialFields
->
-
-type _CloseMultiplayerTestServerResponseImpl = {
-	__index: _CloseMultiplayerTestServerResponseImpl,
-	new: (fields: _CloseMultiplayerTestServerResponsePartialFields?) -> CloseMultiplayerTestServerResponse,
-	encode: (self: CloseMultiplayerTestServerResponse) -> buffer,
-	decode: (input: buffer) -> CloseMultiplayerTestServerResponse,
-	jsonEncode: (self: CloseMultiplayerTestServerResponse) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> CloseMultiplayerTestServerResponse,
-	descriptor: proto.Descriptor,
-}
-
-type _CloseMultiplayerTestServerResponseFields = {
-	ok: boolean,
-}
-
-export type _CloseMultiplayerTestServerResponsePartialFields = {
-	ok: boolean?,
-}
-
-export type CloseMultiplayerTestServerResponse = typeof(setmetatable(
-	{} :: _CloseMultiplayerTestServerResponseFields,
-	{} :: _CloseMultiplayerTestServerResponseImpl
-))
-type _CloseMultiplayerTestServerResponseMessage = proto.Message<
-	CloseMultiplayerTestServerResponse,
-	_CloseMultiplayerTestServerResponsePartialFields
->
-
 type _ListBackendsRequestImpl = {
 	__index: _ListBackendsRequestImpl,
 	new: (fields: _ListBackendsRequestPartialFields?) -> ListBackendsRequest,
@@ -1837,113 +1351,18 @@ type _RodeoSnapshotImpl = {
 
 type _RodeoSnapshotFields = {
 	backends: { BackendInfo },
-	vms: { VmSnapshot },
 	processes: { ProcessInfo },
-	multiplayerTestSessions: { SnapshotMultiplayerTestSession },
+	studios: { StudioState },
 }
 
 export type _RodeoSnapshotPartialFields = {
 	backends: { BackendInfo | _BackendInfoPartialFields }?,
-	vms: { VmSnapshot | _VmSnapshotPartialFields }?,
 	processes: { ProcessInfo | _ProcessInfoPartialFields }?,
-	multiplayerTestSessions: { SnapshotMultiplayerTestSession | _SnapshotMultiplayerTestSessionPartialFields }?,
+	studios: { StudioState | _StudioStatePartialFields }?,
 }
 
 export type RodeoSnapshot = typeof(setmetatable({} :: _RodeoSnapshotFields, {} :: _RodeoSnapshotImpl))
 type _RodeoSnapshotMessage = proto.Message<RodeoSnapshot, _RodeoSnapshotPartialFields>
-
-type _SnapshotMultiplayerTestSessionImpl = {
-	__index: _SnapshotMultiplayerTestSessionImpl,
-	new: (fields: _SnapshotMultiplayerTestSessionPartialFields?) -> SnapshotMultiplayerTestSession,
-	encode: (self: SnapshotMultiplayerTestSession) -> buffer,
-	decode: (input: buffer) -> SnapshotMultiplayerTestSession,
-	jsonEncode: (self: SnapshotMultiplayerTestSession) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> SnapshotMultiplayerTestSession,
-	descriptor: proto.Descriptor,
-}
-
-type _SnapshotMultiplayerTestSessionFields = {
-	sessionGuid: string,
-	server: SnapshotMultiplayerTestServer?,
-	clients: { SnapshotMultiplayerTestClient },
-}
-
-export type _SnapshotMultiplayerTestSessionPartialFields = {
-	sessionGuid: string?,
-	server: (SnapshotMultiplayerTestServer | _SnapshotMultiplayerTestServerPartialFields)?,
-	clients: { SnapshotMultiplayerTestClient | _SnapshotMultiplayerTestClientPartialFields }?,
-}
-
-export type SnapshotMultiplayerTestSession = typeof(setmetatable(
-	{} :: _SnapshotMultiplayerTestSessionFields,
-	{} :: _SnapshotMultiplayerTestSessionImpl
-))
-type _SnapshotMultiplayerTestSessionMessage = proto.Message<
-	SnapshotMultiplayerTestSession,
-	_SnapshotMultiplayerTestSessionPartialFields
->
-
-type _SnapshotMultiplayerTestServerImpl = {
-	__index: _SnapshotMultiplayerTestServerImpl,
-	new: (fields: _SnapshotMultiplayerTestServerPartialFields?) -> SnapshotMultiplayerTestServer,
-	encode: (self: SnapshotMultiplayerTestServer) -> buffer,
-	decode: (input: buffer) -> SnapshotMultiplayerTestServer,
-	jsonEncode: (self: SnapshotMultiplayerTestServer) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> SnapshotMultiplayerTestServer,
-	descriptor: proto.Descriptor,
-}
-
-type _SnapshotMultiplayerTestServerFields = {
-	pid: number,
-	raknetPort: number,
-	raknetSessionGuid: string,
-	playTestGuid: string,
-}
-
-export type _SnapshotMultiplayerTestServerPartialFields = {
-	pid: number?,
-	raknetPort: number?,
-	raknetSessionGuid: string?,
-	playTestGuid: string?,
-}
-
-export type SnapshotMultiplayerTestServer = typeof(setmetatable(
-	{} :: _SnapshotMultiplayerTestServerFields,
-	{} :: _SnapshotMultiplayerTestServerImpl
-))
-type _SnapshotMultiplayerTestServerMessage = proto.Message<
-	SnapshotMultiplayerTestServer,
-	_SnapshotMultiplayerTestServerPartialFields
->
-
-type _SnapshotMultiplayerTestClientImpl = {
-	__index: _SnapshotMultiplayerTestClientImpl,
-	new: (fields: _SnapshotMultiplayerTestClientPartialFields?) -> SnapshotMultiplayerTestClient,
-	encode: (self: SnapshotMultiplayerTestClient) -> buffer,
-	decode: (input: buffer) -> SnapshotMultiplayerTestClient,
-	jsonEncode: (self: SnapshotMultiplayerTestClient) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> SnapshotMultiplayerTestClient,
-	descriptor: proto.Descriptor,
-}
-
-type _SnapshotMultiplayerTestClientFields = {
-	index: number,
-	pid: number,
-}
-
-export type _SnapshotMultiplayerTestClientPartialFields = {
-	index: number?,
-	pid: number?,
-}
-
-export type SnapshotMultiplayerTestClient = typeof(setmetatable(
-	{} :: _SnapshotMultiplayerTestClientFields,
-	{} :: _SnapshotMultiplayerTestClientImpl
-))
-type _SnapshotMultiplayerTestClientMessage = proto.Message<
-	SnapshotMultiplayerTestClient,
-	_SnapshotMultiplayerTestClientPartialFields
->
 
 type _LogFilterImpl = {
 	__index: _LogFilterImpl,
@@ -2447,7 +1866,7 @@ export type _ExecutionKilledPartialFields = {
 export type ExecutionKilled = typeof(setmetatable({} :: _ExecutionKilledFields, {} :: _ExecutionKilledImpl))
 type _ExecutionKilledMessage = proto.Message<ExecutionKilled, _ExecutionKilledPartialFields>
 
-type _ProcessStateMessage = proto.Enum<ProcessState>
+type _ProcessStateMessage = proto.Enum<ProcessState, _ProcessStateVariants>
 export type ProcessState =
 	"PROCESS_STATE_QUEUED"
 	| "PROCESS_STATE_RUNNING"
@@ -2456,6 +1875,14 @@ export type ProcessState =
 	| "PROCESS_STATE_KILLED"
 	| "PROCESS_STATE_DISCONNECTED"
 	| number -- Unknown
+type _ProcessStateVariants = {
+	["PROCESS_STATE_QUEUED"]: "PROCESS_STATE_QUEUED",
+	["PROCESS_STATE_RUNNING"]: "PROCESS_STATE_RUNNING",
+	["PROCESS_STATE_DONE"]: "PROCESS_STATE_DONE",
+	["PROCESS_STATE_ERROR"]: "PROCESS_STATE_ERROR",
+	["PROCESS_STATE_KILLED"]: "PROCESS_STATE_KILLED",
+	["PROCESS_STATE_DISCONNECTED"]: "PROCESS_STATE_DISCONNECTED",
+}
 
 do
 	local _BackendMessageImpl = {}
@@ -2511,24 +1938,6 @@ do
 				then
 					return { type = (v :: any).type, value = messages.FilesComplete.new((v :: any).value) } :: any
 				elseif
-					(v :: any).type == "multiplayerTestServerReady"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-							type = (v :: any).type,
-							value = messages.MultiplayerTestServerReady.new((v :: any).value),
-						} :: any
-				elseif
-					(v :: any).type == "multiplayerTestClientReady"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-							type = (v :: any).type,
-							value = messages.MultiplayerTestClientReady.new((v :: any).value),
-						} :: any
-				elseif
 					(v :: any).type == "sessionExited"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
@@ -2578,14 +1987,6 @@ do
 			elseif self.msg.type == "filesComplete" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "multiplayerTestServerReady" then
-				local encoded = self.msg.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "multiplayerTestClientReady" then
-				local encoded = self.msg.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			elseif self.msg.type == "sessionExited" then
 				local encoded = self.msg.value:encode()
@@ -2652,22 +2053,6 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.msg = { type = "filesComplete", value = messages.FilesComplete.decode(value) }
 					continue
-				elseif field == 8 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = {
-						type = "multiplayerTestServerReady",
-						value = messages.MultiplayerTestServerReady.decode(value),
-					}
-					continue
-				elseif field == 9 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = {
-						type = "multiplayerTestClientReady",
-						value = messages.MultiplayerTestClientReady.decode(value),
-					}
-					continue
 				elseif field == 10 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
@@ -2720,10 +2105,6 @@ do
 				output.playerStatus = self.msg.value:jsonEncode()
 			elseif self.msg.type == "filesComplete" then
 				output.filesComplete = self.msg.value:jsonEncode()
-			elseif self.msg.type == "multiplayerTestServerReady" then
-				output.multiplayerTestServerReady = self.msg.value:jsonEncode()
-			elseif self.msg.type == "multiplayerTestClientReady" then
-				output.multiplayerTestClientReady = self.msg.value:jsonEncode()
 			elseif self.msg.type == "sessionExited" then
 				output.sessionExited = self.msg.value:jsonEncode()
 			elseif self.msg.type == "saveResult" then
@@ -2763,20 +2144,6 @@ do
 
 		if input.filesComplete ~= nil then
 			self.msg = { type = "filesComplete", value = messages.FilesComplete.jsonDecode(input.filesComplete) }
-		end
-
-		if input.multiplayerTestServerReady ~= nil then
-			self.msg = {
-				type = "multiplayerTestServerReady",
-				value = messages.MultiplayerTestServerReady.jsonDecode(input.multiplayerTestServerReady),
-			}
-		end
-
-		if input.multiplayerTestClientReady ~= nil then
-			self.msg = {
-				type = "multiplayerTestClientReady",
-				value = messages.MultiplayerTestClientReady.jsonDecode(input.multiplayerTestClientReady),
-			}
 		end
 
 		if input.sessionExited ~= nil then
@@ -3936,6 +3303,7 @@ do
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
 			status = if data == nil or data.status == nil then "" else data.status,
 			error = if data == nil or data.error == nil then nil else data.error,
+			mcpStudioId = if data == nil or data.mcpStudioId == nil then nil else data.mcpStudioId,
 		}, _StudioInstanceStateImpl :: _StudioInstanceStateImpl)
 	end
 
@@ -3956,6 +3324,11 @@ do
 		if self.error ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.error)
+		end
+
+		if self.mcpStudioId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.mcpStudioId)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -3991,6 +3364,11 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.error = proto.decodeString(value)
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.mcpStudioId = proto.decodeString(value)
 					continue
 				end
 
@@ -4031,6 +3409,10 @@ do
 			output.error = self.error
 		end
 
+		if self.mcpStudioId ~= nil then
+			output.mcpStudioId = self.mcpStudioId
+		end
+
 		return output
 	end
 
@@ -4047,6 +3429,10 @@ do
 
 		if input.error ~= nil then
 			self.error = input.error
+		end
+
+		if input.mcpStudioId ~= nil then
+			self.mcpStudioId = input.mcpStudioId
 		end
 
 		return self
@@ -4077,6 +3463,7 @@ do
 			gameName = if data == nil or data.gameName == nil then nil else data.gameName,
 			activeRuns = if data == nil or data.activeRuns == nil then 0 else data.activeRuns,
 			connected = if data == nil or data.connected == nil then false else data.connected,
+			clientName = if data == nil or data.clientName == nil then nil else data.clientName,
 		}, _VmSnapshotImpl :: _VmSnapshotImpl)
 	end
 
@@ -4127,6 +3514,11 @@ do
 		if self.connected then
 			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.varint)
 			output, cursor = proto.writeVarInt(output, cursor, if self.connected then 1 else 0)
+		end
+
+		if self.clientName ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.clientName)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -4193,6 +3585,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.gameName = proto.decodeString(value)
 					continue
+				elseif field == 10 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.clientName = proto.decodeString(value)
+					continue
 				end
 
 				local length
@@ -4256,6 +3653,10 @@ do
 			output.connected = self.connected
 		end
 
+		if self.clientName ~= nil then
+			output.clientName = self.clientName
+		end
+
 		return output
 	end
 
@@ -4298,6 +3699,10 @@ do
 			self.connected = input.connected
 		end
 
+		if input.clientName ~= nil then
+			self.clientName = input.clientName
+		end
+
 		return self
 	end
 
@@ -4309,6 +3714,414 @@ do
 	messages.VmSnapshot = _VmSnapshotImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.VmSnapshot)
+end
+
+do
+	local _StudioStateImpl = {}
+	_StudioStateImpl.__index = _StudioStateImpl
+
+	function _StudioStateImpl.new(data: _StudioStatePartialFields?): StudioState
+		return setmetatable({
+			id = if data == nil or data.id == nil then "" else data.id,
+			backendId = if data == nil or data.backendId == nil then "" else data.backendId,
+			mcpStudioId = if data == nil or data.mcpStudioId == nil then nil else data.mcpStudioId,
+			name = if data == nil or data.name == nil then "" else data.name,
+			placeId = if data == nil or data.placeId == nil then 0 else data.placeId,
+			active = if data == nil or data.active == nil then false else data.active,
+			status = if data == nil or data.status == nil then "" else data.status,
+			mode = if data == nil or data.mode == nil then "" else data.mode,
+			vms = (function()
+				local src = if data == nil then nil else data.vms
+				if src == nil then
+					return {}
+				end
+				local out = table.create(#src)
+				for i, v in src do
+					out[i] = if getmetatable(v :: any) == nil
+						then messages.StudioVm.new(v :: any)
+						else (v :: any) :: StudioVm
+				end
+				return out
+			end)(),
+		}, _StudioStateImpl :: _StudioStateImpl)
+	end
+
+	function _StudioStateImpl.encode(self: StudioState): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.id ~= nil and self.id ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.id)
+		end
+
+		if self.backendId ~= nil and self.backendId ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.backendId)
+		end
+
+		if self.mcpStudioId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.mcpStudioId)
+		end
+
+		if self.name ~= nil and self.name ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.name)
+		end
+
+		if self.placeId ~= nil and self.placeId ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
+		end
+
+		if self.active then
+			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.active then 1 else 0)
+		end
+
+		if self.status ~= nil and self.status ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.status)
+		end
+
+		if self.mode ~= nil and self.mode ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.mode)
+		end
+
+		if self.vms ~= nil and #self.vms > 0 then
+			for _, value in self.vms do
+				local encoded = value:encode()
+				output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			end
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _StudioStateImpl.decode(input: buffer): StudioState
+		local self = _StudioStateImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 5 then
+					local value
+					value, cursor = proto.readVarIntI64(input, cursor)
+					self.placeId = value
+					continue
+				elseif field == 6 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.active = value ~= 0
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.id = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.backendId = proto.decodeString(value)
+					continue
+				elseif field == 3 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.mcpStudioId = proto.decodeString(value)
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.name = proto.decodeString(value)
+					continue
+				elseif field == 7 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.status = proto.decodeString(value)
+					continue
+				elseif field == 8 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.mode = proto.decodeString(value)
+					continue
+				elseif field == 9 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					table.insert(self.vms, messages.StudioVm.decode(value))
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _StudioStateImpl.jsonEncode(self: StudioState): any
+		local output = {}
+
+		if self.id ~= nil and self.id ~= "" then
+			output.id = self.id
+		end
+
+		if self.backendId ~= nil and self.backendId ~= "" then
+			output.backendId = self.backendId
+		end
+
+		if self.mcpStudioId ~= nil then
+			output.mcpStudioId = self.mcpStudioId
+		end
+
+		if self.name ~= nil and self.name ~= "" then
+			output.name = self.name
+		end
+
+		if self.placeId ~= nil and self.placeId ~= 0 then
+			output.placeId = self.placeId
+		end
+
+		if self.active then
+			output.active = self.active
+		end
+
+		if self.status ~= nil and self.status ~= "" then
+			output.status = self.status
+		end
+
+		if self.mode ~= nil and self.mode ~= "" then
+			output.mode = self.mode
+		end
+
+		if self.vms ~= nil and #self.vms > 0 then
+			local newOutput = {}
+			for _, value in self.vms do
+				table.insert(newOutput, value:jsonEncode())
+			end
+			output.vms = newOutput
+		end
+
+		return output
+	end
+
+	function _StudioStateImpl.jsonDecode(input: { [string]: any }): StudioState
+		local self = _StudioStateImpl.new()
+
+		if input.id ~= nil then
+			self.id = input.id
+		end
+
+		if input.backendId ~= nil then
+			self.backendId = input.backendId
+		end
+
+		if input.mcpStudioId ~= nil then
+			self.mcpStudioId = input.mcpStudioId
+		end
+
+		if input.name ~= nil then
+			self.name = input.name
+		end
+
+		if input.placeId ~= nil then
+			self.placeId = input.placeId
+		end
+
+		if input.active ~= nil then
+			self.active = input.active
+		end
+
+		if input.status ~= nil then
+			self.status = input.status
+		end
+
+		if input.mode ~= nil then
+			self.mode = input.mode
+		end
+
+		if input.vms ~= nil then
+			local newOutput: { StudioVm } = {}
+			for _, value in input.vms do
+				table.insert(newOutput, messages.StudioVm.jsonDecode(value))
+			end
+
+			self.vms = newOutput
+		end
+
+		return self
+	end
+
+	_StudioStateImpl.descriptor = {
+		name = "StudioState",
+		fullName = "rodeo.StudioState",
+	}
+
+	messages.StudioState = _StudioStateImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.StudioState)
+end
+
+do
+	local _StudioVmImpl = {}
+	_StudioVmImpl.__index = _StudioVmImpl
+
+	function _StudioVmImpl.new(data: _StudioVmPartialFields?): StudioVm
+		return setmetatable({
+			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
+			dom = if data == nil or data.dom == nil then "" else data.dom,
+			clientName = if data == nil or data.clientName == nil then nil else data.clientName,
+		}, _StudioVmImpl :: _StudioVmImpl)
+	end
+
+	function _StudioVmImpl.encode(self: StudioVm): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.vmId ~= nil and self.vmId ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.vmId)
+		end
+
+		if self.dom ~= nil and self.dom ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.dom)
+		end
+
+		if self.clientName ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.clientName)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _StudioVmImpl.decode(input: buffer): StudioVm
+		local self = _StudioVmImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.vmId = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.dom = proto.decodeString(value)
+					continue
+				elseif field == 3 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.clientName = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _StudioVmImpl.jsonEncode(self: StudioVm): any
+		local output = {}
+
+		if self.vmId ~= nil and self.vmId ~= "" then
+			output.vmId = self.vmId
+		end
+
+		if self.dom ~= nil and self.dom ~= "" then
+			output.dom = self.dom
+		end
+
+		if self.clientName ~= nil then
+			output.clientName = self.clientName
+		end
+
+		return output
+	end
+
+	function _StudioVmImpl.jsonDecode(input: { [string]: any }): StudioVm
+		local self = _StudioVmImpl.new()
+
+		if input.vmId ~= nil then
+			self.vmId = input.vmId
+		end
+
+		if input.dom ~= nil then
+			self.dom = input.dom
+		end
+
+		if input.clientName ~= nil then
+			self.clientName = input.clientName
+		end
+
+		return self
+	end
+
+	_StudioVmImpl.descriptor = {
+		name = "StudioVm",
+		fullName = "rodeo.StudioVm",
+	}
+
+	messages.StudioVm = _StudioVmImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.StudioVm)
 end
 
 do
@@ -4642,33 +4455,6 @@ do
 				then
 					return { type = (v :: any).type, value = messages.LaunchStudioCommand.new((v :: any).value) } :: any
 				elseif
-					(v :: any).type == "launchMultiplayerTestServer"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-						type = (v :: any).type,
-						value = messages.LaunchMultiplayerTestServerCommand.new((v :: any).value),
-					} :: any
-				elseif
-					(v :: any).type == "launchMultiplayerTestClient"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-						type = (v :: any).type,
-						value = messages.LaunchMultiplayerTestClientCommand.new((v :: any).value),
-					} :: any
-				elseif
-					(v :: any).type == "killMultiplayerTest"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-						type = (v :: any).type,
-						value = messages.KillMultiplayerTestProcessCommand.new((v :: any).value),
-					} :: any
-				elseif
 					(v :: any).type == "closeStudio"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
@@ -4704,18 +4490,6 @@ do
 			elseif self.msg.type == "launchStudio" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "launchMultiplayerTestServer" then
-				local encoded = self.msg.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "launchMultiplayerTestClient" then
-				local encoded = self.msg.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "killMultiplayerTest" then
-				local encoded = self.msg.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			elseif self.msg.type == "closeStudio" then
 				local encoded = self.msg.value:encode()
@@ -4768,30 +4542,6 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.msg = { type = "launchStudio", value = messages.LaunchStudioCommand.decode(value) }
 					continue
-				elseif field == 8 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = {
-						type = "launchMultiplayerTestServer",
-						value = messages.LaunchMultiplayerTestServerCommand.decode(value),
-					}
-					continue
-				elseif field == 9 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = {
-						type = "launchMultiplayerTestClient",
-						value = messages.LaunchMultiplayerTestClientCommand.decode(value),
-					}
-					continue
-				elseif field == 10 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = {
-						type = "killMultiplayerTest",
-						value = messages.KillMultiplayerTestProcessCommand.decode(value),
-					}
-					continue
 				elseif field == 11 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
@@ -4835,12 +4585,6 @@ do
 				output.runCompleted = self.msg.value:jsonEncode()
 			elseif self.msg.type == "launchStudio" then
 				output.launchStudio = self.msg.value:jsonEncode()
-			elseif self.msg.type == "launchMultiplayerTestServer" then
-				output.launchMultiplayerTestServer = self.msg.value:jsonEncode()
-			elseif self.msg.type == "launchMultiplayerTestClient" then
-				output.launchMultiplayerTestClient = self.msg.value:jsonEncode()
-			elseif self.msg.type == "killMultiplayerTest" then
-				output.killMultiplayerTest = self.msg.value:jsonEncode()
 			elseif self.msg.type == "closeStudio" then
 				output.closeStudio = self.msg.value:jsonEncode()
 			end
@@ -4870,27 +4614,6 @@ do
 
 		if input.launchStudio ~= nil then
 			self.msg = { type = "launchStudio", value = messages.LaunchStudioCommand.jsonDecode(input.launchStudio) }
-		end
-
-		if input.launchMultiplayerTestServer ~= nil then
-			self.msg = {
-				type = "launchMultiplayerTestServer",
-				value = messages.LaunchMultiplayerTestServerCommand.jsonDecode(input.launchMultiplayerTestServer),
-			}
-		end
-
-		if input.launchMultiplayerTestClient ~= nil then
-			self.msg = {
-				type = "launchMultiplayerTestClient",
-				value = messages.LaunchMultiplayerTestClientCommand.jsonDecode(input.launchMultiplayerTestClient),
-			}
-		end
-
-		if input.killMultiplayerTest ~= nil then
-			self.msg = {
-				type = "killMultiplayerTest",
-				value = messages.KillMultiplayerTestProcessCommand.jsonDecode(input.killMultiplayerTest),
-			}
 		end
 
 		if input.closeStudio ~= nil then
@@ -5805,1031 +5528,6 @@ do
 	messages.LaunchStudioCommand = _LaunchStudioCommandImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.LaunchStudioCommand)
-end
-
-do
-	local _LaunchMultiplayerTestServerCommandImpl = {}
-	_LaunchMultiplayerTestServerCommandImpl.__index = _LaunchMultiplayerTestServerCommandImpl
-
-	function _LaunchMultiplayerTestServerCommandImpl.new(
-		data: _LaunchMultiplayerTestServerCommandPartialFields?
-	): LaunchMultiplayerTestServerCommand
-		return setmetatable({
-			placeFile = if data == nil or data.placeFile == nil then nil else data.placeFile,
-			placeId = if data == nil or data.placeId == nil then nil else data.placeId,
-			fflags = if data == nil or data.fflags == nil then {} else data.fflags,
-			profile = if data == nil or data.profile == nil then false else data.profile,
-			runId = if data == nil or data.runId == nil then nil else data.runId,
-			fflagFile = if data == nil or data.fflagFile == nil then nil else data.fflagFile,
-			background = if data == nil or data.background == nil then false else data.background,
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-			noHud = if data == nil or data.noHud == nil then false else data.noHud,
-		}, _LaunchMultiplayerTestServerCommandImpl :: _LaunchMultiplayerTestServerCommandImpl)
-	end
-
-	function _LaunchMultiplayerTestServerCommandImpl.encode(self: LaunchMultiplayerTestServerCommand): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.placeFile ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.placeFile)
-		end
-
-		if self.placeId ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
-		end
-
-		if self.fflags ~= nil and #self.fflags > 0 then
-			for _, value in self.fflags do
-				output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeString(output, cursor, value)
-			end
-		end
-
-		if self.profile then
-			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.profile then 1 else 0)
-		end
-
-		if self.runId ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.runId)
-		end
-
-		if self.fflagFile ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.fflagFile)
-		end
-
-		if self.background then
-			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.background then 1 else 0)
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		if self.noHud then
-			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.noHud then 1 else 0)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _LaunchMultiplayerTestServerCommandImpl.decode(input: buffer): LaunchMultiplayerTestServerCommand
-		local self = _LaunchMultiplayerTestServerCommandImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 2 then
-					local value
-					value, cursor = proto.readVarIntU64(input, cursor)
-					self.placeId = value
-					continue
-				elseif field == 4 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.profile = value ~= 0
-					continue
-				elseif field == 7 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.background = value ~= 0
-					continue
-				elseif field == 9 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.noHud = value ~= 0
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.placeFile = proto.decodeString(value)
-					continue
-				elseif field == 3 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.fflags, proto.decodeString(value))
-					continue
-				elseif field == 5 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.runId = proto.decodeString(value)
-					continue
-				elseif field == 6 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.fflagFile = proto.decodeString(value)
-					continue
-				elseif field == 8 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _LaunchMultiplayerTestServerCommandImpl.jsonEncode(self: LaunchMultiplayerTestServerCommand): any
-		local output = {}
-
-		if self.placeFile ~= nil then
-			output.placeFile = self.placeFile
-		end
-
-		if self.placeId ~= nil then
-			output.placeId = self.placeId
-		end
-
-		if self.fflags ~= nil and #self.fflags > 0 then
-			local newOutput = {}
-			for _, value in self.fflags do
-				table.insert(newOutput, value)
-			end
-			output.fflags = newOutput
-		end
-
-		if self.profile then
-			output.profile = self.profile
-		end
-
-		if self.runId ~= nil then
-			output.runId = self.runId
-		end
-
-		if self.fflagFile ~= nil then
-			output.fflagFile = self.fflagFile
-		end
-
-		if self.background then
-			output.background = self.background
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		if self.noHud then
-			output.noHud = self.noHud
-		end
-
-		return output
-	end
-
-	function _LaunchMultiplayerTestServerCommandImpl.jsonDecode(
-		input: { [string]: any }
-	): LaunchMultiplayerTestServerCommand
-		local self = _LaunchMultiplayerTestServerCommandImpl.new()
-
-		if input.placeFile ~= nil then
-			self.placeFile = input.placeFile
-		end
-
-		if input.placeId ~= nil then
-			self.placeId = input.placeId
-		end
-
-		if input.fflags ~= nil then
-			local newOutput: { string } = {}
-			for _, value in input.fflags do
-				table.insert(newOutput, value)
-			end
-
-			self.fflags = newOutput
-		end
-
-		if input.profile ~= nil then
-			self.profile = input.profile
-		end
-
-		if input.runId ~= nil then
-			self.runId = input.runId
-		end
-
-		if input.fflagFile ~= nil then
-			self.fflagFile = input.fflagFile
-		end
-
-		if input.background ~= nil then
-			self.background = input.background
-		end
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		if input.noHud ~= nil then
-			self.noHud = input.noHud
-		end
-
-		return self
-	end
-
-	_LaunchMultiplayerTestServerCommandImpl.descriptor = {
-		name = "LaunchMultiplayerTestServerCommand",
-		fullName = "rodeo.LaunchMultiplayerTestServerCommand",
-	}
-
-	messages.LaunchMultiplayerTestServerCommand = _LaunchMultiplayerTestServerCommandImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.LaunchMultiplayerTestServerCommand)
-end
-
-do
-	local _LaunchMultiplayerTestClientCommandImpl = {}
-	_LaunchMultiplayerTestClientCommandImpl.__index = _LaunchMultiplayerTestClientCommandImpl
-
-	function _LaunchMultiplayerTestClientCommandImpl.new(
-		data: _LaunchMultiplayerTestClientCommandPartialFields?
-	): LaunchMultiplayerTestClientCommand
-		return setmetatable({
-			serverPort = if data == nil or data.serverPort == nil then 0 else data.serverPort,
-			serverPid = if data == nil or data.serverPid == nil then 0 else data.serverPid,
-			raknetSessionGuid = if data == nil or data.raknetSessionGuid == nil then "" else data.raknetSessionGuid,
-			playTestGuid = if data == nil or data.playTestGuid == nil then "" else data.playTestGuid,
-			index = if data == nil or data.index == nil then 0 else data.index,
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-			noHud = if data == nil or data.noHud == nil then false else data.noHud,
-			placeId = if data == nil or data.placeId == nil then 0 else data.placeId,
-			universeId = if data == nil or data.universeId == nil then 0 else data.universeId,
-			placeVersion = if data == nil or data.placeVersion == nil then 0 else data.placeVersion,
-		}, _LaunchMultiplayerTestClientCommandImpl :: _LaunchMultiplayerTestClientCommandImpl)
-	end
-
-	function _LaunchMultiplayerTestClientCommandImpl.encode(self: LaunchMultiplayerTestClientCommand): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.serverPort ~= nil and self.serverPort ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.serverPort)
-		end
-
-		if self.serverPid ~= nil and self.serverPid ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.serverPid)
-		end
-
-		if self.raknetSessionGuid ~= nil and self.raknetSessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.raknetSessionGuid)
-		end
-
-		if self.playTestGuid ~= nil and self.playTestGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.playTestGuid)
-		end
-
-		if self.index ~= nil and self.index ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.index)
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		if self.noHud then
-			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.noHud then 1 else 0)
-		end
-
-		if self.placeId ~= nil and self.placeId ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
-		end
-
-		if self.universeId ~= nil and self.universeId ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.universeId)
-		end
-
-		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.placeVersion)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _LaunchMultiplayerTestClientCommandImpl.decode(input: buffer): LaunchMultiplayerTestClientCommand
-		local self = _LaunchMultiplayerTestClientCommandImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.serverPort = value
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.serverPid = value
-					continue
-				elseif field == 5 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.index = value
-					continue
-				elseif field == 7 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.noHud = value ~= 0
-					continue
-				elseif field == 8 then
-					local value
-					value, cursor = proto.readVarIntU64(input, cursor)
-					self.placeId = value
-					continue
-				elseif field == 9 then
-					local value
-					value, cursor = proto.readVarIntU64(input, cursor)
-					self.universeId = value
-					continue
-				elseif field == 10 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.placeVersion = value
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 3 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.raknetSessionGuid = proto.decodeString(value)
-					continue
-				elseif field == 4 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.playTestGuid = proto.decodeString(value)
-					continue
-				elseif field == 6 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _LaunchMultiplayerTestClientCommandImpl.jsonEncode(self: LaunchMultiplayerTestClientCommand): any
-		local output = {}
-
-		if self.serverPort ~= nil and self.serverPort ~= 0 then
-			output.serverPort = self.serverPort
-		end
-
-		if self.serverPid ~= nil and self.serverPid ~= 0 then
-			output.serverPid = self.serverPid
-		end
-
-		if self.raknetSessionGuid ~= nil and self.raknetSessionGuid ~= "" then
-			output.raknetSessionGuid = self.raknetSessionGuid
-		end
-
-		if self.playTestGuid ~= nil and self.playTestGuid ~= "" then
-			output.playTestGuid = self.playTestGuid
-		end
-
-		if self.index ~= nil and self.index ~= 0 then
-			output.index = self.index
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		if self.noHud then
-			output.noHud = self.noHud
-		end
-
-		if self.placeId ~= nil and self.placeId ~= 0 then
-			output.placeId = self.placeId
-		end
-
-		if self.universeId ~= nil and self.universeId ~= 0 then
-			output.universeId = self.universeId
-		end
-
-		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
-			output.placeVersion = self.placeVersion
-		end
-
-		return output
-	end
-
-	function _LaunchMultiplayerTestClientCommandImpl.jsonDecode(
-		input: { [string]: any }
-	): LaunchMultiplayerTestClientCommand
-		local self = _LaunchMultiplayerTestClientCommandImpl.new()
-
-		if input.serverPort ~= nil then
-			self.serverPort = input.serverPort
-		end
-
-		if input.serverPid ~= nil then
-			self.serverPid = input.serverPid
-		end
-
-		if input.raknetSessionGuid ~= nil then
-			self.raknetSessionGuid = input.raknetSessionGuid
-		end
-
-		if input.playTestGuid ~= nil then
-			self.playTestGuid = input.playTestGuid
-		end
-
-		if input.index ~= nil then
-			self.index = input.index
-		end
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		if input.noHud ~= nil then
-			self.noHud = input.noHud
-		end
-
-		if input.placeId ~= nil then
-			self.placeId = input.placeId
-		end
-
-		if input.universeId ~= nil then
-			self.universeId = input.universeId
-		end
-
-		if input.placeVersion ~= nil then
-			self.placeVersion = input.placeVersion
-		end
-
-		return self
-	end
-
-	_LaunchMultiplayerTestClientCommandImpl.descriptor = {
-		name = "LaunchMultiplayerTestClientCommand",
-		fullName = "rodeo.LaunchMultiplayerTestClientCommand",
-	}
-
-	messages.LaunchMultiplayerTestClientCommand = _LaunchMultiplayerTestClientCommandImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.LaunchMultiplayerTestClientCommand)
-end
-
-do
-	local _KillMultiplayerTestProcessCommandImpl = {}
-	_KillMultiplayerTestProcessCommandImpl.__index = _KillMultiplayerTestProcessCommandImpl
-
-	function _KillMultiplayerTestProcessCommandImpl.new(
-		data: _KillMultiplayerTestProcessCommandPartialFields?
-	): KillMultiplayerTestProcessCommand
-		return setmetatable({
-			pid = if data == nil or data.pid == nil then 0 else data.pid,
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-		}, _KillMultiplayerTestProcessCommandImpl :: _KillMultiplayerTestProcessCommandImpl)
-	end
-
-	function _KillMultiplayerTestProcessCommandImpl.encode(self: KillMultiplayerTestProcessCommand): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.pid)
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _KillMultiplayerTestProcessCommandImpl.decode(input: buffer): KillMultiplayerTestProcessCommand
-		local self = _KillMultiplayerTestProcessCommandImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.pid = value
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _KillMultiplayerTestProcessCommandImpl.jsonEncode(self: KillMultiplayerTestProcessCommand): any
-		local output = {}
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output.pid = self.pid
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		return output
-	end
-
-	function _KillMultiplayerTestProcessCommandImpl.jsonDecode(
-		input: { [string]: any }
-	): KillMultiplayerTestProcessCommand
-		local self = _KillMultiplayerTestProcessCommandImpl.new()
-
-		if input.pid ~= nil then
-			self.pid = input.pid
-		end
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		return self
-	end
-
-	_KillMultiplayerTestProcessCommandImpl.descriptor = {
-		name = "KillMultiplayerTestProcessCommand",
-		fullName = "rodeo.KillMultiplayerTestProcessCommand",
-	}
-
-	messages.KillMultiplayerTestProcessCommand = _KillMultiplayerTestProcessCommandImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.KillMultiplayerTestProcessCommand)
-end
-
-do
-	local _MultiplayerTestServerReadyImpl = {}
-	_MultiplayerTestServerReadyImpl.__index = _MultiplayerTestServerReadyImpl
-
-	function _MultiplayerTestServerReadyImpl.new(
-		data: _MultiplayerTestServerReadyPartialFields?
-	): MultiplayerTestServerReady
-		return setmetatable({
-			pid = if data == nil or data.pid == nil then 0 else data.pid,
-			raknetPort = if data == nil or data.raknetPort == nil then 0 else data.raknetPort,
-			raknetSessionGuid = if data == nil or data.raknetSessionGuid == nil then "" else data.raknetSessionGuid,
-			playTestGuid = if data == nil or data.playTestGuid == nil then "" else data.playTestGuid,
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-			placeId = if data == nil or data.placeId == nil then 0 else data.placeId,
-			universeId = if data == nil or data.universeId == nil then 0 else data.universeId,
-			placeVersion = if data == nil or data.placeVersion == nil then 0 else data.placeVersion,
-		}, _MultiplayerTestServerReadyImpl :: _MultiplayerTestServerReadyImpl)
-	end
-
-	function _MultiplayerTestServerReadyImpl.encode(self: MultiplayerTestServerReady): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.pid)
-		end
-
-		if self.raknetPort ~= nil and self.raknetPort ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.raknetPort)
-		end
-
-		if self.raknetSessionGuid ~= nil and self.raknetSessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.raknetSessionGuid)
-		end
-
-		if self.playTestGuid ~= nil and self.playTestGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.playTestGuid)
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		if self.placeId ~= nil and self.placeId ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
-		end
-
-		if self.universeId ~= nil and self.universeId ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.universeId)
-		end
-
-		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.placeVersion)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _MultiplayerTestServerReadyImpl.decode(input: buffer): MultiplayerTestServerReady
-		local self = _MultiplayerTestServerReadyImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.pid = value
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.raknetPort = value
-					continue
-				elseif field == 6 then
-					local value
-					value, cursor = proto.readVarIntU64(input, cursor)
-					self.placeId = value
-					continue
-				elseif field == 7 then
-					local value
-					value, cursor = proto.readVarIntU64(input, cursor)
-					self.universeId = value
-					continue
-				elseif field == 8 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.placeVersion = value
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 3 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.raknetSessionGuid = proto.decodeString(value)
-					continue
-				elseif field == 4 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.playTestGuid = proto.decodeString(value)
-					continue
-				elseif field == 5 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _MultiplayerTestServerReadyImpl.jsonEncode(self: MultiplayerTestServerReady): any
-		local output = {}
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output.pid = self.pid
-		end
-
-		if self.raknetPort ~= nil and self.raknetPort ~= 0 then
-			output.raknetPort = self.raknetPort
-		end
-
-		if self.raknetSessionGuid ~= nil and self.raknetSessionGuid ~= "" then
-			output.raknetSessionGuid = self.raknetSessionGuid
-		end
-
-		if self.playTestGuid ~= nil and self.playTestGuid ~= "" then
-			output.playTestGuid = self.playTestGuid
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		if self.placeId ~= nil and self.placeId ~= 0 then
-			output.placeId = self.placeId
-		end
-
-		if self.universeId ~= nil and self.universeId ~= 0 then
-			output.universeId = self.universeId
-		end
-
-		if self.placeVersion ~= nil and self.placeVersion ~= 0 then
-			output.placeVersion = self.placeVersion
-		end
-
-		return output
-	end
-
-	function _MultiplayerTestServerReadyImpl.jsonDecode(input: { [string]: any }): MultiplayerTestServerReady
-		local self = _MultiplayerTestServerReadyImpl.new()
-
-		if input.pid ~= nil then
-			self.pid = input.pid
-		end
-
-		if input.raknetPort ~= nil then
-			self.raknetPort = input.raknetPort
-		end
-
-		if input.raknetSessionGuid ~= nil then
-			self.raknetSessionGuid = input.raknetSessionGuid
-		end
-
-		if input.playTestGuid ~= nil then
-			self.playTestGuid = input.playTestGuid
-		end
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		if input.placeId ~= nil then
-			self.placeId = input.placeId
-		end
-
-		if input.universeId ~= nil then
-			self.universeId = input.universeId
-		end
-
-		if input.placeVersion ~= nil then
-			self.placeVersion = input.placeVersion
-		end
-
-		return self
-	end
-
-	_MultiplayerTestServerReadyImpl.descriptor = {
-		name = "MultiplayerTestServerReady",
-		fullName = "rodeo.MultiplayerTestServerReady",
-	}
-
-	messages.MultiplayerTestServerReady = _MultiplayerTestServerReadyImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.MultiplayerTestServerReady)
-end
-
-do
-	local _MultiplayerTestClientReadyImpl = {}
-	_MultiplayerTestClientReadyImpl.__index = _MultiplayerTestClientReadyImpl
-
-	function _MultiplayerTestClientReadyImpl.new(
-		data: _MultiplayerTestClientReadyPartialFields?
-	): MultiplayerTestClientReady
-		return setmetatable({
-			pid = if data == nil or data.pid == nil then 0 else data.pid,
-			index = if data == nil or data.index == nil then 0 else data.index,
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-		}, _MultiplayerTestClientReadyImpl :: _MultiplayerTestClientReadyImpl)
-	end
-
-	function _MultiplayerTestClientReadyImpl.encode(self: MultiplayerTestClientReady): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.pid)
-		end
-
-		if self.index ~= nil and self.index ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.index)
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _MultiplayerTestClientReadyImpl.decode(input: buffer): MultiplayerTestClientReady
-		local self = _MultiplayerTestClientReadyImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.pid = value
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.index = value
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 3 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _MultiplayerTestClientReadyImpl.jsonEncode(self: MultiplayerTestClientReady): any
-		local output = {}
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output.pid = self.pid
-		end
-
-		if self.index ~= nil and self.index ~= 0 then
-			output.index = self.index
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		return output
-	end
-
-	function _MultiplayerTestClientReadyImpl.jsonDecode(input: { [string]: any }): MultiplayerTestClientReady
-		local self = _MultiplayerTestClientReadyImpl.new()
-
-		if input.pid ~= nil then
-			self.pid = input.pid
-		end
-
-		if input.index ~= nil then
-			self.index = input.index
-		end
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		return self
-	end
-
-	_MultiplayerTestClientReadyImpl.descriptor = {
-		name = "MultiplayerTestClientReady",
-		fullName = "rodeo.MultiplayerTestClientReady",
-	}
-
-	messages.MultiplayerTestClientReady = _MultiplayerTestClientReadyImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.MultiplayerTestClientReady)
 end
 
 do
@@ -9914,1364 +8612,6 @@ do
 end
 
 do
-	local _LaunchMultiplayerTestServerRequestImpl = {}
-	_LaunchMultiplayerTestServerRequestImpl.__index = _LaunchMultiplayerTestServerRequestImpl
-
-	function _LaunchMultiplayerTestServerRequestImpl.new(
-		data: _LaunchMultiplayerTestServerRequestPartialFields?
-	): LaunchMultiplayerTestServerRequest
-		return setmetatable({
-			backend = if data == nil or data.backend == nil then "" else data.backend,
-			placeFile = if data == nil or data.placeFile == nil then nil else data.placeFile,
-			placeId = if data == nil or data.placeId == nil then nil else data.placeId,
-			fflags = if data == nil or data.fflags == nil then {} else data.fflags,
-			profile = if data == nil or data.profile == nil then false else data.profile,
-			runId = if data == nil or data.runId == nil then nil else data.runId,
-			fflagFile = if data == nil or data.fflagFile == nil then nil else data.fflagFile,
-			background = if data == nil or data.background == nil then false else data.background,
-			noHud = if data == nil or data.noHud == nil then false else data.noHud,
-		}, _LaunchMultiplayerTestServerRequestImpl :: _LaunchMultiplayerTestServerRequestImpl)
-	end
-
-	function _LaunchMultiplayerTestServerRequestImpl.encode(self: LaunchMultiplayerTestServerRequest): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.backend ~= nil and self.backend ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.backend)
-		end
-
-		if self.placeFile ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.placeFile)
-		end
-
-		if self.placeId ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
-		end
-
-		if self.fflags ~= nil and #self.fflags > 0 then
-			for _, value in self.fflags do
-				output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeString(output, cursor, value)
-			end
-		end
-
-		if self.profile then
-			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.profile then 1 else 0)
-		end
-
-		if self.runId ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.runId)
-		end
-
-		if self.fflagFile ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.fflagFile)
-		end
-
-		if self.background then
-			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.background then 1 else 0)
-		end
-
-		if self.noHud then
-			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.noHud then 1 else 0)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _LaunchMultiplayerTestServerRequestImpl.decode(input: buffer): LaunchMultiplayerTestServerRequest
-		local self = _LaunchMultiplayerTestServerRequestImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 3 then
-					local value
-					value, cursor = proto.readVarIntU64(input, cursor)
-					self.placeId = value
-					continue
-				elseif field == 5 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.profile = value ~= 0
-					continue
-				elseif field == 8 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.background = value ~= 0
-					continue
-				elseif field == 9 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.noHud = value ~= 0
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.backend = proto.decodeString(value)
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.placeFile = proto.decodeString(value)
-					continue
-				elseif field == 4 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.fflags, proto.decodeString(value))
-					continue
-				elseif field == 6 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.runId = proto.decodeString(value)
-					continue
-				elseif field == 7 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.fflagFile = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _LaunchMultiplayerTestServerRequestImpl.jsonEncode(self: LaunchMultiplayerTestServerRequest): any
-		local output = {}
-
-		if self.backend ~= nil and self.backend ~= "" then
-			output.backend = self.backend
-		end
-
-		if self.placeFile ~= nil then
-			output.placeFile = self.placeFile
-		end
-
-		if self.placeId ~= nil then
-			output.placeId = self.placeId
-		end
-
-		if self.fflags ~= nil and #self.fflags > 0 then
-			local newOutput = {}
-			for _, value in self.fflags do
-				table.insert(newOutput, value)
-			end
-			output.fflags = newOutput
-		end
-
-		if self.profile then
-			output.profile = self.profile
-		end
-
-		if self.runId ~= nil then
-			output.runId = self.runId
-		end
-
-		if self.fflagFile ~= nil then
-			output.fflagFile = self.fflagFile
-		end
-
-		if self.background then
-			output.background = self.background
-		end
-
-		if self.noHud then
-			output.noHud = self.noHud
-		end
-
-		return output
-	end
-
-	function _LaunchMultiplayerTestServerRequestImpl.jsonDecode(
-		input: { [string]: any }
-	): LaunchMultiplayerTestServerRequest
-		local self = _LaunchMultiplayerTestServerRequestImpl.new()
-
-		if input.backend ~= nil then
-			self.backend = input.backend
-		end
-
-		if input.placeFile ~= nil then
-			self.placeFile = input.placeFile
-		end
-
-		if input.placeId ~= nil then
-			self.placeId = input.placeId
-		end
-
-		if input.fflags ~= nil then
-			local newOutput: { string } = {}
-			for _, value in input.fflags do
-				table.insert(newOutput, value)
-			end
-
-			self.fflags = newOutput
-		end
-
-		if input.profile ~= nil then
-			self.profile = input.profile
-		end
-
-		if input.runId ~= nil then
-			self.runId = input.runId
-		end
-
-		if input.fflagFile ~= nil then
-			self.fflagFile = input.fflagFile
-		end
-
-		if input.background ~= nil then
-			self.background = input.background
-		end
-
-		if input.noHud ~= nil then
-			self.noHud = input.noHud
-		end
-
-		return self
-	end
-
-	_LaunchMultiplayerTestServerRequestImpl.descriptor = {
-		name = "LaunchMultiplayerTestServerRequest",
-		fullName = "rodeo.LaunchMultiplayerTestServerRequest",
-	}
-
-	messages.LaunchMultiplayerTestServerRequest = _LaunchMultiplayerTestServerRequestImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.LaunchMultiplayerTestServerRequest)
-end
-
-do
-	local _LaunchMultiplayerTestServerEventImpl = {}
-	_LaunchMultiplayerTestServerEventImpl.__index = _LaunchMultiplayerTestServerEventImpl
-
-	function _LaunchMultiplayerTestServerEventImpl.new(
-		data: _LaunchMultiplayerTestServerEventPartialFields?
-	): LaunchMultiplayerTestServerEvent
-		return setmetatable({
-			event = (function()
-				if data == nil or data.event == nil then
-					return nil
-				end
-				local v = data.event
-				if
-					(v :: any).type == "launching"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-						type = (v :: any).type,
-						value = messages.MultiplayerTestServerLaunching.new((v :: any).value),
-					} :: any
-				elseif
-					(v :: any).type == "ready"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-						type = (v :: any).type,
-						value = messages.MultiplayerTestServerReadyEvent.new((v :: any).value),
-					} :: any
-				elseif
-					(v :: any).type == "error"
-					and (v :: any).value ~= nil
-					and getmetatable((v :: any).value) == nil
-				then
-					return {
-						type = (v :: any).type,
-						value = messages.MultiplayerTestServerLaunchError.new((v :: any).value),
-					} :: any
-				end
-				return v :: any
-			end)(),
-		}, _LaunchMultiplayerTestServerEventImpl :: _LaunchMultiplayerTestServerEventImpl)
-	end
-
-	function _LaunchMultiplayerTestServerEventImpl.encode(self: LaunchMultiplayerTestServerEvent): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.event ~= nil then
-			if self.event.type == "launching" then
-				local encoded = self.event.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.event.type == "ready" then
-				local encoded = self.event.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.event.type == "error" then
-				local encoded = self.event.value:encode()
-				output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			end
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _LaunchMultiplayerTestServerEventImpl.decode(input: buffer): LaunchMultiplayerTestServerEvent
-		local self = _LaunchMultiplayerTestServerEventImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.event = { type = "launching", value = messages.MultiplayerTestServerLaunching.decode(value) }
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.event = { type = "ready", value = messages.MultiplayerTestServerReadyEvent.decode(value) }
-					continue
-				elseif field == 3 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.event = { type = "error", value = messages.MultiplayerTestServerLaunchError.decode(value) }
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _LaunchMultiplayerTestServerEventImpl.jsonEncode(self: LaunchMultiplayerTestServerEvent): any
-		local output = {}
-
-		if self.event ~= nil then
-			if self.event.type == "launching" then
-				output.launching = self.event.value:jsonEncode()
-			elseif self.event.type == "ready" then
-				output.ready = self.event.value:jsonEncode()
-			elseif self.event.type == "error" then
-				output.error = self.event.value:jsonEncode()
-			end
-		end
-
-		return output
-	end
-
-	function _LaunchMultiplayerTestServerEventImpl.jsonDecode(
-		input: { [string]: any }
-	): LaunchMultiplayerTestServerEvent
-		local self = _LaunchMultiplayerTestServerEventImpl.new()
-
-		if input.launching ~= nil then
-			self.event =
-				{ type = "launching", value = messages.MultiplayerTestServerLaunching.jsonDecode(input.launching) }
-		end
-
-		if input.ready ~= nil then
-			self.event = { type = "ready", value = messages.MultiplayerTestServerReadyEvent.jsonDecode(input.ready) }
-		end
-
-		if input.error ~= nil then
-			self.event = { type = "error", value = messages.MultiplayerTestServerLaunchError.jsonDecode(input.error) }
-		end
-
-		return self
-	end
-
-	_LaunchMultiplayerTestServerEventImpl.descriptor = {
-		name = "LaunchMultiplayerTestServerEvent",
-		fullName = "rodeo.LaunchMultiplayerTestServerEvent",
-	}
-
-	messages.LaunchMultiplayerTestServerEvent = _LaunchMultiplayerTestServerEventImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.LaunchMultiplayerTestServerEvent)
-end
-
-do
-	local _MultiplayerTestServerLaunchingImpl = {}
-	_MultiplayerTestServerLaunchingImpl.__index = _MultiplayerTestServerLaunchingImpl
-
-	function _MultiplayerTestServerLaunchingImpl.new(
-		data: _MultiplayerTestServerLaunchingPartialFields?
-	): MultiplayerTestServerLaunching
-		return setmetatable({}, _MultiplayerTestServerLaunchingImpl :: _MultiplayerTestServerLaunchingImpl)
-	end
-
-	function _MultiplayerTestServerLaunchingImpl.encode(self: MultiplayerTestServerLaunching): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _MultiplayerTestServerLaunchingImpl.decode(input: buffer): MultiplayerTestServerLaunching
-		local self = _MultiplayerTestServerLaunchingImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				-- No fields
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _MultiplayerTestServerLaunchingImpl.jsonEncode(self: MultiplayerTestServerLaunching): any
-		local output = {}
-
-		return output
-	end
-
-	function _MultiplayerTestServerLaunchingImpl.jsonDecode(input: { [string]: any }): MultiplayerTestServerLaunching
-		local self = _MultiplayerTestServerLaunchingImpl.new()
-
-		return self
-	end
-
-	_MultiplayerTestServerLaunchingImpl.descriptor = {
-		name = "MultiplayerTestServerLaunching",
-		fullName = "rodeo.MultiplayerTestServerLaunching",
-	}
-
-	messages.MultiplayerTestServerLaunching = _MultiplayerTestServerLaunchingImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.MultiplayerTestServerLaunching)
-end
-
-do
-	local _MultiplayerTestServerReadyEventImpl = {}
-	_MultiplayerTestServerReadyEventImpl.__index = _MultiplayerTestServerReadyEventImpl
-
-	function _MultiplayerTestServerReadyEventImpl.new(
-		data: _MultiplayerTestServerReadyEventPartialFields?
-	): MultiplayerTestServerReadyEvent
-		return setmetatable({
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
-		}, _MultiplayerTestServerReadyEventImpl :: _MultiplayerTestServerReadyEventImpl)
-	end
-
-	function _MultiplayerTestServerReadyEventImpl.encode(self: MultiplayerTestServerReadyEvent): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _MultiplayerTestServerReadyEventImpl.decode(input: buffer): MultiplayerTestServerReadyEvent
-		local self = _MultiplayerTestServerReadyEventImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _MultiplayerTestServerReadyEventImpl.jsonEncode(self: MultiplayerTestServerReadyEvent): any
-		local output = {}
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
-		end
-
-		return output
-	end
-
-	function _MultiplayerTestServerReadyEventImpl.jsonDecode(input: { [string]: any }): MultiplayerTestServerReadyEvent
-		local self = _MultiplayerTestServerReadyEventImpl.new()
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
-		end
-
-		return self
-	end
-
-	_MultiplayerTestServerReadyEventImpl.descriptor = {
-		name = "MultiplayerTestServerReadyEvent",
-		fullName = "rodeo.MultiplayerTestServerReadyEvent",
-	}
-
-	messages.MultiplayerTestServerReadyEvent = _MultiplayerTestServerReadyEventImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.MultiplayerTestServerReadyEvent)
-end
-
-do
-	local _MultiplayerTestServerLaunchErrorImpl = {}
-	_MultiplayerTestServerLaunchErrorImpl.__index = _MultiplayerTestServerLaunchErrorImpl
-
-	function _MultiplayerTestServerLaunchErrorImpl.new(
-		data: _MultiplayerTestServerLaunchErrorPartialFields?
-	): MultiplayerTestServerLaunchError
-		return setmetatable({
-			message = if data == nil or data.message == nil then "" else data.message,
-		}, _MultiplayerTestServerLaunchErrorImpl :: _MultiplayerTestServerLaunchErrorImpl)
-	end
-
-	function _MultiplayerTestServerLaunchErrorImpl.encode(self: MultiplayerTestServerLaunchError): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.message ~= nil and self.message ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.message)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _MultiplayerTestServerLaunchErrorImpl.decode(input: buffer): MultiplayerTestServerLaunchError
-		local self = _MultiplayerTestServerLaunchErrorImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.message = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _MultiplayerTestServerLaunchErrorImpl.jsonEncode(self: MultiplayerTestServerLaunchError): any
-		local output = {}
-
-		if self.message ~= nil and self.message ~= "" then
-			output.message = self.message
-		end
-
-		return output
-	end
-
-	function _MultiplayerTestServerLaunchErrorImpl.jsonDecode(
-		input: { [string]: any }
-	): MultiplayerTestServerLaunchError
-		local self = _MultiplayerTestServerLaunchErrorImpl.new()
-
-		if input.message ~= nil then
-			self.message = input.message
-		end
-
-		return self
-	end
-
-	_MultiplayerTestServerLaunchErrorImpl.descriptor = {
-		name = "MultiplayerTestServerLaunchError",
-		fullName = "rodeo.MultiplayerTestServerLaunchError",
-	}
-
-	messages.MultiplayerTestServerLaunchError = _MultiplayerTestServerLaunchErrorImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.MultiplayerTestServerLaunchError)
-end
-
-do
-	local _ConnectMultiplayerTestClientRequestImpl = {}
-	_ConnectMultiplayerTestClientRequestImpl.__index = _ConnectMultiplayerTestClientRequestImpl
-
-	function _ConnectMultiplayerTestClientRequestImpl.new(
-		data: _ConnectMultiplayerTestClientRequestPartialFields?
-	): ConnectMultiplayerTestClientRequest
-		return setmetatable({
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-		}, _ConnectMultiplayerTestClientRequestImpl :: _ConnectMultiplayerTestClientRequestImpl)
-	end
-
-	function _ConnectMultiplayerTestClientRequestImpl.encode(self: ConnectMultiplayerTestClientRequest): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _ConnectMultiplayerTestClientRequestImpl.decode(input: buffer): ConnectMultiplayerTestClientRequest
-		local self = _ConnectMultiplayerTestClientRequestImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _ConnectMultiplayerTestClientRequestImpl.jsonEncode(self: ConnectMultiplayerTestClientRequest): any
-		local output = {}
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		return output
-	end
-
-	function _ConnectMultiplayerTestClientRequestImpl.jsonDecode(
-		input: { [string]: any }
-	): ConnectMultiplayerTestClientRequest
-		local self = _ConnectMultiplayerTestClientRequestImpl.new()
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		return self
-	end
-
-	_ConnectMultiplayerTestClientRequestImpl.descriptor = {
-		name = "ConnectMultiplayerTestClientRequest",
-		fullName = "rodeo.ConnectMultiplayerTestClientRequest",
-	}
-
-	messages.ConnectMultiplayerTestClientRequest = _ConnectMultiplayerTestClientRequestImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.ConnectMultiplayerTestClientRequest)
-end
-
-do
-	local _ConnectMultiplayerTestClientResponseImpl = {}
-	_ConnectMultiplayerTestClientResponseImpl.__index = _ConnectMultiplayerTestClientResponseImpl
-
-	function _ConnectMultiplayerTestClientResponseImpl.new(
-		data: _ConnectMultiplayerTestClientResponsePartialFields?
-	): ConnectMultiplayerTestClientResponse
-		return setmetatable({
-			clientId = if data == nil or data.clientId == nil then "" else data.clientId,
-		}, _ConnectMultiplayerTestClientResponseImpl :: _ConnectMultiplayerTestClientResponseImpl)
-	end
-
-	function _ConnectMultiplayerTestClientResponseImpl.encode(self: ConnectMultiplayerTestClientResponse): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.clientId ~= nil and self.clientId ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.clientId)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _ConnectMultiplayerTestClientResponseImpl.decode(input: buffer): ConnectMultiplayerTestClientResponse
-		local self = _ConnectMultiplayerTestClientResponseImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.clientId = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _ConnectMultiplayerTestClientResponseImpl.jsonEncode(self: ConnectMultiplayerTestClientResponse): any
-		local output = {}
-
-		if self.clientId ~= nil and self.clientId ~= "" then
-			output.clientId = self.clientId
-		end
-
-		return output
-	end
-
-	function _ConnectMultiplayerTestClientResponseImpl.jsonDecode(
-		input: { [string]: any }
-	): ConnectMultiplayerTestClientResponse
-		local self = _ConnectMultiplayerTestClientResponseImpl.new()
-
-		if input.clientId ~= nil then
-			self.clientId = input.clientId
-		end
-
-		return self
-	end
-
-	_ConnectMultiplayerTestClientResponseImpl.descriptor = {
-		name = "ConnectMultiplayerTestClientResponse",
-		fullName = "rodeo.ConnectMultiplayerTestClientResponse",
-	}
-
-	messages.ConnectMultiplayerTestClientResponse = _ConnectMultiplayerTestClientResponseImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.ConnectMultiplayerTestClientResponse)
-end
-
-do
-	local _DisconnectMultiplayerTestClientRequestImpl = {}
-	_DisconnectMultiplayerTestClientRequestImpl.__index = _DisconnectMultiplayerTestClientRequestImpl
-
-	function _DisconnectMultiplayerTestClientRequestImpl.new(
-		data: _DisconnectMultiplayerTestClientRequestPartialFields?
-	): DisconnectMultiplayerTestClientRequest
-		return setmetatable({
-			clientId = if data == nil or data.clientId == nil then "" else data.clientId,
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-		}, _DisconnectMultiplayerTestClientRequestImpl :: _DisconnectMultiplayerTestClientRequestImpl)
-	end
-
-	function _DisconnectMultiplayerTestClientRequestImpl.encode(self: DisconnectMultiplayerTestClientRequest): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.clientId ~= nil and self.clientId ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.clientId)
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _DisconnectMultiplayerTestClientRequestImpl.decode(input: buffer): DisconnectMultiplayerTestClientRequest
-		local self = _DisconnectMultiplayerTestClientRequestImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.clientId = proto.decodeString(value)
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _DisconnectMultiplayerTestClientRequestImpl.jsonEncode(self: DisconnectMultiplayerTestClientRequest): any
-		local output = {}
-
-		if self.clientId ~= nil and self.clientId ~= "" then
-			output.clientId = self.clientId
-		end
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		return output
-	end
-
-	function _DisconnectMultiplayerTestClientRequestImpl.jsonDecode(
-		input: { [string]: any }
-	): DisconnectMultiplayerTestClientRequest
-		local self = _DisconnectMultiplayerTestClientRequestImpl.new()
-
-		if input.clientId ~= nil then
-			self.clientId = input.clientId
-		end
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		return self
-	end
-
-	_DisconnectMultiplayerTestClientRequestImpl.descriptor = {
-		name = "DisconnectMultiplayerTestClientRequest",
-		fullName = "rodeo.DisconnectMultiplayerTestClientRequest",
-	}
-
-	messages.DisconnectMultiplayerTestClientRequest = _DisconnectMultiplayerTestClientRequestImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.DisconnectMultiplayerTestClientRequest)
-end
-
-do
-	local _DisconnectMultiplayerTestClientResponseImpl = {}
-	_DisconnectMultiplayerTestClientResponseImpl.__index = _DisconnectMultiplayerTestClientResponseImpl
-
-	function _DisconnectMultiplayerTestClientResponseImpl.new(
-		data: _DisconnectMultiplayerTestClientResponsePartialFields?
-	): DisconnectMultiplayerTestClientResponse
-		return setmetatable({
-			ok = if data == nil or data.ok == nil then false else data.ok,
-		}, _DisconnectMultiplayerTestClientResponseImpl :: _DisconnectMultiplayerTestClientResponseImpl)
-	end
-
-	function _DisconnectMultiplayerTestClientResponseImpl.encode(self: DisconnectMultiplayerTestClientResponse): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.ok then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.ok then 1 else 0)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _DisconnectMultiplayerTestClientResponseImpl.decode(input: buffer): DisconnectMultiplayerTestClientResponse
-		local self = _DisconnectMultiplayerTestClientResponseImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.ok = value ~= 0
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				-- No fields
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _DisconnectMultiplayerTestClientResponseImpl.jsonEncode(self: DisconnectMultiplayerTestClientResponse): any
-		local output = {}
-
-		if self.ok then
-			output.ok = self.ok
-		end
-
-		return output
-	end
-
-	function _DisconnectMultiplayerTestClientResponseImpl.jsonDecode(
-		input: { [string]: any }
-	): DisconnectMultiplayerTestClientResponse
-		local self = _DisconnectMultiplayerTestClientResponseImpl.new()
-
-		if input.ok ~= nil then
-			self.ok = input.ok
-		end
-
-		return self
-	end
-
-	_DisconnectMultiplayerTestClientResponseImpl.descriptor = {
-		name = "DisconnectMultiplayerTestClientResponse",
-		fullName = "rodeo.DisconnectMultiplayerTestClientResponse",
-	}
-
-	messages.DisconnectMultiplayerTestClientResponse = _DisconnectMultiplayerTestClientResponseImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.DisconnectMultiplayerTestClientResponse)
-end
-
-do
-	local _CloseMultiplayerTestServerRequestImpl = {}
-	_CloseMultiplayerTestServerRequestImpl.__index = _CloseMultiplayerTestServerRequestImpl
-
-	function _CloseMultiplayerTestServerRequestImpl.new(
-		data: _CloseMultiplayerTestServerRequestPartialFields?
-	): CloseMultiplayerTestServerRequest
-		return setmetatable({
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-		}, _CloseMultiplayerTestServerRequestImpl :: _CloseMultiplayerTestServerRequestImpl)
-	end
-
-	function _CloseMultiplayerTestServerRequestImpl.encode(self: CloseMultiplayerTestServerRequest): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _CloseMultiplayerTestServerRequestImpl.decode(input: buffer): CloseMultiplayerTestServerRequest
-		local self = _CloseMultiplayerTestServerRequestImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _CloseMultiplayerTestServerRequestImpl.jsonEncode(self: CloseMultiplayerTestServerRequest): any
-		local output = {}
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		return output
-	end
-
-	function _CloseMultiplayerTestServerRequestImpl.jsonDecode(
-		input: { [string]: any }
-	): CloseMultiplayerTestServerRequest
-		local self = _CloseMultiplayerTestServerRequestImpl.new()
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		return self
-	end
-
-	_CloseMultiplayerTestServerRequestImpl.descriptor = {
-		name = "CloseMultiplayerTestServerRequest",
-		fullName = "rodeo.CloseMultiplayerTestServerRequest",
-	}
-
-	messages.CloseMultiplayerTestServerRequest = _CloseMultiplayerTestServerRequestImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.CloseMultiplayerTestServerRequest)
-end
-
-do
-	local _CloseMultiplayerTestServerResponseImpl = {}
-	_CloseMultiplayerTestServerResponseImpl.__index = _CloseMultiplayerTestServerResponseImpl
-
-	function _CloseMultiplayerTestServerResponseImpl.new(
-		data: _CloseMultiplayerTestServerResponsePartialFields?
-	): CloseMultiplayerTestServerResponse
-		return setmetatable({
-			ok = if data == nil or data.ok == nil then false else data.ok,
-		}, _CloseMultiplayerTestServerResponseImpl :: _CloseMultiplayerTestServerResponseImpl)
-	end
-
-	function _CloseMultiplayerTestServerResponseImpl.encode(self: CloseMultiplayerTestServerResponse): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.ok then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.ok then 1 else 0)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _CloseMultiplayerTestServerResponseImpl.decode(input: buffer): CloseMultiplayerTestServerResponse
-		local self = _CloseMultiplayerTestServerResponseImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.ok = value ~= 0
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				-- No fields
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _CloseMultiplayerTestServerResponseImpl.jsonEncode(self: CloseMultiplayerTestServerResponse): any
-		local output = {}
-
-		if self.ok then
-			output.ok = self.ok
-		end
-
-		return output
-	end
-
-	function _CloseMultiplayerTestServerResponseImpl.jsonDecode(
-		input: { [string]: any }
-	): CloseMultiplayerTestServerResponse
-		local self = _CloseMultiplayerTestServerResponseImpl.new()
-
-		if input.ok ~= nil then
-			self.ok = input.ok
-		end
-
-		return self
-	end
-
-	_CloseMultiplayerTestServerResponseImpl.descriptor = {
-		name = "CloseMultiplayerTestServerResponse",
-		fullName = "rodeo.CloseMultiplayerTestServerResponse",
-	}
-
-	messages.CloseMultiplayerTestServerResponse = _CloseMultiplayerTestServerResponseImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.CloseMultiplayerTestServerResponse)
-end
-
-do
 	local _ListBackendsRequestImpl = {}
 	_ListBackendsRequestImpl.__index = _ListBackendsRequestImpl
 
@@ -11643,19 +8983,6 @@ do
 				end
 				return out
 			end)(),
-			vms = (function()
-				local src = if data == nil then nil else data.vms
-				if src == nil then
-					return {}
-				end
-				local out = table.create(#src)
-				for i, v in src do
-					out[i] = if getmetatable(v :: any) == nil
-						then messages.VmSnapshot.new(v :: any)
-						else (v :: any) :: VmSnapshot
-				end
-				return out
-			end)(),
 			processes = (function()
 				local src = if data == nil then nil else data.processes
 				if src == nil then
@@ -11669,16 +8996,16 @@ do
 				end
 				return out
 			end)(),
-			multiplayerTestSessions = (function()
-				local src = if data == nil then nil else data.multiplayerTestSessions
+			studios = (function()
+				local src = if data == nil then nil else data.studios
 				if src == nil then
 					return {}
 				end
 				local out = table.create(#src)
 				for i, v in src do
 					out[i] = if getmetatable(v :: any) == nil
-						then messages.SnapshotMultiplayerTestSession.new(v :: any)
-						else (v :: any) :: SnapshotMultiplayerTestSession
+						then messages.StudioState.new(v :: any)
+						else (v :: any) :: StudioState
 				end
 				return out
 			end)(),
@@ -11697,14 +9024,6 @@ do
 			end
 		end
 
-		if self.vms ~= nil and #self.vms > 0 then
-			for _, value in self.vms do
-				local encoded = value:encode()
-				output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			end
-		end
-
 		if self.processes ~= nil and #self.processes > 0 then
 			for _, value in self.processes do
 				local encoded = value:encode()
@@ -11713,10 +9032,10 @@ do
 			end
 		end
 
-		if self.multiplayerTestSessions ~= nil and #self.multiplayerTestSessions > 0 then
-			for _, value in self.multiplayerTestSessions do
+		if self.studios ~= nil and #self.studios > 0 then
+			for _, value in self.studios do
 				local encoded = value:encode()
-				output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -11745,20 +9064,15 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					table.insert(self.backends, messages.BackendInfo.decode(value))
 					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.vms, messages.VmSnapshot.decode(value))
-					continue
 				elseif field == 3 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					table.insert(self.processes, messages.ProcessInfo.decode(value))
 					continue
-				elseif field == 4 then
+				elseif field == 5 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.multiplayerTestSessions, messages.SnapshotMultiplayerTestSession.decode(value))
+					table.insert(self.studios, messages.StudioState.decode(value))
 					continue
 				end
 
@@ -11795,14 +9109,6 @@ do
 			output.backends = newOutput
 		end
 
-		if self.vms ~= nil and #self.vms > 0 then
-			local newOutput = {}
-			for _, value in self.vms do
-				table.insert(newOutput, value:jsonEncode())
-			end
-			output.vms = newOutput
-		end
-
 		if self.processes ~= nil and #self.processes > 0 then
 			local newOutput = {}
 			for _, value in self.processes do
@@ -11811,12 +9117,12 @@ do
 			output.processes = newOutput
 		end
 
-		if self.multiplayerTestSessions ~= nil and #self.multiplayerTestSessions > 0 then
+		if self.studios ~= nil and #self.studios > 0 then
 			local newOutput = {}
-			for _, value in self.multiplayerTestSessions do
+			for _, value in self.studios do
 				table.insert(newOutput, value:jsonEncode())
 			end
-			output.multiplayerTestSessions = newOutput
+			output.studios = newOutput
 		end
 
 		return output
@@ -11834,15 +9140,6 @@ do
 			self.backends = newOutput
 		end
 
-		if input.vms ~= nil then
-			local newOutput: { VmSnapshot } = {}
-			for _, value in input.vms do
-				table.insert(newOutput, messages.VmSnapshot.jsonDecode(value))
-			end
-
-			self.vms = newOutput
-		end
-
 		if input.processes ~= nil then
 			local newOutput: { ProcessInfo } = {}
 			for _, value in input.processes do
@@ -11852,13 +9149,13 @@ do
 			self.processes = newOutput
 		end
 
-		if input.multiplayerTestSessions ~= nil then
-			local newOutput: { SnapshotMultiplayerTestSession } = {}
-			for _, value in input.multiplayerTestSessions do
-				table.insert(newOutput, messages.SnapshotMultiplayerTestSession.jsonDecode(value))
+		if input.studios ~= nil then
+			local newOutput: { StudioState } = {}
+			for _, value in input.studios do
+				table.insert(newOutput, messages.StudioState.jsonDecode(value))
 			end
 
-			self.multiplayerTestSessions = newOutput
+			self.studios = newOutput
 		end
 
 		return self
@@ -11872,447 +9169,6 @@ do
 	messages.RodeoSnapshot = _RodeoSnapshotImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.RodeoSnapshot)
-end
-
-do
-	local _SnapshotMultiplayerTestSessionImpl = {}
-	_SnapshotMultiplayerTestSessionImpl.__index = _SnapshotMultiplayerTestSessionImpl
-
-	function _SnapshotMultiplayerTestSessionImpl.new(
-		data: _SnapshotMultiplayerTestSessionPartialFields?
-	): SnapshotMultiplayerTestSession
-		return setmetatable({
-			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-			server = if data == nil or data.server == nil
-				then nil
-				elseif getmetatable(data.server :: any) == nil then messages.SnapshotMultiplayerTestServer.new(
-					data.server :: any
-				)
-				else (data.server :: any) :: SnapshotMultiplayerTestServer,
-			clients = (function()
-				local src = if data == nil then nil else data.clients
-				if src == nil then
-					return {}
-				end
-				local out = table.create(#src)
-				for i, v in src do
-					out[i] = if getmetatable(v :: any) == nil
-						then messages.SnapshotMultiplayerTestClient.new(v :: any)
-						else (v :: any) :: SnapshotMultiplayerTestClient
-				end
-				return out
-			end)(),
-		}, _SnapshotMultiplayerTestSessionImpl :: _SnapshotMultiplayerTestSessionImpl)
-	end
-
-	function _SnapshotMultiplayerTestSessionImpl.encode(self: SnapshotMultiplayerTestSession): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		if self.server ~= nil then
-			local encoded = self.server:encode()
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-		end
-
-		if self.clients ~= nil and #self.clients > 0 then
-			for _, value in self.clients do
-				local encoded = value:encode()
-				output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			end
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _SnapshotMultiplayerTestSessionImpl.decode(input: buffer): SnapshotMultiplayerTestSession
-		local self = _SnapshotMultiplayerTestSessionImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				-- No fields
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 1 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.sessionGuid = proto.decodeString(value)
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.server = messages.SnapshotMultiplayerTestServer.decode(value)
-					continue
-				elseif field == 3 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.clients, messages.SnapshotMultiplayerTestClient.decode(value))
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _SnapshotMultiplayerTestSessionImpl.jsonEncode(self: SnapshotMultiplayerTestSession): any
-		local output = {}
-
-		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
-			output.sessionGuid = self.sessionGuid
-		end
-
-		if self.server ~= nil then
-			output.server = self.server:jsonEncode()
-		end
-
-		if self.clients ~= nil and #self.clients > 0 then
-			local newOutput = {}
-			for _, value in self.clients do
-				table.insert(newOutput, value:jsonEncode())
-			end
-			output.clients = newOutput
-		end
-
-		return output
-	end
-
-	function _SnapshotMultiplayerTestSessionImpl.jsonDecode(input: { [string]: any }): SnapshotMultiplayerTestSession
-		local self = _SnapshotMultiplayerTestSessionImpl.new()
-
-		if input.sessionGuid ~= nil then
-			self.sessionGuid = input.sessionGuid
-		end
-
-		if input.server ~= nil then
-			self.server = messages.SnapshotMultiplayerTestServer.jsonDecode(input.server)
-		end
-
-		if input.clients ~= nil then
-			local newOutput: { SnapshotMultiplayerTestClient } = {}
-			for _, value in input.clients do
-				table.insert(newOutput, messages.SnapshotMultiplayerTestClient.jsonDecode(value))
-			end
-
-			self.clients = newOutput
-		end
-
-		return self
-	end
-
-	_SnapshotMultiplayerTestSessionImpl.descriptor = {
-		name = "SnapshotMultiplayerTestSession",
-		fullName = "rodeo.SnapshotMultiplayerTestSession",
-	}
-
-	messages.SnapshotMultiplayerTestSession = _SnapshotMultiplayerTestSessionImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.SnapshotMultiplayerTestSession)
-end
-
-do
-	local _SnapshotMultiplayerTestServerImpl = {}
-	_SnapshotMultiplayerTestServerImpl.__index = _SnapshotMultiplayerTestServerImpl
-
-	function _SnapshotMultiplayerTestServerImpl.new(
-		data: _SnapshotMultiplayerTestServerPartialFields?
-	): SnapshotMultiplayerTestServer
-		return setmetatable({
-			pid = if data == nil or data.pid == nil then 0 else data.pid,
-			raknetPort = if data == nil or data.raknetPort == nil then 0 else data.raknetPort,
-			raknetSessionGuid = if data == nil or data.raknetSessionGuid == nil then "" else data.raknetSessionGuid,
-			playTestGuid = if data == nil or data.playTestGuid == nil then "" else data.playTestGuid,
-		}, _SnapshotMultiplayerTestServerImpl :: _SnapshotMultiplayerTestServerImpl)
-	end
-
-	function _SnapshotMultiplayerTestServerImpl.encode(self: SnapshotMultiplayerTestServer): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.pid)
-		end
-
-		if self.raknetPort ~= nil and self.raknetPort ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.raknetPort)
-		end
-
-		if self.raknetSessionGuid ~= nil and self.raknetSessionGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.raknetSessionGuid)
-		end
-
-		if self.playTestGuid ~= nil and self.playTestGuid ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.playTestGuid)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _SnapshotMultiplayerTestServerImpl.decode(input: buffer): SnapshotMultiplayerTestServer
-		local self = _SnapshotMultiplayerTestServerImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.pid = value
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.raknetPort = value
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				if field == 3 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.raknetSessionGuid = proto.decodeString(value)
-					continue
-				elseif field == 4 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.playTestGuid = proto.decodeString(value)
-					continue
-				end
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _SnapshotMultiplayerTestServerImpl.jsonEncode(self: SnapshotMultiplayerTestServer): any
-		local output = {}
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output.pid = self.pid
-		end
-
-		if self.raknetPort ~= nil and self.raknetPort ~= 0 then
-			output.raknetPort = self.raknetPort
-		end
-
-		if self.raknetSessionGuid ~= nil and self.raknetSessionGuid ~= "" then
-			output.raknetSessionGuid = self.raknetSessionGuid
-		end
-
-		if self.playTestGuid ~= nil and self.playTestGuid ~= "" then
-			output.playTestGuid = self.playTestGuid
-		end
-
-		return output
-	end
-
-	function _SnapshotMultiplayerTestServerImpl.jsonDecode(input: { [string]: any }): SnapshotMultiplayerTestServer
-		local self = _SnapshotMultiplayerTestServerImpl.new()
-
-		if input.pid ~= nil then
-			self.pid = input.pid
-		end
-
-		if input.raknetPort ~= nil then
-			self.raknetPort = input.raknetPort
-		end
-
-		if input.raknetSessionGuid ~= nil then
-			self.raknetSessionGuid = input.raknetSessionGuid
-		end
-
-		if input.playTestGuid ~= nil then
-			self.playTestGuid = input.playTestGuid
-		end
-
-		return self
-	end
-
-	_SnapshotMultiplayerTestServerImpl.descriptor = {
-		name = "SnapshotMultiplayerTestServer",
-		fullName = "rodeo.SnapshotMultiplayerTestServer",
-	}
-
-	messages.SnapshotMultiplayerTestServer = _SnapshotMultiplayerTestServerImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.SnapshotMultiplayerTestServer)
-end
-
-do
-	local _SnapshotMultiplayerTestClientImpl = {}
-	_SnapshotMultiplayerTestClientImpl.__index = _SnapshotMultiplayerTestClientImpl
-
-	function _SnapshotMultiplayerTestClientImpl.new(
-		data: _SnapshotMultiplayerTestClientPartialFields?
-	): SnapshotMultiplayerTestClient
-		return setmetatable({
-			index = if data == nil or data.index == nil then 0 else data.index,
-			pid = if data == nil or data.pid == nil then 0 else data.pid,
-		}, _SnapshotMultiplayerTestClientImpl :: _SnapshotMultiplayerTestClientImpl)
-	end
-
-	function _SnapshotMultiplayerTestClientImpl.encode(self: SnapshotMultiplayerTestClient): buffer
-		local output = buffer.create(0)
-		local cursor = 0
-
-		if self.index ~= nil and self.index ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.index)
-		end
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.pid)
-		end
-
-		local shrunkBuffer = buffer.create(cursor)
-		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
-		return shrunkBuffer
-	end
-
-	function _SnapshotMultiplayerTestClientImpl.decode(input: buffer): SnapshotMultiplayerTestClient
-		local self = _SnapshotMultiplayerTestClientImpl.new()
-		local cursor = 0
-
-		while cursor < buffer.len(input) do
-			local field, wireType
-			field, wireType, cursor = proto.readTag(input, cursor)
-
-			if wireType == proto.wireTypes.varint then
-				if field == 1 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.index = value
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.pid = value
-					continue
-				end
-
-				local _
-				_, cursor = proto.readVarInt(input, cursor)
-			elseif wireType == proto.wireTypes.lengthDelimited then
-				-- No fields
-
-				local length
-				length, cursor = proto.readVarInt(input, cursor)
-
-				cursor += length
-			elseif wireType == proto.wireTypes.i32 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed32(input, cursor)
-			elseif wireType == proto.wireTypes.i64 then
-				-- No fields
-
-				local _
-				_, cursor = proto.readFixed64(input, cursor)
-			else
-				error("Unsupported wire type: " .. wireType)
-			end
-		end
-
-		return self
-	end
-
-	function _SnapshotMultiplayerTestClientImpl.jsonEncode(self: SnapshotMultiplayerTestClient): any
-		local output = {}
-
-		if self.index ~= nil and self.index ~= 0 then
-			output.index = self.index
-		end
-
-		if self.pid ~= nil and self.pid ~= 0 then
-			output.pid = self.pid
-		end
-
-		return output
-	end
-
-	function _SnapshotMultiplayerTestClientImpl.jsonDecode(input: { [string]: any }): SnapshotMultiplayerTestClient
-		local self = _SnapshotMultiplayerTestClientImpl.new()
-
-		if input.index ~= nil then
-			self.index = input.index
-		end
-
-		if input.pid ~= nil then
-			self.pid = input.pid
-		end
-
-		return self
-	end
-
-	_SnapshotMultiplayerTestClientImpl.descriptor = {
-		name = "SnapshotMultiplayerTestClient",
-		fullName = "rodeo.SnapshotMultiplayerTestClient",
-	}
-
-	messages.SnapshotMultiplayerTestClient = _SnapshotMultiplayerTestClientImpl :: any -- Luau: Not sure why this intersection fails.
-
-	typeRegistry.default:register(messages.SnapshotMultiplayerTestClient)
 end
 
 do
@@ -15362,6 +12218,15 @@ messages.ProcessState = {
 			return nil
 		end
 	end,
+
+	variants = {
+		PROCESS_STATE_QUEUED = "PROCESS_STATE_QUEUED" :: "PROCESS_STATE_QUEUED",
+		PROCESS_STATE_RUNNING = "PROCESS_STATE_RUNNING" :: "PROCESS_STATE_RUNNING",
+		PROCESS_STATE_DONE = "PROCESS_STATE_DONE" :: "PROCESS_STATE_DONE",
+		PROCESS_STATE_ERROR = "PROCESS_STATE_ERROR" :: "PROCESS_STATE_ERROR",
+		PROCESS_STATE_KILLED = "PROCESS_STATE_KILLED" :: "PROCESS_STATE_KILLED",
+		PROCESS_STATE_DISCONNECTED = "PROCESS_STATE_DISCONNECTED" :: "PROCESS_STATE_DISCONNECTED",
+	},
 }
 
 return {
@@ -15377,6 +12242,8 @@ return {
 	StateSnapshot = messages.StateSnapshot,
 	StudioInstanceState = messages.StudioInstanceState,
 	VmSnapshot = messages.VmSnapshot,
+	StudioState = messages.StudioState,
+	StudioVm = messages.StudioVm,
 	StudioSnapshot = messages.StudioSnapshot,
 	PlayerStatus = messages.PlayerStatus,
 	MasterMessage = messages.MasterMessage,
@@ -15386,11 +12253,6 @@ return {
 	SaveCommand = messages.SaveCommand,
 	SaveResult = messages.SaveResult,
 	LaunchStudioCommand = messages.LaunchStudioCommand,
-	LaunchMultiplayerTestServerCommand = messages.LaunchMultiplayerTestServerCommand,
-	LaunchMultiplayerTestClientCommand = messages.LaunchMultiplayerTestClientCommand,
-	KillMultiplayerTestProcessCommand = messages.KillMultiplayerTestProcessCommand,
-	MultiplayerTestServerReady = messages.MultiplayerTestServerReady,
-	MultiplayerTestClientReady = messages.MultiplayerTestClientReady,
 	SessionExited = messages.SessionExited,
 	RunClientMessage = messages.RunClientMessage,
 	SubmitRequest = messages.SubmitRequest,
@@ -15414,24 +12276,10 @@ return {
 	StudioClosed = messages.StudioClosed,
 	SavePlaceRequest = messages.SavePlaceRequest,
 	SavePlaceResponse = messages.SavePlaceResponse,
-	LaunchMultiplayerTestServerRequest = messages.LaunchMultiplayerTestServerRequest,
-	LaunchMultiplayerTestServerEvent = messages.LaunchMultiplayerTestServerEvent,
-	MultiplayerTestServerLaunching = messages.MultiplayerTestServerLaunching,
-	MultiplayerTestServerReadyEvent = messages.MultiplayerTestServerReadyEvent,
-	MultiplayerTestServerLaunchError = messages.MultiplayerTestServerLaunchError,
-	ConnectMultiplayerTestClientRequest = messages.ConnectMultiplayerTestClientRequest,
-	ConnectMultiplayerTestClientResponse = messages.ConnectMultiplayerTestClientResponse,
-	DisconnectMultiplayerTestClientRequest = messages.DisconnectMultiplayerTestClientRequest,
-	DisconnectMultiplayerTestClientResponse = messages.DisconnectMultiplayerTestClientResponse,
-	CloseMultiplayerTestServerRequest = messages.CloseMultiplayerTestServerRequest,
-	CloseMultiplayerTestServerResponse = messages.CloseMultiplayerTestServerResponse,
 	ListBackendsRequest = messages.ListBackendsRequest,
 	ListBackendsResponse = messages.ListBackendsResponse,
 	BackendInfo = messages.BackendInfo,
 	RodeoSnapshot = messages.RodeoSnapshot,
-	SnapshotMultiplayerTestSession = messages.SnapshotMultiplayerTestSession,
-	SnapshotMultiplayerTestServer = messages.SnapshotMultiplayerTestServer,
-	SnapshotMultiplayerTestClient = messages.SnapshotMultiplayerTestClient,
 	LogFilter = messages.LogFilter,
 	HealthResponse = messages.HealthResponse,
 	ContextInfo = messages.ContextInfo,

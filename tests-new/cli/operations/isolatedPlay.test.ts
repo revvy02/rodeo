@@ -128,7 +128,12 @@ describe("isolated play mode (CLI)", () => {
       expect(result.return).toBe(UNIVERSE_ID);
     });
 
-    it("play:server — game.PlaceVersion is non-zero", async () => {
+    // Studio-first multiplayer can't set placeVersion: the server is spawned by
+    // ExecuteMultiplayerTestAsync from the edit DataModel (PlaceVersion 0), and
+    // -task EditPlace ignores -placeVersion (verified). The old path forced it via
+    // StartServer's -placeVersion, which rodeo no longer launches. Known limitation
+    // — PlaceId/GameId/DataStore still resolve correctly.
+    it.skip("play:server — game.PlaceVersion is non-zero (N/A in studio-first multiplayer)", async () => {
       const result = await run({
         target: "play:server",
         source: "return game.PlaceVersion ~= 0",

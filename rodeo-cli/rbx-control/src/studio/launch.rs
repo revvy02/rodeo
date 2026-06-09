@@ -399,6 +399,14 @@ impl Studio {
     /// Terminate the Studio process.
     /// Uses stored PID directly so it never blocks on the handle mutex.
     pub fn kill(&self) {
+        // Reap StudioTestService child processes first. `ExecuteMultiplayerTestAsync`
+        // spawns `-task StartServer`/`StartClient` Studios as children of this edit
+        // Studio (they carry `editpid <our pid>` in argv). rodeo does NOT own those
+        // handles, and `EndTest` does not reliably terminate them, so killing only
+        // this process would orphan them. Kill them explicitly by the editpid marker
+        // (which survives the reparenting that happens when this process dies).
+        reap_test_children(self.pid);
+
         #[cfg(unix)]
         unsafe {
             libc::kill(self.pid as i32, libc::SIGKILL);
@@ -483,6 +491,40 @@ impl Studio {
                 let _ = std::fs::remove_file(lock_path);
             }
         }
+    }
+}
+
+/// Kill the StudioTestService child processes (`-task StartServer`/`StartClient`
+/// spawned by `ExecuteMultiplayerTestAsync`) belonging to the edit Studio
+/// `edit_pid`. They carry `editpid <edit_pid>` in their command line, which is
+/// stable even after the edit Studio dies and they reparent to launchd/init.
+/// Best-effort and fire-and-forget — never blocks Studio teardown.
+fn reap_test_children(edit_pid: u32) {
+    #[cfg(unix)]
+    {
+        let needle = format!("editpid {edit_pid}");
+        let Ok(out) = std::process::Command::new("pgrep").arg("-f").arg(&needle).output() else {
+            return;
+        };
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            if let Ok(pid) = line.trim().parse::<i32>() {
+                if pid as u32 != edit_pid {
+                    unsafe { libc::kill(pid, libc::SIGKILL) };
+                    tracing::info!(edit_pid, child_pid = pid, "reaped StudioTestService child process");
+                }
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        // Best-effort: terminate processes whose command line carries the editpid
+        // marker. taskkill can't filter by command line, so use WMIC (deprecated
+        // but still present on supported Windows versions).
+        let filter = format!("CommandLine like '%editpid {edit_pid}%'");
+        let _ = std::process::Command::new("wmic")
+            .args(["process", "where", filter.as_str(), "call", "terminate"])
+            .output();
+        let _ = edit_pid;
     }
 }
 

@@ -26,10 +26,8 @@ fn try_claim_session_from_handshake(guard: &mut crate::master::BackendState, vm_
     else { return false; };
 
     // Plugin self-reports an id it baked in at install time. Trust it iff
-    // we actually spawned something with that id — either an edit Studio
-    // (studio_instances) or a multiplayer-test server (multiplayer_test_session_meta).
-    let matched = guard.studio_instances.contains_key(&reported)
-        || guard.multiplayer_test_session_meta.contains_key(&reported);
+    // we actually spawned something with that id (studio_instances).
+    let matched = guard.studio_instances.contains_key(&reported);
     if !matched { return false; }
 
     if let Some(inst) = guard.studio_instances.get_mut(&reported) {

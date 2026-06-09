@@ -750,7 +750,7 @@ type _ProcessGetInfoResponseFields = {
 	cwd: string,
 	homedir: string,
 	execpath: string,
-	env: { [string]: string },
+	env: { [string]: string? },
 	platform: string?,
 	arch: string?,
 	studioContentPath: string?,
@@ -4417,6 +4417,7 @@ do
 
 		if self.env ~= nil and next(self.env) ~= nil then
 			for key, value in self.env do
+				assert(value ~= nil, "Luau")
 				local mapBuffer = buffer.create(0)
 				local mapCursor = 0
 				mapBuffer, mapCursor = proto.writeTag(mapBuffer, mapCursor, 1, proto.wireTypes.lengthDelimited)
@@ -4546,6 +4547,7 @@ do
 		if self.env ~= nil and next(self.env) ~= nil then
 			local newOutput = {}
 			for key, value in self.env do
+				assert(value ~= nil, "Luau")
 				newOutput[key] = value
 			end
 			output.env = newOutput
@@ -4582,7 +4584,7 @@ do
 		end
 
 		if input.env ~= nil then
-			local newOutput: { [string]: string } = {}
+			local newOutput: { [string]: string? } = {}
 			for key, value in input.env do
 				newOutput[key] = value
 			end

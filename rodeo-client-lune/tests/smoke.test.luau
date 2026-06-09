@@ -48,8 +48,8 @@ print("✓ connected")
 
 local state = client.getState()
 assert(type(state) == "table", "state should be a table")
-local vms = state.vms or {}
-print(`✓ getState returned {#vms} vm(s)`)
+local studios = state.studios or {}
+print(`✓ getState returned {#studios} studio(s)`)
 
 local backends = client.listBackends()
 assert(type(backends) == "table", "backends should be a table")

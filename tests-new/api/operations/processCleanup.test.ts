@@ -18,10 +18,11 @@ describe("process cleanup", () => {
 
     // Verify the Studio's VMs are cleaned up. Scope by sessionGuid so
     // concurrent Studios from setup.ts / other tests don't pollute the count.
+    // The studio-first snapshot keys VMs under their owning studio entry
+    // (studio.id == sessionGuid), so the closed Studio should be gone entirely.
     const state = await ctx.client.getState();
-    const studioVms = state.vms.filter(
-      (v) => v.sessionGuid === extraStudio.sessionGuid && v.connected,
-    );
+    const studioEntry = state.studios.find((s) => s.id === extraStudio.sessionGuid);
+    const studioVms = studioEntry?.vms ?? [];
     expect(studioVms.length).toBe(0);
   });
 });

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file runtime.proto.
  */
 export const file_runtime: GenFile = /*@__PURE__*/
-  fileDesc("Cg1ydW50aW1lLnByb3RvEg1yb2Rlby5ydW50aW1lIgQKAk9rIj8KEVN0cmVhbU9wZW5SZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG1vZGUYAyABKAkiJAoSU3RyZWFtT3BlblJlc3BvbnNlEg4KBmhhbmRsZRgBIAEoCSJEChZTdHJlYW1SZWFkQ2h1bmtSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCRIRCgRzaXplGAIgASgNSACIAQFCBwoFX3NpemUiNAoXU3RyZWFtUmVhZENodW5rUmVzcG9uc2USDAoEZGF0YRgBIAEoCRILCgNlb2YYAiABKAgiJwoVU3RyZWFtUmVhZExpbmVSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCSIzChZTdHJlYW1SZWFkTGluZVJlc3BvbnNlEgwKBGRhdGEYASABKAkSCwoDZW9mGAIgASgIIiYKFFN0cmVhbVJlYWRBbGxSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCSIlChVTdHJlYW1SZWFkQWxsUmVzcG9uc2USDAoEZGF0YRgBIAEoCSIyChJTdHJlYW1Xcml0ZVJlcXVlc3QSDgoGaGFuZGxlGAEgASgJEgwKBGRhdGEYAiABKAkiJAoSU3RyZWFtQ2xvc2VSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCSIfCg9Gc0V4aXN0c1JlcXVlc3QSDAoEcGF0aBgBIAEoCSIiChBGc0V4aXN0c1Jlc3BvbnNlEg4KBmV4aXN0cxgBIAEoCCIdCg1Gc1N0YXRSZXF1ZXN0EgwKBHBhdGgYASABKAkiwAEKDkZzU3RhdFJlc3BvbnNlEgwKBHR5cGUYASABKAkSDAoEc2l6ZRgCIAEoAxIbCg5jcmVhdGVkX21pbGxpcxgDIAEoA0gAiAEBEhwKD21vZGlmaWVkX21pbGxpcxgEIAEoA0gBiAEBEhwKD2FjY2Vzc2VkX21pbGxpcxgFIAEoA0gCiAEBQhEKD19jcmVhdGVkX21pbGxpc0ISChBfbW9kaWZpZWRfbWlsbGlzQhIKEF9hY2Nlc3NlZF9taWxsaXMiHQoNRnNUeXBlUmVxdWVzdBIMCgRwYXRoGAEgASgJIiwKDkZzVHlwZVJlc3BvbnNlEhEKBHR5cGUYASABKAlIAIgBAUIHCgVfdHlwZSIeCg5Gc01rZGlyUmVxdWVzdBIMCgRwYXRoGAEgASgJIiAKEEZzTGlzdGRpclJlcXVlc3QSDAoEcGF0aBgBIAEoCSI/ChFGc0xpc3RkaXJSZXNwb25zZRIqCgdlbnRyaWVzGAEgAygLMhkucm9kZW8ucnVudGltZS5Gc0RpckVudHJ5IigKCkZzRGlyRW50cnkSDAoEbmFtZRgBIAEoCRIMCgR0eXBlGAIgASgJIh8KD0ZzUmVtb3ZlUmVxdWVzdBIMCgRwYXRoGAEgASgJIh4KDkZzUm1kaXJSZXF1ZXN0EgwKBHBhdGgYASABKAkiKgoNRnNDb3B5UmVxdWVzdBILCgNzcmMYASABKAkSDAoEZGVzdBgCIAEoCSJICg5Qcm9jZXNzT3B0aW9ucxIQCgNjd2QYASABKAlIAIgBARISCgVzdGRpbxgCIAEoCUgBiAEBQgYKBF9jd2RCCAoGX3N0ZGlvIhcKFVByb2Nlc3NHZXRJbmZvUmVxdWVzdCKrAgoWUHJvY2Vzc0dldEluZm9SZXNwb25zZRILCgNjd2QYASABKAkSDwoHaG9tZWRpchgCIAEoCRIQCghleGVjcGF0aBgDIAEoCRI7CgNlbnYYBCADKAsyLi5yb2Rlby5ydW50aW1lLlByb2Nlc3NHZXRJbmZvUmVzcG9uc2UuRW52RW50cnkSFQoIcGxhdGZvcm0YBSABKAlIAIgBARIRCgRhcmNoGAYgASgJSAGIAQESIAoTc3R1ZGlvX2NvbnRlbnRfcGF0aBgHIAEoCUgCiAEBGioKCEVudkVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFCCwoJX3BsYXRmb3JtQgcKBV9hcmNoQhYKFF9zdHVkaW9fY29udGVudF9wYXRoIiIKElByb2Nlc3NFeGl0UmVxdWVzdBIMCgRjb2RlGAEgASgFImIKEVByb2Nlc3NSdW5SZXF1ZXN0EgwKBGFyZ3MYASADKAkSMwoHb3B0aW9ucxgCIAEoCzIdLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc09wdGlvbnNIAIgBAUIKCghfb3B0aW9ucyJMChJQcm9jZXNzUnVuUmVzcG9uc2USCgoCb2sYASABKAgSEAoIZXhpdGNvZGUYAiABKAUSCwoDb3V0GAMgASgJEgsKA2VychgEIAEoCSJoChRQcm9jZXNzU3lzdGVtUmVxdWVzdBIPCgdjb21tYW5kGAEgASgJEjMKB29wdGlvbnMYAiABKAsyHS5yb2Rlby5ydW50aW1lLlByb2Nlc3NPcHRpb25zSACIAQFCCgoIX29wdGlvbnMiZQoUUHJvY2Vzc0NyZWF0ZVJlcXVlc3QSDAoEYXJncxgBIAMoCRIzCgdvcHRpb25zGAIgASgLMh0ucm9kZW8ucnVudGltZS5Qcm9jZXNzT3B0aW9uc0gAiAEBQgoKCF9vcHRpb25zIqwBChVQcm9jZXNzQ3JlYXRlUmVzcG9uc2USCwoDcGlkGAEgASgJEhkKDHN0ZGluX2hhbmRsZRgCIAEoCUgAiAEBEhoKDXN0ZG91dF9oYW5kbGUYAyABKAlIAYgBARIaCg1zdGRlcnJfaGFuZGxlGAQgASgJSAKIAQFCDwoNX3N0ZGluX2hhbmRsZUIQCg5fc3Rkb3V0X2hhbmRsZUIQCg5fc3RkZXJyX2hhbmRsZSImChdQcm9jZXNzUnVuSGFuZGxlUmVxdWVzdBILCgNwaWQYASABKAkiIQoSUHJvY2Vzc0tpbGxSZXF1ZXN0EgsKA3BpZBgBIAEoCSJNCg5NY3BDYWxsUmVxdWVzdBIMCgR0b29sGAEgASgJEhYKDmFyZ3VtZW50c19qc29uGAIgASgJEhUKDW1jcF9zdHVkaW9faWQYAyABKAkiIQoPTWNwQ2FsbFJlc3BvbnNlEg4KBnJlc3VsdBgBIAEoCSKvCgoNQ2xpZW50UnBjQ2FsbBIKCgJpZBgBIAEoCRIUCgxleGVjdXRpb25faWQYAiABKAkSMwoJZnNfZXhpc3RzGAogASgLMh4ucm9kZW8ucnVudGltZS5Gc0V4aXN0c1JlcXVlc3RIABIvCgdmc19zdGF0GAsgASgLMhwucm9kZW8ucnVudGltZS5Gc1N0YXRSZXF1ZXN0SAASLwoHZnNfdHlwZRgMIAEoCzIcLnJvZGVvLnJ1bnRpbWUuRnNUeXBlUmVxdWVzdEgAEjEKCGZzX21rZGlyGA0gASgLMh0ucm9kZW8ucnVudGltZS5Gc01rZGlyUmVxdWVzdEgAEjUKCmZzX2xpc3RkaXIYDiABKAsyHy5yb2Rlby5ydW50aW1lLkZzTGlzdGRpclJlcXVlc3RIABIzCglmc19yZW1vdmUYDyABKAsyHi5yb2Rlby5ydW50aW1lLkZzUmVtb3ZlUmVxdWVzdEgAEjEKCGZzX3JtZGlyGBAgASgLMh0ucm9kZW8ucnVudGltZS5Gc1JtZGlyUmVxdWVzdEgAEi8KB2ZzX2NvcHkYESABKAsyHC5yb2Rlby5ydW50aW1lLkZzQ29weVJlcXVlc3RIABI3CgtzdHJlYW1fb3BlbhgUIAEoCzIgLnJvZGVvLnJ1bnRpbWUuU3RyZWFtT3BlblJlcXVlc3RIABJCChFzdHJlYW1fcmVhZF9jaHVuaxgVIAEoCzIlLnJvZGVvLnJ1bnRpbWUuU3RyZWFtUmVhZENodW5rUmVxdWVzdEgAEkAKEHN0cmVhbV9yZWFkX2xpbmUYFiABKAsyJC5yb2Rlby5ydW50aW1lLlN0cmVhbVJlYWRMaW5lUmVxdWVzdEgAEj4KD3N0cmVhbV9yZWFkX2FsbBgXIAEoCzIjLnJvZGVvLnJ1bnRpbWUuU3RyZWFtUmVhZEFsbFJlcXVlc3RIABI5CgxzdHJlYW1fd3JpdGUYGCABKAsyIS5yb2Rlby5ydW50aW1lLlN0cmVhbVdyaXRlUmVxdWVzdEgAEjkKDHN0cmVhbV9jbG9zZRgZIAEoCzIhLnJvZGVvLnJ1bnRpbWUuU3RyZWFtQ2xvc2VSZXF1ZXN0SAASQAoQcHJvY2Vzc19nZXRfaW5mbxgeIAEoCzIkLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc0dldEluZm9SZXF1ZXN0SAASOQoMcHJvY2Vzc19leGl0GB8gASgLMiEucm9kZW8ucnVudGltZS5Qcm9jZXNzRXhpdFJlcXVlc3RIABI3Cgtwcm9jZXNzX3J1bhggIAEoCzIgLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc1J1blJlcXVlc3RIABI9Cg5wcm9jZXNzX3N5c3RlbRghIAEoCzIjLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc1N5c3RlbVJlcXVlc3RIABI9Cg5wcm9jZXNzX2NyZWF0ZRgiIAEoCzIjLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc0NyZWF0ZVJlcXVlc3RIABJEChJwcm9jZXNzX3J1bl9oYW5kbGUYIyABKAsyJi5yb2Rlby5ydW50aW1lLlByb2Nlc3NSdW5IYW5kbGVSZXF1ZXN0SAASOQoMcHJvY2Vzc19raWxsGCQgASgLMiEucm9kZW8ucnVudGltZS5Qcm9jZXNzS2lsbFJlcXVlc3RIABIxCghtY3BfY2FsbBgoIAEoCzIdLnJvZGVvLnJ1bnRpbWUuTWNwQ2FsbFJlcXVlc3RIAEIFCgNyZXEi2QkKEUNsaWVudFJwY1Jlc3BvbnNlEgoKAmlkGAEgASgJEhQKDGV4ZWN1dGlvbl9pZBgCIAEoCRIPCgVlcnJvchgDIAEoCUgAEjQKCWZzX2V4aXN0cxgKIAEoCzIfLnJvZGVvLnJ1bnRpbWUuRnNFeGlzdHNSZXNwb25zZUgAEjAKB2ZzX3N0YXQYCyABKAsyHS5yb2Rlby5ydW50aW1lLkZzU3RhdFJlc3BvbnNlSAASMAoHZnNfdHlwZRgMIAEoCzIdLnJvZGVvLnJ1bnRpbWUuRnNUeXBlUmVzcG9uc2VIABIlCghmc19ta2RpchgNIAEoCzIRLnJvZGVvLnJ1bnRpbWUuT2tIABI2Cgpmc19saXN0ZGlyGA4gASgLMiAucm9kZW8ucnVudGltZS5Gc0xpc3RkaXJSZXNwb25zZUgAEiYKCWZzX3JlbW92ZRgPIAEoCzIRLnJvZGVvLnJ1bnRpbWUuT2tIABIlCghmc19ybWRpchgQIAEoCzIRLnJvZGVvLnJ1bnRpbWUuT2tIABIkCgdmc19jb3B5GBEgASgLMhEucm9kZW8ucnVudGltZS5Pa0gAEjgKC3N0cmVhbV9vcGVuGBQgASgLMiEucm9kZW8ucnVudGltZS5TdHJlYW1PcGVuUmVzcG9uc2VIABJDChFzdHJlYW1fcmVhZF9jaHVuaxgVIAEoCzImLnJvZGVvLnJ1bnRpbWUuU3RyZWFtUmVhZENodW5rUmVzcG9uc2VIABJBChBzdHJlYW1fcmVhZF9saW5lGBYgASgLMiUucm9kZW8ucnVudGltZS5TdHJlYW1SZWFkTGluZVJlc3BvbnNlSAASPwoPc3RyZWFtX3JlYWRfYWxsGBcgASgLMiQucm9kZW8ucnVudGltZS5TdHJlYW1SZWFkQWxsUmVzcG9uc2VIABIpCgxzdHJlYW1fd3JpdGUYGCABKAsyES5yb2Rlby5ydW50aW1lLk9rSAASKQoMc3RyZWFtX2Nsb3NlGBkgASgLMhEucm9kZW8ucnVudGltZS5Pa0gAEkEKEHByb2Nlc3NfZ2V0X2luZm8YHiABKAsyJS5yb2Rlby5ydW50aW1lLlByb2Nlc3NHZXRJbmZvUmVzcG9uc2VIABIpCgxwcm9jZXNzX2V4aXQYHyABKAsyES5yb2Rlby5ydW50aW1lLk9rSAASOAoLcHJvY2Vzc19ydW4YICABKAsyIS5yb2Rlby5ydW50aW1lLlByb2Nlc3NSdW5SZXNwb25zZUgAEjsKDnByb2Nlc3Nfc3lzdGVtGCEgASgLMiEucm9kZW8ucnVudGltZS5Qcm9jZXNzUnVuUmVzcG9uc2VIABI+Cg5wcm9jZXNzX2NyZWF0ZRgiIAEoCzIkLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc0NyZWF0ZVJlc3BvbnNlSAASPwoScHJvY2Vzc19ydW5faGFuZGxlGCMgASgLMiEucm9kZW8ucnVudGltZS5Qcm9jZXNzUnVuUmVzcG9uc2VIABIpCgxwcm9jZXNzX2tpbGwYJCABKAsyES5yb2Rlby5ydW50aW1lLk9rSAASMgoIbWNwX2NhbGwYKCABKAsyHi5yb2Rlby5ydW50aW1lLk1jcENhbGxSZXNwb25zZUgAQgUKA3Jlc2IGcHJvdG8z");
+  fileDesc("Cg1ydW50aW1lLnByb3RvEg1yb2Rlby5ydW50aW1lIgQKAk9rIj8KEVN0cmVhbU9wZW5SZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCRIMCgRwYXRoGAIgASgJEgwKBG1vZGUYAyABKAkiJAoSU3RyZWFtT3BlblJlc3BvbnNlEg4KBmhhbmRsZRgBIAEoCSJEChZTdHJlYW1SZWFkQ2h1bmtSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCRIRCgRzaXplGAIgASgNSACIAQFCBwoFX3NpemUiNAoXU3RyZWFtUmVhZENodW5rUmVzcG9uc2USDAoEZGF0YRgBIAEoCRILCgNlb2YYAiABKAgiJwoVU3RyZWFtUmVhZExpbmVSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCSIzChZTdHJlYW1SZWFkTGluZVJlc3BvbnNlEgwKBGRhdGEYASABKAkSCwoDZW9mGAIgASgIIiYKFFN0cmVhbVJlYWRBbGxSZXF1ZXN0Eg4KBmhhbmRsZRgBIAEoCSIlChVTdHJlYW1SZWFkQWxsUmVzcG9uc2USDAoEZGF0YRgBIAEoCSIyChJTdHJlYW1Xcml0ZVJlcXVlc3QSDgoGaGFuZGxlGAEgASgJEgwKBGRhdGEYAiABKAkiKAoWU3RyZWFtUmVhZEJ5dGVzUmVxdWVzdBIOCgZoYW5kbGUYASABKAkiJwoXU3RyZWFtUmVhZEJ5dGVzUmVzcG9uc2USDAoEZGF0YRgBIAEoDCI3ChdTdHJlYW1Xcml0ZUJ5dGVzUmVxdWVzdBIOCgZoYW5kbGUYASABKAkSDAoEZGF0YRgCIAEoDCIkChJTdHJlYW1DbG9zZVJlcXVlc3QSDgoGaGFuZGxlGAEgASgJIjEKE1JvYmxveEV4cG9ydFJlcXVlc3QSDAoEcGF0aBgBIAEoCRIMCgRkYXRhGAIgASgMIh8KD0ZzRXhpc3RzUmVxdWVzdBIMCgRwYXRoGAEgASgJIiIKEEZzRXhpc3RzUmVzcG9uc2USDgoGZXhpc3RzGAEgASgIIh0KDUZzU3RhdFJlcXVlc3QSDAoEcGF0aBgBIAEoCSLAAQoORnNTdGF0UmVzcG9uc2USDAoEdHlwZRgBIAEoCRIMCgRzaXplGAIgASgDEhsKDmNyZWF0ZWRfbWlsbGlzGAMgASgDSACIAQESHAoPbW9kaWZpZWRfbWlsbGlzGAQgASgDSAGIAQESHAoPYWNjZXNzZWRfbWlsbGlzGAUgASgDSAKIAQFCEQoPX2NyZWF0ZWRfbWlsbGlzQhIKEF9tb2RpZmllZF9taWxsaXNCEgoQX2FjY2Vzc2VkX21pbGxpcyIdCg1Gc1R5cGVSZXF1ZXN0EgwKBHBhdGgYASABKAkiLAoORnNUeXBlUmVzcG9uc2USEQoEdHlwZRgBIAEoCUgAiAEBQgcKBV90eXBlIh4KDkZzTWtkaXJSZXF1ZXN0EgwKBHBhdGgYASABKAkiIAoQRnNMaXN0ZGlyUmVxdWVzdBIMCgRwYXRoGAEgASgJIj8KEUZzTGlzdGRpclJlc3BvbnNlEioKB2VudHJpZXMYASADKAsyGS5yb2Rlby5ydW50aW1lLkZzRGlyRW50cnkiKAoKRnNEaXJFbnRyeRIMCgRuYW1lGAEgASgJEgwKBHR5cGUYAiABKAkiHwoPRnNSZW1vdmVSZXF1ZXN0EgwKBHBhdGgYASABKAkiHgoORnNSbWRpclJlcXVlc3QSDAoEcGF0aBgBIAEoCSIqCg1Gc0NvcHlSZXF1ZXN0EgsKA3NyYxgBIAEoCRIMCgRkZXN0GAIgASgJIkgKDlByb2Nlc3NPcHRpb25zEhAKA2N3ZBgBIAEoCUgAiAEBEhIKBXN0ZGlvGAIgASgJSAGIAQFCBgoEX2N3ZEIICgZfc3RkaW8iFwoVUHJvY2Vzc0dldEluZm9SZXF1ZXN0IqsCChZQcm9jZXNzR2V0SW5mb1Jlc3BvbnNlEgsKA2N3ZBgBIAEoCRIPCgdob21lZGlyGAIgASgJEhAKCGV4ZWNwYXRoGAMgASgJEjsKA2VudhgEIAMoCzIuLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc0dldEluZm9SZXNwb25zZS5FbnZFbnRyeRIVCghwbGF0Zm9ybRgFIAEoCUgAiAEBEhEKBGFyY2gYBiABKAlIAYgBARIgChNzdHVkaW9fY29udGVudF9wYXRoGAcgASgJSAKIAQEaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUILCglfcGxhdGZvcm1CBwoFX2FyY2hCFgoUX3N0dWRpb19jb250ZW50X3BhdGgiIgoSUHJvY2Vzc0V4aXRSZXF1ZXN0EgwKBGNvZGUYASABKAUiYgoRUHJvY2Vzc1J1blJlcXVlc3QSDAoEYXJncxgBIAMoCRIzCgdvcHRpb25zGAIgASgLMh0ucm9kZW8ucnVudGltZS5Qcm9jZXNzT3B0aW9uc0gAiAEBQgoKCF9vcHRpb25zIkwKElByb2Nlc3NSdW5SZXNwb25zZRIKCgJvaxgBIAEoCBIQCghleGl0Y29kZRgCIAEoBRILCgNvdXQYAyABKAkSCwoDZXJyGAQgASgJImgKFFByb2Nlc3NTeXN0ZW1SZXF1ZXN0Eg8KB2NvbW1hbmQYASABKAkSMwoHb3B0aW9ucxgCIAEoCzIdLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc09wdGlvbnNIAIgBAUIKCghfb3B0aW9ucyJlChRQcm9jZXNzQ3JlYXRlUmVxdWVzdBIMCgRhcmdzGAEgAygJEjMKB29wdGlvbnMYAiABKAsyHS5yb2Rlby5ydW50aW1lLlByb2Nlc3NPcHRpb25zSACIAQFCCgoIX29wdGlvbnMirAEKFVByb2Nlc3NDcmVhdGVSZXNwb25zZRILCgNwaWQYASABKAkSGQoMc3RkaW5faGFuZGxlGAIgASgJSACIAQESGgoNc3Rkb3V0X2hhbmRsZRgDIAEoCUgBiAEBEhoKDXN0ZGVycl9oYW5kbGUYBCABKAlIAogBAUIPCg1fc3RkaW5faGFuZGxlQhAKDl9zdGRvdXRfaGFuZGxlQhAKDl9zdGRlcnJfaGFuZGxlIiYKF1Byb2Nlc3NSdW5IYW5kbGVSZXF1ZXN0EgsKA3BpZBgBIAEoCSIhChJQcm9jZXNzS2lsbFJlcXVlc3QSCwoDcGlkGAEgASgJIk0KDk1jcENhbGxSZXF1ZXN0EgwKBHRvb2wYASABKAkSFgoOYXJndW1lbnRzX2pzb24YAiABKAkSFQoNbWNwX3N0dWRpb19pZBgDIAEoCSIhCg9NY3BDYWxsUmVzcG9uc2USDgoGcmVzdWx0GAEgASgJIvYLCg1DbGllbnRScGNDYWxsEgoKAmlkGAEgASgJEhQKDGV4ZWN1dGlvbl9pZBgCIAEoCRIzCglmc19leGlzdHMYCiABKAsyHi5yb2Rlby5ydW50aW1lLkZzRXhpc3RzUmVxdWVzdEgAEi8KB2ZzX3N0YXQYCyABKAsyHC5yb2Rlby5ydW50aW1lLkZzU3RhdFJlcXVlc3RIABIvCgdmc190eXBlGAwgASgLMhwucm9kZW8ucnVudGltZS5Gc1R5cGVSZXF1ZXN0SAASMQoIZnNfbWtkaXIYDSABKAsyHS5yb2Rlby5ydW50aW1lLkZzTWtkaXJSZXF1ZXN0SAASNQoKZnNfbGlzdGRpchgOIAEoCzIfLnJvZGVvLnJ1bnRpbWUuRnNMaXN0ZGlyUmVxdWVzdEgAEjMKCWZzX3JlbW92ZRgPIAEoCzIeLnJvZGVvLnJ1bnRpbWUuRnNSZW1vdmVSZXF1ZXN0SAASMQoIZnNfcm1kaXIYECABKAsyHS5yb2Rlby5ydW50aW1lLkZzUm1kaXJSZXF1ZXN0SAASLwoHZnNfY29weRgRIAEoCzIcLnJvZGVvLnJ1bnRpbWUuRnNDb3B5UmVxdWVzdEgAEjcKC3N0cmVhbV9vcGVuGBQgASgLMiAucm9kZW8ucnVudGltZS5TdHJlYW1PcGVuUmVxdWVzdEgAEkIKEXN0cmVhbV9yZWFkX2NodW5rGBUgASgLMiUucm9kZW8ucnVudGltZS5TdHJlYW1SZWFkQ2h1bmtSZXF1ZXN0SAASQAoQc3RyZWFtX3JlYWRfbGluZRgWIAEoCzIkLnJvZGVvLnJ1bnRpbWUuU3RyZWFtUmVhZExpbmVSZXF1ZXN0SAASPgoPc3RyZWFtX3JlYWRfYWxsGBcgASgLMiMucm9kZW8ucnVudGltZS5TdHJlYW1SZWFkQWxsUmVxdWVzdEgAEjkKDHN0cmVhbV93cml0ZRgYIAEoCzIhLnJvZGVvLnJ1bnRpbWUuU3RyZWFtV3JpdGVSZXF1ZXN0SAASOQoMc3RyZWFtX2Nsb3NlGBkgASgLMiEucm9kZW8ucnVudGltZS5TdHJlYW1DbG9zZVJlcXVlc3RIABJCChFzdHJlYW1fcmVhZF9ieXRlcxgaIAEoCzIlLnJvZGVvLnJ1bnRpbWUuU3RyZWFtUmVhZEJ5dGVzUmVxdWVzdEgAEkQKEnN0cmVhbV93cml0ZV9ieXRlcxgbIAEoCzImLnJvZGVvLnJ1bnRpbWUuU3RyZWFtV3JpdGVCeXRlc1JlcXVlc3RIABJAChBwcm9jZXNzX2dldF9pbmZvGB4gASgLMiQucm9kZW8ucnVudGltZS5Qcm9jZXNzR2V0SW5mb1JlcXVlc3RIABI5Cgxwcm9jZXNzX2V4aXQYHyABKAsyIS5yb2Rlby5ydW50aW1lLlByb2Nlc3NFeGl0UmVxdWVzdEgAEjcKC3Byb2Nlc3NfcnVuGCAgASgLMiAucm9kZW8ucnVudGltZS5Qcm9jZXNzUnVuUmVxdWVzdEgAEj0KDnByb2Nlc3Nfc3lzdGVtGCEgASgLMiMucm9kZW8ucnVudGltZS5Qcm9jZXNzU3lzdGVtUmVxdWVzdEgAEj0KDnByb2Nlc3NfY3JlYXRlGCIgASgLMiMucm9kZW8ucnVudGltZS5Qcm9jZXNzQ3JlYXRlUmVxdWVzdEgAEkQKEnByb2Nlc3NfcnVuX2hhbmRsZRgjIAEoCzImLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc1J1bkhhbmRsZVJlcXVlc3RIABI5Cgxwcm9jZXNzX2tpbGwYJCABKAsyIS5yb2Rlby5ydW50aW1lLlByb2Nlc3NLaWxsUmVxdWVzdEgAEjEKCG1jcF9jYWxsGCggASgLMh0ucm9kZW8ucnVudGltZS5NY3BDYWxsUmVxdWVzdEgAEjsKDXJvYmxveF9leHBvcnQYMiABKAsyIi5yb2Rlby5ydW50aW1lLlJvYmxveEV4cG9ydFJlcXVlc3RIAEIFCgNyZXEi+woKEUNsaWVudFJwY1Jlc3BvbnNlEgoKAmlkGAEgASgJEhQKDGV4ZWN1dGlvbl9pZBgCIAEoCRIPCgVlcnJvchgDIAEoCUgAEjQKCWZzX2V4aXN0cxgKIAEoCzIfLnJvZGVvLnJ1bnRpbWUuRnNFeGlzdHNSZXNwb25zZUgAEjAKB2ZzX3N0YXQYCyABKAsyHS5yb2Rlby5ydW50aW1lLkZzU3RhdFJlc3BvbnNlSAASMAoHZnNfdHlwZRgMIAEoCzIdLnJvZGVvLnJ1bnRpbWUuRnNUeXBlUmVzcG9uc2VIABIlCghmc19ta2RpchgNIAEoCzIRLnJvZGVvLnJ1bnRpbWUuT2tIABI2Cgpmc19saXN0ZGlyGA4gASgLMiAucm9kZW8ucnVudGltZS5Gc0xpc3RkaXJSZXNwb25zZUgAEiYKCWZzX3JlbW92ZRgPIAEoCzIRLnJvZGVvLnJ1bnRpbWUuT2tIABIlCghmc19ybWRpchgQIAEoCzIRLnJvZGVvLnJ1bnRpbWUuT2tIABIkCgdmc19jb3B5GBEgASgLMhEucm9kZW8ucnVudGltZS5Pa0gAEjgKC3N0cmVhbV9vcGVuGBQgASgLMiEucm9kZW8ucnVudGltZS5TdHJlYW1PcGVuUmVzcG9uc2VIABJDChFzdHJlYW1fcmVhZF9jaHVuaxgVIAEoCzImLnJvZGVvLnJ1bnRpbWUuU3RyZWFtUmVhZENodW5rUmVzcG9uc2VIABJBChBzdHJlYW1fcmVhZF9saW5lGBYgASgLMiUucm9kZW8ucnVudGltZS5TdHJlYW1SZWFkTGluZVJlc3BvbnNlSAASPwoPc3RyZWFtX3JlYWRfYWxsGBcgASgLMiQucm9kZW8ucnVudGltZS5TdHJlYW1SZWFkQWxsUmVzcG9uc2VIABIpCgxzdHJlYW1fd3JpdGUYGCABKAsyES5yb2Rlby5ydW50aW1lLk9rSAASKQoMc3RyZWFtX2Nsb3NlGBkgASgLMhEucm9kZW8ucnVudGltZS5Pa0gAEkMKEXN0cmVhbV9yZWFkX2J5dGVzGBogASgLMiYucm9kZW8ucnVudGltZS5TdHJlYW1SZWFkQnl0ZXNSZXNwb25zZUgAEi8KEnN0cmVhbV93cml0ZV9ieXRlcxgbIAEoCzIRLnJvZGVvLnJ1bnRpbWUuT2tIABJBChBwcm9jZXNzX2dldF9pbmZvGB4gASgLMiUucm9kZW8ucnVudGltZS5Qcm9jZXNzR2V0SW5mb1Jlc3BvbnNlSAASKQoMcHJvY2Vzc19leGl0GB8gASgLMhEucm9kZW8ucnVudGltZS5Pa0gAEjgKC3Byb2Nlc3NfcnVuGCAgASgLMiEucm9kZW8ucnVudGltZS5Qcm9jZXNzUnVuUmVzcG9uc2VIABI7Cg5wcm9jZXNzX3N5c3RlbRghIAEoCzIhLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc1J1blJlc3BvbnNlSAASPgoOcHJvY2Vzc19jcmVhdGUYIiABKAsyJC5yb2Rlby5ydW50aW1lLlByb2Nlc3NDcmVhdGVSZXNwb25zZUgAEj8KEnByb2Nlc3NfcnVuX2hhbmRsZRgjIAEoCzIhLnJvZGVvLnJ1bnRpbWUuUHJvY2Vzc1J1blJlc3BvbnNlSAASKQoMcHJvY2Vzc19raWxsGCQgASgLMhEucm9kZW8ucnVudGltZS5Pa0gAEjIKCG1jcF9jYWxsGCggASgLMh4ucm9kZW8ucnVudGltZS5NY3BDYWxsUmVzcG9uc2VIABIqCg1yb2Jsb3hfZXhwb3J0GDIgASgLMhEucm9kZW8ucnVudGltZS5Pa0gAQgUKA3Jlc2IGcHJvdG8z");
 
 /**
  * @generated from message rodeo.runtime.Ok
@@ -213,6 +213,62 @@ export const StreamWriteRequestSchema: GenMessage<StreamWriteRequest> = /*@__PUR
   messageDesc(file_runtime, 9);
 
 /**
+ * @generated from message rodeo.runtime.StreamReadBytesRequest
+ */
+export type StreamReadBytesRequest = Message<"rodeo.runtime.StreamReadBytesRequest"> & {
+  /**
+   * @generated from field: string handle = 1;
+   */
+  handle: string;
+};
+
+/**
+ * Describes the message rodeo.runtime.StreamReadBytesRequest.
+ * Use `create(StreamReadBytesRequestSchema)` to create a new message.
+ */
+export const StreamReadBytesRequestSchema: GenMessage<StreamReadBytesRequest> = /*@__PURE__*/
+  messageDesc(file_runtime, 10);
+
+/**
+ * @generated from message rodeo.runtime.StreamReadBytesResponse
+ */
+export type StreamReadBytesResponse = Message<"rodeo.runtime.StreamReadBytesResponse"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message rodeo.runtime.StreamReadBytesResponse.
+ * Use `create(StreamReadBytesResponseSchema)` to create a new message.
+ */
+export const StreamReadBytesResponseSchema: GenMessage<StreamReadBytesResponse> = /*@__PURE__*/
+  messageDesc(file_runtime, 11);
+
+/**
+ * @generated from message rodeo.runtime.StreamWriteBytesRequest
+ */
+export type StreamWriteBytesRequest = Message<"rodeo.runtime.StreamWriteBytesRequest"> & {
+  /**
+   * @generated from field: string handle = 1;
+   */
+  handle: string;
+
+  /**
+   * @generated from field: bytes data = 2;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message rodeo.runtime.StreamWriteBytesRequest.
+ * Use `create(StreamWriteBytesRequestSchema)` to create a new message.
+ */
+export const StreamWriteBytesRequestSchema: GenMessage<StreamWriteBytesRequest> = /*@__PURE__*/
+  messageDesc(file_runtime, 12);
+
+/**
  * @generated from message rodeo.runtime.StreamCloseRequest
  */
 export type StreamCloseRequest = Message<"rodeo.runtime.StreamCloseRequest"> & {
@@ -227,7 +283,31 @@ export type StreamCloseRequest = Message<"rodeo.runtime.StreamCloseRequest"> & {
  * Use `create(StreamCloseRequestSchema)` to create a new message.
  */
 export const StreamCloseRequestSchema: GenMessage<StreamCloseRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 10);
+  messageDesc(file_runtime, 13);
+
+/**
+ * @generated from message rodeo.runtime.RobloxExportRequest
+ */
+export type RobloxExportRequest = Message<"rodeo.runtime.RobloxExportRequest"> & {
+  /**
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * binary bytes from SerializeInstancesAsync
+   *
+   * @generated from field: bytes data = 2;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message rodeo.runtime.RobloxExportRequest.
+ * Use `create(RobloxExportRequestSchema)` to create a new message.
+ */
+export const RobloxExportRequestSchema: GenMessage<RobloxExportRequest> = /*@__PURE__*/
+  messageDesc(file_runtime, 14);
 
 /**
  * @generated from message rodeo.runtime.FsExistsRequest
@@ -244,7 +324,7 @@ export type FsExistsRequest = Message<"rodeo.runtime.FsExistsRequest"> & {
  * Use `create(FsExistsRequestSchema)` to create a new message.
  */
 export const FsExistsRequestSchema: GenMessage<FsExistsRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 11);
+  messageDesc(file_runtime, 15);
 
 /**
  * @generated from message rodeo.runtime.FsExistsResponse
@@ -261,7 +341,7 @@ export type FsExistsResponse = Message<"rodeo.runtime.FsExistsResponse"> & {
  * Use `create(FsExistsResponseSchema)` to create a new message.
  */
 export const FsExistsResponseSchema: GenMessage<FsExistsResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 12);
+  messageDesc(file_runtime, 16);
 
 /**
  * @generated from message rodeo.runtime.FsStatRequest
@@ -278,7 +358,7 @@ export type FsStatRequest = Message<"rodeo.runtime.FsStatRequest"> & {
  * Use `create(FsStatRequestSchema)` to create a new message.
  */
 export const FsStatRequestSchema: GenMessage<FsStatRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 13);
+  messageDesc(file_runtime, 17);
 
 /**
  * Timestamps are milliseconds since UNIX epoch. Unit is in the field name
@@ -321,7 +401,7 @@ export type FsStatResponse = Message<"rodeo.runtime.FsStatResponse"> & {
  * Use `create(FsStatResponseSchema)` to create a new message.
  */
 export const FsStatResponseSchema: GenMessage<FsStatResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 14);
+  messageDesc(file_runtime, 18);
 
 /**
  * @generated from message rodeo.runtime.FsTypeRequest
@@ -338,7 +418,7 @@ export type FsTypeRequest = Message<"rodeo.runtime.FsTypeRequest"> & {
  * Use `create(FsTypeRequestSchema)` to create a new message.
  */
 export const FsTypeRequestSchema: GenMessage<FsTypeRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 15);
+  messageDesc(file_runtime, 19);
 
 /**
  * @generated from message rodeo.runtime.FsTypeResponse
@@ -357,7 +437,7 @@ export type FsTypeResponse = Message<"rodeo.runtime.FsTypeResponse"> & {
  * Use `create(FsTypeResponseSchema)` to create a new message.
  */
 export const FsTypeResponseSchema: GenMessage<FsTypeResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 16);
+  messageDesc(file_runtime, 20);
 
 /**
  * @generated from message rodeo.runtime.FsMkdirRequest
@@ -374,7 +454,7 @@ export type FsMkdirRequest = Message<"rodeo.runtime.FsMkdirRequest"> & {
  * Use `create(FsMkdirRequestSchema)` to create a new message.
  */
 export const FsMkdirRequestSchema: GenMessage<FsMkdirRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 17);
+  messageDesc(file_runtime, 21);
 
 /**
  * @generated from message rodeo.runtime.FsListdirRequest
@@ -391,7 +471,7 @@ export type FsListdirRequest = Message<"rodeo.runtime.FsListdirRequest"> & {
  * Use `create(FsListdirRequestSchema)` to create a new message.
  */
 export const FsListdirRequestSchema: GenMessage<FsListdirRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 18);
+  messageDesc(file_runtime, 22);
 
 /**
  * @generated from message rodeo.runtime.FsListdirResponse
@@ -408,7 +488,7 @@ export type FsListdirResponse = Message<"rodeo.runtime.FsListdirResponse"> & {
  * Use `create(FsListdirResponseSchema)` to create a new message.
  */
 export const FsListdirResponseSchema: GenMessage<FsListdirResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 19);
+  messageDesc(file_runtime, 23);
 
 /**
  * @generated from message rodeo.runtime.FsDirEntry
@@ -432,7 +512,7 @@ export type FsDirEntry = Message<"rodeo.runtime.FsDirEntry"> & {
  * Use `create(FsDirEntrySchema)` to create a new message.
  */
 export const FsDirEntrySchema: GenMessage<FsDirEntry> = /*@__PURE__*/
-  messageDesc(file_runtime, 20);
+  messageDesc(file_runtime, 24);
 
 /**
  * @generated from message rodeo.runtime.FsRemoveRequest
@@ -449,7 +529,7 @@ export type FsRemoveRequest = Message<"rodeo.runtime.FsRemoveRequest"> & {
  * Use `create(FsRemoveRequestSchema)` to create a new message.
  */
 export const FsRemoveRequestSchema: GenMessage<FsRemoveRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 21);
+  messageDesc(file_runtime, 25);
 
 /**
  * @generated from message rodeo.runtime.FsRmdirRequest
@@ -466,7 +546,7 @@ export type FsRmdirRequest = Message<"rodeo.runtime.FsRmdirRequest"> & {
  * Use `create(FsRmdirRequestSchema)` to create a new message.
  */
 export const FsRmdirRequestSchema: GenMessage<FsRmdirRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 22);
+  messageDesc(file_runtime, 26);
 
 /**
  * @generated from message rodeo.runtime.FsCopyRequest
@@ -488,7 +568,7 @@ export type FsCopyRequest = Message<"rodeo.runtime.FsCopyRequest"> & {
  * Use `create(FsCopyRequestSchema)` to create a new message.
  */
 export const FsCopyRequestSchema: GenMessage<FsCopyRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 23);
+  messageDesc(file_runtime, 27);
 
 /**
  * @generated from message rodeo.runtime.ProcessOptions
@@ -512,7 +592,7 @@ export type ProcessOptions = Message<"rodeo.runtime.ProcessOptions"> & {
  * Use `create(ProcessOptionsSchema)` to create a new message.
  */
 export const ProcessOptionsSchema: GenMessage<ProcessOptions> = /*@__PURE__*/
-  messageDesc(file_runtime, 24);
+  messageDesc(file_runtime, 28);
 
 /**
  * @generated from message rodeo.runtime.ProcessGetInfoRequest
@@ -525,7 +605,7 @@ export type ProcessGetInfoRequest = Message<"rodeo.runtime.ProcessGetInfoRequest
  * Use `create(ProcessGetInfoRequestSchema)` to create a new message.
  */
 export const ProcessGetInfoRequestSchema: GenMessage<ProcessGetInfoRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 25);
+  messageDesc(file_runtime, 29);
 
 /**
  * @generated from message rodeo.runtime.ProcessGetInfoResponse
@@ -572,7 +652,7 @@ export type ProcessGetInfoResponse = Message<"rodeo.runtime.ProcessGetInfoRespon
  * Use `create(ProcessGetInfoResponseSchema)` to create a new message.
  */
 export const ProcessGetInfoResponseSchema: GenMessage<ProcessGetInfoResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 26);
+  messageDesc(file_runtime, 30);
 
 /**
  * @generated from message rodeo.runtime.ProcessExitRequest
@@ -589,7 +669,7 @@ export type ProcessExitRequest = Message<"rodeo.runtime.ProcessExitRequest"> & {
  * Use `create(ProcessExitRequestSchema)` to create a new message.
  */
 export const ProcessExitRequestSchema: GenMessage<ProcessExitRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 27);
+  messageDesc(file_runtime, 31);
 
 /**
  * @generated from message rodeo.runtime.ProcessRunRequest
@@ -611,7 +691,7 @@ export type ProcessRunRequest = Message<"rodeo.runtime.ProcessRunRequest"> & {
  * Use `create(ProcessRunRequestSchema)` to create a new message.
  */
 export const ProcessRunRequestSchema: GenMessage<ProcessRunRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 28);
+  messageDesc(file_runtime, 32);
 
 /**
  * @generated from message rodeo.runtime.ProcessRunResponse
@@ -643,7 +723,7 @@ export type ProcessRunResponse = Message<"rodeo.runtime.ProcessRunResponse"> & {
  * Use `create(ProcessRunResponseSchema)` to create a new message.
  */
 export const ProcessRunResponseSchema: GenMessage<ProcessRunResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 29);
+  messageDesc(file_runtime, 33);
 
 /**
  * @generated from message rodeo.runtime.ProcessSystemRequest
@@ -665,7 +745,7 @@ export type ProcessSystemRequest = Message<"rodeo.runtime.ProcessSystemRequest">
  * Use `create(ProcessSystemRequestSchema)` to create a new message.
  */
 export const ProcessSystemRequestSchema: GenMessage<ProcessSystemRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 30);
+  messageDesc(file_runtime, 34);
 
 /**
  * @generated from message rodeo.runtime.ProcessCreateRequest
@@ -687,7 +767,7 @@ export type ProcessCreateRequest = Message<"rodeo.runtime.ProcessCreateRequest">
  * Use `create(ProcessCreateRequestSchema)` to create a new message.
  */
 export const ProcessCreateRequestSchema: GenMessage<ProcessCreateRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 31);
+  messageDesc(file_runtime, 35);
 
 /**
  * @generated from message rodeo.runtime.ProcessCreateResponse
@@ -719,7 +799,7 @@ export type ProcessCreateResponse = Message<"rodeo.runtime.ProcessCreateResponse
  * Use `create(ProcessCreateResponseSchema)` to create a new message.
  */
 export const ProcessCreateResponseSchema: GenMessage<ProcessCreateResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 32);
+  messageDesc(file_runtime, 36);
 
 /**
  * @generated from message rodeo.runtime.ProcessRunHandleRequest
@@ -736,7 +816,7 @@ export type ProcessRunHandleRequest = Message<"rodeo.runtime.ProcessRunHandleReq
  * Use `create(ProcessRunHandleRequestSchema)` to create a new message.
  */
 export const ProcessRunHandleRequestSchema: GenMessage<ProcessRunHandleRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 33);
+  messageDesc(file_runtime, 37);
 
 /**
  * @generated from message rodeo.runtime.ProcessKillRequest
@@ -753,7 +833,7 @@ export type ProcessKillRequest = Message<"rodeo.runtime.ProcessKillRequest"> & {
  * Use `create(ProcessKillRequestSchema)` to create a new message.
  */
 export const ProcessKillRequestSchema: GenMessage<ProcessKillRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 34);
+  messageDesc(file_runtime, 38);
 
 /**
  * @generated from message rodeo.runtime.McpCallRequest
@@ -780,7 +860,7 @@ export type McpCallRequest = Message<"rodeo.runtime.McpCallRequest"> & {
  * Use `create(McpCallRequestSchema)` to create a new message.
  */
 export const McpCallRequestSchema: GenMessage<McpCallRequest> = /*@__PURE__*/
-  messageDesc(file_runtime, 35);
+  messageDesc(file_runtime, 39);
 
 /**
  * @generated from message rodeo.runtime.McpCallResponse
@@ -797,7 +877,7 @@ export type McpCallResponse = Message<"rodeo.runtime.McpCallResponse"> & {
  * Use `create(McpCallResponseSchema)` to create a new message.
  */
 export const McpCallResponseSchema: GenMessage<McpCallResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 36);
+  messageDesc(file_runtime, 40);
 
 /**
  * @generated from message rodeo.runtime.ClientRpcCall
@@ -906,6 +986,18 @@ export type ClientRpcCall = Message<"rodeo.runtime.ClientRpcCall"> & {
     case: "streamClose";
   } | {
     /**
+     * @generated from field: rodeo.runtime.StreamReadBytesRequest stream_read_bytes = 26;
+     */
+    value: StreamReadBytesRequest;
+    case: "streamReadBytes";
+  } | {
+    /**
+     * @generated from field: rodeo.runtime.StreamWriteBytesRequest stream_write_bytes = 27;
+     */
+    value: StreamWriteBytesRequest;
+    case: "streamWriteBytes";
+  } | {
+    /**
      * process: 30-39
      *
      * @generated from field: rodeo.runtime.ProcessGetInfoRequest process_get_info = 30;
@@ -956,6 +1048,14 @@ export type ClientRpcCall = Message<"rodeo.runtime.ClientRpcCall"> & {
      */
     value: McpCallRequest;
     case: "mcpCall";
+  } | {
+    /**
+     * roblox: 50-59
+     *
+     * @generated from field: rodeo.runtime.RobloxExportRequest roblox_export = 50;
+     */
+    value: RobloxExportRequest;
+    case: "robloxExport";
   } | { case: undefined; value?: undefined };
 };
 
@@ -964,7 +1064,7 @@ export type ClientRpcCall = Message<"rodeo.runtime.ClientRpcCall"> & {
  * Use `create(ClientRpcCallSchema)` to create a new message.
  */
 export const ClientRpcCallSchema: GenMessage<ClientRpcCall> = /*@__PURE__*/
-  messageDesc(file_runtime, 37);
+  messageDesc(file_runtime, 41);
 
 /**
  * @generated from message rodeo.runtime.ClientRpcResponse
@@ -1081,6 +1181,18 @@ export type ClientRpcResponse = Message<"rodeo.runtime.ClientRpcResponse"> & {
     case: "streamClose";
   } | {
     /**
+     * @generated from field: rodeo.runtime.StreamReadBytesResponse stream_read_bytes = 26;
+     */
+    value: StreamReadBytesResponse;
+    case: "streamReadBytes";
+  } | {
+    /**
+     * @generated from field: rodeo.runtime.Ok stream_write_bytes = 27;
+     */
+    value: Ok;
+    case: "streamWriteBytes";
+  } | {
+    /**
      * process: 30-39
      *
      * @generated from field: rodeo.runtime.ProcessGetInfoResponse process_get_info = 30;
@@ -1131,6 +1243,14 @@ export type ClientRpcResponse = Message<"rodeo.runtime.ClientRpcResponse"> & {
      */
     value: McpCallResponse;
     case: "mcpCall";
+  } | {
+    /**
+     * roblox: 50-59
+     *
+     * @generated from field: rodeo.runtime.Ok roblox_export = 50;
+     */
+    value: Ok;
+    case: "robloxExport";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1139,5 +1259,5 @@ export type ClientRpcResponse = Message<"rodeo.runtime.ClientRpcResponse"> & {
  * Use `create(ClientRpcResponseSchema)` to create a new message.
  */
 export const ClientRpcResponseSchema: GenMessage<ClientRpcResponse> = /*@__PURE__*/
-  messageDesc(file_runtime, 38);
+  messageDesc(file_runtime, 42);
 

@@ -6,16 +6,6 @@ use crate::commands::process_source::{self, ProcessedSource};
 use crate::util::config;
 use rodeo_proto as proto;
 
-/// Create a connectrpc MasterService client for the given host/port.
-fn master_client(host: &str, port: u16) -> Result<proto::MasterServiceClient<connectrpc::client::HttpClient>> {
-    let url: http::Uri = format!("http://{host}:{port}")
-        .parse()
-        .context("invalid server URL")?;
-    let http = connectrpc::client::HttpClient::plaintext();
-    let config = connectrpc::client::ClientConfig::new(url);
-    Ok(proto::MasterServiceClient::new(http, config))
-}
-
 /// All run command arguments
 pub struct RunArgs {
     pub script: Option<String>,
@@ -471,29 +461,15 @@ async fn build_launch_request(
     })
 }
 
-/// Launch play server and/or clients based on the target.
-/// Uses HTTP API to check existing state and spawn what's missing.
-/// Handles to play-mode processes, cleaned up on Drop.
-pub struct PlayHandles {
-    server: Option<crate::studio_backend::MultiplayerTestServer>,
-    clients: Vec<crate::studio_backend::MultiplayerTestClient>,
-}
+/// Placeholder retained for the play call sites. Multiplayer-test VMs are now
+/// owned by the studio backend (the edit Studio hosts the in-Studio test via
+/// `StudioTestService:ExecuteMultiplayerTestAsync`), so the CLI holds no process
+/// handles to clean up.
+#[derive(Default)]
+pub struct PlayHandles;
 
 impl PlayHandles {
-    pub fn cleanup(&mut self) {
-        for client in &mut self.clients {
-            client.cleanup();
-        }
-        if let Some(ref mut server) = self.server {
-            server.cleanup();
-        }
-    }
-}
-
-impl Drop for PlayHandles {
-    fn drop(&mut self) {
-        self.cleanup();
-    }
+    pub fn cleanup(&mut self) {}
 }
 
 async fn launch_play_processes(
@@ -507,228 +483,108 @@ async fn launch_play_processes(
     profile: bool,
 ) -> Result<PlayHandles> {
     use crate::shared::target::Dom;
-    use crate::studio_backend::{MultiplayerTestClient, MultiplayerTestClientOptions, PlaceTarget};
+    use crate::studio_backend::PlaceTarget;
+    use rodeo_client::studio::{OpenOpts, OpenFileOpts, OpenPlaceOpts};
 
-    // Check if a play server is already running via the state API
-    let master = master_client(host, port)?;
-    let snapshot = master.get_state(proto::GetStateRequest::default()).await
-        .ok().map(|r| r.into_owned());
-    let has_play_server = snapshot.as_ref().map_or(false, |s| {
-        s.vms.iter().any(|vm| vm.mode.as_deref() == Some("play") && vm.dom.as_deref() == Some("server"))
+    let _ = port;
+    let client = RodeoClient::connect(host, port)?;
+
+    let want_client = matches!(target.dom, Dom::Client);
+
+    // Existing play session? (a studio that already has a server VM)
+    let snapshot = client.get_state().await.ok();
+    let server_studio = snapshot.as_ref().and_then(|s| {
+        s.studios.iter().find(|st| st.vms.iter().any(|v| v.dom == "server")).cloned()
     });
 
-    // Determine what needs to be launched
-    let need_server = !has_play_server && place.is_some();
-    let need_clients = target.dom == Dom::Client;
-    let client_index = target.client_index; // None = append, Some(N) = ensure N
-
-    tracing::debug!(
-        has_play_server, need_server, need_clients,
-        client_index = ?client_index,
-        target_dom = ?target.dom,
-        target_mode = ?target.mode,
-        "launch_play_processes: decision"
-    );
-
-    if need_server || (need_clients && !has_play_server) {
-        // Route server launch through the canonical
-        // `launch_multiplayer_test_server` RPC on master. The studio backend
-        // owns the StartServer process and reports MultiplayerTestServerReady
-        // back to master; master fires Ready on the launch stream once the
-        // play:server VM is registered, or Error if the process dies during
-        // launch (no more 60s polling timeout).
-        let (place_file_arg, place_id_arg): (Option<String>, Option<u64>) = match place.cloned() {
-            Some(PlaceTarget::File(p)) => (Some(p), None),
-            Some(PlaceTarget::PlaceId { place_id, .. }) => (None, Some(place_id)),
-            Some(PlaceTarget::Empty) | Some(PlaceTarget::Content(_)) | None => (None, None),
+    if let Some(st) = server_studio {
+        // A multiplayer test is already running. Grow it to the target client
+        // count via AddPlayers on the server VM:
+        //   play:client:N  => N total clients
+        //   play:client    => append one more than currently connected
+        //   play:server    => leave as-is
+        let current = st.vms.iter().filter(|v| v.dom == "client").count() as u32;
+        let target_total = if want_client {
+            match target.client_index {
+                Some(n) => n,
+                None => current + 1,
+            }
+        } else {
+            current
         };
-
-        tracing::info!("launching play server via master...");
-        let mut stream = master.launch_multiplayer_test_server(proto::LaunchMultiplayerTestServerRequest {
-            backend: String::new(),  // first studio backend
-            place_file: place_file_arg,
-            place_id: place_id_arg,
-            fflags: fflags.fflag_override.clone(),
-            profile,
-            run_id: None,
-            fflag_file: fflags.fflag_file.clone(),
-            background,
-            no_hud,
-            ..Default::default()
-        }).await.context("launch_multiplayer_test_server RPC failed")?;
-        loop {
-            let view = stream.message().await
-                .context("launch_multiplayer_test_server stream errored")?
-                .ok_or_else(|| anyhow::anyhow!("launch_multiplayer_test_server stream ended without Ready/Error"))?;
-            let event = view.to_owned_message();
-            match event.event {
-                Some(proto::launch_multiplayer_test_server_event::Event::Ready(_)) => break,
-                Some(proto::launch_multiplayer_test_server_event::Event::Error(err)) => {
-                    anyhow::bail!("play server launch failed: {}", err.message);
-                }
-                _ => {}
-            }
-        }
-        tracing::info!("play server registered with master");
-
-        // Now launch requested clients (if any) — this CLI path assumes a single
-        // session (CLI target syntax for multi-session is deferred). Read the
-        // singleton session from state; error if zero or ambiguous.
-        let mut launched_clients: Vec<MultiplayerTestClient> = Vec::new();
-        if need_clients {
-            let state = master.get_state(proto::GetStateRequest::default()).await
-                .context("failed to query server state")?
-                .into_owned();
-            if state.multiplayer_test_sessions.len() != 1 {
-                anyhow::bail!("expected exactly one play session for CLI client launch, got {}", state.multiplayer_test_sessions.len());
-            }
-            let session = state.multiplayer_test_sessions.into_iter().next().unwrap();
-            let ps = session.server.into_option()
-                .context("play session has no server info")?;
-            let user_id = get_roblox_user_id().await?;
-            let count = client_index.unwrap_or(1);
-            for i in 1..=count {
-                tracing::info!(index = i, "launching play client...");
-                let _ = port; // generic client doesn't need the rodeo plugin port (plugin is shared with server)
-                let client = MultiplayerTestClient::launch(MultiplayerTestClientOptions {
-                    raknet_port: ps.raknet_port as u16,
-                    raknet_session_guid: ps.raknet_session_guid.clone(),
-                    server_pid: ps.pid,
-                    play_test_guid: ps.play_test_guid.clone(),
-                    index: i,
-                    background,
-                    user_id,
-                    detached: false,
-                    no_hud,
-                    // CLI inline-client path: state snapshot doesn't surface the
-                    // session's published-place ids today, so the client launches
-                    // anonymous. The canonical path (LaunchMultiplayerTestClient
-                    // dispatched by the backend) DOES forward them.
-                    place_id: 0,
-                    universe_id: 0,
-                    place_version: 0,
-                })?;
-                tracing::info!(index = i, pid = client.pid(), "play client running");
-                launched_clients.push(client);
-            }
-        }
-
-        // Server is owned by the studio backend; we own only clients we spawned
-        // inline (if any).
-        return Ok(PlayHandles { server: None, clients: launched_clients });
-    } else if need_clients && has_play_server {
-        // Server exists, spawn requested client(s) via the canonical ConnectClient
-        // RPC. Studio backend owns the Child handles, so they die when the
-        // server's session drops (Rust ownership cascade).
-        // CLI assumes a single session — read it from state; error if ambiguous.
-        let state = master.get_state(proto::GetStateRequest::default()).await
-            .context("failed to query server state")?
-            .into_owned();
-        if state.multiplayer_test_sessions.len() != 1 {
-            anyhow::bail!(
-                "expected exactly one play session for CLI client launch, got {}",
-                state.multiplayer_test_sessions.len()
-            );
-        }
-        let session = state.multiplayer_test_sessions.into_iter().next().unwrap();
-        let session_id = session.session_guid;
-        let existing_clients = session.clients.len() as u32;
-
-        // How many clients to request, and at what target indices for wait logic.
-        let to_spawn = match client_index {
-            Some(n) => n.saturating_sub(existing_clients).max(1),
-            None => 1,
-        };
-
-        tracing::info!(session_id = %session_id, to_spawn, existing_clients, ?client_index, "spawning play clients via ConnectClient RPC");
-
-        for _ in 0..to_spawn {
-            master.connect_multiplayer_test_client(proto::ConnectMultiplayerTestClientRequest {
-                session_guid: session_id.clone(),
+        if target_total > current {
+            let add = target_total - current;
+            tracing::info!(add, current, target_total, "growing play session via AddPlayers");
+            client.submit_run(rodeo_client::RunCodeOpts {
+                source: format!("game:GetService(\"StudioTestService\"):AddPlayers({add})\nreturn true"),
+                target: Some("play:server".to_string()),
                 ..Default::default()
-            }).await.context("connect_multiplayer_test_client RPC failed")?;
+            }).await.context("AddPlayers run failed")?;
         }
-
-        // Wait for the expected number of play:client VMs to register so
-        // subsequent run-submit targeting play:client:N can route.
-        let expected_total = existing_clients + to_spawn;
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
-        loop {
-            let snap = master.get_state(proto::GetStateRequest::default()).await
-                .context("failed to query state while waiting for play clients")?
-                .into_owned();
-            let connected = snap.vms.iter()
-                .filter(|vm| vm.mode.as_deref() == Some("play") && vm.dom.as_deref() == Some("client") && vm.connected)
-                .count() as u32;
-            if connected >= expected_total {
-                break;
-            }
-            if std::time::Instant::now() >= deadline {
-                anyhow::bail!("timed out waiting for play clients to register (expected >= {}, got {})", expected_total, connected);
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-        }
-
-        return Ok(PlayHandles { server: None, clients: vec![] });
+        wait_for_play_session(&client, target_total).await?;
+        return Ok(PlayHandles);
     }
 
-    // Wait for plugin connections
-    tracing::info!("waiting for play VMs to connect...");
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    // No play session yet. Initial client count for the fresh test:
+    //   play:client:N => N, play:client => 1, play:server => 0.
+    let initial_clients: u32 = if want_client { target.client_index.unwrap_or(1) } else { 0 };
+
+    // We need a place to open the edit Studio that will host the test.
+    let Some(place) = place else {
+        tracing::info!("waiting for play VMs to connect...");
+        wait_for_play_session(&client, initial_clients).await?;
+        return Ok(PlayHandles);
+    };
+
+    // Open the edit Studio (profile=true so the multiplayer-test child
+    // DataModels inherit the profiler FFlags), then start the in-Studio test.
+    let backend = client.get_local_studio().await?;
+    let fflag_overrides = fflags.fflag_override.clone();
+    let fflag_file = fflags.fflag_file.clone();
+    tracing::info!(dom = ?target.dom, initial_clients, "opening edit Studio for multiplayer test");
+    let studio = match place {
+        PlaceTarget::File(p) => backend.open_file(OpenFileOpts {
+            path: p.clone(),
+            fflags: fflag_overrides, background, profile,
+            logs: None, save: None, detached: false, fflag_file, no_hud,
+        }).await?,
+        PlaceTarget::PlaceId { place_id, .. } => backend.open_place(OpenPlaceOpts {
+            place_id: *place_id,
+            fflags: fflag_overrides, background, profile,
+            logs: None, save: None, detached: false, fflag_file, no_hud,
+        }).await?,
+        PlaceTarget::Empty => backend.open(OpenOpts {
+            fflags: fflag_overrides, background, profile,
+            logs: None, save: None, detached: false, fflag_file, no_hud,
+        }).await?,
+        PlaceTarget::Content(_) => bail!("Content place target is not supported for play launch"),
+    };
+
+    studio.start_multiplayer_test(initial_clients).await
+        .context("failed to start multiplayer test")?;
+    tracing::info!("multiplayer test started");
+
+    Ok(PlayHandles)
+}
+
+/// Poll the studio-first state until a play session (a studio with a server VM
+/// and at least `clients` client VMs) is present.
+async fn wait_for_play_session(client: &RodeoClient, clients: u32) -> Result<()> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     loop {
-        if std::time::Instant::now() > deadline {
-            bail!("timeout waiting for play VMs to connect");
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
-        if let Ok(resp) = master.get_state(proto::GetStateRequest::default()).await {
-            let state = resp.into_owned();
-            let play_vms: Vec<_> = state.vms.iter()
-                .filter(|vm| vm.mode.as_deref() == Some("play"))
-                .collect();
-
-            let has_server = play_vms.iter().any(|vm| vm.dom.as_deref() == Some("server"));
-            let client_count = play_vms.iter().filter(|vm| vm.dom.as_deref() == Some("client")).count();
-
-            let needed_clients = if target.dom == Dom::Client {
-                target.client_index.unwrap_or(1) as usize
-            } else {
-                0
-            };
-
-            if (target.dom == Dom::Server && has_server) ||
-               (target.dom == Dom::Client && has_server && client_count >= needed_clients)
-            {
-                tracing::info!(server = has_server, clients = client_count, "play VMs connected");
-                break;
+        if let Ok(state) = client.get_state().await {
+            let ready = state.studios.iter().any(|st| {
+                st.vms.iter().any(|v| v.dom == "server")
+                    && st.vms.iter().filter(|v| v.dom == "client").count() as u32 >= clients
+            });
+            if ready {
+                return Ok(());
             }
         }
+        if std::time::Instant::now() >= deadline {
+            bail!("timed out waiting for play session (server + {clients} clients)");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     }
-
-    Ok(PlayHandles { server: None, clients: vec![] })
 }
 
-/// Get the current Roblox user ID from the auth cookie.
-pub(crate) async fn get_roblox_user_id() -> Result<u64> {
-    let cookie = rbx_cookie::get()
-        .context("failed to get Roblox auth cookie — is Studio logged in?")?;
-
-    let client = crate::util::http::client();
-    let resp = client
-        .get("https://users.roblox.com/v1/users/authenticated")
-        .header("Cookie", &cookie)
-        .send()
-        .await
-        .context("failed to reach Roblox users API")?;
-
-    if !resp.status().is_success() {
-        bail!("Roblox users API returned {} — auth cookie may be expired", resp.status());
-    }
-
-    let body: serde_json::Value = resp.json().await
-        .context("failed to parse Roblox users API response")?;
-
-    body["id"]
-        .as_u64()
-        .context("Roblox users API response missing user id")
-}

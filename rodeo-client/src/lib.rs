@@ -13,7 +13,7 @@ pub mod runtime;
 
 pub use client::RodeoClient;
 pub use studio::{
-    MultiplayerTestClient, MultiplayerTestServer, Studio, StudioBackend,
+    MultiplayerTest, Studio, StudioBackend,
 };
 pub use vm::Vm;
 pub use run::{RunCodeOpts, RunResult, RunStream};

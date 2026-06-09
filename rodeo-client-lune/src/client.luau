@@ -10,8 +10,30 @@ local vmMod = require("./vm")
 export type BackendInfo = { id: string, kind: string, name: string }
 export type ProcessInfo = { [string]: any }
 
+type StudioVmEntry = {
+	vmId: string,
+	dom: string,
+	clientName: string?,
+}
+
+type StudioSnapshot = {
+	id: string,
+	backendId: string,
+	mcpStudioId: string?,
+	name: string,
+	placeId: number,
+	active: boolean,
+	status: string,
+	mode: string,
+	vms: { StudioVmEntry },
+}
+
 type StateSnapshot = {
-	vms: { vmMod.VmSnapshot },
+	backends: { any }?,
+	processes: { any }?,
+	-- DEPRECATED: prefer `studios[].vms`. Still present for now.
+	vms: { vmMod.VmSnapshot }?,
+	studios: { StudioSnapshot },
 }
 
 export type ConnectOpts = {
@@ -75,8 +97,22 @@ local function connect(opts: ConnectOpts): RodeoClient
 	function self.getVms()
 		local state = self.getState()
 		local out = {}
-		for _, s in state.vms or {} do
-			table.insert(out, vmMod.create(s, daemon))
+		for _, studio in state.studios or {} do
+			for _, sv in studio.vms or {} do
+				local snap: vmMod.VmSnapshot = {
+					vmId = sv.vmId,
+					dom = sv.dom,
+					mode = if sv.dom == "edit" then "edit" else studio.mode,
+					backendId = studio.backendId,
+					sessionGuid = studio.id,
+					placeId = studio.placeId,
+					gameName = studio.name,
+					connected = true,
+					activeRuns = 0,
+					clientName = sv.clientName,
+				}
+				table.insert(out, vmMod.create(snap, daemon))
+			end
 		end
 		return out
 	end

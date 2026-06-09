@@ -35,12 +35,6 @@ service MasterService {
   rpc CloseStudio(CloseStudioRequest) returns (stream CloseStudioEvent);
   rpc SavePlace(SavePlaceRequest) returns (SavePlaceResponse);
 
-  // Multiplayer-test server / clients (Studio launched via -task StartServer / StartClient)
-  rpc LaunchMultiplayerTestServer(LaunchMultiplayerTestServerRequest) returns (stream LaunchMultiplayerTestServerEvent);
-  rpc ConnectMultiplayerTestClient(ConnectMultiplayerTestClientRequest) returns (ConnectMultiplayerTestClientResponse);
-  rpc DisconnectMultiplayerTestClient(DisconnectMultiplayerTestClientRequest) returns (DisconnectMultiplayerTestClientResponse);
-  rpc CloseMultiplayerTestServer(CloseMultiplayerTestServerRequest) returns (CloseMultiplayerTestServerResponse);
-
   // Reserved for future LaunchLivePlayer / ExitLivePlayer.
   // (Wire-format compat preserved for the live-runtime work.)
 
@@ -61,8 +55,7 @@ message BackendMessage {
     StateSnapshot state_snapshot = 5;
     PlayerStatus player_status = 6;
     FilesComplete files_complete = 7;
-    MultiplayerTestServerReady multiplayer_test_server_ready = 8;
-    MultiplayerTestClientReady multiplayer_test_client_ready = 9;
+    // 8 was multiplayer_test_server_ready, 9 was multiplayer_test_client_ready.
     // Process for `session_guid` exited (clean exit, crash, kill, or pre-handoff
     // launch failure). Emitted from `Child::on_exit` on the studio backend
     // uniformly for edit Studios, MP test servers, and MP test clients.
@@ -73,6 +66,7 @@ message BackendMessage {
     SessionExited session_exited = 10;
     SaveResult save_result = 11;
   }
+  reserved 8, 9;
 }
 
 message FileChunk {
@@ -125,6 +119,9 @@ message StudioInstanceState {
   string session_guid = 1;
   string status = 2;              // "launching" | "running" | "closing"
   optional string error = 3;
+  // StudioMCP's id for this Studio (resolved via reconciliation). Surfaced so
+  // master can populate StudioState.mcp_studio_id in the studio-first snapshot.
+  optional string mcp_studio_id = 4;
 }
 
 message VmSnapshot {
@@ -137,6 +134,30 @@ message VmSnapshot {
   optional string game_name = 7;
   uint32 active_runs = 8;
   bool connected = 9;
+  // Player name for client VMs (from the plugin's client_info). Used to
+  // populate StudioVm.client_name in the master's studio-first snapshot.
+  optional string client_name = 10;
+}
+
+// Canonical studio-first state (master → client, in RodeoSnapshot). Modeled on
+// Roblox Studio's MCP studio entry (id/name/active) extended with mode + a
+// nested vms array. Master derives one per session_guid by grouping VMs.
+message StudioState {
+  string id = 1;                     // canonical studio id = session_guid
+  string backend_id = 2;
+  optional string mcp_studio_id = 3; // StudioMCP's id (set_active_studio / elevated)
+  string name = 4;                   // place / game name
+  int64 place_id = 5;
+  bool active = 6;                   // the MCP-active studio (best-effort)
+  string status = 7;                 // launching | connected | closing | error
+  string mode = 8;                   // edit | run | test | play (derived)
+  repeated StudioVm vms = 9;
+}
+
+message StudioVm {
+  string vm_id = 1;
+  string dom = 2;                    // edit | server | client
+  optional string client_name = 3;   // player name for client VMs
 }
 
 message StudioSnapshot {
@@ -165,13 +186,12 @@ message MasterMessage {
     // reserved for the live-runtime work.
     RunCompleted run_completed = 6;
     LaunchStudioCommand launch_studio = 7;
-    LaunchMultiplayerTestServerCommand launch_multiplayer_test_server = 8;
-    LaunchMultiplayerTestClientCommand launch_multiplayer_test_client = 9;
-    KillMultiplayerTestProcessCommand kill_multiplayer_test = 10;
+    // 8 was launch_multiplayer_test_server, 9 was launch_multiplayer_test_client,
+    // 10 was kill_multiplayer_test.
     CloseStudioCommand close_studio = 11;
     // 12 was SetModeCommand; replaced by plugin-driven SetTargetModeMsg
   }
-  reserved 4, 5;
+  reserved 4, 5, 8, 9, 10;
 }
 
 message CloseStudioCommand {
@@ -225,69 +245,6 @@ message LaunchStudioCommand {
                                        // to <logs_dir>/<session_guid>.log for Studio's lifetime
   bool no_hud = 10;                    // strip dock UI panels via plist patch (restored on exit)
   bool profile = 11;                   // enable microprofiler auto-capture (backend injects fflags)
-}
-
-// Master → Studio backend (multiplayer-test mode). All messages carry a `session_guid`
-// (UUID) assigned by master — the one session identity shared across
-// MultiplayerTestServer + its MultiplayerTestClients, baked into the plugin and stamped on every
-// VM that connects for this session.
-message LaunchMultiplayerTestServerCommand {
-  optional string place_file = 1;
-  optional uint64 place_id = 2;
-  repeated string fflags = 3;
-  bool profile = 4;
-  optional string run_id = 5;
-  optional string fflag_file = 6;
-  bool background = 7;
-  string session_guid = 8;
-  bool no_hud = 9;  // strip Studio dock UI panels; restored on exit
-}
-
-message LaunchMultiplayerTestClientCommand {
-  uint32 server_port = 1;
-  uint32 server_pid = 2;
-  // RakNet/multiplayer session guid (from StartServer's stdout), distinct
-  // from the rodeo session_guid. Passed to StartClient as -parentSessionGuid.
-  string raknet_session_guid = 3;
-  string play_test_guid = 4;
-  uint32 index = 5;
-  string session_guid = 6;
-  bool no_hud = 7;  // strip Studio dock UI panels; restored on exit
-  // Real published identifiers forwarded to Studio's StartClient `-placeId` /
-  // `-universeId` / `-placeVersion` flags so the client process reports the
-  // correct `game.PlaceId` / `game.GameId`. 0 = anonymous/unset.
-  uint64 place_id = 8;
-  uint64 universe_id = 9;
-  uint32 place_version = 10;
-}
-
-message KillMultiplayerTestProcessCommand {
-  uint32 pid = 1;
-  string session_guid = 2;
-}
-
-// Backend → Master (multiplayer-test feedback). All carry `session_guid` so master can
-// keep its per-session mirror accurate.
-message MultiplayerTestServerReady {
-  uint32 pid = 1;
-  uint32 raknet_port = 2;
-  // RakNet/multiplayer session guid from StartServer's stdout — distinct
-  // from session_guid (the rodeo identity).
-  string raknet_session_guid = 3;
-  string play_test_guid = 4;
-  string session_guid = 5;
-  // Resolved published identifiers for this session (passed back so master can
-  // forward them when launching MultiplayerTestClients without re-resolving).
-  // 0 = anonymous / no published place.
-  uint64 place_id = 6;
-  uint64 universe_id = 7;
-  uint32 place_version = 8;
-}
-
-message MultiplayerTestClientReady {
-  uint32 pid = 1;
-  uint32 index = 2;
-  string session_guid = 3;
 }
 
 // Backend → Master: the host process for `session_guid` has exited.
@@ -442,70 +399,6 @@ message SavePlaceResponse {
   optional string error = 3;
 }
 
-message LaunchMultiplayerTestServerRequest {
-  string backend = 1;
-  optional string place_file = 2;
-  optional uint64 place_id = 3;
-  repeated string fflags = 4;
-  bool profile = 5;
-  optional string run_id = 6;
-  optional string fflag_file = 7;
-  bool background = 8;
-  bool no_hud = 9;  // strip Studio dock UI panels; restored on exit
-}
-
-// Server-streaming launch event — mirrors LaunchStudioEvent's shape so both
-// launch RPCs are isomorphic. Pre-handoff failures (Studio crashes during
-// stdout-parse) surface as Error in <1s instead of forcing the client to
-// poll-and-timeout.
-message LaunchMultiplayerTestServerEvent {
-  oneof event {
-    MultiplayerTestServerLaunching launching = 1;
-    MultiplayerTestServerReadyEvent ready = 2;
-    MultiplayerTestServerLaunchError error = 3;
-  }
-}
-
-message MultiplayerTestServerLaunching {}
-message MultiplayerTestServerReadyEvent {
-  // Master-minted session GUID; use as `session_guid` in subsequent
-  // ConnectMultiplayerTestClient / DisconnectMultiplayerTestClient /
-  // CloseMultiplayerTestServer calls.
-  string session_guid = 1;
-  // The play:server VM's id, ready to dispatch runs to. Master fires Ready
-  // only after the plugin has connected and registered this VM, so callers
-  // can construct a Vm handle directly without polling.
-  string vm_id = 2;
-}
-message MultiplayerTestServerLaunchError {
-  string message = 1;
-}
-
-message ConnectMultiplayerTestClientRequest {
-  string session_guid = 1;
-}
-
-message ConnectMultiplayerTestClientResponse {
-  string client_id = 1;  // per-session client index as string
-}
-
-message DisconnectMultiplayerTestClientRequest {
-  string client_id = 1;
-  string session_guid = 2;  // required to disambiguate when multiple sessions exist
-}
-
-message DisconnectMultiplayerTestClientResponse {
-  bool ok = 1;
-}
-
-message CloseMultiplayerTestServerRequest {
-  string session_guid = 1;
-}
-
-message CloseMultiplayerTestServerResponse {
-  bool ok = 1;
-}
-
 message ListBackendsRequest {
   optional string kind = 1;    // "studio", "player", or empty for all
 }
@@ -523,30 +416,12 @@ message BackendInfo {
 // Full state snapshot returned by GetState
 message RodeoSnapshot {
   repeated BackendInfo backends = 1;
-  repeated VmSnapshot vms = 2;
+  // 2 was the flat `vms` list — replaced by the studio-first `studios` field.
+  // 4 was multiplayer_test_sessions (removed with the old -task StartServer path).
   repeated ProcessInfo processes = 3;
-  // Active multi-process multiplayer-test sessions, keyed implicitly by session_id.
-  repeated SnapshotMultiplayerTestSession multiplayer_test_sessions = 4;
-}
-
-message SnapshotMultiplayerTestSession {
-  string session_guid = 1;
-  SnapshotMultiplayerTestServer server = 2;
-  repeated SnapshotMultiplayerTestClient clients = 3;
-}
-
-message SnapshotMultiplayerTestServer {
-  uint32 pid = 1;
-  uint32 raknet_port = 2;
-  // RakNet/multiplayer session guid from StartServer's stdout — distinct
-  // from the rodeo session_guid at SnapshotMultiplayerTestSession.
-  string raknet_session_guid = 3;
-  string play_test_guid = 4;
-}
-
-message SnapshotMultiplayerTestClient {
-  uint32 index = 1;
-  uint32 pid = 2;
+  // Canonical studio-first state: one entry per connected Studio instance.
+  repeated StudioState studios = 5;
+  reserved 2, 4;
 }
 
 // ---------------------------------------------------------------------------

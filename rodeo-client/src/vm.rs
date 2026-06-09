@@ -18,21 +18,40 @@ pub struct Vm {
     pub game_name: String,
     pub connected: bool,
     pub active_runs: u32,
+    /// Player name for client VMs (from the studio-first state). None otherwise.
+    pub client_name: Option<String>,
     pub(crate) transport: Arc<Transport>,
 }
 
 impl Vm {
-    pub(crate) fn from_snapshot(snap: proto::VmSnapshot, transport: Arc<Transport>) -> Self {
+    /// Build a VM handle from the canonical studio-first state. VM-level fields
+    /// (`vm_id`, `dom`, `client_name`) come from the `StudioVm`; the rest
+    /// (`backend_id`, `session_guid`, place, name) come from the parent
+    /// `StudioState`. The edit VM's mode is always "edit"; non-edit VMs share
+    /// the studio's active mode (run/test/play).
+    pub(crate) fn from_studio_vm(
+        studio: &proto::StudioState,
+        v: &proto::StudioVm,
+        transport: Arc<Transport>,
+    ) -> Self {
+        // Synthetic single-VM studios (no real session) use a "vm:" id prefix.
+        let session_guid = if studio.id.starts_with("vm:") {
+            None
+        } else {
+            Some(studio.id.clone())
+        };
+        let mode = if v.dom == "edit" { "edit".to_string() } else { studio.mode.clone() };
         Self {
-            vm_id: snap.vm_id,
-            backend_id: snap.backend_id.unwrap_or_default(),
-            mode: snap.mode.unwrap_or_default(),
-            dom: snap.dom.unwrap_or_default(),
-            session_guid: snap.session_guid,
-            place_id: snap.place_id.unwrap_or(0),
-            game_name: snap.game_name.unwrap_or_default(),
-            connected: snap.connected,
-            active_runs: snap.active_runs,
+            vm_id: v.vm_id.clone(),
+            backend_id: studio.backend_id.clone(),
+            mode,
+            dom: v.dom.clone(),
+            session_guid,
+            place_id: studio.place_id,
+            game_name: studio.name.clone(),
+            connected: true,
+            active_runs: 0,
+            client_name: v.client_name.clone(),
             transport,
         }
     }

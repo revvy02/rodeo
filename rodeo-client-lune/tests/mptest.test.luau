@@ -1,6 +1,7 @@
--- Smoke test for backend.startMultiplayerTest — validates the Luau wire path
--- and the architectural property that MP test servers do NOT require an open
--- edit Studio.
+-- Smoke test for studio.startMultiplayerTest — validates the Luau wire path.
+-- The multiplayer API now requires an OPEN EDIT STUDIO: the session runs
+-- ExecuteMultiplayerTestAsync inside a real Studio, so this test only fully
+-- passes against a live Studio; its structure validates the wire path.
 -- Run: `lune run rodeo-client-lune/tests/mptest.test.luau`.
 
 local process = require("@lune/process")
@@ -23,11 +24,17 @@ task.spawn(drain, serve.stdout)
 task.spawn(drain, serve.stderr)
 
 local client: rodeo.RodeoClient? = nil
-local mpServer: rodeo.MultiplayerTestServer? = nil
+local studio: rodeo.Studio? = nil
+local mp: rodeo.MultiplayerTest? = nil
 
 local function cleanup()
-	if mpServer then
-		pcall((mpServer :: any).close)
+	if mp then
+		pcall(function()
+			(mp :: any)["end"]()
+		end)
+	end
+	if studio then
+		pcall((studio :: any).close)
 	end
 	if client then
 		pcall((client :: any).close)
@@ -53,17 +60,26 @@ client = connectResult
 local c = connectResult :: rodeo.RodeoClient
 print("✓ connected")
 
--- 2. Start MP server WITHOUT calling backend.open() first — that's the whole point.
+-- 2. Open an edit Studio — the MP API now requires one.
 local backend = c.getLocalStudio()
-local ok, result = pcall(backend.startMultiplayerTest, {})
-if not ok then
-	die(`backend.startMultiplayerTest failed: {result}`)
+local openOk, openResult = pcall(backend.open, {})
+if not openOk then
+	die(`backend.open failed: {openResult}`)
 end
-mpServer = result :: rodeo.MultiplayerTestServer
-print(`✓ mp server started (vmId: {mpServer.vmId})`)
+studio = openResult :: rodeo.Studio
+local s = openResult :: rodeo.Studio
+print("✓ edit studio opened")
 
--- 3. Run a trivial script on the server VM (the server handle IS the Vm).
-local runOk, runResult = pcall(mpServer.runCode, { source = "return 1 + 1", showReturn = true })
+-- 3. Start a server-only multiplayer test (0 clients).
+local startOk, startResult = pcall(s.startMultiplayerTest, 0)
+if not startOk then
+	die(`studio.startMultiplayerTest failed: {startResult}`)
+end
+mp = startResult :: rodeo.MultiplayerTest
+print(`✓ mp started (server vmId: {mp.server.vmId}, {#mp.clients} client(s))`)
+
+-- 4. Run a trivial script on the server VM (an ordinary Vm).
+local runOk, runResult = pcall(mp.server.runCode, { source = "return 1 + 1", showReturn = true })
 if not runOk then
 	die(`runCode errored: {runResult}`)
 end

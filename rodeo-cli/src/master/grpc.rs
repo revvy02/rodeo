@@ -9,7 +9,6 @@ use rodeo_proto as proto;
 use crate::master::SharedMasterState;
 use std::sync::Arc;
 use std::pin::Pin;
-use std::collections::HashMap;
 use tokio::sync::{mpsc, watch};
 use futures::stream::{Stream, StreamExt};
 use connectrpc::{ConnectError, Context};
@@ -269,47 +268,6 @@ async fn handle_backend_msg(
             let mut guard = state.lock().await;
             guard.handle_files_complete(&fc.execution_id);
         }
-        Msg::MultiplayerTestServerReady(ps) => {
-            let mut guard = state.lock().await;
-            let session_guid = ps.session_guid.clone();
-            tracing::info!(
-                pid = ps.pid,
-                raknet_port = ps.raknet_port,
-                session_guid = %session_guid,
-                place_id = ps.place_id,
-                universe_id = ps.universe_id,
-                place_version = ps.place_version,
-                "play server ready"
-            );
-            let no_hud = guard.multiplayer_test_no_hud.get(&session_guid).copied().unwrap_or(false);
-            guard.multiplayer_test_session_meta.insert(session_guid.clone(), crate::master::MultiplayerTestSessionMeta {
-                session_guid,
-                server: crate::master::MultiplayerTestServerState {
-                    pid: ps.pid,
-                    raknet_port: ps.raknet_port as u16,
-                    raknet_session_guid: ps.raknet_session_guid,
-                    play_test_guid: ps.play_test_guid,
-                },
-                clients: HashMap::new(),
-                no_hud,
-                place_id: ps.place_id,
-                universe_id: ps.universe_id,
-                place_version: ps.place_version,
-            });
-        }
-        Msg::MultiplayerTestClientReady(pc) => {
-            let mut guard = state.lock().await;
-            let session_id = pc.session_guid.clone();
-            tracing::info!(pid = pc.pid, index = pc.index, session_id = %session_id, "play client ready");
-            if let Some(meta) = guard.multiplayer_test_session_meta.get_mut(&session_id) {
-                meta.clients.insert(pc.index, crate::master::MultiplayerTestClientState {
-                    pid: pc.pid,
-                    index: pc.index,
-                });
-            } else {
-                tracing::warn!(session_id = %session_id, "MultiplayerTestClientReady for unknown session");
-            }
-        }
         Msg::SessionExited(e) => {
             // Session-level death event. Per-VM run cleanup is handled
             // separately by `Msg::VmDisconnect` (the OS closes the plugin's
@@ -323,19 +281,6 @@ async fn handle_backend_msg(
             let reason = e.reason.clone();
             tracing::info!(session_guid = %session_guid, reason = %reason, "session exited");
             let mut guard = state.lock().await;
-            guard.multiplayer_test_session_meta.remove(&session_guid);
-            guard.multiplayer_test_no_hud.remove(&session_guid);
-            if let Some(tx) = guard.pending_mp_launches.remove(&session_guid) {
-                let _ = tx.send(rodeo_proto::LaunchMultiplayerTestServerEvent {
-                    event: Some(rodeo_proto::launch_multiplayer_test_server_event::Event::Error(
-                        Box::new(rodeo_proto::MultiplayerTestServerLaunchError {
-                            message: reason,
-                            ..Default::default()
-                        }),
-                    )),
-                    ..Default::default()
-                });
-            }
             guard.reconcile();
         }
         Msg::SaveResult(result) => {
@@ -794,185 +739,6 @@ impl proto::MasterService for RodeoServices {
                 ))
             }
         }
-    }
-
-    async fn launch_multiplayer_test_server(&self, _ctx: Context, req: OwnedView<proto::LaunchMultiplayerTestServerRequestView<'static>>) -> Result<(Pin<Box<dyn Stream<Item = Result<proto::LaunchMultiplayerTestServerEvent, ConnectError>> + Send>>, Context), ConnectError> {
-        let backend_name = req.backend.to_string();
-        let no_hud = req.no_hud;
-        let mut guard = self.state.lock().await;
-        let backend = if backend_name.is_empty() {
-            guard.backends.values().find(|b| b.kind == "studio")
-        } else {
-            guard.backends.values().find(|b| b.kind == "studio" && (b.id.starts_with(&backend_name) || b.name == backend_name))
-        };
-        let Some(b) = backend else {
-            return Err(ConnectError::not_found("no studio backend connected"));
-        };
-
-        // Mint session_guid up front. Used end-to-end:
-        //   - sent on the LaunchMultiplayerTestServer command to backend
-        //   - used as the routing key for SessionExited / Ready events here
-        //   - included verbatim in the client-facing Ready event
-        let session_guid = uuid::Uuid::new_v4().to_string();
-        let mut state_rx = b.state_rx.clone();
-        let _ = b.tx.send(proto::MasterMessage {
-            msg: Some(proto::master_message::Msg::LaunchMultiplayerTestServer(Box::new(proto::LaunchMultiplayerTestServerCommand {
-                place_file: req.place_file.map(|s| s.to_string()),
-                place_id: req.place_id,
-                fflags: req.fflags.iter().map(|s| s.to_string()).collect(),
-                profile: req.profile,
-                run_id: req.run_id.map(|s| s.to_string()),
-                fflag_file: req.fflag_file.map(|s| s.to_string()),
-                background: req.background,
-                session_guid: session_guid.clone(),
-                no_hud,
-                ..Default::default()
-            }))),
-            ..Default::default()
-        });
-
-        let (tx, rx) = mpsc::unbounded_channel();
-        // Register the sender so SessionExited's handler (or the VM-stamping
-        // path below) can dispatch Error/Ready point-to-point.
-        guard.pending_mp_launches.insert(session_guid.clone(), tx.clone());
-        guard.multiplayer_test_no_hud.insert(session_guid.clone(), no_hud);
-        drop(guard);
-
-        let _ = tx.send(proto::LaunchMultiplayerTestServerEvent {
-            event: Some(proto::launch_multiplayer_test_server_event::Event::Launching(Box::new(proto::MultiplayerTestServerLaunching::default()))),
-            ..Default::default()
-        });
-
-        // Watch backend snapshots for the play:server VM whose plugin reports
-        // our session_guid. Once it appears, fire Ready { session_guid, vm_id }.
-        // SessionExited (handled in master::handle_backend_msg) closes the
-        // race for the failure side.
-        let state_arc = self.state.clone();
-        let session_guid_clone = session_guid.clone();
-        tokio::spawn(async move {
-            loop {
-                // Extract just the vm_id we need before any .await — the
-                // tokio::sync::watch::Ref guard isn't Send.
-                let matching_vm_id: Option<String> = {
-                    let snap = state_rx.borrow();
-                    snap.vms.iter().find(|v| {
-                        v.connected
-                            && v.mode.as_deref() == Some("play")
-                            && v.dom.as_deref() == Some("server")
-                            && v.session_guid.as_deref() == Some(&session_guid_clone)
-                    }).map(|v| v.vm_id.clone())
-                };
-                if let Some(vm_id) = matching_vm_id {
-                    // Race: SessionExited may have already removed the pending
-                    // entry. The remove is the take-and-ack — only fire Ready
-                    // if we still own it.
-                    let mut guard = state_arc.lock().await;
-                    if guard.pending_mp_launches.remove(&session_guid_clone).is_some() {
-                        let _ = tx.send(proto::LaunchMultiplayerTestServerEvent {
-                            event: Some(proto::launch_multiplayer_test_server_event::Event::Ready(Box::new(proto::MultiplayerTestServerReadyEvent {
-                                session_guid: session_guid_clone.clone(),
-                                vm_id,
-                                ..Default::default()
-                            }))),
-                            ..Default::default()
-                        });
-                    }
-                    break;
-                }
-                if state_rx.changed().await.is_err() {
-                    break;
-                }
-            }
-        });
-
-        let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(Ok);
-        Ok((Box::pin(stream), Context::default()))
-    }
-
-    async fn connect_multiplayer_test_client(&self, _ctx: Context, req: OwnedView<proto::ConnectMultiplayerTestClientRequestView<'static>>) -> Result<(proto::ConnectMultiplayerTestClientResponse, Context), ConnectError> {
-        let session_guid = req.session_guid.to_string();
-        let guard = self.state.lock().await;
-        let Some(session_meta) = guard.multiplayer_test_session_meta.get(&session_guid) else {
-            return Err(ConnectError::failed_precondition(format!("unknown session: {session_guid}")));
-        };
-        // 1-based: MultiplayerTestClient::launch expects indices starting at 1 so that
-        // -instanceId (StudioPlayer_{index - 1}) starts at StudioPlayer_0.
-        let next_index = session_meta.clients.keys().max().map(|k| k + 1).unwrap_or(1);
-        let server = &session_meta.server;
-        let no_hud = guard.multiplayer_test_no_hud.get(&session_guid).copied().unwrap_or(false);
-        let backend = guard.backends.values().find(|b| b.kind == "studio");
-        if let Some(b) = backend {
-            let _ = b.tx.send(proto::MasterMessage {
-                msg: Some(proto::master_message::Msg::LaunchMultiplayerTestClient(Box::new(proto::LaunchMultiplayerTestClientCommand {
-                    server_port: server.raknet_port as u32,
-                    server_pid: server.pid,
-                    raknet_session_guid: server.raknet_session_guid.clone(),
-                    play_test_guid: server.play_test_guid.clone(),
-                    index: next_index,
-                    session_guid: session_guid.clone(),
-                    no_hud,
-                    place_id: session_meta.place_id,
-                    universe_id: session_meta.universe_id,
-                    place_version: session_meta.place_version,
-                    ..Default::default()
-                }))),
-                ..Default::default()
-            });
-            Ok((proto::ConnectMultiplayerTestClientResponse { client_id: next_index.to_string(), ..Default::default() }, Context::default()))
-        } else {
-            Err(ConnectError::not_found("no studio backend connected"))
-        }
-    }
-
-    async fn disconnect_multiplayer_test_client(&self, _ctx: Context, req: OwnedView<proto::DisconnectMultiplayerTestClientRequestView<'static>>) -> Result<(proto::DisconnectMultiplayerTestClientResponse, Context), ConnectError> {
-        let session_guid = req.session_guid.to_string();
-        let index: u32 = req.client_id.parse().unwrap_or(0);
-        let guard = self.state.lock().await;
-        let Some(meta) = guard.multiplayer_test_session_meta.get(&session_guid) else {
-            // Idempotent: session already cleaned up by SessionExited.
-            return Ok((proto::DisconnectMultiplayerTestClientResponse { ok: true, ..Default::default() }, Context::default()));
-        };
-        let Some(client) = meta.clients.get(&index) else {
-            return Ok((proto::DisconnectMultiplayerTestClientResponse { ok: true, ..Default::default() }, Context::default()));
-        };
-        let pid = client.pid;
-        if let Some(b) = guard.backends.values().find(|b| b.kind == "studio") {
-            let _ = b.tx.send(proto::MasterMessage {
-                msg: Some(proto::master_message::Msg::KillMultiplayerTest(Box::new(proto::KillMultiplayerTestProcessCommand {
-                    pid,
-                    session_guid: session_guid.clone(),
-                    ..Default::default()
-                }))),
-                ..Default::default()
-            });
-        }
-        Ok((proto::DisconnectMultiplayerTestClientResponse { ok: true, ..Default::default() }, Context::default()))
-    }
-
-    async fn close_multiplayer_test_server(&self, _ctx: Context, req: OwnedView<proto::CloseMultiplayerTestServerRequestView<'static>>) -> Result<(proto::CloseMultiplayerTestServerResponse, Context), ConnectError> {
-        let session_guid = req.session_guid.to_string();
-        let guard = self.state.lock().await;
-        let Some(meta) = guard.multiplayer_test_session_meta.get(&session_guid) else {
-            // Idempotent: session already cleaned up by SessionExited (process
-            // crashed and SessionExited got there first). Caller's `close()`
-            // is structurally a "make sure it's dead" — reporting "already dead"
-            // as success matches that contract.
-            return Ok((proto::CloseMultiplayerTestServerResponse { ok: true, ..Default::default() }, Context::default()));
-        };
-        let server_pid = meta.server.pid;
-        // Tell backend to kill the server — its Drop cascades to clients via
-        // MultiplayerTestServer's owned `clients` HashMap.
-        if let Some(b) = guard.backends.values().find(|b| b.kind == "studio") {
-            let _ = b.tx.send(proto::MasterMessage {
-                msg: Some(proto::master_message::Msg::KillMultiplayerTest(Box::new(proto::KillMultiplayerTestProcessCommand {
-                    pid: server_pid,
-                    session_guid: session_guid.clone(),
-                    ..Default::default()
-                }))),
-                ..Default::default()
-            });
-        }
-        Ok((proto::CloseMultiplayerTestServerResponse { ok: true, ..Default::default() }, Context::default()))
     }
 
     async fn list_backends(&self, _ctx: Context, req: OwnedView<proto::ListBackendsRequestView<'static>>) -> Result<(proto::ListBackendsResponse, Context), ConnectError> {

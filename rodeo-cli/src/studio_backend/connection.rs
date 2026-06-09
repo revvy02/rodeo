@@ -104,11 +104,6 @@ pub struct VmConnection {
     /// across master, backends, and clients (replaces the old dual
     /// `canonical_studio_id` + `session_uid` identities).
     pub session_guid: Option<String>,
-    /// Wall-clock time the plugin's WS connected. Used to pair a play:client
-    /// VM with its specific StartClient process by `launched_at` ordering —
-    /// the most-recently-launched client whose `launched_at <= connected_at`
-    /// is this VM's owning process.
-    pub connected_at: std::time::SystemTime,
 }
 
 impl VmConnection {
@@ -120,7 +115,6 @@ impl VmConnection {
             active_runs: HashMap::new(),
             state: None,
             session_guid: None,
-            connected_at: std::time::SystemTime::now(),
         }
     }
 

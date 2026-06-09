@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use rodeo_client::{
-    MultiplayerTestClient, MultiplayerTestServer, RodeoClient, RunCodeOpts,
+    MultiplayerTest, RodeoClient, RunCodeOpts,
     Studio, StudioBackend, Vm,
 };
 use serde::{Deserialize, Serialize};
@@ -80,12 +80,10 @@ struct State {
     // Mutex so method handlers can take an exclusive borrow even when the
     // Arc itself is cloned out of the map.
     studios: Mutex<HashMap<String, Arc<Mutex<Studio>>>>,
-    /// MP-test server wrappers keyed by their **server VM's vm_id** — same
-    /// handle the user holds. Lifecycle is server-VM-scoped; entry removed
-    /// on `vm.closeServer`.
-    mp_servers: Handles<MultiplayerTestServer>,
-    /// MP-test client wrappers keyed by their **client VM's vm_id**.
-    mp_clients: Handles<MultiplayerTestClient>,
+    /// Running in-Studio multiplayer tests, keyed by a minted `mp` handle.
+    /// `MultiplayerTest` is mutable (addPlayers refreshes its client handles),
+    /// so wrap each in a Mutex.
+    mp_tests: Mutex<HashMap<String, Arc<Mutex<MultiplayerTest>>>>,
     next_handle: AtomicU64,
     /// Cancel channels keyed by the client-provided streamId — `vm.cancelRun`
     /// drops the sender to signal the runCode task to stop.
@@ -111,8 +109,7 @@ pub async fn main(host: String, port: u16) -> Result<()> {
         client,
         backends: Default::default(),
         studios: Default::default(),
-        mp_servers: Default::default(),
-        mp_clients: Default::default(),
+        mp_tests: Default::default(),
         next_handle: AtomicU64::new(1),
         streams: Default::default(),
         stdout: Mutex::new(tokio::io::stdout()),
@@ -158,12 +155,12 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
         "client.getState" => {
             let mut snapshot = serde_json::to_value(state.client.get_state().await?)?;
             // proto3 JSON omits empty `repeated` fields, but the wire contract
-            // (StateSnapshotDTO) is "vms is always an array" — every consumer
-            // does state.vms.{find,filter,map} unguarded. Materialize it so an
+            // (StateSnapshotDTO) is "studios is always an array" — every consumer
+            // does state.studios.{find,filter,map} unguarded. Materialize it so an
             // empty snapshot (e.g. right after the last Studio closes) doesn't
             // crash callers with "undefined is not an object".
             if let Some(obj) = snapshot.as_object_mut() {
-                obj.entry("vms").or_insert_with(|| Value::Array(Vec::new()));
+                obj.entry("studios").or_insert_with(|| Value::Array(Vec::new()));
             }
             Ok(snapshot)
         }
@@ -212,17 +209,18 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
         "studio.save" => studio_save(state, params).await,
         "studio.close" => studio_close(state, params).await,
         "studio.getVms" => studio_get_vms(state, params).await,
-        "backend.startMultiplayerTest" => backend_start_multiplayer_test(state, params).await,
+        "studio.startMultiplayerTest" => studio_start_multiplayer_test(state, params).await,
+
+        // mp.* — in-Studio multiplayer test lifecycle, keyed by an `mpHandle`
+        // returned from studio.startMultiplayerTest. The server/client VMs are
+        // run via vm.runCode by vmId like any other VM.
+        "mp.addPlayers" => mp_add_players(state, params).await,
+        "mp.leave" => mp_leave(state, params).await,
+        "mp.end" => mp_end(state, params).await,
 
         // vm.*
         "vm.runCode" => vm_run_code(state, params).await,
         "vm.cancelRun" => vm_cancel_run(state, params).await,
-        // MP-server / MP-client lifecycle ops are keyed by the server VM's or
-        // client VM's vmId — the same handle the user already has from
-        // startMultiplayerTest / connectClient.
-        "vm.connectClient" => vm_connect_client(state, params).await,
-        "vm.disconnectClient" => vm_disconnect_client(state, params).await,
-        "vm.closeServer" => vm_close_server(state, params).await,
 
         _ => anyhow::bail!("unknown method: {method}"),
     }
@@ -363,55 +361,47 @@ async fn studio_get_vms(state: Arc<State>, params: Value) -> Result<Value> {
     Ok(serde_json::to_value(vms.iter().map(vm_snapshot).collect::<Vec<_>>())?)
 }
 
-async fn backend_start_multiplayer_test(state: Arc<State>, params: Value) -> Result<Value> {
-    let backend = lookup_backend(&state, &params).await?;
-    let opts = rodeo_client::studio::StartMultiplayerTestOpts {
-        place_file: params.get("placeFile").and_then(|v| v.as_str()).map(String::from),
-        place_id: params.get("placeId").and_then(|v| v.as_u64()),
-        fflags: params.get("fflags").and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())
-            .unwrap_or_default(),
-        profile: params.get("profile").and_then(|v| v.as_bool()).unwrap_or(false),
-        run_id: params.get("runId").and_then(|v| v.as_str()).map(String::from),
-        no_hud: params.get("noHud").and_then(|v| v.as_bool()).unwrap_or(false),
-    };
-    let server = backend.start_multiplayer_test(opts).await?;
-    let vm_id = server.vm_id.clone();
-    let session_guid = server.session_guid().to_string();
-    state.mp_servers.lock().await.insert(vm_id.clone(), Arc::new(server));
-    Ok(json!({ "vmId": vm_id, "sessionGuid": session_guid }))
+async fn studio_start_multiplayer_test(state: Arc<State>, params: Value) -> Result<Value> {
+    let studio = lookup_studio(&state, &params).await?;
+    let num_players = params.get("numPlayers").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+    let mp = studio.lock().await.start_multiplayer_test(num_players).await?;
+    let server_vm_id = mp.server.vm_id.clone();
+    let client_vm_ids: Vec<String> = mp.clients.iter().map(|v| v.vm_id.clone()).collect();
+    let handle = state.mint_handle("mp");
+    state.mp_tests.lock().await.insert(handle.clone(), Arc::new(Mutex::new(mp)));
+    Ok(json!({ "mpHandle": handle, "serverVmId": server_vm_id, "clientVmIds": client_vm_ids }))
 }
 
-async fn vm_connect_client(state: Arc<State>, params: Value) -> Result<Value> {
-    let server_vm_id = params.get("vmId").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("vmId required"))?;
-    let server = state.mp_servers.lock().await.get(server_vm_id).cloned()
-        .ok_or_else(|| anyhow!("unknown server vmId: {server_vm_id}"))?;
-    let client = server.connect_client().await?;
-    let client_vm_id = client.vm_id.clone();
-    state.mp_clients.lock().await.insert(client_vm_id.clone(), Arc::new(client));
-    Ok(json!({ "vmId": client_vm_id }))
+async fn lookup_mp(state: &State, params: &Value) -> Result<Arc<Mutex<MultiplayerTest>>> {
+    let h = params.get("mpHandle").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("mpHandle required"))?;
+    state.mp_tests.lock().await.get(h).cloned()
+        .ok_or_else(|| anyhow!("unknown mpHandle: {h}"))
 }
 
-async fn vm_disconnect_client(state: Arc<State>, params: Value) -> Result<Value> {
-    let vm_id = params.get("vmId").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("vmId required"))?
-        .to_string();
-    let client = state.mp_clients.lock().await.get(&vm_id).cloned()
-        .ok_or_else(|| anyhow!("unknown client vmId: {vm_id}"))?;
-    client.disconnect().await?;
-    state.mp_clients.lock().await.remove(&vm_id);
+async fn mp_add_players(state: Arc<State>, params: Value) -> Result<Value> {
+    let mp = lookup_mp(&state, &params).await?;
+    let n = params.get("numPlayers").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+    let mut guard = mp.lock().await;
+    guard.add_players(n).await?;
+    let client_vm_ids: Vec<String> = guard.clients.iter().map(|v| v.vm_id.clone()).collect();
+    Ok(json!({ "clientVmIds": client_vm_ids }))
+}
+
+async fn mp_leave(state: Arc<State>, params: Value) -> Result<Value> {
+    let mp = lookup_mp(&state, &params).await?;
+    let index = params.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+    mp.lock().await.leave(index).await?;
     Ok(Value::Null)
 }
 
-async fn vm_close_server(state: Arc<State>, params: Value) -> Result<Value> {
-    let vm_id = params.get("vmId").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("vmId required"))?
+async fn mp_end(state: Arc<State>, params: Value) -> Result<Value> {
+    let handle = params.get("mpHandle").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("mpHandle required"))?
         .to_string();
-    let server = state.mp_servers.lock().await.get(&vm_id).cloned()
-        .ok_or_else(|| anyhow!("unknown server vmId: {vm_id}"))?;
-    server.close().await?;
-    state.mp_servers.lock().await.remove(&vm_id);
+    let mp = lookup_mp(&state, &params).await?;
+    mp.lock().await.end().await?;
+    state.mp_tests.lock().await.remove(&handle);
     Ok(Value::Null)
 }
 

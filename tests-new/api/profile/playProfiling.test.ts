@@ -1,27 +1,38 @@
-import { describe, it, expect, afterAll } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { rmSync } from "node:fs";
 import { setupBackend } from "../helpers.js";
 import { PROFILE_SCRIPT, extractMarker, assertEveryDumpContains } from "../../utils/profiling.js";
-import type { MultiplayerTestServer } from "../../../rodeo-client-ts/src/index.js";
+import type { MultiplayerTest, Studio } from "../../../rodeo-client-ts/src/index.js";
 
 const ctx = setupBackend();
 
 const profileDir = ".rodeo/.temp/test-profile-play-ts";
 
 describe("--profile with multiplayer-test mode", () => {
-  let server: MultiplayerTestServer;
+  let studio: Studio;
+  let mp: MultiplayerTest;
+
+  beforeAll(async () => {
+    // Open the edit Studio with profile:true so the multiplayer-test child
+    // DataModels (server/clients) inherit the profiler FFlags. They're spawned by
+    // Studio's ExecuteMultiplayerTestAsync, not rodeo, so the FFlags must already
+    // be present at edit-Studio launch — opening the edit Studio without profile
+    // (e.g. via setupStudio) yields no dumps.
+    studio = await ctx.backend.open({ profile: true, background: true });
+  });
 
   afterAll(async () => {
     rmSync(profileDir, { recursive: true, force: true });
-    await server.close();
+    await mp?.end();
+    await studio?.close();
   });
 
   it("every dump from a profiled play:server run contains the script's marker", async () => {
     rmSync(profileDir, { recursive: true, force: true });
 
-    server = await ctx.backend.startMultiplayerTest({ profile: true });
+    mp = await studio.startMultiplayerTest(1);
 
-    const result = await server.runCode({ source: PROFILE_SCRIPT, profile: profileDir });
+    const result = await mp.server.runCode({ source: PROFILE_SCRIPT, profile: profileDir });
     expect(result.ok).toBe(true);
 
     assertEveryDumpContains(profileDir, extractMarker(result.output));

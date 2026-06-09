@@ -19,10 +19,8 @@ export type Studio = studio.Studio
 export type OpenOpts = studio.OpenOpts
 export type OpenPlaceOpts = studio.OpenPlaceOpts
 export type OpenFileOpts = studio.OpenFileOpts
-export type StartMultiplayerTestOpts = studio.StartMultiplayerTestOpts
 export type SaveResult = studio.SaveResult
-export type MultiplayerTestServer = studio.MultiplayerTestServer
-export type MultiplayerTestClient = studio.MultiplayerTestClient
+export type MultiplayerTest = studio.MultiplayerTest
 
 export type RunCodeOpts = run.RunCodeOpts
 export type RunResult = run.RunResult

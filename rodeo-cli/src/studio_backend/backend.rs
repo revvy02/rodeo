@@ -322,29 +322,12 @@ async fn handle_master_msg(
                     let log_path = {
                         let guard = state.lock().await;
                         let Some(vm) = guard.vms.get(&vm_id) else { return };
-                        let connected_at = vm.connected_at;
-                        let dom = vm.state.as_ref().map(|s| s.dom.as_str()).unwrap_or("");
                         let sid = vm.session_guid.clone();
                         sid.and_then(|sid| {
                             // Edit-Studio path: 1 process per session.
-                            if let Some(p) = guard.studio_instances.get(&sid)
+                            guard.studio_instances.get(&sid)
                                 .and_then(|inst| inst.studio.as_ref())
                                 .and_then(|s| s.log_path())
-                            { return Some(p); }
-
-                            // MP-test path: 1 server + N clients share session_guid.
-                            // Pair the VM with the matching process by spawn-vs-connect
-                            // time ordering (the most-recently-launched process whose
-                            // launched_at precedes this VM's connect is its owner).
-                            let session = guard.multiplayer_test_sessions.get(&sid)?;
-                            if dom == "client" {
-                                session.clients().values()
-                                    .filter(|c| c.launched_at() <= connected_at)
-                                    .max_by_key(|c| c.launched_at())
-                                    .and_then(|c| c.log_path())
-                            } else {
-                                session.log_path()
-                            }
                         })
                     };
                     let (path_to_store, offset) = match log_path {
@@ -814,288 +797,6 @@ async fn handle_master_msg(
                 });
             });
         }
-        proto::master_message::Msg::LaunchMultiplayerTestServer(cmd) => {
-            let cmd = *cmd;
-            let out_tx = outgoing_tx.clone();
-            let ls = state.clone();
-            let rodeo_port = {
-                let guard = ls.lock().await;
-                guard.port
-            };
-            tokio::spawn(async move {
-                use crate::studio_backend::{MultiplayerTestServer, MultiplayerTestServerOptions, FflagConfig, PlaceTarget};
-                let session_guid = cmd.session_guid.clone();
-
-                // Resolve place target — if published, download + stage locally first.
-                // Helper: emit SessionExited for any early-return failure path so master
-                // fires Error on the open launch stream (otherwise the stream hangs).
-                let send_launch_failed = |reason: String| {
-                    let _ = out_tx.send(proto::BackendMessage {
-                        msg: Some(proto::backend_message::Msg::SessionExited(
-                            Box::new(proto::SessionExited {
-                                session_guid: session_guid.clone(),
-                                reason: format!("launch_failed: {reason}"),
-                                ..Default::default()
-                            })
-                        )),
-                        ..Default::default()
-                    });
-                };
-
-                // Resolved published-place identifiers; 0 means "not a published
-                // place" (file path or empty launch). These are forwarded into
-                // the StartServer args and persisted into session meta so
-                // LaunchMultiplayerTestClient can reuse them without re-resolving.
-                let mut resolved_place_id: u64 = 0;
-                let mut resolved_universe_id: u64 = 0;
-                let mut resolved_place_version: u32 = 0;
-
-                let place_target = if let Some(file) = cmd.place_file {
-                    PlaceTarget::File(file)
-                } else if cmd.place_id.unwrap_or(0) > 0 {
-                    let place_id = cmd.place_id.unwrap();
-                    tracing::info!(place_id, "downloading place for play server...");
-                    match rbx_control::place::download_published_place(place_id).await {
-                        Ok(result) => {
-                            resolved_place_id = place_id;
-                            resolved_universe_id = result.universe_id;
-                            resolved_place_version = result.place_version;
-                            // Hand bytes to launch.rs directly — it stages and
-                            // patches the GUID attribute in one place. No temp
-                            // file, no double-write.
-                            PlaceTarget::Content(result.content)
-                        }
-                        Err(e) => {
-                            tracing::error!(place_id, "failed to download place: {e}");
-                            send_launch_failed(format!("download_place failed: {e}"));
-                            return;
-                        }
-                    }
-                } else {
-                    PlaceTarget::Empty
-                };
-
-                // Fetch Roblox user_id (required for -task StartServer auth).
-                let user_id = match crate::commands::run::get_roblox_user_id().await {
-                    Ok(uid) => uid,
-                    Err(e) => {
-                        tracing::error!("failed to get Roblox user_id: {e}");
-                        send_launch_failed(format!("get_roblox_user_id failed: {e}"));
-                        return;
-                    }
-                };
-
-                let mut fflags = FflagConfig { overrides: cmd.fflags, file: cmd.fflag_file };
-                if cmd.profile {
-                    fflags = crate::studio_backend::launch::inject_profile_fflags(fflags);
-                }
-                match MultiplayerTestServer::launch(MultiplayerTestServerOptions {
-                    place: place_target,
-                    rodeo_port,
-                    raknet_port: 0,
-                    fflags,
-                    background: cmd.background,
-                    user_id,
-                    session_guid: session_guid.clone(),
-                    no_hud: cmd.no_hud,
-                    place_id: resolved_place_id,
-                    universe_id: resolved_universe_id,
-                    place_version: resolved_place_version,
-                }) {
-                    Ok(server) => {
-                        let pid = server.pid();
-                        let raknet_port = server.raknet_port();
-                        let raknet_session_guid = server.raknet_session_guid().to_string();
-                        let play_test_guid = server.play_test_guid().to_string();
-                        tracing::info!(pid, port = raknet_port, session_guid = %session_guid, "play server launched");
-
-                        let (exit_tx, exit_rx) = tokio::sync::oneshot::channel();
-                        server.on_exit(move |status| {
-                            let _ = exit_tx.send(status);
-                        });
-
-                        let session_meta = crate::master::MultiplayerTestSessionMeta {
-                            session_guid: session_guid.clone(),
-                            server: crate::master::MultiplayerTestServerState {
-                                pid,
-                                raknet_port,
-                                raknet_session_guid: raknet_session_guid.clone(),
-                                play_test_guid: play_test_guid.clone(),
-                            },
-                            clients: std::collections::HashMap::new(),
-                            no_hud: cmd.no_hud,
-                            place_id: resolved_place_id,
-                            universe_id: resolved_universe_id,
-                            place_version: resolved_place_version,
-                        };
-
-                        let launched_at = server.launched_at();
-                        let process_log = server.process_log().clone();
-                        let mut guard = ls.lock().await;
-                        guard.multiplayer_test_sessions.insert(session_guid.clone(), server);
-                        guard.multiplayer_test_session_meta.insert(session_guid.clone(), session_meta);
-                        if let Some(ref scanner) = guard.log_scanner {
-                            scanner.pair(launched_at, process_log);
-                        }
-                        drop(guard);
-
-                        // Server-exit watcher, scoped to this session_guid.
-                        let state_clone = ls.clone();
-                        let out_tx_clone = out_tx.clone();
-                        let sid_for_watcher = session_guid.clone();
-                        tokio::spawn(async move {
-                            let _ = exit_rx.await;
-                            tracing::info!(pid, session_guid = %sid_for_watcher, "play server exited; tearing down session");
-                            {
-                                let mut guard = state_clone.lock().await;
-                                guard.multiplayer_test_sessions.remove(&sid_for_watcher);          // Drop cascades: kills clients
-                                guard.multiplayer_test_session_meta.remove(&sid_for_watcher);
-                            }
-                            let _ = out_tx_clone.send(proto::BackendMessage {
-                                msg: Some(proto::backend_message::Msg::SessionExited(
-                                    Box::new(proto::SessionExited {
-                                        session_guid: sid_for_watcher,
-                                        reason: "exited".to_string(),
-                                        ..Default::default()
-                                    })
-                                )),
-                                ..Default::default()
-                            });
-                        });
-
-                        let _ = out_tx.send(proto::BackendMessage {
-                            msg: Some(proto::backend_message::Msg::MultiplayerTestServerReady(Box::new(proto::MultiplayerTestServerReady {
-                                pid,
-                                raknet_port: raknet_port as u32,
-                                raknet_session_guid,
-                                play_test_guid,
-                                session_guid: session_guid.clone(),
-                                place_id: resolved_place_id,
-                                universe_id: resolved_universe_id,
-                                place_version: resolved_place_version,
-                                ..Default::default()
-                            }))),
-                            ..Default::default()
-                        });
-                    }
-                    Err(e) => {
-                        // Pre-handoff failure (Studio crashed during stdout-parse, etc).
-                        // Master needs to know so it can fire Error on the open
-                        // launch_multiplayer_test_server stream — without this, the
-                        // client sits on the stream until disconnect.
-                        tracing::error!(session_guid = %session_guid, "failed to launch play server: {e}");
-                        let _ = out_tx.send(proto::BackendMessage {
-                            msg: Some(proto::backend_message::Msg::SessionExited(
-                                Box::new(proto::SessionExited {
-                                    session_guid: session_guid.clone(),
-                                    reason: format!("launch_failed: {e}"),
-                                    ..Default::default()
-                                })
-                            )),
-                            ..Default::default()
-                        });
-                    }
-                }
-            });
-        }
-        proto::master_message::Msg::LaunchMultiplayerTestClient(cmd) => {
-            let cmd = *cmd;
-            let out_tx = outgoing_tx.clone();
-            let ls = state.clone();
-            let rodeo_port = {
-                let guard = ls.lock().await;
-                guard.port
-            };
-            tokio::spawn(async move {
-                use crate::studio_backend::{MultiplayerTestClient, MultiplayerTestClientOptions};
-                let user_id = match crate::commands::run::get_roblox_user_id().await {
-                    Ok(uid) => uid,
-                    Err(e) => {
-                        tracing::error!(index = cmd.index, "failed to get Roblox user_id: {e}");
-                        return;
-                    }
-                };
-                let _ = rodeo_port; // plugin already shared from the server; generic client doesn't need this
-                match MultiplayerTestClient::launch(MultiplayerTestClientOptions {
-                    raknet_port: cmd.server_port as u16,
-                    server_pid: cmd.server_pid,
-                    raknet_session_guid: cmd.raknet_session_guid,
-                    play_test_guid: cmd.play_test_guid,
-                    index: cmd.index,
-                    background: true,
-                    user_id,
-                    detached: false,
-                    no_hud: cmd.no_hud,
-                    place_id: cmd.place_id,
-                    universe_id: cmd.universe_id,
-                    place_version: cmd.place_version,
-                }) {
-                    Ok(client) => {
-                        let pid = client.pid();
-                        let launched_at = client.launched_at();
-                        let process_log = client.process_log().clone();
-                        let session_guid = cmd.session_guid.clone();
-                        tracing::info!(pid, index = cmd.index, session_guid = %session_guid, "play client launched");
-                        let mut guard = ls.lock().await;
-                        // MultiplayerTestServer (in guard.multiplayer_test_sessions[sid]) owns its clients —
-                        // dropping the session drops this client's handle via Rust
-                        // ownership, which kills its Studio process.
-                        if let Some(session) = guard.multiplayer_test_sessions.get_mut(&session_guid) {
-                            session.add_client(cmd.index, client);
-                            if let Some(meta) = guard.multiplayer_test_session_meta.get_mut(&session_guid) {
-                                meta.clients.insert(cmd.index, crate::master::MultiplayerTestClientState { pid, index: cmd.index });
-                            }
-                        } else {
-                            tracing::warn!(index = cmd.index, session_guid = %session_guid, "LaunchMultiplayerTestClient: unknown session; client will leak");
-                        }
-                        if let Some(ref scanner) = guard.log_scanner {
-                            scanner.pair(launched_at, process_log);
-                        }
-                        drop(guard);
-                        let _ = out_tx.send(proto::BackendMessage {
-                            msg: Some(proto::backend_message::Msg::MultiplayerTestClientReady(Box::new(proto::MultiplayerTestClientReady {
-                                pid, index: cmd.index, session_guid, ..Default::default()
-                            }))),
-                            ..Default::default()
-                        });
-                    }
-                    Err(e) => tracing::error!(index = cmd.index, "failed to launch play client: {e}"),
-                }
-            });
-        }
-        proto::master_message::Msg::KillMultiplayerTest(cmd) => {
-            // Drop the matching handle within the targeted session.
-            // Server pid match → drop the whole session (cascades to clients).
-            // Client pid match → remove just that client from the session.
-            let mut guard = state.lock().await;
-            let session_guid = cmd.session_guid.clone();
-            let pid = cmd.pid;
-
-            // Is this the server for the given session?
-            let is_server = guard.multiplayer_test_session_meta.get(&session_guid)
-                .map_or(false, |m| m.server.pid == pid);
-            if is_server {
-                tracing::info!(pid, session_guid = %session_guid, "killing play server (cascades to clients)");
-                guard.multiplayer_test_sessions.remove(&session_guid);    // Drop cascades: clients all killed
-                guard.multiplayer_test_session_meta.remove(&session_guid);
-                return;
-            }
-
-            // Otherwise, a client within that session
-            let client_idx = guard.multiplayer_test_sessions.get(&session_guid).and_then(|s| s.client_by_pid(pid));
-            if let Some(idx) = client_idx {
-                tracing::info!(pid, index = idx, session_guid = %session_guid, "killing play client");
-                if let Some(session) = guard.multiplayer_test_sessions.get_mut(&session_guid) {
-                    session.remove_client(idx);
-                }
-                if let Some(meta) = guard.multiplayer_test_session_meta.get_mut(&session_guid) {
-                    meta.clients.remove(&idx);
-                }
-            } else {
-                tracing::warn!(pid, session_guid = %session_guid, "kill_multiplayer_test: no handle found in session; falling back to platform kill");
-                crate::platform::kill_process(pid, true);
-            }
-        }
         proto::master_message::Msg::CloseStudio(cmd) => {
             let session_guid = cmd.session_guid.clone();
             let studio_to_cleanup = {
@@ -1282,6 +983,10 @@ async fn build_state_snapshot(state: &SharedBackendState) -> proto::StateSnapsho
         game_name: vm.state.as_ref().map(|s| s.game_name.clone()),
         active_runs: vm.active_count() as u32,
         connected: vm.connected,
+        // Player name for client VMs, so master can populate StudioVm.client_name.
+        client_name: vm.state.as_ref()
+            .and_then(|s| s.client_info.clone().into_option())
+            .map(|ci| ci.name),
         ..Default::default()
     }).collect();
     let studios = guard.studios.iter().map(|(_, s)| proto::StudioSnapshot {
@@ -1292,6 +997,7 @@ async fn build_state_snapshot(state: &SharedBackendState) -> proto::StateSnapsho
         session_guid: inst.session_guid.clone(),
         status: inst.status.clone(),
         error: inst.error.clone(),
+        mcp_studio_id: inst.mcp_studio_id.clone(),
         ..Default::default()
     }).collect();
     proto::StateSnapshot { vms, studios, studio_instances, ..Default::default() }
