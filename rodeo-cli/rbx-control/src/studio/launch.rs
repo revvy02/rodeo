@@ -349,6 +349,37 @@ impl Studio {
     /// handle the key equivalent.
     pub fn save(&self) -> Result<()> {
         let started = std::time::Instant::now();
+
+        // macOS primary path: press File > Save to File via Accessibility.
+        // This needs no focus and is delivered regardless of activation state,
+        // so it avoids both keystroke failure modes (Qt's undrained Carbon
+        // queue for background targets; cooperative-activation denials that
+        // keep `focus()` from ever making the target frontmost — observed
+        // eating ~27s of the save budget and still dropping the chord).
+        // Matched by exact title because Studio binds ⌘S internally without
+        // exposing AXMenuItemCmdChar on the item. Falls back to the keystroke
+        // path if the AX press fails (e.g. no accessibility permission).
+        #[cfg(target_os = "macos")]
+        {
+            let guard = self.handle.lock().unwrap();
+            if let Some(ref handle) = *guard {
+                match handle.press_menu_item("File", "Save to File") {
+                    Ok(()) => {
+                        tracing::info!(
+                            pid = handle.id(),
+                            elapsed_ms = started.elapsed().as_millis() as u64,
+                            "save: pressed File > Save to File via accessibility",
+                        );
+                        return Ok(());
+                    }
+                    Err(e) => tracing::warn!(
+                        pid = handle.id(),
+                        "save: AX menu press failed ({e}); falling back to focus+keystroke",
+                    ),
+                }
+            }
+        }
+
         // On Windows, foregrounding happens inside `send_keystroke` under the
         // global keystroke lock. We must NOT pre-focus here: a `focus()` call
         // outside that lock races with a concurrent save's locked injection and
