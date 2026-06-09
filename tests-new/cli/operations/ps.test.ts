@@ -20,7 +20,7 @@ describe("ps (CLI)", () => {
 
   it("lists active processes by id", async () => {
     // ps is live-only: a normal run is removed from the process table the moment
-    // it finishes (only --profile/--logs runs linger for file transfer), so a
+    // it finishes (only --profile runs linger for file transfer), so a
     // just-completed run can't be observed. Assert against a still-present
     // process instead — spawn a long run and confirm ps lists its id.
     const scriptProc = spawnBackground([

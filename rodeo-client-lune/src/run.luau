@@ -18,7 +18,6 @@ export type RunCodeOpts = {
 	verbose: boolean?,
 	scriptArgs: { string }?,
 	profile: string?,
-	logs: string?,
 	-- Write the script's return value to this host-side path. `.luau`/`.lua`
 	-- emits Luau source (e.g. `return { pos = Vector3.new(1,2,3) }`); any
 	-- other extension emits JSON-encoded tagged structs.

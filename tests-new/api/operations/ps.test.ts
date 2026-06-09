@@ -4,7 +4,7 @@ const ctx = setupStudio();
 describe("ps", () => {
   it("lists active processes by id", async () => {
     // ps is live-only: a normal run is removed from the process table the moment
-    // it finishes (only --profile/--logs runs linger for file transfer), so a
+    // it finishes (only --profile runs linger for file transfer), so a
     // just-completed run can't be observed. Assert against a still-running run
     // instead — start a long one and confirm listProcesses lists it by id.
     const runPromise = ctx.editVm.runCode({ source: "task.wait(30) return nil" });

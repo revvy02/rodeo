@@ -224,16 +224,12 @@ export function makeCliRunFn(
       }
     }
 
-    // --profile and --logs accept optional output dirs; the CLI writes
-    // artifacts directly to those paths. Tests that need to inspect file
-    // bytes read them from disk.
+    // --profile accepts an optional output dir; the CLI writes artifacts
+    // directly to that path. Tests that need to inspect file bytes read
+    // them from disk.
     if (opts.profile !== undefined) {
       args.push("--profile");
       if (opts.profile.length > 0) args.push(opts.profile);
-    }
-    if (opts.logs !== undefined) {
-      args.push("--logs");
-      if (opts.logs.length > 0) args.push(opts.logs);
     }
 
     if (opts.returnFile !== undefined) {

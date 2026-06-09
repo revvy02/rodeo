@@ -21,7 +21,6 @@ pub struct OpenOpts {
     pub fflags: Vec<String>,
     pub background: bool,
     pub profile: bool,
-    pub logs: Option<String>,
     pub save: Option<String>,
     pub detached: bool,
     pub fflag_file: Option<String>,
@@ -35,7 +34,6 @@ pub struct OpenPlaceOpts {
     pub fflags: Vec<String>,
     pub background: bool,
     pub profile: bool,
-    pub logs: Option<String>,
     pub save: Option<String>,
     pub detached: bool,
     pub fflag_file: Option<String>,
@@ -49,7 +47,6 @@ pub struct OpenFileOpts {
     pub fflags: Vec<String>,
     pub background: bool,
     pub profile: bool,
-    pub logs: Option<String>,
     pub save: Option<String>,
     pub detached: bool,
     pub fflag_file: Option<String>,
@@ -77,7 +74,6 @@ impl StudioBackend {
             profile: opts.profile,
             save_path: opts.save,
             fflag_file: opts.fflag_file,
-            logs_dir: opts.logs,
             no_hud: opts.no_hud,
             ..Default::default()
         }).await
@@ -93,7 +89,6 @@ impl StudioBackend {
             profile: opts.profile,
             save_path: opts.save,
             fflag_file: opts.fflag_file,
-            logs_dir: opts.logs,
             no_hud: opts.no_hud,
             ..Default::default()
         }).await
@@ -109,7 +104,6 @@ impl StudioBackend {
             profile: opts.profile,
             save_path: opts.save,
             fflag_file: opts.fflag_file,
-            logs_dir: opts.logs,
             no_hud: opts.no_hud,
             ..Default::default()
         }).await

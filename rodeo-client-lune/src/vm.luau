@@ -84,16 +84,12 @@ local function create(snap: VmSnapshot, daemon: Daemon): Vm
 		local processed = processSource(opts)
 
 		local executionId = uuid.v4()
-		-- profile/logs are directory paths sent straight to the daemon. The
-		-- daemon passes them to rodeo-client, which writes files directly to
-		-- disk — this process never sees the bytes.
+		-- profile is a directory path sent straight to the daemon. The daemon
+		-- passes it to rodeo-client, which writes files directly to disk — this
+		-- process never sees the bytes.
 		local profileDir: string? = nil
 		if opts.profile ~= nil then
 			profileDir = if opts.profile ~= "" then opts.profile else `.rodeo/.temp/profiles/{executionId}`
-		end
-		local logsDir: string? = nil
-		if opts.logs ~= nil then
-			logsDir = if opts.logs ~= "" then opts.logs else `.rodeo/.temp/logs/{executionId}`
 		end
 
 		local streamId = uuid.v4()
@@ -155,7 +151,6 @@ local function create(snap: VmSnapshot, daemon: Daemon): Vm
 			verbose = opts.verbose == true,
 			scriptArgs = opts.scriptArgs or {},
 			profileDir = profileDir,
-			logsDir = logsDir,
 			returnFile = opts.returnFile,
 			processName = opts.processName,
 			instancePath = processed.instancePath,

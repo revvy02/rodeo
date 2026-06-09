@@ -54,7 +54,7 @@ describe("directives (CLI)", () => {
   // enumerated in the old hand-written directive switch should work in a
   // directive *automatically* under the splice. If `--output` is ever
   // removed or repurposed, pick another previously-unmirrored flag
-  // (--sourcemap, --logs, --no-hud, --place.universe, --verbose).
+  // (--sourcemap, --no-hud, --place.universe, --verbose).
   it("auto-parity: --output directive routes prints to file", () => {
     const outPath = mkTmp(".txt");
     const script = writeScript(

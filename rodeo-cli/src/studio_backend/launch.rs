@@ -102,8 +102,6 @@ pub struct Studio {
     daemon_slot: std::sync::Mutex<Option<crate::studio_backend::daemon::SlotHandle>>,
     /// Master-minted session identity.
     session_guid: String,
-    /// Log file path, resolved asynchronously by the log scanner after launch.
-    process_log: rbx_control::studio::log_scanner::ProcessLog,
     /// Rodeo plugin file written by `install_launch_plugin` — deleted on cleanup
     /// so a subsequent launch doesn't pick up this launch's plugin.
     plugin_path: Option<PathBuf>,
@@ -173,7 +171,6 @@ impl Studio {
         Ok(Studio {
             daemon_slot: std::sync::Mutex::new(daemon_slot),
             session_guid,
-            process_log: rbx_control::studio::log_scanner::ProcessLog::new(),
             plugin_path: Some(plugin_path),
             inner,
         })
@@ -195,21 +192,14 @@ impl Studio {
 
     // -- Delegates to inner --
 
-    pub fn is_running(&self) -> bool { self.inner.is_running() }
     pub fn detached(&self) -> bool { self.inner.detached() }
     /// Event-driven exit notification. See `launch_control::Child::on_exit`.
     pub fn on_exit(&self, callback: impl FnOnce(std::process::ExitStatus) + Send + 'static) {
         self.inner.on_exit(callback);
     }
     pub fn place_path(&self) -> Option<&Path> { self.inner.place_path() }
-    pub fn launched_at(&self) -> std::time::SystemTime { self.inner.launched_at() }
     pub fn save(&self) -> Result<()> { self.inner.save() }
     pub fn kill(&self) { self.inner.kill() }
-
-    // -- Rodeo-only --
-
-    pub fn process_log(&self) -> &rbx_control::studio::log_scanner::ProcessLog { &self.process_log }
-    pub fn log_path(&self) -> Option<PathBuf> { self.process_log.get() }
 
     /// Full cleanup — delegates to inner (save + kill + fflag restore) and
     /// removes the rodeo plugin file.

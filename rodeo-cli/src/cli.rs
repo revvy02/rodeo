@@ -270,10 +270,6 @@ pub struct PlaceArgs {
     #[arg(long = "profile", num_args = 0..=1, default_missing_value = "", help_heading = "Profiling")]
     pub profile: Option<String>,
 
-    /// Collect Studio log output for this run (optional: output directory)
-    #[arg(long = "logs", num_args = 0..=1, default_missing_value = "", help_heading = "Profiling")]
-    pub logs: Option<String>,
-
     /// Save Studio place on exit, optionally to a specific path
     #[arg(long, num_args = 0..=1, default_missing_value = "")]
     pub save: Option<String>,

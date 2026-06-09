@@ -128,11 +128,6 @@ pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) 
         state.lock().await.profile_scanner = Some(scanner);
     }
 
-    {
-        let log_scanner = rbx_control::studio::log_scanner::start();
-        state.lock().await.log_scanner = Some(log_scanner);
-    }
-
     tokio::spawn(crate::master::run_reconciliation(state.clone()));
 
     let addr: SocketAddr = ([127, 0, 0, 1], port).into();

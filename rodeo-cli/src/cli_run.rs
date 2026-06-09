@@ -38,8 +38,6 @@ pub struct RunRequest {
     pub process_name: Option<String>,
     pub profile: bool,
     pub profile_dir: Option<std::path::PathBuf>,
-    pub logs: bool,
-    pub logs_dir: Option<std::path::PathBuf>,
 }
 
 /// Execute a run against a live server. Writes script stdout/stderr to the
@@ -55,7 +53,6 @@ pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<Run
         verbose: request.verbose,
         script_args: request.script_args,
         profile: request.profile,
-        logs: request.logs,
         process_name: request.process_name,
         log_filter: Some(request.log_filter),
         instance_path: request.instance_path,
@@ -63,7 +60,6 @@ pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<Run
         return_file: request.return_file,
         output_file: request.output_file,
         profile_dir: request.profile_dir,
-        logs_dir: request.logs_dir,
         job: request.job,
     };
 

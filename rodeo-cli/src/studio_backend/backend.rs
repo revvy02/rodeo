@@ -80,9 +80,6 @@ pub async fn run_master_loop(
     // Relay channel: plugin_ws sends proto::BackendMessage, forwarded to bidi stream
     let (relay_tx, mut relay_rx) = mpsc::unbounded_channel::<proto::BackendMessage>();
 
-    // Log dump channel: plugin_ws relay path sends LogDumpTask here for processing
-    let (log_dump_tx, mut log_dump_rx) = mpsc::unbounded_channel::<crate::master::LogDumpTask>();
-
     // Spawn task to forward relay messages to bidi stream
     let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel::<proto::BackendMessage>();
     let relay_out_tx = outgoing_tx.clone();
@@ -95,7 +92,6 @@ pub async fn run_master_loop(
     {
         let mut guard = state.lock().await;
         guard.relay_tx = Some(relay_tx.clone());
-        guard.log_dump_tx = Some(log_dump_tx);
     }
 
     // Send vm_connect for already-connected VMs
@@ -169,70 +165,6 @@ pub async fn run_master_loop(
                     _ => break,
                 }
             }
-            // Log dump tasks from plugin_ws relay path
-            task = log_dump_rx.recv() => {
-                if let Some(task) = task {
-                    let dump_client = client.clone();
-                    let files_done_tx = outgoing_tx.clone();
-                    tokio::spawn(async move {
-                        // Empty PathBuf is the "logs=true but unresolved" sentinel —
-                        // skip the read; still emit FilesComplete below so master
-                        // stops waiting for this run's files.
-                        if task.log_path.as_os_str().is_empty() {
-                            tracing::debug!(execution_id = task.execution_id.as_str(), "log dump: skipping read (unresolved path), emitting FilesComplete only");
-                        } else {
-                            // Blocking file read on the blocking pool so a slow disk
-                            // or large log doesn't stall async worker threads.
-                            let log_path = task.log_path.clone();
-                            let start_offset = task.start_offset;
-                            let read_result = tokio::task::spawn_blocking(move || {
-                                use std::io::{Read, Seek, SeekFrom};
-                                let mut f = std::fs::File::open(&log_path)?;
-                                f.seek(SeekFrom::Start(start_offset))?;
-                                let mut buf = Vec::new();
-                                f.read_to_end(&mut buf)?;
-                                std::io::Result::Ok(buf)
-                            }).await;
-
-                            let result: std::io::Result<Vec<u8>> = match read_result {
-                                Ok(r) => r,
-                                Err(join_err) => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("spawn_blocking join: {join_err}"))),
-                            };
-
-                            match result {
-                                Ok(data) => {
-                                    // Flat, self-describing filename:
-                                    //   exec-<execution_id>-<session_guid>-<ts>.log
-                                    // execution_id alone is globally unique; session_guid
-                                    // enables `ls | grep <session_guid>` to collect every
-                                    // dump from one Studio; ts orders chronologically.
-                                    let ts = crate::util::log_capture::filename_timestamp();
-                                    let filename = if task.session_guid.is_empty() {
-                                        format!("exec-{}-{}.log", &task.execution_id, ts)
-                                    } else {
-                                        format!("exec-{}-{}-{}.log", &task.execution_id, &task.session_guid, ts)
-                                    };
-                                    let chunks = stream_file_chunks(&filename, &task.execution_id, &data);
-                                    if let Err(e) = dump_client.send_file(chunks).await {
-                                        tracing::warn!("log dump send failed: {e}");
-                                    } else {
-                                        tracing::debug!(filename, size = data.len(), "log dump: sent via gRPC");
-                                    }
-                                }
-                                Err(e) => tracing::warn!(execution_id = task.execution_id.as_str(), "log dump read failed: {e}"),
-                            }
-                        }
-                        // Signal master that file transfer is complete
-                        let _ = files_done_tx.send(proto::BackendMessage {
-                            msg: Some(proto::backend_message::Msg::FilesComplete(Box::new(proto::FilesComplete {
-                                execution_id: task.execution_id,
-                                ..Default::default()
-                            }))),
-                            ..Default::default()
-                        });
-                    });
-                }
-            }
         }
     }
 
@@ -303,46 +235,6 @@ async fn handle_master_msg(
                         tracing::debug!(execution_id, "profile: registered run on backend scanner");
                     }
                     drop(guard);
-                }
-
-                // Log dump: record the target Studio's log file + current byte offset.
-                // Keyed by execution_id. The log file is resolved via the scanner
-                // at Studio launch time; we look it up through the target VM's
-                // session_guid → studio_instances → studio.log_path().
-                //
-                // IMPORTANT: master's complete_run holds the run open waiting for
-                // FilesComplete whenever logs=true (see mod.rs:1156). So we must
-                // ALWAYS populate log_runs for logs=true runs, even when we can't
-                // resolve the log path — otherwise the plugin_ws Done handler
-                // doesn't fire a LogDumpTask and master hangs forever. An empty
-                // PathBuf sentinel signals "logs=true but no path" to the dump
-                // task, which skips the file read and goes straight to
-                // FilesComplete.
-                if run_cmd.logs == Some(true) {
-                    let log_path = {
-                        let guard = state.lock().await;
-                        let Some(vm) = guard.vms.get(&vm_id) else { return };
-                        let sid = vm.session_guid.clone();
-                        sid.and_then(|sid| {
-                            // Edit-Studio path: 1 process per session.
-                            guard.studio_instances.get(&sid)
-                                .and_then(|inst| inst.studio.as_ref())
-                                .and_then(|s| s.log_path())
-                        })
-                    };
-                    let (path_to_store, offset) = match log_path {
-                        Some(p) => {
-                            let off = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
-                            tracing::debug!(execution_id, path = %p.display(), offset = off, "log dump: recorded start");
-                            (p, off)
-                        }
-                        None => {
-                            tracing::debug!(execution_id, vm_id = &vm_id[..8.min(vm_id.len())], "log dump: path unresolved (will emit empty FilesComplete)");
-                            (std::path::PathBuf::new(), 0)
-                        }
-                    };
-                    let mut guard = state.lock().await;
-                    guard.log_runs.insert(execution_id.clone(), (path_to_store, offset));
                 }
             }
 
@@ -529,10 +421,6 @@ async fn handle_master_msg(
                     notify.notify_one();
                 }
             }
-            let shutdown_token = {
-                let guard = ls.lock().await;
-                guard.shutdown_token.clone()
-            };
             tokio::spawn(async move {
                 use crate::studio_backend::{Studio, StudioOptions, FflagConfig, PlaceTarget};
                 let target = if let Some(file) = cmd.place_file {
@@ -641,46 +529,6 @@ async fn handle_master_msg(
                     let mut guard = ls.lock().await;
                     if let Some(inst) = guard.studio_instances.get_mut(&session_guid) {
                         inst.studio = Some(instance.clone());
-                    }
-                }
-
-                // Pair this Studio with its log file via the scanner, then
-                // continuously mirror the log to <logs_dir>/studio-<sg>-<ts>.log
-                // until the Studio process exits.
-                {
-                    let scanner = {
-                        let guard = ls.lock().await;
-                        guard.log_scanner.clone()
-                    };
-                    if let Some(scanner) = scanner {
-                        let inst = instance.clone();
-                        let process_log = instance.process_log().clone();
-                        let session_guid_for_log = session_guid.clone();
-                        // Default to the shared subprocess log dir when the caller
-                        // didn't specify one, so Studio logs always land next to
-                        // master/studio-backend/player-backend logs for unified
-                        // post-mortem debugging.
-                        let logs_dir = cmd.logs_dir
-                            .clone()
-                            .filter(|s| !s.is_empty())
-                            .unwrap_or_else(|| ".rodeo/.temp/logs".to_string());
-                        let shutdown_for_mirror = shutdown_token.clone();
-                        tokio::spawn(async move {
-                            let Some(path) = scanner
-                                .claim_new_log(inst.launched_at(), std::time::Duration::from_secs(10))
-                                .await
-                            else {
-                                tracing::warn!(session_guid = %session_guid_for_log, "log scanner: claim timed out");
-                                return;
-                            };
-                            tracing::debug!(session_guid = %session_guid_for_log, path = %path.display(), "log scanner: claimed log");
-                            process_log.set(path.clone());
-
-                            let ts = crate::util::log_capture::filename_timestamp();
-                            let filename = format!("studio-{}-{}.log", session_guid_for_log, ts);
-                            let dst = std::path::PathBuf::from(&logs_dir).join(filename);
-                            mirror_studio_log(path, dst, inst, session_guid_for_log, shutdown_for_mirror).await;
-                        });
                     }
                 }
 
@@ -856,94 +704,6 @@ async fn handle_master_msg(
         }
         _ => {}
     }
-}
-
-/// Continuously mirror a Studio's log file to a destination path until the
-/// Studio process exits or shutdown fires. Appends new bytes to `dst` as
-/// Studio writes them. Used by LaunchStudio when `logs_dir` is set on the
-/// request — lets callers tail -f the destination in real time to see
-/// everything Studio outputs (including background task output from our
-/// transition scripts, which doesn't land in any per-execution log dump).
-async fn mirror_studio_log(
-    src: std::path::PathBuf,
-    dst: std::path::PathBuf,
-    instance: std::sync::Arc<crate::studio_backend::Studio>,
-    session_guid: String,
-    shutdown: tokio_util::sync::CancellationToken,
-) {
-    use std::io::{Read, Seek, SeekFrom, Write};
-
-    // Ensure destination directory exists.
-    if let Some(parent) = dst.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-
-    // Open mirror file (create/truncate — each Studio launch gets a fresh file).
-    let mut out = match std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&dst) {
-        Ok(f) => f,
-        Err(e) => {
-            tracing::warn!(session_guid = %session_guid, dst = %dst.display(), "log mirror: open failed: {e}");
-            return;
-        }
-    };
-
-    tracing::info!(session_guid = %session_guid, src = %src.display(), dst = %dst.display(), "log mirror: started");
-
-    let mut offset: u64 = 0;
-    let poll_interval = std::time::Duration::from_millis(200);
-    loop {
-        // Exit conditions: Studio process exited, or global shutdown requested.
-        if !instance.is_running() {
-            break;
-        }
-        if shutdown.is_cancelled() {
-            break;
-        }
-
-        // Read any new bytes and append to dst.
-        let read_result = tokio::task::spawn_blocking({
-            let src = src.clone();
-            move || -> std::io::Result<Vec<u8>> {
-                let mut f = std::fs::File::open(&src)?;
-                f.seek(SeekFrom::Start(offset))?;
-                let mut buf = Vec::new();
-                f.read_to_end(&mut buf)?;
-                Ok(buf)
-            }
-        }).await;
-
-        match read_result {
-            Ok(Ok(buf)) if !buf.is_empty() => {
-                let len = buf.len() as u64;
-                if let Err(e) = out.write_all(&buf) {
-                    tracing::warn!(session_guid = %session_guid, "log mirror: write failed: {e}");
-                    break;
-                }
-                let _ = out.flush();
-                offset += len;
-            }
-            Ok(Ok(_)) => {} // no new bytes this tick
-            Ok(Err(e)) => {
-                tracing::debug!(session_guid = %session_guid, "log mirror: read error (may be rotating): {e}");
-            }
-            Err(e) => {
-                tracing::warn!(session_guid = %session_guid, "log mirror: spawn_blocking join: {e}");
-                break;
-            }
-        }
-
-        tokio::time::sleep(poll_interval).await;
-    }
-
-    // Flush any final bytes.
-    if let Ok(buf) = std::fs::read(&src) {
-        if (buf.len() as u64) > offset {
-            let _ = out.write_all(&buf[offset as usize..]);
-            let _ = out.flush();
-        }
-    }
-
-    tracing::info!(session_guid = %session_guid, dst = %dst.display(), "log mirror: stopped");
 }
 
 /// Break file data into FileChunk messages for gRPC streaming.

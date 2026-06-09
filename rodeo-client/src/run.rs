@@ -20,7 +20,6 @@ pub struct RunCodeOpts {
     pub verbose: bool,
     pub script_args: Vec<String>,
     pub profile: bool,
-    pub logs: bool,
     pub process_name: Option<String>,
     pub log_filter: Option<proto::LogFilter>,
     pub instance_path: Option<String>,
@@ -28,7 +27,6 @@ pub struct RunCodeOpts {
     pub return_file: Option<String>,
     pub output_file: Option<String>,
     pub profile_dir: Option<std::path::PathBuf>,
-    pub logs_dir: Option<std::path::PathBuf>,
     pub job: Option<String>,
 }
 
@@ -104,7 +102,6 @@ async fn run_inner(
         script_path: opts.script_path,
         process_name: opts.process_name,
         profile: if opts.profile { Some(true) } else { None },
-        logs: if opts.logs { Some(true) } else { None },
         ..Default::default()
     };
     bidi.send(proto::RunClientMessage {
@@ -116,10 +113,9 @@ async fn run_inner(
 
     let (event_tx, event_rx) = mpsc::unbounded_channel::<RunStreamEvent>();
     let profile_dir = opts.profile_dir.clone();
-    let logs_dir = opts.logs_dir.clone();
 
     let task = tokio::spawn(async move {
-        message_loop(&mut bidi, &execution_id, profile_dir, logs_dir, event_tx).await;
+        message_loop(&mut bidi, &execution_id, profile_dir, event_tx).await;
     });
 
     Ok((event_rx, task))
@@ -193,7 +189,6 @@ async fn message_loop(
     bidi: &mut connectrpc::client::BidiStream<hyper::body::Incoming, proto::RunClientMessage, proto::RunEventView<'static>>,
     execution_id: &str,
     profile_dir: Option<std::path::PathBuf>,
-    logs_dir: Option<std::path::PathBuf>,
     event_tx: mpsc::UnboundedSender<RunStreamEvent>,
 ) {
     // The runtime unconditionally routes script stdout/stderr writes through
@@ -320,13 +315,7 @@ async fn message_loop(
                                         is_last: chunk.is_last,
                                     });
                                     if chunk.is_last {
-                                        let is_log = chunk.filename.ends_with(".log");
-                                        let dest = if is_log {
-                                            logs_dir.as_ref().or(profile_dir.as_ref())
-                                        } else {
-                                            profile_dir.as_ref()
-                                        };
-                                        if let Some(dir) = dest {
+                                        if let Some(dir) = profile_dir.as_ref() {
                                             let _ = std::fs::create_dir_all(dir);
                                             let tmp = dir.join(format!("{}.tmp", &chunk.filename));
                                             let final_path = dir.join(&chunk.filename);

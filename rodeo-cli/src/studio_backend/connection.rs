@@ -29,8 +29,6 @@ pub struct RunRequest {
     pub process_name: Option<String>,
     /// Whether this run has profiling enabled
     pub profile: Option<bool>,
-    /// Whether this run should collect Studio log output
-    pub logs: Option<bool>,
     /// Channel to send output back to the run client
     pub client_tx: mpsc::UnboundedSender<crate::master::ClientMsg>,
 
@@ -152,7 +150,6 @@ impl VmConnection {
                     instance_path: run.instance_path.clone(),
                     script_path: run.script_path.clone(),
                     profile: run.profile,
-                    logs: run.logs,
                     ..Default::default()
                 },
             ))),

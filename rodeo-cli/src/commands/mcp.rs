@@ -306,9 +306,7 @@ fn run_code_input_schema() -> Arc<JsonObject> {
             "sourcemap": { "type": "string", "description": "Path to sourcemap.json for require resolution" },
             "instance_path": { "type": "string", "description": "Instance path for the script" },
             "profile": { "type": "boolean", "description": "Capture a microprofiler dump for this run" },
-            "profile_dir": { "type": "string", "description": "Directory to write the profile dump into (implies profile=true)" },
-            "logs": { "type": "boolean", "description": "Capture Studio log_*.txt files for this run" },
-            "logs_dir": { "type": "string", "description": "Directory to write captured logs into (implies logs=true)" }
+            "profile_dir": { "type": "string", "description": "Directory to write the profile dump into (implies profile=true)" }
         },
         "required": ["code"]
     }))
@@ -873,8 +871,6 @@ async fn handle_run_code(
     let instance_path = args["instance_path"].as_str().map(String::from);
     let profile_dir = args["profile_dir"].as_str().map(std::path::PathBuf::from);
     let profile = args["profile"].as_bool().unwrap_or(false) || profile_dir.is_some();
-    let logs_dir = args["logs_dir"].as_str().map(std::path::PathBuf::from);
-    let logs = args["logs"].as_bool().unwrap_or(false) || logs_dir.is_some();
 
     if !target.is_empty() {
         if let Err(e) = crate::shared::target::parse(&target) {
@@ -933,8 +929,6 @@ async fn handle_run_code(
         process_name,
         profile,
         profile_dir,
-        logs,
-        logs_dir,
     };
 
     let result = match cli_run::run_piped(host, port, request).await {
@@ -1090,8 +1084,6 @@ async fn handle_luau_tool(
         process_name: None,
         profile: false,
         profile_dir: None,
-        logs: false,
-        logs_dir: None,
     };
 
     let result = cli_run::run_piped(host, port, request)

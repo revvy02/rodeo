@@ -397,7 +397,6 @@ impl proto::RunService for RodeoServices {
                 script_path: submit.script_path,
                 process_name: submit.process_name,
                 profile: submit.profile,
-                logs: submit.logs,
                 client_tx,
                 process_id: pid,
                 state: proto::ProcessState::PROCESS_STATE_QUEUED,
@@ -559,7 +558,6 @@ impl proto::MasterService for RodeoServices {
                 profile: req.profile,
                 save_path: req.save_path.map(|s| s.to_string()),
                 fflag_file: req.fflag_file.map(|s| s.to_string()),
-                logs_dir: req.logs_dir.map(|s| s.to_string()),
                 ..Default::default()
             }))),
             ..Default::default()

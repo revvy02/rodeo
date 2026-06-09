@@ -47,10 +47,7 @@ fn try_claim_session_from_handshake(guard: &mut crate::master::BackendState, vm_
 /// Shared handler for plugin-reported run termination (Done or Killed).
 /// Both outcomes follow the same shape: check whether the run is local to
 /// this backend; if so, forward the typed event to the run client and
-/// complete the run locally; otherwise, trigger a log dump and relay the
-/// PluginMessage upstream. Master's `complete_run` keeps `logs=true` runs
-/// alive waiting for `FilesComplete`, so the log dump must fire on both
-/// paths — otherwise killed runs hang the client's run stream indefinitely.
+/// complete the run locally; otherwise, relay the PluginMessage upstream.
 async fn handle_run_finished(
     state: &SharedBackendState,
     vm_id: &str,
@@ -71,22 +68,7 @@ async fn handle_run_finished(
         guard.complete_run(eid, vm_id, new_state);
     } else {
         let relay_tx = guard.relay_tx.clone();
-        let log_dump_tx = guard.log_dump_tx.clone();
-        let log_entry = guard.log_runs.remove(eid);
-        let session_guid = guard.vms.get(vm_id)
-            .and_then(|vm| vm.session_guid.clone())
-            .unwrap_or_default();
         drop(guard);
-        if let Some((log_path, start_offset)) = log_entry {
-            if let Some(ref tx) = log_dump_tx {
-                let _ = tx.send(crate::master::LogDumpTask {
-                    execution_id: eid.to_string(),
-                    session_guid,
-                    log_path,
-                    start_offset,
-                });
-            }
-        }
         if let Some(tx) = relay_tx {
             let _ = tx.send(wrap_vm_plugin_message(vm_id, pm_for_relay));
         }

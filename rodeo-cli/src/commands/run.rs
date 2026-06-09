@@ -61,8 +61,6 @@ struct RunConfig {
     vm: Option<String>,
     // Profiling
     profile: Option<std::path::PathBuf>,
-    // Log dump
-    logs: Option<std::path::PathBuf>,
 }
 
 pub async fn main(mut args: RunArgs) -> Result<()> {
@@ -118,12 +116,8 @@ async fn persistent_mode(args: RunArgs) -> Result<()> {
         // Studio persistent mode
         let mut handle = super::serve::start_full_serve(port).await?;
 
-        // `--logs` with no value resolves to `.rodeo/.temp/logs` — backend writes
-        // per-session files `<logs_dir>/<session_guid>.log` so the dir is shared.
-        let logs = args.place.logs.clone().map(|p| if p.is_empty() { ".rodeo/.temp/logs".to_string() } else { p });
-
         if let Some(target) = place_target {
-            let req = build_launch_request(&target, !args.place.focus, args.place.save, args.fflags, args.place.detached, args.place.no_hud, args.place.profile.is_some(), logs, &args.server.host, port).await?;
+            let req = build_launch_request(&target, !args.place.focus, args.place.save, args.fflags, args.place.detached, args.place.no_hud, args.place.profile.is_some(), &args.server.host, port).await?;
             // Race Studio launch against ctrl-c. Bind the RodeoClient to a
             // local so its borrow outlives the tokio::select! future.
             let rc = RodeoClient::connect(&args.server.host, port)?;
@@ -244,15 +238,6 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         }
     });
 
-    // Resolve --logs output dir. Flat for the same reason as --profile.
-    let logs = args.place.logs.as_ref().map(|p| {
-        if p.is_empty() {
-            std::path::PathBuf::from(".rodeo/.temp/logs")
-        } else {
-            std::path::PathBuf::from(p)
-        }
-    });
-
     let fflags = args.fflags;
 
     Ok(RunConfig {
@@ -279,7 +264,6 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         job: args.place.job,
         vm: args.place.vm,
         profile,
-        logs,
     })
 }
 
@@ -320,7 +304,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         serve_handle = Some(handle);
 
         if let Some(ref target) = cfg.place_target {
-            let req = build_launch_request(target, !cfg.focus, cfg.save.clone(), cfg.fflags.clone(), cfg.detached, cfg.no_hud, cfg.profile.is_some(), cfg.logs.as_ref().map(|p| p.to_string_lossy().into_owned()), &cfg.host, cfg.port).await?;
+            let req = build_launch_request(target, !cfg.focus, cfg.save.clone(), cfg.fflags.clone(), cfg.detached, cfg.no_hud, cfg.profile.is_some(), &cfg.host, cfg.port).await?;
             // Race launch against shutdown (ctrl-c / SIGTERM)
             if let Some(ref mut handle) = serve_handle {
                 let rc = RodeoClient::connect(&cfg.host, cfg.port)?;
@@ -363,7 +347,6 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
     }
 
     let is_profiling = cfg.profile.is_some();
-    let is_logging = cfg.logs.is_some();
     let request = RunRequest {
         script: cfg.script_content,
         target: cfg.target.unwrap_or_default(),
@@ -381,8 +364,6 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         process_name: None,
         profile: is_profiling,
         profile_dir: cfg.profile.clone(),
-        logs: is_logging,
-        logs_dir: cfg.logs.clone(),
     };
 
     let result = if let Some(mut handle) = serve_handle {
@@ -430,7 +411,6 @@ async fn build_launch_request(
     detached: bool,
     no_hud: bool,
     profile: bool,
-    logs: Option<String>,
     host: &str,
     port: u16,
 ) -> Result<rodeo_proto::LaunchStudioRequest> {
@@ -456,7 +436,6 @@ async fn build_launch_request(
         profile,
         save_path: save,
         fflag_file: fflags.fflag_file,
-        logs_dir: logs,
         ..Default::default()
     })
 }
@@ -546,16 +525,16 @@ async fn launch_play_processes(
         PlaceTarget::File(p) => backend.open_file(OpenFileOpts {
             path: p.clone(),
             fflags: fflag_overrides, background, profile,
-            logs: None, save: None, detached: false, fflag_file, no_hud,
+            save: None, detached: false, fflag_file, no_hud,
         }).await?,
         PlaceTarget::PlaceId { place_id, .. } => backend.open_place(OpenPlaceOpts {
             place_id: *place_id,
             fflags: fflag_overrides, background, profile,
-            logs: None, save: None, detached: false, fflag_file, no_hud,
+            save: None, detached: false, fflag_file, no_hud,
         }).await?,
         PlaceTarget::Empty => backend.open(OpenOpts {
             fflags: fflag_overrides, background, profile,
-            logs: None, save: None, detached: false, fflag_file, no_hud,
+            save: None, detached: false, fflag_file, no_hud,
         }).await?,
         PlaceTarget::Content(_) => bail!("Content place target is not supported for play launch"),
     };

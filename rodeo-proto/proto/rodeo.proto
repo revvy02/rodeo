@@ -241,8 +241,7 @@ message LaunchStudioCommand {
   optional string save_path = 6;       // if set, save place to this path on exit
   optional string fflag_file = 7;      // path to JSON fflag file
   string session_guid = 8;             // master-assigned session identity
-  optional string logs_dir = 9;        // if set, mirror Studio's log file continuously
-                                       // to <logs_dir>/<session_guid>.log for Studio's lifetime
+  reserved 9;                          // old `logs_dir` — removed Studio FLog-capture feature
   bool no_hud = 10;                    // strip dock UI panels via plist patch (restored on exit)
   bool profile = 11;                   // enable microprofiler auto-capture (backend injects fflags)
 }
@@ -290,7 +289,7 @@ message SubmitRequest {
   optional string process_name = 20;
   optional bool profile = 22;
   LogFilter log_filter = 23;
-  optional bool logs = 24;
+  reserved 24;  // old `logs` — removed Studio FLog-capture feature
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +338,7 @@ message LaunchStudioRequest {
   bool detached = 6;
   optional string save_path = 7;
   optional string fflag_file = 8;
-  optional string logs_dir = 9; // if set, mirror Studio's log file continuously
+  reserved 9;                   // old `logs_dir` — removed Studio FLog-capture feature
   bool no_hud = 10;             // strip Studio dock UI panels; restored on exit
   bool profile = 11;            // enable microprofiler auto-capture (backend injects fflags)
 }
@@ -576,7 +575,7 @@ message RunCommand {
   optional string script_path = 16;
   optional bool profile = 18;
   LogFilter log_filter = 19;
-  optional bool logs = 20;
+  reserved 20;  // old `logs` — removed Studio FLog-capture feature
 }
 
 message KillCommand {

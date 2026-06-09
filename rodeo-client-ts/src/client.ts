@@ -103,9 +103,6 @@ export class Vm {
     const profileDir = opts.profile !== undefined
       ? (opts.profile || `.rodeo/.temp/profiles/${executionId}`)
       : undefined;
-    const logsDir = opts.logs !== undefined
-      ? (opts.logs || `.rodeo/.temp/logs/${executionId}`)
-      : undefined;
 
     // Client-allocated streamId: we register the callback BEFORE sending the
     // request, so notifications can arrive at any time (even before the
@@ -170,7 +167,6 @@ export class Vm {
         verbose: opts.verbose ?? false,
         scriptArgs: opts.scriptArgs ?? [],
         profileDir: profileDir ?? null,
-        logsDir: logsDir ?? null,
         returnFile: opts.returnFile ?? null,
         processName: opts.processName ?? null,
         instancePath: processed.instancePath ?? null,
@@ -286,7 +282,6 @@ export type OpenPlaceOpts = {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
-  logs?: string;
   noHud?: boolean;
   /** Studio process survives `studio.close()` and rodeo serve exit. Caller
    *  owns the OS lifecycle from there — the Studio is no longer in rodeo's
@@ -298,7 +293,6 @@ export type OpenFileOpts = {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
-  logs?: string;
   noHud?: boolean;
   detached?: boolean;
 };
@@ -307,7 +301,6 @@ export type OpenOpts = {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
-  logs?: string;
   noHud?: boolean;
   detached?: boolean;
 };
@@ -331,7 +324,6 @@ export class StudioBackend {
       fflags: opts.fflags ?? [],
       background: opts.background ?? false,
       profile: opts.profile ?? false,
-      logs: opts.logs,
       noHud: opts.noHud ?? false,
       detached: opts.detached ?? false,
     });
@@ -344,7 +336,6 @@ export class StudioBackend {
       fflags: opts.fflags ?? [],
       background: opts.background ?? false,
       profile: opts.profile ?? false,
-      logs: opts.logs,
       noHud: opts.noHud ?? false,
       detached: opts.detached ?? false,
     });
@@ -357,7 +348,6 @@ export class StudioBackend {
       fflags: opts.fflags ?? [],
       background: opts.background ?? false,
       profile: opts.profile ?? false,
-      logs: opts.logs,
       noHud: opts.noHud ?? false,
       detached: opts.detached ?? false,
     });

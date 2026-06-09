@@ -53,12 +53,6 @@ pub struct BackendState {
     pub relay_tx: Option<mpsc::UnboundedSender<rodeo_proto::BackendMessage>>,
     /// Profile scanner for collecting microprofiler dumps
     pub profile_scanner: Option<rbx_control::profile_scanner::ProfileScannerHandle>,
-    /// Log scanner for pairing Studios with their log files (notify-based)
-    pub log_scanner: Option<rbx_control::studio::log_scanner::LogScannerHandle>,
-    /// Active log-dump runs: execution_id → (log file path, byte offset at run start)
-    pub log_runs: HashMap<String, (std::path::PathBuf, u64)>,
-    /// Channel to trigger log dumps from plugin_ws relay path to run_master_loop
-    pub log_dump_tx: Option<mpsc::UnboundedSender<LogDumpTask>>,
     /// Local port this backend listens on (for Studio plugin connections)
     pub port: u16,
     /// Cancellation token for graceful shutdown — SIGTERM cancels this
@@ -83,9 +77,6 @@ impl BackendState {
             port: 0,
             shutdown_token: tokio_util::sync::CancellationToken::new(),
             profile_scanner: None,
-            log_scanner: None,
-            log_runs: HashMap::new(),
-            log_dump_tx: None,
             master_id: String::new(),
         }
     }
@@ -298,19 +289,7 @@ pub struct ActiveRun {
     pub client_tx: mpsc::UnboundedSender<ClientMsg>,
     pub state: ProcessState,
     pub profile: Option<bool>,
-    pub logs: Option<bool>,
     pub created_at: f64,
-}
-
-/// Task sent from plugin_ws relay path to run_master_loop to perform a log dump.
-pub struct LogDumpTask {
-    pub execution_id: String,
-    /// Owning Studio's session_guid — baked into the dump filename for
-    /// `ls | grep <session_guid>` correlation. Empty if the VM wasn't stamped
-    /// (shouldn't happen post-handshake, but defensive).
-    pub session_guid: String,
-    pub log_path: std::path::PathBuf,
-    pub start_offset: u64,
 }
 
 impl MasterState {
@@ -466,7 +445,6 @@ impl MasterState {
                 instance_path: run.instance_path.clone(),
                 script_path: run.script_path.clone(),
                 profile: run.profile,
-                logs: run.logs,
                 ..Default::default()
             }))),
             ..Default::default()
@@ -506,7 +484,6 @@ impl MasterState {
             client_tx: run.client_tx,
             state: ProcessState::PROCESS_STATE_RUNNING,
             profile: run.profile,
-            logs: run.logs,
             created_at: run.created_at,
         });
     }
@@ -737,9 +714,8 @@ impl MasterState {
     pub fn complete_run(&mut self, execution_id: &str, new_state: ProcessState) {
         let run = self.active_runs.get(execution_id);
         let is_profiled = run.map(|r| r.profile == Some(true)).unwrap_or(false);
-        let is_logs = run.map(|r| r.logs == Some(true)).unwrap_or(false);
 
-        if is_profiled || is_logs {
+        if is_profiled {
             // Keep run alive until file transfers complete.
             if let Some(run) = self.active_runs.get_mut(execution_id) {
                 run.state = new_state;

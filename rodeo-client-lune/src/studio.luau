@@ -204,7 +204,6 @@ export type OpenOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	logs: string?,
 	noHud: boolean?,
 }
 
@@ -213,7 +212,6 @@ export type OpenPlaceOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	logs: string?,
 	noHud: boolean?,
 }
 
@@ -221,7 +219,6 @@ export type OpenFileOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	logs: string?,
 	noHud: boolean?,
 }
 
@@ -262,7 +259,6 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			fflags = opts.fflags or {},
 			background = opts.background == true,
 			profile = opts.profile == true,
-			logs = opts.logs,
 			noHud = opts.noHud == true,
 			detached = opts.detached == true,
 		})
@@ -275,7 +271,6 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			fflags = opts.fflags or {},
 			background = opts.background == true,
 			profile = opts.profile == true,
-			logs = opts.logs,
 			noHud = opts.noHud == true,
 			detached = opts.detached == true,
 		})
@@ -289,7 +284,6 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			fflags = opts.fflags or {},
 			background = opts.background == true,
 			profile = opts.profile == true,
-			logs = opts.logs,
 			noHud = opts.noHud == true,
 			detached = opts.detached == true,
 		})

@@ -258,7 +258,6 @@ fn parse_open_opts(params: &Value) -> rodeo_client::studio::OpenOpts {
             .unwrap_or_default(),
         background: params.get("background").and_then(|v| v.as_bool()).unwrap_or(false),
         profile: params.get("profile").and_then(|v| v.as_bool()).unwrap_or(false),
-        logs: params.get("logs").and_then(|v| v.as_str()).map(String::from),
         save: params.get("save").and_then(|v| v.as_str()).map(String::from),
         detached: params.get("detached").and_then(|v| v.as_bool()).unwrap_or(false),
         fflag_file: params.get("fflagFile").and_then(|v| v.as_str()).map(String::from),
@@ -285,7 +284,6 @@ async fn studio_open_place(state: Arc<State>, params: Value) -> Result<Value> {
         fflags: opts.fflags,
         background: opts.background,
         profile: opts.profile,
-        logs: opts.logs,
         save: opts.save,
         detached: opts.detached,
         fflag_file: opts.fflag_file,
@@ -308,7 +306,6 @@ async fn studio_open_file(state: Arc<State>, params: Value) -> Result<Value> {
         fflags: opts.fflags,
         background: opts.background,
         profile: opts.profile,
-        logs: opts.logs,
         save: opts.save,
         detached: opts.detached,
         fflag_file: opts.fflag_file,
@@ -447,7 +444,6 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
     // stream file bytes back over stdio — that path was a ~10× amplification
     // of on-disk data and a quadratic hazard for Luau's line-buffered reader.
     let profile_dir = params.get("profileDir").and_then(|v| v.as_str()).map(std::path::PathBuf::from);
-    let logs_dir = params.get("logsDir").and_then(|v| v.as_str()).map(std::path::PathBuf::from);
 
     let opts = RunCodeOpts {
         source: params.get("source").and_then(|v| v.as_str()).unwrap_or("").to_string(),
@@ -459,7 +455,6 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
             .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())
             .unwrap_or_default(),
         profile: profile_dir.is_some(),
-        logs: logs_dir.is_some(),
         process_name: params.get("processName").and_then(|v| v.as_str()).map(String::from),
         log_filter: Some(log_filter),
         instance_path: params.get("instancePath").and_then(|v| v.as_str()).map(String::from),
@@ -467,7 +462,6 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
         return_file: params.get("returnFile").and_then(|v| v.as_str()).map(String::from),
         output_file: params.get("outputFile").and_then(|v| v.as_str()).map(String::from),
         profile_dir,
-        logs_dir,
         job: params.get("job").and_then(|v| v.as_str()).map(String::from),
     };
 
@@ -503,8 +497,8 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
                         }
                         rodeo_client::run::RunStreamEvent::FileChunk { .. } => {
                             // rodeo-client writes files directly to disk via
-                            // profile_dir/logs_dir passed in opts. Nothing to
-                            // forward to the JSON-RPC caller.
+                            // profile_dir passed in opts. Nothing to forward to
+                            // the JSON-RPC caller.
                         }
                         rodeo_client::run::RunStreamEvent::RpcCall { .. } => {
                             // Handled entirely inside the daemon. Not surfaced to

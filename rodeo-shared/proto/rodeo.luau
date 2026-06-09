@@ -678,7 +678,6 @@ type _LaunchStudioCommandFields = {
 	savePath: string?,
 	fflagFile: string?,
 	sessionGuid: string,
-	logsDir: string?,
 	noHud: boolean,
 	profile: boolean,
 }
@@ -692,7 +691,6 @@ export type _LaunchStudioCommandPartialFields = {
 	savePath: string?,
 	fflagFile: string?,
 	sessionGuid: string?,
-	logsDir: string?,
 	noHud: boolean?,
 	profile: boolean?,
 }
@@ -780,7 +778,6 @@ type _SubmitRequestFields = {
 	processName: string?,
 	profile: boolean?,
 	logFilter: LogFilter?,
-	logs: boolean?,
 }
 
 export type _SubmitRequestPartialFields = {
@@ -801,7 +798,6 @@ export type _SubmitRequestPartialFields = {
 	processName: string?,
 	profile: boolean?,
 	logFilter: (LogFilter | _LogFilterPartialFields)?,
-	logs: boolean?,
 }
 
 export type SubmitRequest = typeof(setmetatable({} :: _SubmitRequestFields, {} :: _SubmitRequestImpl))
@@ -978,7 +974,6 @@ type _LaunchStudioRequestFields = {
 	detached: boolean,
 	savePath: string?,
 	fflagFile: string?,
-	logsDir: string?,
 	noHud: boolean,
 	profile: boolean,
 }
@@ -992,7 +987,6 @@ export type _LaunchStudioRequestPartialFields = {
 	detached: boolean?,
 	savePath: string?,
 	fflagFile: string?,
-	logsDir: string?,
 	noHud: boolean?,
 	profile: boolean?,
 }
@@ -1774,7 +1768,6 @@ type _RunCommandFields = {
 	scriptPath: string?,
 	profile: boolean?,
 	logFilter: LogFilter?,
-	logs: boolean?,
 }
 
 export type _RunCommandPartialFields = {
@@ -1791,7 +1784,6 @@ export type _RunCommandPartialFields = {
 	scriptPath: string?,
 	profile: boolean?,
 	logFilter: (LogFilter | _LogFilterPartialFields)?,
-	logs: boolean?,
 }
 
 export type RunCommand = typeof(setmetatable({} :: _RunCommandFields, {} :: _RunCommandImpl))
@@ -5246,7 +5238,6 @@ do
 			savePath = if data == nil or data.savePath == nil then nil else data.savePath,
 			fflagFile = if data == nil or data.fflagFile == nil then nil else data.fflagFile,
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-			logsDir = if data == nil or data.logsDir == nil then nil else data.logsDir,
 			noHud = if data == nil or data.noHud == nil then false else data.noHud,
 			profile = if data == nil or data.profile == nil then false else data.profile,
 		}, _LaunchStudioCommandImpl :: _LaunchStudioCommandImpl)
@@ -5296,11 +5287,6 @@ do
 		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
-		end
-
-		if self.logsDir ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.logsDir)
 		end
 
 		if self.noHud then
@@ -5382,11 +5368,6 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.sessionGuid = proto.decodeString(value)
 					continue
-				elseif field == 9 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.logsDir = proto.decodeString(value)
-					continue
 				end
 
 				local length
@@ -5450,10 +5431,6 @@ do
 			output.sessionGuid = self.sessionGuid
 		end
 
-		if self.logsDir ~= nil then
-			output.logsDir = self.logsDir
-		end
-
 		if self.noHud then
 			output.noHud = self.noHud
 		end
@@ -5503,10 +5480,6 @@ do
 
 		if input.sessionGuid ~= nil then
 			self.sessionGuid = input.sessionGuid
-		end
-
-		if input.logsDir ~= nil then
-			self.logsDir = input.logsDir
 		end
 
 		if input.noHud ~= nil then
@@ -5831,7 +5804,6 @@ do
 					data.logFilter :: any
 				)
 				else (data.logFilter :: any) :: LogFilter,
-			logs = if data == nil or data.logs == nil then nil else data.logs,
 		}, _SubmitRequestImpl :: _SubmitRequestImpl)
 	end
 
@@ -5927,11 +5899,6 @@ do
 			output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 		end
 
-		if self.logs ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 24, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.logs then 1 else 0)
-		end
-
 		local shrunkBuffer = buffer.create(cursor)
 		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
 		return shrunkBuffer
@@ -5965,11 +5932,6 @@ do
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
 					self.profile = value ~= 0
-					continue
-				elseif field == 24 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.logs = value ~= 0
 					continue
 				end
 
@@ -6140,10 +6102,6 @@ do
 			output.logFilter = self.logFilter:jsonEncode()
 		end
 
-		if self.logs ~= nil then
-			output.logs = self.logs
-		end
-
 		return output
 	end
 
@@ -6221,10 +6179,6 @@ do
 
 		if input.logFilter ~= nil then
 			self.logFilter = messages.LogFilter.jsonDecode(input.logFilter)
-		end
-
-		if input.logs ~= nil then
-			self.logs = input.logs
 		end
 
 		return self
@@ -7010,7 +6964,6 @@ do
 			detached = if data == nil or data.detached == nil then false else data.detached,
 			savePath = if data == nil or data.savePath == nil then nil else data.savePath,
 			fflagFile = if data == nil or data.fflagFile == nil then nil else data.fflagFile,
-			logsDir = if data == nil or data.logsDir == nil then nil else data.logsDir,
 			noHud = if data == nil or data.noHud == nil then false else data.noHud,
 			profile = if data == nil or data.profile == nil then false else data.profile,
 		}, _LaunchStudioRequestImpl :: _LaunchStudioRequestImpl)
@@ -7060,11 +7013,6 @@ do
 		if self.fflagFile ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.fflagFile)
-		end
-
-		if self.logsDir ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.logsDir)
 		end
 
 		if self.noHud then
@@ -7146,11 +7094,6 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.fflagFile = proto.decodeString(value)
 					continue
-				elseif field == 9 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.logsDir = proto.decodeString(value)
-					continue
 				end
 
 				local length
@@ -7214,10 +7157,6 @@ do
 			output.fflagFile = self.fflagFile
 		end
 
-		if self.logsDir ~= nil then
-			output.logsDir = self.logsDir
-		end
-
 		if self.noHud then
 			output.noHud = self.noHud
 		end
@@ -7267,10 +7206,6 @@ do
 
 		if input.fflagFile ~= nil then
 			self.fflagFile = input.fflagFile
-		end
-
-		if input.logsDir ~= nil then
-			self.logsDir = input.logsDir
 		end
 
 		if input.noHud ~= nil then
@@ -11479,7 +11414,6 @@ do
 					data.logFilter :: any
 				)
 				else (data.logFilter :: any) :: LogFilter,
-			logs = if data == nil or data.logs == nil then nil else data.logs,
 		}, _RunCommandImpl :: _RunCommandImpl)
 	end
 
@@ -11555,11 +11489,6 @@ do
 			output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 		end
 
-		if self.logs ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 20, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.logs then 1 else 0)
-		end
-
 		local shrunkBuffer = buffer.create(cursor)
 		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
 		return shrunkBuffer
@@ -11593,11 +11522,6 @@ do
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
 					self.profile = value ~= 0
-					continue
-				elseif field == 20 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.logs = value ~= 0
 					continue
 				end
 
@@ -11732,10 +11656,6 @@ do
 			output.logFilter = self.logFilter:jsonEncode()
 		end
 
-		if self.logs ~= nil then
-			output.logs = self.logs
-		end
-
 		return output
 	end
 
@@ -11797,10 +11717,6 @@ do
 
 		if input.logFilter ~= nil then
 			self.logFilter = messages.LogFilter.jsonDecode(input.logFilter)
-		end
-
-		if input.logs ~= nil then
-			self.logs = input.logs
 		end
 
 		return self
