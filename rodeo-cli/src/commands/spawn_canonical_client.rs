@@ -81,8 +81,8 @@ struct State {
     // Arc itself is cloned out of the map.
     studios: Mutex<HashMap<String, Arc<Mutex<Studio>>>>,
     /// Running in-Studio multiplayer tests, keyed by a minted `mp` handle.
-    /// `MultiplayerTest` is mutable (addPlayers refreshes its client handles),
-    /// so wrap each in a Mutex.
+    /// `MultiplayerTest` is mutable (connectClient/disconnectClient update its
+    /// client handles), so wrap each in a Mutex.
     mp_tests: Mutex<HashMap<String, Arc<Mutex<MultiplayerTest>>>>,
     next_handle: AtomicU64,
     /// Cancel channels keyed by the client-provided streamId — `vm.cancelRun`
@@ -214,9 +214,9 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
         // mp.* — in-Studio multiplayer test lifecycle, keyed by an `mpHandle`
         // returned from studio.startMultiplayerTest. The server/client VMs are
         // run via vm.runCode by vmId like any other VM.
-        "mp.addPlayers" => mp_add_players(state, params).await,
-        "mp.leave" => mp_leave(state, params).await,
-        "mp.end" => mp_end(state, params).await,
+        "mp.connectClient" => mp_connect_client(state, params).await,
+        "mp.disconnectClient" => mp_disconnect_client(state, params).await,
+        "mp.close" => mp_close(state, params).await,
 
         // vm.*
         "vm.runCode" => vm_run_code(state, params).await,
@@ -360,13 +360,12 @@ async fn studio_get_vms(state: Arc<State>, params: Value) -> Result<Value> {
 
 async fn studio_start_multiplayer_test(state: Arc<State>, params: Value) -> Result<Value> {
     let studio = lookup_studio(&state, &params).await?;
-    let num_players = params.get("numPlayers").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
-    let mp = studio.lock().await.start_multiplayer_test(num_players).await?;
+    // Always server-only: clients connect one at a time via mp.connectClient.
+    let mp = studio.lock().await.start_multiplayer_test(0).await?;
     let server_vm_id = mp.server.vm_id.clone();
-    let client_vm_ids: Vec<String> = mp.clients.iter().map(|v| v.vm_id.clone()).collect();
     let handle = state.mint_handle("mp");
     state.mp_tests.lock().await.insert(handle.clone(), Arc::new(Mutex::new(mp)));
-    Ok(json!({ "mpHandle": handle, "serverVmId": server_vm_id, "clientVmIds": client_vm_ids }))
+    Ok(json!({ "mpHandle": handle, "serverVmId": server_vm_id }))
 }
 
 async fn lookup_mp(state: &State, params: &Value) -> Result<Arc<Mutex<MultiplayerTest>>> {
@@ -376,28 +375,27 @@ async fn lookup_mp(state: &State, params: &Value) -> Result<Arc<Mutex<Multiplaye
         .ok_or_else(|| anyhow!("unknown mpHandle: {h}"))
 }
 
-async fn mp_add_players(state: Arc<State>, params: Value) -> Result<Value> {
+async fn mp_connect_client(state: Arc<State>, params: Value) -> Result<Value> {
     let mp = lookup_mp(&state, &params).await?;
-    let n = params.get("numPlayers").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
-    let mut guard = mp.lock().await;
-    guard.add_players(n).await?;
-    let client_vm_ids: Vec<String> = guard.clients.iter().map(|v| v.vm_id.clone()).collect();
-    Ok(json!({ "clientVmIds": client_vm_ids }))
+    let client = mp.lock().await.connect_client().await?;
+    Ok(json!({ "clientVmId": client.vm_id }))
 }
 
-async fn mp_leave(state: Arc<State>, params: Value) -> Result<Value> {
+async fn mp_disconnect_client(state: Arc<State>, params: Value) -> Result<Value> {
     let mp = lookup_mp(&state, &params).await?;
-    let index = params.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-    mp.lock().await.leave(index).await?;
+    let vm_id = params.get("vmId").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("vmId required"))?
+        .to_string();
+    mp.lock().await.disconnect_client(&vm_id).await?;
     Ok(Value::Null)
 }
 
-async fn mp_end(state: Arc<State>, params: Value) -> Result<Value> {
+async fn mp_close(state: Arc<State>, params: Value) -> Result<Value> {
     let handle = params.get("mpHandle").and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("mpHandle required"))?
         .to_string();
     let mp = lookup_mp(&state, &params).await?;
-    mp.lock().await.end().await?;
+    mp.lock().await.close().await?;
     state.mp_tests.lock().await.remove(&handle);
     Ok(Value::Null)
 }

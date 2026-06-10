@@ -1,7 +1,7 @@
 --!strict
--- Run all transform benchmarks via rodeo-client-lune against an isolated
--- multiplayer-test server (no edit Studio in the background), then generate
--- diff flamegraphs vs the bulkmoveto baseline.
+-- Run all transform benchmarks via rodeo-client-lune against a multiplayer-test
+-- server (one fresh test per scenario, hosted by a single profiled edit
+-- Studio), then generate diff flamegraphs vs the bulkmoveto baseline.
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -38,9 +38,12 @@ end)
 local client = rodeo.connect({ port = PORT })
 task.wait(1)
 local backend = client.getLocalStudio()
+-- profile=true at edit-Studio launch so the multiplayer-test server DataModels
+-- (spawned by Studio, not rodeo) inherit the profiler FFlags.
+local studio = backend.open({ profile = true, noHud = true, background = true })
 
 local function profile(runCodeOpts: rodeo.RunCodeOpts)
-	local server = backend.startMultiplayerTest({ profile = true, noHud = true })
+	local server = studio.startMultiplayerTest()
 	server.runCode(runCodeOpts)
 	server.close()
 end
@@ -101,6 +104,7 @@ profile({
 	profile = PROFILES .. "/motor6d_transform_hack",
 })
 
+studio.close()
 client.close()
 serve:kill()
 

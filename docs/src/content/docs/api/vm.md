@@ -52,6 +52,7 @@ type VmSnapshot = {
 	gameName: string?,
 	connected: boolean,
 	activeRuns: number,
+	clientName: string?,
 }
 ```
 

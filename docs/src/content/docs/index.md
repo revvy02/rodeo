@@ -4,9 +4,6 @@ description: An automation tool for headless studio workflows that extends Roblo
 template: splash
 hero:
   tagline: An automation tool for headless studio workflows that extends Roblox's Luau runtime with a complete standard library.
-  image:
-    file: ../../assets/rodeo.jpeg
-    alt: rodeo
   actions:
     - text: Get started
       link: /rodeo/getting-started/installation/

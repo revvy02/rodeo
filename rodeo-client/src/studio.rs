@@ -362,42 +362,48 @@ pub struct MultiplayerTest {
 impl MultiplayerTest {
     pub fn server(&self) -> &Vm { &self.server }
     pub fn clients(&self) -> &[Vm] { &self.clients }
-    pub fn client(&self, index: usize) -> Option<&Vm> { self.clients.get(index) }
 
-    /// Add `n` more client DataModels (`StudioTestService:AddPlayers` on the
-    /// server), then refresh the client handles once they register.
-    pub async fn add_players(&mut self, n: u32) -> Result<()> {
-        let want = self.clients.len() + n as usize;
+    /// Connect one more client DataModel (`StudioTestService:AddPlayers(1)` on
+    /// the server), wait for it to register, and return its Vm handle.
+    pub async fn connect_client(&mut self) -> Result<Vm> {
+        let known: std::collections::HashSet<String> =
+            self.clients.iter().map(|v| v.vm_id.clone()).collect();
         self.server.run_code(crate::run::RunCodeOpts {
-            source: format!("game:GetService(\"StudioTestService\"):AddPlayers({n})\nreturn true"),
+            source: "game:GetService(\"StudioTestService\"):AddPlayers(1)\nreturn true".to_string(),
             ..Default::default()
         }).await?;
+        let known_pred = known.clone();
         let inst = self.wait_for_instance(move |s| {
-            s.vms.iter().filter(|v| v.dom == "client").count() >= want
+            s.vms.iter().any(|v| v.dom == "client" && !known_pred.contains(&v.vm_id))
         }).await?;
         self.clients = inst.vms.iter()
             .filter(|v| v.dom == "client")
             .map(|v| Vm::from_studio_vm(&inst, v, self.transport.clone()))
             .collect();
+        self.clients.iter()
+            .find(|v| !known.contains(&v.vm_id))
+            .cloned()
+            .ok_or_else(|| anyhow!("new client VM did not appear in studio state"))
+    }
+
+    /// Disconnect one client (`StudioTestService:LeaveTest` on that client VM),
+    /// identified by its vmId.
+    pub async fn disconnect_client(&mut self, vm_id: &str) -> Result<()> {
+        let index = self.clients.iter().position(|v| v.vm_id == vm_id)
+            .ok_or_else(|| anyhow!("no client with vmId {vm_id} in this test"))?;
+        self.clients[index].run_code(crate::run::RunCodeOpts {
+            source: "local s = game:GetService(\"StudioTestService\")\n\
+                     if s:CanLeaveTest() then s:LeaveTest() end\nreturn true".to_string(),
+            ..Default::default()
+        }).await?;
+        self.clients.remove(index);
         Ok(())
     }
 
     /// End the whole session (`StudioTestService:EndTest` on the server).
-    pub async fn end(&self) -> Result<()> {
+    pub async fn close(&self) -> Result<()> {
         self.server.run_code(crate::run::RunCodeOpts {
             source: "game:GetService(\"StudioTestService\"):EndTest(\"end\")\nreturn true".to_string(),
-            ..Default::default()
-        }).await?;
-        Ok(())
-    }
-
-    /// Disconnect one client (`StudioTestService:LeaveTest` on that client VM).
-    pub async fn leave(&self, index: usize) -> Result<()> {
-        let client = self.clients.get(index)
-            .ok_or_else(|| anyhow!("no client at index {index}"))?;
-        client.run_code(crate::run::RunCodeOpts {
-            source: "local s = game:GetService(\"StudioTestService\")\n\
-                     if s:CanLeaveTest() then s:LeaveTest() end\nreturn true".to_string(),
             ..Default::default()
         }).await?;
         Ok(())

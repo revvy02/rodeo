@@ -59,9 +59,9 @@ export type BackendCtx = {
 };
 
 // Spawns `rodeo serve` and exposes the local StudioBackend without opening an
-// edit Studio. Use for tests that exercise backend-level APIs (e.g.
-// startMultiplayerTest) where opening an extra Studio process would just be
-// waste and would mask the "no edit Studio required" property.
+// edit Studio. Use for tests that need to open their own Studio with
+// non-default options (e.g. profile:true), where setupStudio's extra Studio
+// process would just be waste.
 export function setupBackend(port: number = nextPort++): BackendCtx {
   const ctx = { port } as BackendCtx;
   let serverProc: ReturnType<typeof Bun.spawn> | null = null;

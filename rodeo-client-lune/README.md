@@ -35,7 +35,7 @@ client.close()
 
 `StudioBackend.open(opts)` / `.openPlace(opts)` / `.openFile(opts)` → `Studio` with:
 - `editVm.runCode({ source, target?, showReturn?, ... })` → `RunResult { ok, output, exitCode }`
-- `startMultiplayerTest(opts)` → `MultiplayerTestServer`
+- `startMultiplayerTest()` → `MultiplayerTestServer` (a Vm with `connectClient()` → `MultiplayerTestClient` with `disconnect()`, and `close()` to end the test)
 - `close()`
 
 See [`src/init.luau`](src/init.luau) for the full type surface.

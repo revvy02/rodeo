@@ -19,7 +19,6 @@ These APIs are not finalized and may change in backwards incompatible ways.
 | [OpenOpts](#openopts) |  |
 | [OpenPlaceOpts](#openplaceopts) |  |
 | [SaveResult](#saveresult) |  |
-| [StartMultiplayerTestOpts](#startmultiplayertestopts) |  |
 | [Studio](#studio) |  |
 | [StudioBackend](#studiobackend) |  |
 
@@ -55,7 +54,6 @@ type OpenFileOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	logs: string?,
 	noHud: boolean?,
 }
 ```
@@ -69,7 +67,6 @@ type OpenOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	logs: string?,
 	noHud: boolean?,
 }
 ```
@@ -84,7 +81,6 @@ type OpenPlaceOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	logs: string?,
 	noHud: boolean?,
 }
 ```
@@ -98,21 +94,6 @@ type SaveResult = {
 	saved: boolean,
 	path: string?,
 	error: string?,
-}
-```
-
----
-
-### StartMultiplayerTestOpts
-
-```luau
-type StartMultiplayerTestOpts = {
-	placeFile: string?,
-	placeId: number?,
-	fflags: { string }?,
-	profile: boolean?,
-	runId: string?,
-	noHud: boolean?,
 }
 ```
 
@@ -132,6 +113,7 @@ type Studio = {
 	save: () -> SaveResult,
 	close: () -> (),
 	getVms: () -> { vmMod.Vm },
+	startMultiplayerTest: () -> MultiplayerTestServer,
 }
 ```
 
@@ -146,7 +128,6 @@ type StudioBackend = {
 	open: (opts: OpenOpts?) -> Studio,
 	openPlace: (opts: OpenPlaceOpts) -> Studio,
 	openFile: (path: string, opts: OpenFileOpts?) -> Studio,
-	startMultiplayerTest: (opts: StartMultiplayerTestOpts?) -> MultiplayerTestServer,
 }
 ```
 

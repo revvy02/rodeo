@@ -1,4 +1,4 @@
--- StudioBackend + Studio + MultiplayerTest.
+-- StudioBackend + Studio + MultiplayerTestServer/MultiplayerTestClient.
 -- Mirrors the TS client's class hierarchy; dot-notation method surface.
 
 local vmMod = require("./vm")
@@ -64,17 +64,18 @@ export type SaveResult = {
 }
 
 -- ---------------------------------------------------------------------------
--- MultiplayerTest — an in-Studio multiplayer test session (server + N clients).
--- The server/client VMs are ordinary Vms (run via vm.runCode); the session
--- lifecycle (addPlayers/leave/end) is layered on top.
+-- MultiplayerTestServer / MultiplayerTestClient — Vm-with-extras. Same data
+-- plane (runCode, vmId, ...) as any Vm, plus the test lifecycle keyed by the
+-- daemon-side mpHandle.
 -- ---------------------------------------------------------------------------
 
-export type MultiplayerTest = {
-	server: vmMod.Vm,
-	clients: { vmMod.Vm },
-	addPlayers: (numPlayers: number) -> (),
-	leave: (index: number) -> (),
-	["end"]: () -> (),
+export type MultiplayerTestClient = vmMod.Vm & {
+	disconnect: () -> (),
+}
+
+export type MultiplayerTestServer = vmMod.Vm & {
+	connectClient: () -> MultiplayerTestClient,
+	close: () -> (),
 }
 
 export type Studio = {
@@ -88,7 +89,7 @@ export type Studio = {
 	save: () -> SaveResult,
 	close: () -> (),
 	getVms: () -> { vmMod.Vm },
-	startMultiplayerTest: (numPlayers: number) -> MultiplayerTest,
+	startMultiplayerTest: () -> MultiplayerTestServer,
 }
 
 local function createStudio(
@@ -149,10 +150,9 @@ local function createStudio(
 		daemon.call("studio.close", { studioHandle = handle })
 	end
 
-	function self.startMultiplayerTest(numPlayers)
+	function self.startMultiplayerTest()
 		local resp = daemon.call("studio.startMultiplayerTest", {
 			studioHandle = handle,
-			numPlayers = numPlayers,
 		})
 		local mpHandle = resp.mpHandle
 
@@ -165,32 +165,24 @@ local function createStudio(
 			return vmMod.create(snap, daemon)
 		end
 
-		local function buildClients(vmIds: { string }): { vmMod.Vm }
-			local clients = {}
-			for _, vmId in vmIds do
-				table.insert(clients, buildVm(vmId))
+		local server = buildVm(resp.serverVmId) :: any
+
+		function server.connectClient(): MultiplayerTestClient
+			local r = daemon.call("mp.connectClient", { mpHandle = mpHandle })
+			local client = buildVm(r.clientVmId) :: any
+
+			function client.disconnect()
+				daemon.call("mp.disconnectClient", { mpHandle = mpHandle, vmId = client.vmId })
 			end
-			return clients
+
+			return client :: MultiplayerTestClient
 		end
 
-		local mp = {} :: MultiplayerTest
-		mp.server = buildVm(resp.serverVmId)
-		mp.clients = buildClients(resp.clientVmIds or {})
-
-		function mp.addPlayers(n)
-			local r = daemon.call("mp.addPlayers", { mpHandle = mpHandle, numPlayers = n })
-			mp.clients = buildClients(r.clientVmIds or {})
+		function server.close()
+			daemon.call("mp.close", { mpHandle = mpHandle })
 		end
 
-		function mp.leave(index)
-			daemon.call("mp.leave", { mpHandle = mpHandle, index = index })
-		end
-
-		mp["end"] = function()
-			daemon.call("mp.end", { mpHandle = mpHandle })
-		end
-
-		return mp
+		return server :: MultiplayerTestServer
 	end
 
 	return self

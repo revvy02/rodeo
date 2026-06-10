@@ -74,7 +74,6 @@ backend.open({
     noHud = false,        -- hide Studio's HUD panels
     fflags = {},          -- FFlag overrides for this Studio
     profile = false,      -- attach microprofiler
-    logs = "./logs",      -- capture Studio logs to this directory
 })
 ```
 
@@ -128,13 +127,14 @@ end
 
 ## Multiplayer test
 
-`startMultiplayerTest` launches an isolated play-test server process and lets you connect simulated clients. Each is its own VM that you target via the returned handles.
+`studio.startMultiplayerTest` starts a multiplayer test from an open Studio: a server process plus simulated clients that you connect one at a time. Each is its own VM that you target via the returned handles.
 
 ```luau
 local backend = client.getLocalStudio()
+local studio = backend.open({})
 
--- Launch the server VM. No edit Studio required.
-local server = backend.startMultiplayerTest({})
+-- Start the test. The returned server handle is an ordinary Vm.
+local server = studio.startMultiplayerTest()
 
 -- Run code on the server.
 local sr = server.runCode({
@@ -167,14 +167,13 @@ server.close()
 
 ### Picking a place
 
-By default `startMultiplayerTest` uses a blank place. Override with `placeId` or `placeFile`:
+The test runs whatever place the Studio has open. To test a published place or a local file, open the Studio on it first:
 
 ```luau
-local server = backend.startMultiplayerTest({
-    placeId = 12345,
-    -- or:
-    -- placeFile = "./my-place.rbxl",
-})
+local studio = backend.openPlace({ placeId = 12345 })
+-- or:
+-- local studio = backend.openFile("./my-place.rbxl")
+local server = studio.startMultiplayerTest()
 ```
 
 ### Disconnecting a client
@@ -215,6 +214,10 @@ local result = vm.runCode({
 })
 print(result.output)
 --> '{ name = "Frank", score = 99 }'
+
+-- The parsed return value is also on the result. Bracket notation,
+-- because `return` is a reserved keyword:
+print(result["return"].name)  --> "Frank"
 ```
 
 For machine-parseable output, write to a file. `.luau` / `.lua` extensions emit Luau source; any other extension emits JSON:
@@ -227,17 +230,6 @@ vm.runCode({
 ```
 
 ### Logs
-
-Stream Studio logs to disk:
-
-```luau
-vm.runCode({
-    source = 'print("hello")',
-    logs = "./.rodeo/logs",
-})
-```
-
-Per-run `.log` files land in that directory.
 
 Filter which categories the runtime captures:
 
@@ -300,7 +292,6 @@ local result = vm.runCode({
     target = "run:server",
     showReturn = true,
     returnFile = "./out.json",
-    logs = "./logs",
     scriptArgs = { "--mode", "ci" },
     cacheRequires = true,
 })

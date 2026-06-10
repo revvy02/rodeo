@@ -25,12 +25,12 @@ task.spawn(drain, serve.stderr)
 
 local client: rodeo.RodeoClient? = nil
 local studio: rodeo.Studio? = nil
-local mp: rodeo.MultiplayerTest? = nil
+local mp: rodeo.MultiplayerTestServer? = nil
 
 local function cleanup()
 	if mp then
 		pcall(function()
-			(mp :: any)["end"]()
+			(mp :: any).close()
 		end)
 	end
 	if studio then
@@ -70,16 +70,16 @@ studio = openResult :: rodeo.Studio
 local s = openResult :: rodeo.Studio
 print("✓ edit studio opened")
 
--- 3. Start a server-only multiplayer test (0 clients).
-local startOk, startResult = pcall(s.startMultiplayerTest, 0)
+-- 3. Start a multiplayer test (server only; clients join via connectClient).
+local startOk, startResult = pcall(s.startMultiplayerTest)
 if not startOk then
 	die(`studio.startMultiplayerTest failed: {startResult}`)
 end
-mp = startResult :: rodeo.MultiplayerTest
-print(`✓ mp started (server vmId: {mp.server.vmId}, {#mp.clients} client(s))`)
+mp = startResult :: rodeo.MultiplayerTestServer
+print(`✓ mp started (server vmId: {mp.vmId})`)
 
--- 4. Run a trivial script on the server VM (an ordinary Vm).
-local runOk, runResult = pcall(mp.server.runCode, { source = "return 1 + 1", showReturn = true })
+-- 4. Run a trivial script on the server (an ordinary Vm).
+local runOk, runResult = pcall(mp.runCode, { source = "return 1 + 1", showReturn = true })
 if not runOk then
 	die(`runCode errored: {runResult}`)
 end

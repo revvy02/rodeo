@@ -87,7 +87,6 @@ Run a script in Studio
 * `--detached` — Keep Studio/Player running after rodeo exits
 * `--no-hud` — Strip Studio UI panels (Explorer/Properties/Toolbox/Output/etc.) for a minimal launch. Applies only to the Studio rodeo launches; restored on exit
 * `--profile <PROFILE>` — Enable microprofiler auto-capture and collect dumps (optional: output directory)
-* `--logs <LOGS>` — Collect Studio log output for this run (optional: output directory)
 * `--save <SAVE>` — Save Studio place on exit, optionally to a specific path
 * `--fflag.override <KEY=VALUE>` — Set FFlag override (Key=Value, repeatable)
 * `--fflag.file <PATH>` — Load FFlag overrides from a JSON file

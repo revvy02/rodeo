@@ -441,60 +441,68 @@ export class Studio {
     return (studio.vms ?? []).map((sv) => new Vm(buildVmSnapshot(studio, sv), this.daemon));
   }
 
-  /** Start an isolated multiplayer test (one server + `numPlayers` clients).
-   *  Requires this Studio to be open (the headless backend-level entrypoint is
-   *  gone). Returns a MultiplayerTest holding Vm handles for the server and
-   *  each client; run code via the normal `vm.runCode` path on those handles. */
-  async startMultiplayerTest(numPlayers: number): Promise<MultiplayerTest> {
+  /** Start an in-Studio multiplayer test (server only — connect players via
+   *  `connectClient()` on the returned handle). Requires this Studio to be
+   *  open: the server DataModel is spawned from its edit DataModel. The
+   *  returned server is an ordinary Vm (run code via `runCode`) with the test
+   *  lifecycle layered on top; `close()` tears down the whole test. */
+  async startMultiplayerTest(): Promise<MultiplayerTestServer> {
     const resp = await this.daemon.request<{
       mpHandle: string;
       serverVmId: string;
-      clientVmIds: string[];
-    }>("studio.startMultiplayerTest", { studioHandle: this.studioHandle, numPlayers });
+    }>("studio.startMultiplayerTest", { studioHandle: this.studioHandle });
 
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
-    const server = vmById(state, resp.serverVmId, this.daemon, "server");
-    const clients = resp.clientVmIds.map((id) => vmById(state, id, this.daemon, "client"));
-    return new MultiplayerTest(resp.mpHandle, server, clients, this.daemon);
+    const snap = findVmSnapshot(state, resp.serverVmId);
+    if (!snap) throw new Error(`server VM ${resp.serverVmId} not found`);
+    return new MultiplayerTestServer(resp.mpHandle, snap, this.daemon);
   }
 }
 
 // ---------------------------------------------------------------------------
-// MultiplayerTest — handle to an isolated multiplayer test. `server` and
-// `clients` are ordinary Vm handles (run code via `runCode`); the lifecycle
-// methods are keyed by the daemon-side `mpHandle`.
+// MultiplayerTestServer / MultiplayerTestClient — Vm-with-extras. Same data
+// plane (.runCode, .vmId, ...) as any Vm, plus the test lifecycle keyed by the
+// daemon-side `mpHandle`.
 // ---------------------------------------------------------------------------
 
-export class MultiplayerTest {
-  server: Vm;
-  clients: Vm[];
+export class MultiplayerTestServer extends Vm {
   private mpHandle: string;
-  private daemon: Daemon;
 
-  constructor(mpHandle: string, server: Vm, clients: Vm[], daemon: Daemon) {
+  constructor(mpHandle: string, snap: VmSnapshotDTO, daemon: Daemon) {
+    super(snap, daemon);
     this.mpHandle = mpHandle;
-    this.server = server;
-    this.clients = clients;
-    this.daemon = daemon;
   }
 
-  /** Add `n` more client players; rebuilds `clients` from the latest state. */
-  async addPlayers(n: number): Promise<void> {
-    const resp = await this.daemon.request<{ clientVmIds: string[] }>(
-      "mp.addPlayers", { mpHandle: this.mpHandle, numPlayers: n },
+  /** Connect one more client player; returns its Vm-shaped handle. */
+  async connectClient(): Promise<MultiplayerTestClient> {
+    const resp = await this.daemon.request<{ clientVmId: string }>(
+      "mp.connectClient", { mpHandle: this.mpHandle },
     );
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
-    this.clients = resp.clientVmIds.map((id) => vmById(state, id, this.daemon, "client"));
+    const snap = findVmSnapshot(state, resp.clientVmId);
+    if (!snap) throw new Error(`client VM ${resp.clientVmId} not found`);
+    return new MultiplayerTestClient(this.mpHandle, snap, this.daemon);
   }
 
-  /** Disconnect the client player at `index`. */
-  async leave(index: number): Promise<void> {
-    await this.daemon.request<null>("mp.leave", { mpHandle: this.mpHandle, index });
+  /** End the multiplayer test (tears down the server + all clients). */
+  async close(): Promise<void> {
+    await this.daemon.request<null>("mp.close", { mpHandle: this.mpHandle });
+  }
+}
+
+export class MultiplayerTestClient extends Vm {
+  private mpHandle: string;
+
+  constructor(mpHandle: string, snap: VmSnapshotDTO, daemon: Daemon) {
+    super(snap, daemon);
+    this.mpHandle = mpHandle;
   }
 
-  /** End the multiplayer test (tears down server + all clients). */
-  async end(): Promise<void> {
-    await this.daemon.request<null>("mp.end", { mpHandle: this.mpHandle });
+  /** Disconnect this client from the test. */
+  async disconnect(): Promise<void> {
+    await this.daemon.request<null>(
+      "mp.disconnectClient", { mpHandle: this.mpHandle, vmId: this.vmId },
+    );
   }
 }
 
@@ -540,14 +548,6 @@ function findVmSnapshot(state: StateSnapshotDTO, vmId: string): VmSnapshotDTO | 
     }
   }
   return undefined;
-}
-
-// Resolve a vmId in a studio-first snapshot to a Vm, throwing a labeled error
-// if no studio owns it. `label` ("server"/"client") sharpens the message.
-function vmById(state: StateSnapshotDTO, vmId: string, daemon: Daemon, label: string): Vm {
-  const snap = findVmSnapshot(state, vmId);
-  if (!snap) throw new Error(`${label} VM ${vmId} not found`);
-  return new Vm(snap, daemon);
 }
 
 function parseUrl(url: string): { host: string; port: number } {
