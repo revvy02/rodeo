@@ -592,10 +592,35 @@ async fn handle_master_msg(
 
                 // Pre-warm Studio's accessibility connection in the background
                 // so the first save's AX menu press doesn't absorb the ~25s
-                // first-contact settle inside the save budget.
+                // first-contact settle inside the save budget. Holds only a
+                // Weak ref between probes: the Studio owns the daemon
+                // SlotHandle and process handle, and pinning the Arc for the
+                // warm window delays teardown and exhausts launch slots
+                // (observed: processCleanup pid lingering + Studio opens
+                // queueing behind phantom slots).
                 {
-                    let warm_instance = instance.clone();
-                    tokio::task::spawn_blocking(move || warm_instance.warm_save_menu());
+                    let warm_weak = std::sync::Arc::downgrade(&instance);
+                    let warm_sg = sg_short.to_string();
+                    tokio::spawn(async move {
+                        let started = std::time::Instant::now();
+                        let deadline = started + std::time::Duration::from_secs(60);
+                        while std::time::Instant::now() < deadline {
+                            let Some(studio) = warm_weak.upgrade() else { return };
+                            let done = tokio::task::spawn_blocking(move || studio.warm_save_menu_once())
+                                .await
+                                .unwrap_or(true);
+                            if done {
+                                tracing::debug!(
+                                    session_guid = warm_sg.as_str(),
+                                    elapsed_ms = started.elapsed().as_millis() as u64,
+                                    "save menu pre-warm: ready",
+                                );
+                                return;
+                            }
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        }
+                        tracing::debug!(session_guid = warm_sg.as_str(), "save menu pre-warm: gave up after 60s");
+                    });
                 }
 
                 // Event-driven exit handler — replaces the old 2-second polling

@@ -340,42 +340,30 @@ impl Studio {
         Ok(())
     }
 
-    /// Pre-warm Studio's accessibility connection by walking its menu bar
-    /// until "File > Save to File" answers (read-only — nothing is pressed).
-    /// The first AX contact with a freshly-launched Studio can block ~25s
-    /// while its main thread settles; doing that walk here, in the background
-    /// at launch, keeps it out of the save budget so `save()`'s menu press
-    /// responds in milliseconds. Blocking — call from a blocking-ok context.
-    /// No-op on non-macOS.
-    pub fn warm_save_menu(&self) {
+    /// One pre-warm probe of Studio's accessibility connection: walk the menu
+    /// bar for "File > Save to File" (read-only — nothing is pressed).
+    /// Returns true when the caller should stop probing (item answered, or
+    /// the handle is gone). The first AX contact with a freshly-launched
+    /// Studio can block ~25s while its main thread settles; probing in the
+    /// background at launch keeps that out of the save budget so `save()`'s
+    /// menu press responds in milliseconds.
+    ///
+    /// Single-shot by design: the caller loops while holding only a `Weak`
+    /// to this Studio — holding the Studio (and with it the daemon
+    /// SlotHandle + process handle) across a long warm loop delays teardown
+    /// and exhausts launch slots.
+    pub fn warm_save_menu_once(&self) -> bool {
         #[cfg(target_os = "macos")]
         {
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
-            let started = std::time::Instant::now();
-            while std::time::Instant::now() < deadline {
-                let result = {
-                    let guard = self.handle.lock().unwrap();
-                    match *guard {
-                        Some(ref handle) => Some(handle.find_menu_item("File", "Save to File")),
-                        None => None,
-                    }
-                };
-                match result {
-                    Some(Ok(true)) => {
-                        tracing::info!(
-                            pid = self.pid,
-                            elapsed_ms = started.elapsed().as_millis() as u64,
-                            "save menu pre-warm: ready",
-                        );
-                        return;
-                    }
-                    Some(Ok(false)) | Some(Err(_)) => {
-                        std::thread::sleep(std::time::Duration::from_secs(2));
-                    }
-                    None => return, // handle gone — Studio closing
-                }
+            let guard = self.handle.lock().unwrap();
+            match *guard {
+                Some(ref handle) => matches!(handle.find_menu_item("File", "Save to File"), Ok(true)),
+                None => true, // handle gone — Studio closing, stop probing
             }
-            tracing::warn!(pid = self.pid, "save menu pre-warm: gave up after 60s");
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            true
         }
     }
 
