@@ -46,6 +46,16 @@ export function runRodeo(args: string[], opts: { timeout?: number } = {}): ProcR
 // full command line); Windows has neither, so shell to PowerShell's CIM process
 // query, whose `CommandLine` field gives the same match surface. `pattern` is a
 // regex in both worlds (pgrep -f and PowerShell -match both take regex).
+//
+// Every Windows query excludes its own powershell (`$_.ProcessId -ne $PID`):
+// the query's command line contains the pattern text, which itself matches the
+// pattern as a regex. Without the exclusion, processMatches always returns
+// true (it counts itself), killMatching can Stop-Process its own host and
+// abort the pipeline before later matches die, and pidsMatching captures a
+// transient powershell pid that Windows then reuses for an unrelated process
+// inside waitForPidsGone's window — a phantom "survivor" (observed as a flaky
+// false fail in processCleanup). pgrep/pkill on macOS already exclude
+// themselves.
 const IS_WINDOWS = process.platform === "win32";
 
 /** True if any running process's command line matches `pattern`. */
@@ -53,7 +63,7 @@ export function processMatches(pattern: string): boolean {
   if (IS_WINDOWS) {
     const r = Bun.spawnSync([
       "powershell", "-NoProfile", "-Command",
-      `@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '${pattern}' }).Count`,
+      `@(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -match '${pattern}' }).Count`,
     ]);
     return parseInt(r.stdout.toString().trim() || "0", 10) > 0;
   }
@@ -65,7 +75,7 @@ export function killMatching(pattern: string): void {
   if (IS_WINDOWS) {
     Bun.spawnSync([
       "powershell", "-NoProfile", "-Command",
-      `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '${pattern}' } | ` +
+      `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -match '${pattern}' } | ` +
         `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
     ]);
     return;
@@ -78,7 +88,7 @@ export function pidsMatching(pattern: string): number[] {
   const r = IS_WINDOWS
     ? Bun.spawnSync([
         "powershell", "-NoProfile", "-Command",
-        `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '${pattern}' } | ForEach-Object { $_.ProcessId }`,
+        `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -match '${pattern}' } | ForEach-Object { $_.ProcessId }`,
       ])
     : Bun.spawnSync(["pgrep", "-f", pattern]);
   return r.stdout.toString().split(/\s+/).map((s) => parseInt(s, 10)).filter((n) => n > 0);
@@ -96,10 +106,18 @@ export async function waitForPidsGone(pids: number[], timeoutMs: number): Promis
   if (IS_WINDOWS) {
     const sec = Math.max(1, Math.ceil(timeoutMs / 1000));
     const idList = pids.join(",");
+    // The post-wait liveness check must ignore ZOMBIES: a freshly-killed
+    // process lingers in .NET's process list (which Get-Process uses) for as
+    // long as anything holds a handle to it — Studio's crash handler holds
+    // one for a few seconds after Studio dies. Wait-Process correctly returns
+    // immediately (the zombie's handle is signaled), but a bare Get-Process
+    // then reports the corpse as alive and this helper returned a false
+    // "survivor" (~50% processCleanup flake). `HasExited` reads the handle's
+    // signaled state, so it's true for zombies.
     const r = Bun.spawnSync([
       "powershell", "-NoProfile", "-Command",
       `Wait-Process -Id ${idList} -Timeout ${sec} -ErrorAction SilentlyContinue; ` +
-        `if (@(${idList}) | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }) { exit 1 } else { exit 0 }`,
+        `if (@(${idList}) | Where-Object { $p = Get-Process -Id $_ -ErrorAction SilentlyContinue; $p -and -not $p.HasExited }) { exit 1 } else { exit 0 }`,
     ]);
     return r.exitCode === 0;
   }
