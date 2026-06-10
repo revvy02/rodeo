@@ -909,6 +909,7 @@ async fn handle_run_code(
         },
         target,
         vm_id,
+        session: None,
         job,
         log_filter: proto::LogFilter {
             enable_warn: true,
@@ -1064,6 +1065,7 @@ async fn handle_luau_tool(
         script,
         target,
         vm_id: None,
+        session: None,
         job: None,
         log_filter: proto::LogFilter {
             enable_warn: true,

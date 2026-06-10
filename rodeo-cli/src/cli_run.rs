@@ -25,6 +25,9 @@ pub struct RunRequest {
     pub script: String,
     pub target: String,
     pub vm_id: Option<String>,
+    /// Pin target-routed execution to this studio session (e.g. the Studio
+    /// this run just launched via `--place`).
+    pub session: Option<String>,
     pub job: Option<String>,
     pub log_filter: proto::LogFilter,
     pub cache_requires: bool,
@@ -61,6 +64,7 @@ pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<Run
         output_file: request.output_file,
         profile_dir: request.profile_dir,
         job: request.job,
+        session: request.session,
     };
 
     let mut stream = match request.vm_id.as_deref() {

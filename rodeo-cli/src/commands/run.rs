@@ -298,10 +298,17 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
             cfg.profile.is_some(),
         )
         .await?);
-    } else if cfg.place_target.is_some() && !RodeoClient::connect(&cfg.host, cfg.port)?.is_healthy().await {
-        // Studio launch (edit/run/test modes)
-        let handle = super::serve::start_full_serve(cfg.port).await?;
-        serve_handle = Some(handle);
+    } else if cfg.place_target.is_some() {
+        // `--place` guarantees the place is opened: launch a Studio for it
+        // whether or not a serve already exists on the port. No serve →
+        // bootstrap one first; existing serve → open an additional studio
+        // session on it (the backend supports N concurrent sessions). The
+        // run below is pinned to the launched session so the script provably
+        // executes in THIS place, not load-balanced across resident studios.
+        if !RodeoClient::connect(&cfg.host, cfg.port)?.is_healthy().await {
+            let handle = super::serve::start_full_serve(cfg.port).await?;
+            serve_handle = Some(handle);
+        }
 
         if let Some(ref target) = cfg.place_target {
             let req = build_launch_request(target, !cfg.focus, cfg.save.clone(), cfg.fflags.clone(), cfg.detached, cfg.no_hud, cfg.profile.is_some(), &cfg.host, cfg.port).await?;
@@ -351,6 +358,9 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         script: cfg.script_content,
         target: cfg.target.unwrap_or_default(),
         vm_id: cfg.vm,
+        // Pin to the studio we launched (if any) so the script runs in the
+        // requested place even when other studios share this serve.
+        session: launched_studio_id.clone(),
         job: cfg.job,
         log_filter: cfg.log_filter,
         cache_requires: cfg.cache_requires,
@@ -386,7 +396,15 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         drop(handle);
         r?
     } else {
-        cli_run::run_piped(&cfg.host, cfg.port, request).await?
+        let r = cli_run::run_piped(&cfg.host, cfg.port, request).await;
+        // Same one-shot hygiene when we launched a studio on someone else's
+        // serve: close it after the run (unless --detached).
+        if let Some(ref sid) = launched_studio_id {
+            if !cfg.detached {
+                let _ = RodeoClient::connect(&cfg.host, cfg.port)?.close_studio_raw(sid).await;
+            }
+        }
+        r?
     };
 
     Ok(result)

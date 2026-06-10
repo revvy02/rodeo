@@ -28,6 +28,12 @@ pub struct RunCodeOpts {
     pub output_file: Option<String>,
     pub profile_dir: Option<std::path::PathBuf>,
     pub job: Option<String>,
+    /// Session filter for target-routed submissions (empty `vm_id`): the
+    /// server only matches VMs belonging to this studio session. Lets a
+    /// caller that just launched a Studio pin its run to that Studio instead
+    /// of load-balancing across every session on the serve. Ignored on the
+    /// `Vm`-handle path, which pins by the VM's own session.
+    pub session: Option<String>,
 }
 
 /// Buffered result of `Vm::run_code` — aligns with the TS RunResult shape.
@@ -138,15 +144,17 @@ pub(crate) async fn run_stream_target(
     transport: Arc<Transport>,
     opts: RunCodeOpts,
 ) -> Result<RunStream> {
-    run_stream(transport, "", None, opts).await
+    let session = opts.session.clone();
+    run_stream(transport, "", session, opts).await
 }
 
 pub(crate) async fn run_buffered_target(
     transport: Arc<Transport>,
     opts: RunCodeOpts,
 ) -> Result<RunResult> {
-    // vm_id empty → server routes by target
-    run_buffered(transport, "", None, opts).await
+    // vm_id empty → server routes by target (within opts.session if set)
+    let session = opts.session.clone();
+    run_buffered(transport, "", session, opts).await
 }
 
 pub(crate) async fn run_buffered(
