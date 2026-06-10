@@ -103,8 +103,8 @@ pub struct Studio {
 
 impl Studio {
     /// Spawn a new Studio instance. Installs the rodeo plugin, prepares the
-    /// place file (stamping session_guid), and launches Studio.
-    /// Call [`Self::wait_for_ready`] after storing the handle to block on login.
+    /// place file (stamping session_guid), and launches Studio. Readiness is
+    /// signaled by the plugin's WebSocket connection, not by this handle.
     pub fn spawn(target: PlaceTarget, opts: StudioOptions) -> Result<Self> {
         let session_guid = opts.session_guid.clone();
         let sg_short = &session_guid[..8.min(session_guid.len())];
@@ -149,15 +149,6 @@ impl Studio {
             plugin_path: Some(plugin_path),
             inner,
         })
-    }
-
-    /// Wait for Studio's login gate to pass (post-auth marker in its output).
-    pub fn wait_for_ready(&self) {
-        let pid = self.inner.pid();
-        let sg_short = &self.session_guid[..8.min(self.session_guid.len())];
-        tracing::info!(session_guid = sg_short, pid, "wait_for_ready: waiting on login gate stdout");
-        self.inner.wait_for_ready();
-        tracing::info!(session_guid = sg_short, pid, "wait_for_ready: complete");
     }
 
     // -- Delegates to inner --

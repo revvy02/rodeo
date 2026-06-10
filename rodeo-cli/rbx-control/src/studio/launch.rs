@@ -11,7 +11,7 @@ use anyhow::{bail, Context, Result};
 use rbx_dom_weak::{InstanceBuilder, WeakDom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use crate::fflags::{self, FflagConfig, FflagHandle, FflagTarget};
 use crate::studio::layout;
@@ -81,8 +81,7 @@ impl Default for SaveMode {
 /// before the value drops.
 pub struct Studio {
     handle: std::sync::Mutex<Option<launch_control::Child>>,
-    /// PID stored separately so `kill()` never blocks on the handle mutex
-    /// (wait_for_ready holds it during the login gate).
+    /// PID stored separately so `kill()` never blocks on the handle mutex.
     pid: u32,
     place_path: Option<PathBuf>,
     save_mode: SaveMode,
@@ -94,15 +93,13 @@ pub struct Studio {
     /// Cleaned-once flag — guarantees `cleanup()` runs its body only once.
     cleaned: AtomicBool,
     detached: bool,
-    launched_at: SystemTime,
 }
 
 impl Studio {
     /// Launch a new Studio instance with the given target and options.
     ///
-    /// Returns a handle immediately; Studio is still booting. Call
-    /// [`Self::wait_for_ready`] after storing the handle to block until
-    /// Studio's login flow completes.
+    /// Returns a handle immediately; Studio is still booting. Callers detect
+    /// readiness out of band (rodeo waits for the plugin's WebSocket connect).
     pub fn spawn(target: PlaceTarget, opts: StudioOptions) -> Result<Self> {
         // Apply fflags before launching (Studio reads them at startup).
         let fflag_handle = if !opts.fflags.overrides.is_empty() || opts.fflags.file.is_some() {
@@ -140,14 +137,6 @@ impl Studio {
         let parent_args: Vec<String> =
             vec!["-parentPid".to_string(), std::process::id().to_string()];
 
-        // Capture the launch time BEFORE spawning. On Windows the bootstrapper
-        // creates Studio's log file during the spawn (before launch_control's
-        // adopt-the-real-process handoff returns), so a launched_at recorded
-        // after spawn() would be *later* than the log's creation — and the log
-        // scanner's claim_new_log(launched_at) would then never match it, so
-        // process_log stays unresolved and --logs capture produces nothing.
-        let launched_at = SystemTime::now();
-
         match target {
             PlaceTarget::PlaceId { place_id, universe_id } => {
                 if !matches!(opts.save, SaveMode::NoSave) {
@@ -184,7 +173,6 @@ impl Studio {
                     saved: AtomicBool::new(false),
                     cleaned: AtomicBool::new(false),
                     detached: opts.detached,
-                    launched_at,
                 })
             }
             PlaceTarget::File(ref path) => {
@@ -232,7 +220,6 @@ impl Studio {
                     saved: AtomicBool::new(false),
                     cleaned: AtomicBool::new(false),
                     detached: opts.detached,
-                    launched_at,
                 })
             }
             PlaceTarget::Content(_) => {
@@ -260,36 +247,9 @@ impl Studio {
                     saved: AtomicBool::new(false),
                     cleaned: AtomicBool::new(false),
                     detached: opts.detached,
-                    launched_at,
                 })
             }
         }
-    }
-
-    /// Block until Studio's login flow completes. Returns after login is detected
-    /// or on a 30s timeout.
-    ///
-    /// macOS launches Studio under a pty, so the login marker
-    /// (`Exit stage 'FetchUserInfo'`) lands on stdout. Windows has no tty, so the
-    /// login markers go only to the log file — there we wait on `Authenticated :
-    /// YES` in the log instead. Reading the stdout gate on Windows would just burn
-    /// its full 30s timeout, holding the daemon launch slot and serializing
-    /// parallel launches.
-    pub fn wait_for_ready(&self) {
-        let pid = self.pid;
-        tracing::debug!(pid, "wait_for_ready: waiting on login gate");
-        #[cfg(target_os = "macos")]
-        {
-            let mut handle_guard = self.handle.lock().unwrap();
-            if let Some(ref mut handle) = *handle_guard {
-                wait_for_login_stdout(handle);
-            }
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            wait_for_login_via_log(self.place_path.as_deref(), self.launched_at);
-        }
-        tracing::debug!(pid, "wait_for_ready: complete");
     }
 
     /// Check if Studio process is still running.
@@ -317,12 +277,6 @@ impl Studio {
     /// Path to the place file Studio opened, if any.
     pub fn place_path(&self) -> Option<&Path> {
         self.place_path.as_deref()
-    }
-
-    /// Wall-clock time this Studio was spawned. Useful for pairing with log
-    /// files created at startup.
-    pub fn launched_at(&self) -> SystemTime {
-        self.launched_at
     }
 
     /// Whether this Studio was launched with `detached: true` — when true,
@@ -700,139 +654,3 @@ pub fn studio_content_path() -> Option<String> {
         .map(|s| s.content_path().to_string_lossy().to_string())
 }
 
-// ---------------------------------------------------------------------------
-// Login gate: detect login completion
-// ---------------------------------------------------------------------------
-
-/// macOS: wait for Studio to finish its login flow by scanning stdout.
-/// Returns on the `Exit stage 'FetchUserInfo'` marker or 30s timeout.
-///
-/// Pipes are auto-drained by `launch_control`'s background threads; no manual
-/// drain needed.
-#[cfg(target_os = "macos")]
-pub fn wait_for_login_stdout(child: &mut launch_control::Child) {
-    let stdout = match child.stdout.as_ref() {
-        Some(stdout) => stdout,
-        None => {
-            tracing::debug!("login gate: no stdout channel available");
-            return;
-        }
-    };
-
-    let deadline = Instant::now() + Duration::from_secs(30);
-
-    loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            tracing::debug!("login gate: timeout waiting for FetchUserInfo");
-            return;
-        }
-
-        match stdout.recv_timeout(remaining) {
-            Ok(line) => {
-                if line.contains("Exit stage 'FetchUserInfo'") {
-                    tracing::debug!("login gate: FetchUserInfo completed");
-                    return;
-                }
-            }
-            Err(_) => {
-                tracing::debug!("login gate: stdout channel closed");
-                return;
-            }
-        }
-    }
-}
-
-/// Windows (and other non-macOS): Studio has no tty, so its login markers go only
-/// to the log file. Wait for `Authenticated : YES` in the Studio's own log.
-/// Returns when login completes or after a 30s timeout. The Studio's log is
-/// identified by the unique temp place filename echoed in the log's command-line
-/// header (robust under concurrent launches); with no place file (PlaceId
-/// targets) fall back to the newest log created at/after `launched_at`.
-#[cfg(not(target_os = "macos"))]
-fn wait_for_login_via_log(place_path: Option<&Path>, launched_at: SystemTime) {
-    let logs_dir = match crate::paths::roblox_logs_dir() {
-        Some(d) => d,
-        None => {
-            tracing::debug!("login gate(log): no Roblox logs dir");
-            return;
-        }
-    };
-    let deadline = Instant::now() + Duration::from_secs(30);
-    let since = launched_at
-        .checked_sub(Duration::from_secs(5))
-        .unwrap_or(launched_at);
-    let id_marker = place_path
-        .and_then(|p| p.file_name())
-        .and_then(|n| n.to_str())
-        .map(|s| s.to_string());
-
-    // Phase 1: locate our Studio's log.
-    let log = loop {
-        if let Some(p) = find_login_log(&logs_dir, since, id_marker.as_deref()) {
-            break p;
-        }
-        if Instant::now() >= deadline {
-            tracing::debug!("login gate(log): timeout locating Studio log");
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(200));
-    };
-
-    // Phase 2: wait for login completion.
-    loop {
-        if let Ok(content) = std::fs::read_to_string(&log) {
-            if content.contains("Authenticated : YES") {
-                tracing::debug!("login gate(log): authenticated");
-                return;
-            }
-        }
-        if Instant::now() >= deadline {
-            tracing::debug!("login gate(log): timeout waiting for Authenticated");
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(200));
-    }
-}
-
-/// Find the `*_Studio_*_last.log` for our launch: if `id_marker` is set (the temp
-/// place filename), require the log's contents to contain it; otherwise take the
-/// newest log modified at/after `since`.
-#[cfg(not(target_os = "macos"))]
-fn find_login_log(logs_dir: &Path, since: SystemTime, id_marker: Option<&str>) -> Option<PathBuf> {
-    let mut best: Option<(SystemTime, PathBuf)> = None;
-    for entry in std::fs::read_dir(logs_dir).ok()?.flatten() {
-        let path = entry.path();
-        let name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) => n,
-            None => continue,
-        };
-        if !name.contains("_Studio_") || !name.ends_with("_last.log") {
-            continue;
-        }
-        let mtime = match entry.metadata().and_then(|m| m.modified()) {
-            Ok(t) => t,
-            Err(_) => continue,
-        };
-        if mtime < since {
-            continue;
-        }
-        match id_marker {
-            Some(marker) => {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if content.contains(marker)
-                        && best.as_ref().map_or(true, |(t, _)| mtime > *t)
-                    {
-                        best = Some((mtime, path));
-                    }
-                }
-            }
-            None => {
-                if best.as_ref().map_or(true, |(t, _)| mtime > *t) {
-                    best = Some((mtime, path));
-                }
-            }
-        }
-    }
-    best.map(|(_, p)| p)
-}

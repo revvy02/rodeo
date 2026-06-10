@@ -484,8 +484,8 @@ async fn handle_master_msg(
                 };
                 tracing::info!(session_guid = sg_short, pre_count = pre_ids.len(), "launch: pre-spawn MCP snapshot done, entering spawn_blocking");
 
-                // Phase 1: spawn Studio (blocking — daemon slot + process spawn)
-                // Handle is available immediately after spawn, before login gate
+                // Spawn Studio (blocking). Handle is available immediately;
+                // readiness is signaled by the plugin's WS connect.
                 let spawn_result = tokio::task::spawn_blocking(move || Studio::spawn(target, opts)).await;
                 tracing::info!(session_guid = sg_short, ok = spawn_result.is_ok(), "launch: spawn_blocking returned");
                 let instance = match spawn_result {
@@ -538,9 +538,9 @@ async fn handle_master_msg(
                 }
 
                 // Side-channel: poll list_roblox_studios for the new mcp_studio_id.
-                // Runs in the background so it doesn't block wait_for_ready. First new
-                // entry not already claimed by another studio_instance is attributed
-                // here. Timeout after 30s; launch-order correlation remains as fallback.
+                // First new entry not already claimed by another studio_instance is
+                // attributed here. Timeout after 30s; launch-order correlation
+                // remains as fallback.
                 {
                     let poll_state = ls.clone();
                     let poll_session_guid = session_guid.clone();
@@ -583,12 +583,6 @@ async fn handle_master_msg(
                         }
                     });
                 }
-
-                // Phase 2: wait for login gate (blocking, but Studio is already tracked)
-                tracing::info!(session_guid = sg_short, "launch: entering wait_for_ready");
-                let wait_instance = instance.clone();
-                tokio::task::spawn_blocking(move || wait_instance.wait_for_ready()).await.ok();
-                tracing::info!(session_guid = sg_short, "launch: wait_for_ready returned");
 
                 // Pre-warm Studio's accessibility connection in the background
                 // so the first save's AX menu press doesn't absorb the ~25s
