@@ -2167,10 +2167,13 @@ export type ExecutionDone = Message<"rodeo.ExecutionDone"> & {
   error?: string;
 
   /**
-   * JSON-encoded script return value. Present iff the script returned a
-   * non-nil value. Carried in-memory over the wire so clients can surface
-   * it as `result.return` without round-tripping through a file. Note: no
-   * size cap — very large return values (>256KB) are out of scope.
+   * JSON-encoded script return value, carried in-memory over the wire so
+   * clients can surface it as `result.return` without round-tripping through
+   * a file. Present when the script returned a non-nil value and no return
+   * file was given — a return file always captures the value instead (JSON,
+   * or Luau source for .luau/.lua paths), keeping it off the wire. Values too
+   * large for a single message (transports cap at a few MB) must use a
+   * return file, which streams in chunks and has no size limit.
    *
    * @generated from field: optional string return_value = 4;
    */

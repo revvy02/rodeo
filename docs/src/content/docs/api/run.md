@@ -50,7 +50,9 @@ type RunCodeOpts = {
 	profile: string?,
 	-- Write the script's return value to this host-side path. `.luau`/`.lua`
 	-- emits Luau source (e.g. `return { pos = Vector3.new(1,2,3) }`); any
-	-- other extension emits JSON-encoded tagged structs.
+	-- other extension emits JSON-encoded tagged structs. When set, the value
+	-- lives in the file and `result["return"]` is `nil`; the file path also
+	-- streams in chunks, so it works for values of any size.
 	returnFile: string?,
 	processName: string?,
 	logFilter: LogFilter?,
@@ -66,10 +68,11 @@ type RunResult = {
 	ok: boolean,
 	output: string,
 	exitCode: number,
-	-- JSON-parsed script return value. `nil` if the script returned nothing
-	-- or if the return payload failed to parse (the latter is swallowed
-	-- defensively). Access via bracket notation because `return` is a Luau
-	-- reserved keyword: `result["return"]`.
+	-- JSON-parsed script return value. `nil` if the script returned nothing,
+	-- if `returnFile` captured the value instead, or if the return payload
+	-- failed to parse (the latter is swallowed defensively). Access via
+	-- bracket notation because `return` is a Luau reserved keyword:
+	-- `result["return"]`.
 	["return"]: any?,
 }
 ```

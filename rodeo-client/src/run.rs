@@ -44,8 +44,10 @@ pub struct RunResult {
     pub output: String,
     pub files: HashMap<String, Vec<u8>>,
     /// JSON-encoded return value from the script, untouched. `None` if the
-    /// script didn't return anything. Clients are expected to `JSON.parse` /
-    /// `json.deserialize` and surface as `result.return`.
+    /// script didn't return anything or if a return file captured the value
+    /// instead (the value is in the file, not on the wire). Clients are
+    /// expected to `JSON.parse` / `json.deserialize` and surface as
+    /// `result.return`.
     pub return_value: Option<String>,
 }
 

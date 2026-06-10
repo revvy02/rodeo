@@ -129,24 +129,37 @@ if outputFileStream then
 end
 
 -- Handle return value output. `returnValueJson` is the canonical wire-format
--- (JSON-encoded normalized result); we compute it once and reuse it for both
--- the optional file write and the resultsEvent payload so it can flow over
--- the WS as `ExecutionDone.return_value`.
+-- (JSON-encoded normalized result); it flows over the WS as
+-- `ExecutionDone.return_value` only when no return file was given — a return
+-- file captures the value instead, keeping it off the done message (a single
+-- unchunkable hop whose downstream transports cap at a few MB). File and
+-- stdout writes are size-unbounded: stream.write chunks large payloads.
+
 local returnValueJson: string? = nil
 if success and result ~= nil then
 	local normalized = normalize(result)
-	returnValueJson = HttpService:JSONEncode(normalized)
+	local isLuauReturnFile = returnFile ~= "" and string.match(returnFile, "%.luau?$") ~= nil
+
+	-- The JSON form backs the wire field, --show-return, and non-.luau return
+	-- files; .luau return files serialize to Luau source instead, so the
+	-- (potentially huge) encode is skipped when nothing consumes it.
+	local json: string? = nil
+	if not isLuauReturnFile or showReturn then
+		json = HttpService:JSONEncode(normalized)
+	end
+
 	if returnFile ~= "" then
 		local f = apis.fs.open(returnFile, "w")
-		if string.match(returnFile, "%.luau?$") then
-			apis.stream.write(f, serializeToLuau(normalized))
-		else
-			apis.stream.write(f, returnValueJson)
-		end
+		apis.stream.write(f, if isLuauReturnFile then serializeToLuau(normalized) else json :: string)
 		apis.stream.close(f)
 	end
+
 	if showReturn then
-		apis.stream.write(apis.io.stdout, returnValueJson .. "\n")
+		apis.stream.write(apis.io.stdout, (json :: string) .. "\n")
+	end
+
+	if returnFile == "" then
+		returnValueJson = json
 	end
 end
 

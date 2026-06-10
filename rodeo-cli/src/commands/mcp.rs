@@ -317,7 +317,7 @@ fn run_code_output_schema() -> Arc<JsonObject> {
         "type": "object",
         "properties": {
             "stdout": { "type": "string", "description": "Combined stdout/stderr from the script run." },
-            "return_value": { "type": ["string", "null"], "description": "Raw JSON-encoded return value, or null if the script returned nothing." },
+            "return_value": { "type": ["string", "null"], "description": "Raw JSON-encoded return value. Null if the script returned nothing, or if a return_file captured the value instead." },
             "exit_code": { "type": "integer", "description": "0 on success, non-zero on script error or runtime failure." },
             "error": { "type": ["string", "null"], "description": "Failure message when exit_code is non-zero." }
         },
@@ -948,9 +948,10 @@ async fn handle_run_code(
         }
     }
 
-    // Return value now flows over the wire — no disk read or temp file
+    // Return value flows over the wire — no disk read or temp file
     // management here. If the caller explicitly passed `return_file`, the
-    // plugin already wrote JSON to that path as a side effect.
+    // plugin wrote the value to that path instead (JSON, or Luau source for
+    // .luau paths) and return_value is absent.
     let return_value = result.return_value.clone();
 
     let error = if result.exit_code != 0 {

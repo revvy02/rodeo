@@ -49,11 +49,40 @@ return function(rpc)
 		end
 	end
 
+	-- Each write is one RPC message to the host; oversized messages sever the
+	-- WS connection (or are refused by the WS client) instead of erroring, so
+	-- large payloads are split into chunks. (repeat/until so an empty write
+	-- still makes one call, matching the unchunked behavior.)
+	-- 4MB leaves room for JSON escaping inflation (~2x worst case) inside the
+	-- envelope before the WS server's 16MB frame cap.
+	local WRITE_CHUNK = 4 * 1024 * 1024
+
 	function stream.write(handle, data)
-		rpc.call("stream_write", runtime.StreamWriteRequest.new({
-			handle = handle.__handle,
-			data = tostring(data),
-		}))
+		local s = tostring(data)
+		local len = #s
+		local offset = 1
+		repeat
+			local last = math.min(offset + WRITE_CHUNK - 1, len)
+			if last < len then
+				-- Cuts must land on codepoint boundaries: every hop (the RPC
+				-- JSONEncode, WS text frames, serde on the host) rejects
+				-- invalid UTF-8, and a chunk holding half a codepoint hangs
+				-- the call. utf8.offset(0) gives the start of the codepoint
+				-- containing the byte after the cut; if that codepoint
+				-- straddles the cut, end the chunk just before it. (The
+				-- offset guard keeps progress on non-UTF-8 data, which the
+				-- transport rejects regardless.)
+				local cpStart = utf8.offset(s, 0, last + 1)
+				if cpStart ~= nil and cpStart > offset then
+					last = cpStart - 1
+				end
+			end
+			rpc.call("stream_write", runtime.StreamWriteRequest.new({
+				handle = handle.__handle,
+				data = string.sub(s, offset, last),
+			}))
+			offset = last + 1
+		until offset > len
 	end
 
 	function stream.readBytes(handle): buffer
