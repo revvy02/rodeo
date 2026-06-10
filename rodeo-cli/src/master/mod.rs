@@ -125,6 +125,17 @@ impl BackendState {
                 let _ = wanted_job; // placeholder
             }
 
+            // Session filter — `run.session` is the master-minted session_guid.
+            // Applies regardless of target: a default-target run pinned to a
+            // session (e.g. the Studio `run --place` just launched) must never
+            // route into another session's VMs.
+            if let Some(ref wanted) = run.session {
+                let vm_session = vm.session_guid.as_deref();
+                if vm_session != Some(wanted.as_str()) {
+                    continue;
+                }
+            }
+
             if let Some(ref t) = parsed {
                 // Mode-aware matching using VM's reported state
                 let vm_mode = match vm.mode() {
@@ -149,14 +160,6 @@ impl BackendState {
                 };
                 if target_dom != vm_dom {
                     continue;
-                }
-
-                // Session filter — `run.session` is the master-minted session_guid.
-                if let Some(ref wanted) = run.session {
-                    let vm_session = vm.session_guid.as_deref();
-                    if vm_session != Some(wanted.as_str()) {
-                        continue;
-                    }
                 }
             }
 
@@ -391,6 +394,15 @@ impl MasterState {
                 continue;
             }
 
+            // Session filter applies regardless of target — see the sibling
+            // find_match_for_run: a session-pinned default-target run must not
+            // route into another session's VMs.
+            if let Some(ref wanted) = run.session {
+                if vm.session_guid.as_deref() != Some(wanted.as_str()) {
+                    continue;
+                }
+            }
+
             if let Some(ref t) = parsed {
                 let vm_mode = vm.mode.as_deref().unwrap_or("");
                 let vm_dom = vm.dom.as_deref().unwrap_or("");
@@ -405,12 +417,6 @@ impl MasterState {
                 };
                 if target_dom != vm_dom {
                     continue;
-                }
-
-                if let Some(ref wanted) = run.session {
-                    if vm.session_guid.as_deref() != Some(wanted.as_str()) {
-                        continue;
-                    }
                 }
             }
 
