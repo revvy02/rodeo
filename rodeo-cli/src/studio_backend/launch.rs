@@ -199,6 +199,7 @@ impl Studio {
     }
     pub fn place_path(&self) -> Option<&Path> { self.inner.place_path() }
     pub fn save(&self) -> Result<()> { self.inner.save() }
+    pub fn warm_save_menu(&self) { self.inner.warm_save_menu() }
     pub fn kill(&self) { self.inner.kill() }
 
     /// Full cleanup — delegates to inner (save + kill + fflag restore) and

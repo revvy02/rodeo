@@ -336,7 +336,12 @@ async fn handle_master_msg(
                 // mtime changes or we hit the overall deadline.
                 let (saved, path, error) = match (place_path, mtime_before) {
                     (Some(path), Some(before)) => {
-                        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+                        // 60s: generous because a save attempt against a busy /
+                        // still-settling Studio can stall ~25s on its first AX
+                        // or focus contact (worse under suite load); the
+                        // pre-warm usually absorbs that, but the budget must
+                        // tolerate the un-warmed worst case plus retries.
+                        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
                         let mut changed = false;
                         let mut ticks = 0u32;
                         let mut attempts = 0u32;
@@ -368,7 +373,7 @@ async fn handle_master_msg(
                         } else {
                             tracing::warn!(session_guid = sg_short.as_str(), ticks, attempts, "save: timed out waiting for mtime change");
                             (false, Some(path.to_string_lossy().into_owned()),
-                             last_err.or_else(|| Some("mtime did not change within 30s".to_string())))
+                             last_err.or_else(|| Some("mtime did not change within 60s".to_string())))
                         }
                     }
                     // No place path / no baseline mtime — can't confirm via mtime.
@@ -584,6 +589,14 @@ async fn handle_master_msg(
                 let wait_instance = instance.clone();
                 tokio::task::spawn_blocking(move || wait_instance.wait_for_ready()).await.ok();
                 tracing::info!(session_guid = sg_short, "launch: wait_for_ready returned");
+
+                // Pre-warm Studio's accessibility connection in the background
+                // so the first save's AX menu press doesn't absorb the ~25s
+                // first-contact settle inside the save budget.
+                {
+                    let warm_instance = instance.clone();
+                    tokio::task::spawn_blocking(move || warm_instance.warm_save_menu());
+                }
 
                 // Event-driven exit handler — replaces the old 2-second polling
                 // monitor. `Child::on_exit` fires via OS-level wait/kqueue, so we

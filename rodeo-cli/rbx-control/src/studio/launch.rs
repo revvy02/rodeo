@@ -340,6 +340,45 @@ impl Studio {
         Ok(())
     }
 
+    /// Pre-warm Studio's accessibility connection by walking its menu bar
+    /// until "File > Save to File" answers (read-only — nothing is pressed).
+    /// The first AX contact with a freshly-launched Studio can block ~25s
+    /// while its main thread settles; doing that walk here, in the background
+    /// at launch, keeps it out of the save budget so `save()`'s menu press
+    /// responds in milliseconds. Blocking — call from a blocking-ok context.
+    /// No-op on non-macOS.
+    pub fn warm_save_menu(&self) {
+        #[cfg(target_os = "macos")]
+        {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+            let started = std::time::Instant::now();
+            while std::time::Instant::now() < deadline {
+                let result = {
+                    let guard = self.handle.lock().unwrap();
+                    match *guard {
+                        Some(ref handle) => Some(handle.find_menu_item("File", "Save to File")),
+                        None => None,
+                    }
+                };
+                match result {
+                    Some(Ok(true)) => {
+                        tracing::info!(
+                            pid = self.pid,
+                            elapsed_ms = started.elapsed().as_millis() as u64,
+                            "save menu pre-warm: ready",
+                        );
+                        return;
+                    }
+                    Some(Ok(false)) | Some(Err(_)) => {
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                    }
+                    None => return, // handle gone — Studio closing
+                }
+            }
+            tracing::warn!(pid = self.pid, "save menu pre-warm: gave up after 60s");
+        }
+    }
+
     /// Send Cmd+S / Ctrl+S to Studio to trigger save. focus() is best-effort —
     /// if it can't confirm we're frontmost, log a warning but still fire the
     /// keystroke. Rationale: the old ("pre-refactor") save path always fired

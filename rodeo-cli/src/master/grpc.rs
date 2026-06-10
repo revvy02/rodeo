@@ -714,7 +714,10 @@ impl proto::MasterService for RodeoServices {
             }
         }
 
-        match tokio::time::timeout(std::time::Duration::from_secs(35), rx).await {
+        // Backend's save confirm loop runs up to 60s (mtime watch + retries);
+        // wait a bit longer so a slow-but-successful save isn't reported as
+        // a deadline error here.
+        match tokio::time::timeout(std::time::Duration::from_secs(70), rx).await {
             Ok(Ok(result)) => Ok((
                 proto::SavePlaceResponse {
                     saved: result.saved,
@@ -733,7 +736,7 @@ impl proto::MasterService for RodeoServices {
                 let mut guard = self.state.lock().await;
                 guard.pending_saves.remove(&request_id);
                 Err(ConnectError::deadline_exceeded(
-                    "save: no SaveResult from backend within 35s",
+                    "save: no SaveResult from backend within 70s",
                 ))
             }
         }
