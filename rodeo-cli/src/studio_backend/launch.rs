@@ -119,17 +119,28 @@ impl Studio {
         let sg_short = &session_guid[..8.min(session_guid.len())];
         tracing::info!(session_guid = sg_short, "spawn: acquiring daemon slot");
 
-        let daemon_slot = match crate::studio_backend::daemon::acquire_slot(
-            &crate::studio_backend::daemon_paths(),
-            crate::studio_backend::DAEMON_SUBCOMMAND,
-        ) {
-            Ok(slot) => {
-                tracing::info!(session_guid = sg_short, "spawn: acquired daemon slot");
-                Some(slot)
-            }
-            Err(e) => {
-                tracing::warn!(session_guid = sg_short, "studio daemon unavailable, launching without gate: {e}");
-                None
+        // Launch-slot daemon gate. RODEO_STUDIO_DAEMON=0|false skips the gate
+        // entirely (no admission control, no slot pid tracking) — the rest of
+        // the launch path already tolerates a missing slot.
+        let use_daemon = std::env::var("RODEO_STUDIO_DAEMON")
+            .map(|v| v != "0" && v != "false")
+            .unwrap_or(true);
+        let daemon_slot = if !use_daemon {
+            tracing::info!(session_guid = sg_short, "spawn: studio daemon disabled (RODEO_STUDIO_DAEMON)");
+            None
+        } else {
+            match crate::studio_backend::daemon::acquire_slot(
+                &crate::studio_backend::daemon_paths(),
+                crate::studio_backend::DAEMON_SUBCOMMAND,
+            ) {
+                Ok(slot) => {
+                    tracing::info!(session_guid = sg_short, "spawn: acquired daemon slot");
+                    Some(slot)
+                }
+                Err(e) => {
+                    tracing::warn!(session_guid = sg_short, "studio daemon unavailable, launching without gate: {e}");
+                    None
+                }
             }
         };
 

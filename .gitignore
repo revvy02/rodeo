@@ -39,3 +39,4 @@ node_modules
 # Local reference clones (Luau ecosystem projects pulled for docs reference)
 /submodules/lute/
 /submodules/lune/
+.testlogs/
