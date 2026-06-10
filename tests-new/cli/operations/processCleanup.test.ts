@@ -12,6 +12,10 @@ const REAP_TIMEOUT_MS = 20_000;
 
 describe("process cleanup (CLI)", () => {
   it("run --place kills Studio on completion", async () => {
+    // Scope to Studios spawned by THIS test: earlier suite files can leave
+    // intentionally-orphaned Studios behind (detached flows), and asserting
+    // on every rodeo Studio machine-wide makes this test order-dependent.
+    const preExisting = new Set(pidsMatching(RODEO_STUDIO));
     const result = runRodeo([
       "run", "--place", "--port", "46216",
       "--source", "return nil", "--show-return",
@@ -19,16 +23,20 @@ describe("process cleanup (CLI)", () => {
     expect(result.ok).toBe(true);
 
     // As the one-shot run exits it issues CloseStudio; Studio is mid-teardown.
-    const pids = pidsMatching(RODEO_STUDIO);
+    // Only wait on pids this run created (already-gone means already reaped).
+    const pids = pidsMatching(RODEO_STUDIO).filter((p) => !preExisting.has(p));
     expect(await waitForPidsGone(pids, REAP_TIMEOUT_MS)).toBe(true);
   });
 
   it("serve --place kills Studio on SIGTERM", async () => {
+    const preExisting = new Set(pidsMatching(RODEO_STUDIO));
     const bg = spawnBackground(["run", "--port", "46218", "--place"]);
     await waitForVm(46218);
 
-    // Capture the live Studio pid, then kill the serve and confirm it's reaped.
-    const pids = pidsMatching(RODEO_STUDIO);
+    // Capture the Studio pid(s) this serve launched, then kill the serve and
+    // confirm they're reaped.
+    const pids = pidsMatching(RODEO_STUDIO).filter((p) => !preExisting.has(p));
+    expect(pids.length).toBeGreaterThan(0);
     bg.kill();
     await bg.exited;
     expect(await waitForPidsGone(pids, REAP_TIMEOUT_MS)).toBe(true);
