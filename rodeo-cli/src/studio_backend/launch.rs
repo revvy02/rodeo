@@ -1,8 +1,8 @@
 //! Rodeo-specific Studio launch wrappers.
 //!
 //! Composes [`rbx_control::studio::launch::Studio`] with rodeo orchestration:
-//! launch-slot daemon gating, rodeo plugin install, `__RODEO_SESSION_GUID__`
-//! attribute stamping onto place files, and log-scanner binding.
+//! rodeo plugin install, `__RODEO_SESSION_GUID__` attribute stamping onto
+//! place files, and log-scanner binding.
 
 use anyhow::{bail, Context, Result};
 use rbx_dom_weak::{InstanceBuilder, WeakDom};
@@ -89,60 +89,25 @@ pub struct StudioOptions {
 
 /// Handle to a rodeo-managed Studio instance. Composes:
 /// - `inner`: generic process + fflag + save-on-exit mechanics
-/// - `daemon_slot`: launch-slot gate (released on drop)
 /// - `plugin_path`: rodeo plugin file to delete on cleanup
 /// - `log_path`: paired by the log scanner shortly after launch
-///
-/// Field declaration order matters for Drop: `daemon_slot` drops first
-/// (issues `ReleaseSlot`), `inner` drops last (save + kill + fflag restore).
 pub struct Studio {
-    /// Daemon slot handle — released on drop, letting the next queued launch
-    /// through. Declared first so field-drop-order releases before inner's
-    /// save+kill sequence.
-    daemon_slot: std::sync::Mutex<Option<crate::studio_backend::daemon::SlotHandle>>,
     /// Master-minted session identity.
     session_guid: String,
     /// Rodeo plugin file written by `install_launch_plugin` — deleted on cleanup
     /// so a subsequent launch doesn't pick up this launch's plugin.
     plugin_path: Option<PathBuf>,
-    /// Inner generic Studio. Declared last so it drops last (runs save + kill
-    /// + fflag restore after daemon slot has been released).
+    /// Inner generic Studio. Drop runs save + kill + fflag restore.
     inner: rbx_control::studio::launch::Studio,
 }
 
 impl Studio {
-    /// Spawn a new Studio instance. Acquires daemon slot, installs rodeo plugin,
-    /// prepares the place file (stamping session_guid), and launches Studio.
+    /// Spawn a new Studio instance. Installs the rodeo plugin, prepares the
+    /// place file (stamping session_guid), and launches Studio.
     /// Call [`Self::wait_for_ready`] after storing the handle to block on login.
     pub fn spawn(target: PlaceTarget, opts: StudioOptions) -> Result<Self> {
         let session_guid = opts.session_guid.clone();
         let sg_short = &session_guid[..8.min(session_guid.len())];
-        tracing::info!(session_guid = sg_short, "spawn: acquiring daemon slot");
-
-        // Launch-slot daemon gate. RODEO_STUDIO_DAEMON=0|false skips the gate
-        // entirely (no admission control, no slot pid tracking) — the rest of
-        // the launch path already tolerates a missing slot.
-        let use_daemon = std::env::var("RODEO_STUDIO_DAEMON")
-            .map(|v| v != "0" && v != "false")
-            .unwrap_or(true);
-        let daemon_slot = if !use_daemon {
-            tracing::info!(session_guid = sg_short, "spawn: studio daemon disabled (RODEO_STUDIO_DAEMON)");
-            None
-        } else {
-            match crate::studio_backend::daemon::acquire_slot(
-                &crate::studio_backend::daemon_paths(),
-                crate::studio_backend::DAEMON_SUBCOMMAND,
-            ) {
-                Ok(slot) => {
-                    tracing::info!(session_guid = sg_short, "spawn: acquired daemon slot");
-                    Some(slot)
-                }
-                Err(e) => {
-                    tracing::warn!(session_guid = sg_short, "studio daemon unavailable, launching without gate: {e}");
-                    None
-                }
-            }
-        };
 
         tracing::info!(session_guid = sg_short, "spawn: installing launch plugin");
         let plugin_path = install_launch_plugin(&target, opts.port, &session_guid)?;
@@ -180,24 +145,18 @@ impl Studio {
         tracing::info!(session_guid = sg_short, pid = inner.pid(), "spawn: Studio process spawned");
 
         Ok(Studio {
-            daemon_slot: std::sync::Mutex::new(daemon_slot),
             session_guid,
             plugin_path: Some(plugin_path),
             inner,
         })
     }
 
-    /// Wait for Studio login gate, then notify the daemon that the login slot
-    /// can be released to the next queued launch.
+    /// Wait for Studio's login gate to pass (post-auth marker in its output).
     pub fn wait_for_ready(&self) {
         let pid = self.inner.pid();
         let sg_short = &self.session_guid[..8.min(self.session_guid.len())];
         tracing::info!(session_guid = sg_short, pid, "wait_for_ready: waiting on login gate stdout");
         self.inner.wait_for_ready();
-        tracing::info!(session_guid = sg_short, pid, "wait_for_ready: login gate passed, notifying daemon");
-        if let Some(ref mut slot) = *self.daemon_slot.lock().unwrap() {
-            let _ = slot.launch_complete(pid, self.inner.detached());
-        }
         tracing::info!(session_guid = sg_short, pid, "wait_for_ready: complete");
     }
 
@@ -231,19 +190,16 @@ impl Drop for Studio {
             session_guid = sg_short,
             pid = self.inner.pid(),
             detached,
-            "Studio::Drop fired (will release daemon slot)"
+            "Studio::Drop fired"
         );
         if detached {
             // Caller asked Studio to survive parent exit. Skip cleanup —
             // inner Drop handles fflag/layout restore and leaves the Studio
             // process alone. Plugin file stays installed so the running
             // Studio keeps it loaded; explicit `cleanup()` removes it.
-            // daemon_slot still drops via field-drop-order.
             return;
         }
         self.cleanup();
-        // daemon_slot drops automatically on return (field-drop-order),
-        // issuing ReleaseSlot via its own Drop impl.
     }
 }
 

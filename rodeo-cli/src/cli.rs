@@ -161,9 +161,6 @@ pub enum Commands {
         server: ServerArgs,
     },
 
-    /// Internal: studio daemon process (auto-started by studio backends)
-    #[command(name = "__studio-daemon", hide = true)]
-    StudioDaemon,
 
     /// Internal: master server process
     #[command(name = "__master", hide = true)]

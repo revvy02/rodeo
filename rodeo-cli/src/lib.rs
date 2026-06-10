@@ -6,7 +6,6 @@ mod studio_backend;
 mod shared;
 mod runtime;
 mod util;
-mod platform;
 
 use clap::{CommandFactory, FromArgMatches};
 use cli::{Cli, Commands};
@@ -191,7 +190,6 @@ pub async fn run() {
     let subprocess_role: Option<&'static str> = match &cli.command {
         Commands::InternalMaster { .. } => Some("master"),
         Commands::InternalStudioBackend { .. } => Some("studio-backend"),
-        Commands::StudioDaemon => Some("studio-daemon"),
         _ => None,
     };
     let master_bootstrap_id: Option<String> = if let Some(role) = subprocess_role {
@@ -274,7 +272,6 @@ pub async fn run() {
         Commands::Plugin => commands::plugin::main(),
         Commands::Setup => commands::setup::main(),
         Commands::Mcp { server } => commands::mcp::main(&server.host, server.port).await,
-        Commands::StudioDaemon => studio_backend::daemon::main(studio_backend::daemon_run_opts()),
         Commands::InternalMaster { port, ppid } => {
             if let Some(ppid) = ppid { parent_exit::on_parent_exit(ppid); }
             let master_id = master_bootstrap_id.unwrap_or_default();
