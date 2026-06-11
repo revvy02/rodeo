@@ -26,11 +26,20 @@ describe("place", () => {
   // cli/operations/place.test.ts for the full mechanism.
   it("openFile with a corrupted place file rejects with a launch error", async () => {
     const backend = await ctx.client.getLocalStudio();
-    await expect(
-      backend.openFile(
+    // try/catch instead of expect(...).rejects.toThrow(): on Windows,
+    // bun 1.3.14's rejects matcher on this pending promise starves the
+    // client-daemon subprocess's stdout delivery, so the (correctly sent)
+    // launch error never reaches the client and the test hangs to its
+    // timeout. Awaited directly, the same promise rejects in ~20ms.
+    let error: unknown;
+    try {
+      await backend.openFile(
         resolve("tests-new/fixtures/corrupted_place/place.rbxl"),
         { background: true },
-      ),
-    ).rejects.toThrow(/launch/);
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect(String(error)).toMatch(/launch/);
   }, 30_000);
 });
