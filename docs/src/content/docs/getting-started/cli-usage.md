@@ -46,4 +46,4 @@ Studio launches in the background, the script runs, and Studio stays up so subse
 
 ## Where to go next
 
-See the full [CLI reference](/rodeo/cli/) for every subcommand and flag, or move on to [Client usage](/rodeo/getting-started/client-usage/) for programmatic control from Luau.
+See the full [CLI reference](/rodeo/cli/) for every subcommand and flag, or move on to [Runtime usage](/rodeo/getting-started/runtime-usage/) for what scripts can do inside Studio.

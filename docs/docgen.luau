@@ -13,11 +13,15 @@ local process = require("@std/process")
 -- Each entry: source dir (relative to repo root), destination dir, and
 -- lute's auto-generated package name (used to find the output subdir).
 local SECTIONS = {
-	{
-		src = "rodeo-client-lune/src",
-		dest = "docs/src/content/docs/api",
-		luePkg = "rodeo-client-lune",
-	},
+	-- Luau API (rodeo-client-lune) docs are unpublished for now — the client
+	-- surface is still churning. Restore this entry (plus the 'Luau API'
+	-- sidebar section in astro.config.mjs and the index/README links) when it
+	-- stabilizes:
+	-- {
+	-- 	src = "rodeo-client-lune/src",
+	-- 	dest = "docs/src/content/docs/api",
+	-- 	luePkg = "rodeo-client-lune",
+	-- },
 	{
 		src = "rodeo-pkg/rodeo/src",
 		dest = "docs/src/content/docs/runtime",

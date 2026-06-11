@@ -16,7 +16,6 @@
 **[revvy02.github.io/rodeo](https://revvy02.github.io/rodeo/)** — full reference site with search.
 
 - [CLI reference](https://revvy02.github.io/rodeo/cli/) — every subcommand and flag (auto-generated from source).
-- [Luau API](https://revvy02.github.io/rodeo/api/) — drive rodeo programmatically from Luau (Lune / Lute).
 - [@rodeo runtime](https://revvy02.github.io/rodeo/runtime/) — the runtime library scripts get inside Studio (fs, io, stream, process, roblox).
 
 ## Companion tools

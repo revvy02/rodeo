@@ -182,4 +182,3 @@ Useful for staging test fixtures, snapshotting Studio state, or moving subtrees 
 ## Where to go next
 
 - **[@rodeo runtime](/rodeo/runtime/)** — full API reference for `fs`, `io`, `process`, `stream`, `roblox`
-- **[Client usage](/rodeo/getting-started/client-usage/)** — same APIs callable from outside Studio via `rodeo-client-lune`

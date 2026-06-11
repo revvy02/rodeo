@@ -30,9 +30,7 @@ The CLI is a workflow tool built around that runtime. It launches Studio, lets y
 
 - [Installation](/rodeo/getting-started/installation/)
 - [CLI usage](/rodeo/getting-started/cli-usage/)
-- [Client usage](/rodeo/getting-started/client-usage/)
 - [Runtime usage](/rodeo/getting-started/runtime-usage/)
 - [Remote usage](/rodeo/getting-started/remote-usage/)
 - [CLI reference](/rodeo/cli/)
-- [Luau API](/rodeo/api/)
 - [@rodeo runtime](/rodeo/runtime/)

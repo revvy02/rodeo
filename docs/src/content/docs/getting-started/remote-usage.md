@@ -88,4 +88,3 @@ ssh -L 44872:localhost:44872 central.example.com
 ## Where to go next
 
 - **[CLI reference](/rodeo/cli/)** — the full `serve` flag set
-- **[Client usage](/rodeo/getting-started/client-usage/)** — driving Studios via the Luau client
