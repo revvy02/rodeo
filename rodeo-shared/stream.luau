@@ -49,13 +49,18 @@ return function(rpc)
 		end
 	end
 
-	-- Each write is one RPC message to the host; oversized messages sever the
-	-- WS connection (or are refused by the WS client) instead of erroring, so
-	-- large payloads are split into chunks. (repeat/until so an empty write
-	-- still makes one call, matching the unchunked behavior.)
-	-- 4MB leaves room for JSON escaping inflation (~2x worst case) inside the
-	-- envelope before the WS server's 16MB frame cap.
-	local WRITE_CHUNK = 4 * 1024 * 1024
+	-- Each write is one RPC message to the host; oversized messages kill the
+	-- transport instead of erroring, so large payloads are split into chunks.
+	-- (repeat/until so an empty write still makes one call, matching the
+	-- unchunked behavior.)
+	--
+	-- The binding limit is connectrpc's 4,194,304-byte per-envelope cap on
+	-- the backend→master and master→client hops (measured wrapper overhead
+	-- ~170 bytes, plus the file-handle path length). 4,000,000 leaves ~190KB
+	-- of headroom; a full 4MiB chunk is over the cap BY CONSTRUCTION and
+	-- deterministically drops the whole backend. The WS hop (16MB frames)
+	-- never binds, even with worst-case ~2x JSON escaping inflation.
+	local WRITE_CHUNK = 4_000_000
 
 	function stream.write(handle, data)
 		local s = tostring(data)

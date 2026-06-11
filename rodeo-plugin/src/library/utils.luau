@@ -116,6 +116,7 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 	end
 
 	local rpcMod = cloneDep(sharedRoot.rpc, "@rodeo/rpc")
+	local limitsMod = cloneDep(sharedRoot.limits, "@rodeo/limits")
 	local loggingMod = cloneDep(sharedRoot.logging, "@rodeo/logging")
 	local normalizeMod = cloneDep(sharedRoot.normalize, "@rodeo/normalize")
 	local serializeMod = cloneDep(sharedRoot.serialize, "@rodeo/serialize")
@@ -147,6 +148,7 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 
 	addRef("module", module)
 	addRef("rpc", rpcMod)
+	addRef("limits", limitsMod)
 	addRef("runtimeProto", protoFolder.runtime)
 	addRef("logging", loggingMod)
 	addRef("normalize", normalizeMod)

@@ -31,9 +31,11 @@ export type RunResult = {
 	output: string,
 	exitCode: number,
 	-- JSON-parsed script return value. `nil` if the script returned nothing,
-	-- if a return file captured the value instead, or if the return payload
-	-- failed to parse (the latter is swallowed defensively). Access via
-	-- bracket notation because `return` is a Luau reserved keyword:
+	-- if a return file captured the value instead, if the value exceeded the
+	-- 2MiB wire cap with showReturn set (printed in full, omitted here;
+	-- without showReturn an over-cap value fails the run), or if the return
+	-- payload failed to parse (the latter is swallowed defensively). Access
+	-- via bracket notation because `return` is a Luau reserved keyword:
 	-- `result["return"]`.
 	["return"]: any?,
 }

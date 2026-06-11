@@ -239,6 +239,15 @@ pub async fn handle_studio_client<S, R>(
                         }
                     }
                     Some(Ok(Message::Close(_))) | None => break,
+                    Some(Err(e)) => {
+                        // A read error (e.g. a message over the size cap, or a
+                        // protocol/UTF-8 violation) poisons the stream — break
+                        // so the normal disconnect cleanup runs instead of
+                        // silently polling a dead connection while the
+                        // in-flight run waits forever.
+                        tracing::warn!(error = %e, "plugin WS read error; disconnecting vm");
+                        break;
+                    }
                     _ => {}
                 }
             }

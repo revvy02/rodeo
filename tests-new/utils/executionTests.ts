@@ -174,6 +174,67 @@ function rmIfExists(path: string): void {
   try { unlinkSync(path); } catch {}
 }
 
+// ── returnValueCap ───────────────────────────────────────────────────────
+// The in-wire return value (ExecutionDone.return_value) is capped at 2MiB —
+// it rides the done message, a single unchunkable hop with a hard transport
+// limit (an oversized one used to kill the backend↔master stream). Return
+// files and --show-return stdout are chunked and size-unbounded. Sizes hug
+// the cap (±64KiB) so each test moves ~2MB, not transport-killing payloads.
+//
+// NOTE: requires a run fn whose result.return reflects the WIRE field (the
+// API helper). The CLI helper shadows returns via a temp --return file, so
+// the CLI variant of these tests lives in cli/operations/returnCap.test.ts
+// as direct runRodeo invocations.
+export function returnValueCap(run: RunFn): void {
+  const CAP = 2 * 1024 * 1024;
+
+  it("under-cap return value rides the wire", async () => {
+    const n = CAP - 65536;
+    const result = await run({ source: `return string.rep("a", ${n})` });
+    expect(result.ok).toBe(true);
+    expect(typeof result.return).toBe("string");
+    expect((result.return as string).length).toBe(n);
+  });
+
+  it("over-cap return value fails with an actionable error", async () => {
+    const n = CAP + 65536;
+    const result = await run({ source: `return string.rep("a", ${n})` });
+    expect(result.ok).toBe(false);
+    expect(result.return).toBeUndefined();
+    expect(result.output).toContain("return value too large");
+    expect(result.output).toContain("--return");
+  });
+
+  it("over-cap return value succeeds through a return file", async () => {
+    const n = CAP + 65536;
+    const path = mkTmp(".json");
+    try {
+      const result = await run({
+        source: `return string.rep("a", ${n})`,
+        returnFile: path,
+      });
+      expect(result.ok).toBe(true);
+      // JSON of an all-ASCII string is the string plus two quotes.
+      expect(readFileSync(path, "utf-8").length).toBe(n + 2);
+    } finally {
+      rmIfExists(path);
+    }
+  });
+
+  it("over-cap with showReturn prints the value and omits result.return", async () => {
+    const n = CAP + 65536;
+    const result = await run({
+      source: `return "S__" .. string.rep("a", ${n}) .. "__E"`,
+      showReturn: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.return).toBeUndefined();
+    expect(result.output).toContain("S__");
+    expect(result.output).toContain("__E");
+    expect(result.output).toContain("omitted from result.return");
+  });
+}
+
 export function returnFile(run: RunFn): void {
   it("writes plain table to .luau", async () => {
     const path = mkTmp(".luau");

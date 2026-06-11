@@ -44,10 +44,12 @@ pub struct RunResult {
     pub output: String,
     pub files: HashMap<String, Vec<u8>>,
     /// JSON-encoded return value from the script, untouched. `None` if the
-    /// script didn't return anything or if a return file captured the value
-    /// instead (the value is in the file, not on the wire). Clients are
-    /// expected to `JSON.parse` / `json.deserialize` and surface as
-    /// `result.return`.
+    /// script didn't return anything, if a return file captured the value
+    /// instead (the value is in the file, not on the wire), or if the value
+    /// exceeded the 2MiB wire cap with show_return set (printed to stdout,
+    /// omitted here; without show_return an over-cap value fails the run).
+    /// Clients are expected to `JSON.parse` / `json.deserialize` and surface
+    /// as `result.return`.
     pub return_value: Option<String>,
 }
 
@@ -282,10 +284,16 @@ async fn message_loop(
                                         forward_captured(kind, bytes);
                                     }
                                 }
-                                proto::run_event::Event::Disconnect(_reason) => {
+                                proto::run_event::Event::Disconnect(reason) => {
                                     // Stream is lost — server won't send Complete.
-                                    // Synthesize a terminal Done with ok=false so
+                                    // Surface the reason (the only error channel
+                                    // consumers read is the output stream), then
+                                    // synthesize a terminal Done with ok=false so
                                     // consumers don't hang waiting.
+                                    let _ = event_tx.send(RunStreamEvent::Output {
+                                        kind: runtime::CapturedStreamKind::Stderr,
+                                        chunk: format!("rodeo: run disconnected: {reason}\n"),
+                                    });
                                     let files_out = std::mem::take(&mut file_buffers);
                                     let _ = event_tx.send(RunStreamEvent::Done {
                                         result: RunResult {

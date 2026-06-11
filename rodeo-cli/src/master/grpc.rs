@@ -95,17 +95,47 @@ impl proto::BackendService for RodeoServices {
         let bid = backend_id.clone();
         let relay_master_tx = master_tx.clone();
         tokio::spawn(async move {
-            while let Some(Ok(view)) = requests.next().await {
-                let backend_msg = view.to_owned_message();
-                if let Some(msg) = backend_msg.msg {
-                    handle_backend_msg(msg, &relay_state, &bid, &relay_master_tx).await;
+            loop {
+                match requests.next().await {
+                    Some(Ok(view)) => {
+                        let backend_msg = view.to_owned_message();
+                        if let Some(msg) = backend_msg.msg {
+                            handle_backend_msg(msg, &relay_state, &bid, &relay_master_tx).await;
+                        }
+                    }
+                    // A stream error (e.g. an envelope over the connectrpc
+                    // message-size limit) is fatal to the relay — log it;
+                    // the silent `while let Some(Ok(..))` form made these
+                    // teardowns invisible.
+                    Some(Err(e)) => {
+                        tracing::warn!(id = &bid[..8], error = %e, "backend stream error; dropping backend");
+                        break;
+                    }
+                    None => break,
                 }
             }
 
-            // Backend disconnected — clean up
+            // Backend disconnected — clean up. Complete any runs still active
+            // on this backend's VMs: no VmDisconnect can arrive for them
+            // anymore (this stream WAS its delivery channel), so without the
+            // sweep their run clients block forever on a Complete that never
+            // comes.
             tracing::info!(id = &bid[..8], "backend disconnected");
             let mut guard = relay_state.lock().await;
             guard.backends.remove(&bid);
+            let orphaned: Vec<String> = guard.active_runs.values()
+                .filter(|r| guard.backend_for_vm(&r.vm_id).is_none())
+                .map(|r| r.execution_id.clone())
+                .collect();
+            for eid in orphaned {
+                tracing::warn!(execution_id = eid.as_str(), "backend removed: completing orphaned run as disconnected");
+                if let Some(run) = guard.active_runs.get(&eid) {
+                    let _ = run.client_tx.send(crate::master::ClientMsg::Disconnect(
+                        "backend disconnected while the run was active (run aborted)".to_string(),
+                    ));
+                }
+                guard.complete_run(&eid, proto::ProcessState::PROCESS_STATE_KILLED);
+            }
         });
 
         // Return the master → backend stream
@@ -178,6 +208,16 @@ async fn handle_backend_msg(
                 .collect();
             for eid in orphaned {
                 tracing::info!(execution_id = eid.as_str(), vm = &vm_id[..8.min(vm_id.len())], "vm disconnect: completing orphaned run as killed");
+                // Tell the run client this is a disconnect, not a clean
+                // completion — a bare Complete leaves its exit_code at 0,
+                // reporting a run whose output/return value just vanished
+                // as success. (Explicit kills are unaffected: they deliver
+                // ExecutionKilled via the plugin's ack before completing.)
+                if let Some(run) = guard.active_runs.get(&eid) {
+                    let _ = run.client_tx.send(crate::master::ClientMsg::Disconnect(
+                        format!("vm {} disconnected while the run was active", &vm_id[..8.min(vm_id.len())]),
+                    ));
+                }
                 guard.complete_run(&eid, proto::ProcessState::PROCESS_STATE_KILLED);
             }
             // Also drop any pending_runs that were waiting for this specific VM.
@@ -272,11 +312,12 @@ async fn handle_backend_msg(
             // Session-level death event. Per-VM run cleanup is handled
             // separately by `Msg::VmDisconnect` (the OS closes the plugin's
             // socket when the process dies, the WS reader fires VmDisconnect,
-            // master's existing handler orphans active_runs as KILLED). This
-            // handler does only what's session-level: drop session_meta /
-            // studio_instances, fire Error on any open launch stream for
-            // this session, run reconcile() to drain pending_runs scoped to
-            // the dead session.
+            // master's existing handler orphans active_runs as KILLED). Open
+            // launch_studio streams are NOT resolved here — they watch the
+            // backend snapshot, where the backend marks the failed instance
+            // status="error" (see fail_launch and the on_exit handler in
+            // studio_backend/backend.rs). This handler only reconciles to
+            // drain pending_runs scoped to the dead session.
             let session_guid = e.session_guid.clone();
             let reason = e.reason.clone();
             tracing::info!(session_guid = %session_guid, reason = %reason, "session exited");

@@ -588,11 +588,12 @@ message ExecutionDone {
   optional string error = 3;
   // JSON-encoded script return value, carried in-memory over the wire so
   // clients can surface it as `result.return` without round-tripping through
-  // a file. Present when the script returned a non-nil value and no return
-  // file was given — a return file always captures the value instead (JSON,
-  // or Luau source for .luau/.lua paths), keeping it off the wire. Values too
-  // large for a single message (transports cap at a few MB) must use a
-  // return file, which streams in chunks and has no size limit.
+  // a file. Present when the script returned a non-nil value, no return file
+  // was given (a return file always captures the value instead — JSON, or
+  // Luau source for .luau/.lua paths), and the JSON is within the 2MiB wire
+  // cap. Over-cap values fail the run with an actionable error — or, with
+  // show_return, print in full to stdout with this field omitted. Return
+  // files and stdout stream in chunks and have no size limit.
   optional string return_value = 4;
 }
 

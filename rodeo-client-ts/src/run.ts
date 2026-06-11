@@ -33,8 +33,10 @@ export type RunResult = {
   output: string;
   exitCode: number;
   /** JSON-parsed script return value. `undefined` if the script returned
-   *  nothing, if a returnFile captured the value instead, or if the return
-   *  payload failed to parse (the latter is swallowed defensively — never
-   *  throws at the consumer). */
+   *  nothing, if a returnFile captured the value instead, if the value
+   *  exceeded the 2MiB wire cap with showReturn set (printed in full,
+   *  omitted here; without showReturn an over-cap value fails the run), or
+   *  if the return payload failed to parse (the latter is swallowed
+   *  defensively — never throws at the consumer). */
   return?: unknown;
 };

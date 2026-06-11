@@ -60,6 +60,7 @@ _G.__rodeo_eid = executionId
 local normalize = require(ref("normalize"))
 local serializeToLuau = require(ref("serialize"))
 local setupLogging = require(ref("logging"))
+local limits = require(ref("limits"))
 
 -- Setup log capture (LogService → stdout stream, optional output file)
 local logConnection, outputFileStream = setupLogging(LogService, apis.fs, apis.stream, apis.io, logFilter, outputFile)
@@ -136,6 +137,7 @@ end
 -- stdout writes are size-unbounded: stream.write chunks large payloads.
 
 local returnValueJson: string? = nil
+local capError: string? = nil
 if success and result ~= nil then
 	local normalized = normalize(result)
 	local isLuauReturnFile = returnFile ~= "" and string.match(returnFile, "%.luau?$") ~= nil
@@ -159,7 +161,30 @@ if success and result ~= nil then
 	end
 
 	if returnFile == "" then
-		returnValueJson = json
+		-- The wire field rides the done message — a single unchunkable hop
+		-- with a hard transport cap; an oversized value would kill the
+		-- backend↔master stream. File writes and --show-return stdout are
+		-- chunked and size-unbounded, so cap only the wire copy.
+		local j = json :: string
+		local sizeMsg = string.format(
+			"return value too large for the wire (%.1f MB > %d MB)",
+			#j / 1048576,
+			limits.MAX_WIRE_RETURN_BYTES / 1048576
+		)
+		if #j <= limits.MAX_WIRE_RETURN_BYTES then
+			returnValueJson = j
+		elseif showReturn then
+			-- stdout already carried the full value; just flag the omission.
+			-- ExecutionDone.error is dropped by every client, so stderr is
+			-- the one channel users actually see.
+			apis.stream.write(
+				apis.io.stderr,
+				"\27[33m" .. sizeMsg .. "; omitted from result.return — use --return <path> to capture it\27[0m\n"
+			)
+		else
+			capError = sizeMsg .. "; write it to a file with --return <path>"
+			apis.stream.write(apis.io.stderr, "\27[31m" .. capError .. "\27[0m\n")
+		end
 	end
 end
 
@@ -168,8 +193,8 @@ _G.__rodeo_eid = nil
 _G.__rodeo_procs[executionId] = nil
 
 resultsEvent:Fire({
-	success = success,
-	error = not success and tostring(result) or nil,
+	success = success and capError == nil,
+	error = if not success then tostring(result) elseif capError ~= nil then capError else nil,
 	returnValue = returnValueJson,
 })
 
