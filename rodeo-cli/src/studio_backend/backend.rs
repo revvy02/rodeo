@@ -172,6 +172,36 @@ pub async fn run_master_loop(
     info!("master connection closed");
 }
 
+/// Mark a launching session as failed. Drives the lifecycle transition
+/// through the snapshot — sets the instance row to status="error" rather
+/// than removing it, because the master's launch_studio watcher only
+/// resolves on a terminal status; absence would leave it (and the run
+/// client blocked on it) hanging forever. SessionExited is still emitted
+/// so the master reconciles pending runs scoped to the dead session.
+async fn fail_launch(
+    state: &SharedBackendState,
+    outgoing_tx: &mpsc::UnboundedSender<proto::BackendMessage>,
+    session_guid: &str,
+    reason: String,
+) {
+    let _ = outgoing_tx.send(proto::BackendMessage {
+        msg: Some(proto::backend_message::Msg::SessionExited(
+            Box::new(proto::SessionExited {
+                session_guid: session_guid.to_string(),
+                reason: reason.clone(),
+                ..Default::default()
+            })
+        )),
+        ..Default::default()
+    });
+    let mut guard = state.lock().await;
+    if let Some(inst) = guard.studio_instances.get_mut(session_guid) {
+        inst.status = "error".to_string();
+        inst.error = Some(reason);
+    }
+    if let Some(ref notify) = guard.snapshot_trigger { notify.notify_one(); }
+}
+
 async fn handle_master_msg(
     msg: proto::master_message::Msg,
     client: &proto::BackendServiceClient<connectrpc::client::HttpClient>,
@@ -492,39 +522,12 @@ async fn handle_master_msg(
                     Ok(Ok(inst)) => std::sync::Arc::new(inst),
                     Ok(Err(e)) => {
                         tracing::error!("Studio spawn failed: {e}");
-                        // Pre-handoff failure: emit SessionExited so master can
-                        // fire Error on the open launch_studio stream + clean
-                        // session-level state. Don't rely on snapshot polling.
-                        let _ = out_tx.send(proto::BackendMessage {
-                            msg: Some(proto::backend_message::Msg::SessionExited(
-                                Box::new(proto::SessionExited {
-                                    session_guid: session_guid.clone(),
-                                    reason: format!("launch_failed: {e}"),
-                                    ..Default::default()
-                                })
-                            )),
-                            ..Default::default()
-                        });
-                        let mut guard = ls.lock().await;
-                        guard.studio_instances.remove(&session_guid);
-                        if let Some(ref notify) = guard.snapshot_trigger { notify.notify_one(); }
+                        fail_launch(&ls, &out_tx, &session_guid, format!("launch_failed: {e}")).await;
                         return;
                     }
                     Err(e) => {
                         tracing::error!("Studio spawn task failed: {e}");
-                        let _ = out_tx.send(proto::BackendMessage {
-                            msg: Some(proto::backend_message::Msg::SessionExited(
-                                Box::new(proto::SessionExited {
-                                    session_guid: session_guid.clone(),
-                                    reason: format!("launch_failed: {e}"),
-                                    ..Default::default()
-                                })
-                            )),
-                            ..Default::default()
-                        });
-                        let mut guard = ls.lock().await;
-                        guard.studio_instances.remove(&session_guid);
-                        if let Some(ref notify) = guard.snapshot_trigger { notify.notify_one(); }
+                        fail_launch(&ls, &out_tx, &session_guid, format!("launch_failed: {e}")).await;
                         return;
                     }
                 };

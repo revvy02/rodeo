@@ -33,6 +33,30 @@ describe("place (CLI)", () => {
   });
 });
 
+// A failed Studio launch must FAIL the run, not hang it.
+//
+// Regression: when place prep failed ("failed to parse binary place"), the
+// backend removed the studio_instances row instead of marking it
+// status="error" — but the master's launch_studio watcher only resolves on a
+// terminal status in the snapshot, so the stream never emitted and the run
+// client blocked forever (observed alive 1h40m past the error). Fixed by
+// fail_launch in studio_backend/backend.rs driving the same snapshot
+// transition the on_exit handler uses.
+describe("run --place with a corrupted place file (CLI)", () => {
+  it("fails fast with a launch error instead of hanging", () => {
+    const r = runRodeo(
+      [
+        "run", "--port", "46238",
+        "--place", "tests-new/fixtures/corrupted_place/place.rbxl",
+        "--source", "return 1",
+      ],
+      { timeout: 30_000 },
+    );
+    expect(r.ok).toBe(false);
+    expect(r.stdout + r.stderr).toContain("launch failed");
+  }, 60_000);
+});
+
 // `rodeo run --place` must GUARANTEE the place is opened.
 //
 // The launch is gated on serve health, not on whether the requested place is
