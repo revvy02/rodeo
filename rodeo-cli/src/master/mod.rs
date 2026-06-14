@@ -591,8 +591,18 @@ impl MasterState {
             let snap = backend.state_rx.borrow();
             for vm in &snap.vms {
                 if !vm.connected { continue; }
-                let Some(session) = vm.session_guid.as_deref() else { continue; };
-                studio_vms.entry(session.to_string()).or_default().push(vm.vm_id.clone());
+                // Session-bearing VMs group by session. Session-less VMs —
+                // manually-installed plugins report SESSION_GUID=nil — get their
+                // own vm_id as a standalone key, so a session-less run (the common
+                // `rodeo run --target X` / MCP run_code case) can still drive their
+                // mode transition. Skipping them here meant the master never pushed
+                // SetTargetMode to a hand-opened Studio, so auto-transition never
+                // fired and the run hung in pending_runs forever.
+                let key = match vm.session_guid.as_deref() {
+                    Some(s) if !s.is_empty() => s.to_string(),
+                    _ => vm.vm_id.clone(),
+                };
+                studio_vms.entry(key).or_default().push(vm.vm_id.clone());
             }
         }
         for vms in studio_vms.values_mut() { vms.sort(); }
@@ -1021,5 +1031,114 @@ pub async fn run_reconciliation(state: SharedBackendState) {
 
         let delay = if has_unresolved { 1 } else { 5 };
         tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::{mpsc, watch};
+
+    fn edit_vm(vm_id: &str, session_guid: Option<&str>) -> rodeo_proto::VmSnapshot {
+        rodeo_proto::VmSnapshot {
+            vm_id: vm_id.to_string(),
+            mode: Some("edit".to_string()),
+            dom: Some("edit".to_string()),
+            session_guid: session_guid.map(|s| s.to_string()),
+            connected: true,
+            ..Default::default()
+        }
+    }
+
+    fn queued_run(target: &str) -> (RunRequest, mpsc::UnboundedReceiver<ClientMsg>) {
+        let (client_tx, client_rx) = mpsc::unbounded_channel();
+        let run = RunRequest {
+            execution_id: "exec-1".to_string(),
+            script: String::new(),
+            target: target.to_string(),
+            session: None,
+            vm_id: None,
+            job: None,
+            log_filter: rodeo_proto::LogFilter::default(),
+            cache_requires: None,
+            script_args: None,
+            return_file: None,
+            show_return: None,
+            output_file: None,
+            verbose: None,
+            instance_path: None,
+            script_path: None,
+            process_name: None,
+            profile: None,
+            client_tx,
+            process_id: 1,
+            state: rodeo_proto::ProcessState::PROCESS_STATE_QUEUED,
+            created_at: 0.0,
+        };
+        (run, client_rx)
+    }
+
+    fn state_with_edit_vm(
+        vm_id: &str,
+        session_guid: Option<&str>,
+    ) -> (MasterState, mpsc::UnboundedReceiver<rodeo_proto::MasterMessage>) {
+        let mut state = MasterState::new("master-test".to_string());
+        let (backend_tx, backend_rx) = mpsc::unbounded_channel();
+        let (state_tx, state_rx) = watch::channel(rodeo_proto::StateSnapshot {
+            vms: vec![edit_vm(vm_id, session_guid)],
+            ..Default::default()
+        });
+        state.backends.insert(
+            "backend-1".to_string(),
+            grpc::BackendConnection {
+                id: "backend-1".to_string(),
+                kind: "studio".to_string(),
+                name: "test-studio".to_string(),
+                tx: backend_tx,
+                state_tx,
+                state_rx,
+            },
+        );
+        (state, backend_rx)
+    }
+
+    // Regression: a manually-installed plugin reports SESSION_GUID=nil, so its
+    // edit VM registers with no session_guid. derive_and_push_targets used to
+    // skip session-less VMs entirely, so the master never pushed SetTargetMode
+    // to a hand-opened Studio — auto-transition never fired and the run hung in
+    // pending_runs forever. A session-less edit VM must still be driven for a
+    // session-less (`session: None`) run.
+    #[test]
+    fn session_less_edit_vm_is_driven_for_a_session_less_run() {
+        let (mut state, mut backend_rx) = state_with_edit_vm("edit-vm", None);
+        let (run, _client_rx) = queued_run("test:server");
+        state.pending_runs.push(run);
+
+        state.derive_and_push_targets();
+
+        // Session-less VM is keyed by its own vm_id and gets the "test" target.
+        assert_eq!(
+            state.target_modes.get("edit-vm"),
+            Some(&("test".to_string(), vec!["edit-vm".to_string()])),
+            "session-less edit VM must be included in target derivation"
+        );
+        // And an actual SetTargetMode push must be dispatched to its backend.
+        assert!(backend_rx.try_recv().is_ok(), "a SetTargetMode push must be sent to the VM");
+    }
+
+    // Control: a session-bearing edit VM keeps being keyed by its session.
+    #[test]
+    fn session_bearing_edit_vm_is_driven_by_session() {
+        let (mut state, _backend_rx) = state_with_edit_vm("edit-vm", Some("sess-A"));
+        let (run, _client_rx) = queued_run("test:server");
+        state.pending_runs.push(run);
+
+        state.derive_and_push_targets();
+
+        assert_eq!(
+            state.target_modes.get("sess-A"),
+            Some(&("test".to_string(), vec!["edit-vm".to_string()])),
+            "session-bearing VM is keyed by its session_guid"
+        );
     }
 }
