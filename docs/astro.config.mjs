@@ -30,6 +30,8 @@ export default defineConfig({
 						{ label: 'Bundling', link: '/getting-started/bundling/' },
 						{ label: 'Runtime usage', link: '/getting-started/runtime-usage/' },
 						{ label: 'Remote usage', link: '/getting-started/remote-usage/' },
+						{ label: 'Profiling', link: '/getting-started/profiling/' },
+						{ label: 'Prebaking', link: '/getting-started/prebaking/' },
 					],
 				},
 				{ label: 'CLI reference', link: '/cli/' },
