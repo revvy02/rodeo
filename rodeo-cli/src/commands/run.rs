@@ -421,7 +421,7 @@ fn is_play_target(target: Option<&str>) -> bool {
 }
 
 /// Build a LaunchStudioRequest from CLI args for the LaunchStudio RPC.
-async fn build_launch_request(
+pub(crate) async fn build_launch_request(
     target: &crate::studio_backend::PlaceTarget,
     background: bool,
     save: Option<String>,

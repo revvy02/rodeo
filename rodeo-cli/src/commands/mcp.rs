@@ -34,7 +34,8 @@ Direct targeting:
 - job: target a specific game server by job ID
 
 Launch:
-- place: launch Studio (empty = new place, number = place ID, string = file path)
+- launch_studio: open a standalone Studio (place = empty/ID/file path), optionally with profiling; stays alive for later run_code calls
+- run_code place: launch Studio inline when running code (empty = new place, number = place ID, string = file path)
 
 Return values: Scripts can return values. Use run_code to both query data and make changes.
 Use get_state to discover available VMs, studios, and processes.
@@ -348,6 +349,20 @@ fn save_place_input_schema() -> Arc<JsonObject> {
     }))
 }
 
+fn launch_studio_input_schema() -> Arc<JsonObject> {
+    obj_arc(serde_json::json!({
+        "type": "object",
+        "properties": {
+            "place": { "type": "string", "description": "What to open: empty = new place, a number = published place ID, a path = local .rbxl/.rbxlx file" },
+            "universe_id": { "type": "integer", "description": "Universe ID to resolve a published place ID against (optional)" },
+            "profile": { "type": "boolean", "description": "Enable microprofiler auto-capture on the launched Studio, so later run_code calls with profile_dir collect dumps" },
+            "detached": { "type": "boolean", "description": "Keep Studio running even if the rodeo server stops (default: false, tied to the server's lifetime). Studio persists across run_code calls either way" },
+            "focus": { "type": "boolean", "description": "Bring Studio to the foreground (default: launch in the background)" },
+            "no_hud": { "type": "boolean", "description": "Hide the rodeo HUD overlay" }
+        }
+    }))
+}
+
 // --- Typed parameter structs for #[tool] fns. ---
 // Only `Deserialize` is required — input schemas are passed explicitly to the
 // macro via `input_schema = ...` to preserve our hand-crafted JSON exactly.
@@ -364,6 +379,22 @@ struct KillProcessArgs {
 struct SavePlaceArgs {
     #[serde(default)]
     out: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, Default)]
+struct LaunchStudioArgs {
+    #[serde(default)]
+    place: Option<String>,
+    #[serde(default)]
+    universe_id: Option<u64>,
+    #[serde(default)]
+    profile: bool,
+    #[serde(default)]
+    detached: bool,
+    #[serde(default)]
+    focus: bool,
+    #[serde(default)]
+    no_hud: bool,
 }
 
 // --- Server state ---
@@ -494,6 +525,23 @@ impl RodeoServer {
         ct: CancellationToken,
     ) -> CallToolResult {
         text_or_cancel(&ct, handle_save_place(&self.host, self.port, args.out)).await
+    }
+
+    #[tool(
+        description = "Launch a Roblox Studio instance and block until it connects, without running any \
+            code. The Studio stays connected to the server so subsequent run_code calls can target it. \
+            Pass `place` to open a published place ID or a local .rbxl file; omit it for a new empty \
+            place. Set `profile` to enable microprofiler capture for later profiling runs, and \
+            `detached` to keep Studio running even after the server stops.",
+        input_schema = launch_studio_input_schema(),
+        annotations(destructive_hint = false, idempotent_hint = false, open_world_hint = true),
+    )]
+    async fn launch_studio(
+        &self,
+        Parameters(args): Parameters<LaunchStudioArgs>,
+        ct: CancellationToken,
+    ) -> CallToolResult {
+        text_or_cancel(&ct, handle_launch_studio(&self.host, self.port, args)).await
     }
 }
 
@@ -1015,6 +1063,44 @@ async fn handle_save_place(host: &str, port: u16, out: Option<String>) -> Result
         }
     }
     Ok(msg)
+}
+
+async fn handle_launch_studio(host: &str, port: u16, args: LaunchStudioArgs) -> Result<String, String> {
+    // Mirror the CLI's `--place` parsing: empty = new place, numeric = place ID,
+    // anything else = file path.
+    let place = args.place.unwrap_or_default();
+    let target = if place.is_empty() {
+        crate::studio_backend::PlaceTarget::Empty
+    } else if let Ok(place_id) = place.parse::<u64>() {
+        crate::studio_backend::PlaceTarget::PlaceId { place_id, universe_id: args.universe_id }
+    } else {
+        crate::studio_backend::PlaceTarget::File(place)
+    };
+
+    // The serve holds the Studio handle, so it stays available for follow-up
+    // run_code requests regardless of `detached`; `detached` only decides
+    // whether it also survives the server itself stopping.
+    let req = super::run::build_launch_request(
+        &target,
+        !args.focus,
+        None,
+        crate::cli::FflagArgs::default(),
+        args.detached,
+        args.no_hud,
+        args.profile,
+        host,
+        port,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let (_backend, session_guid) = RodeoClient::connect(host, port)
+        .map_err(|e| e.to_string())?
+        .launch_studio_raw(req)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(format!("Studio launched (session {session_guid})"))
 }
 
 /// Convert MCP tool arguments (a JSON object) into argparse-style argv:
