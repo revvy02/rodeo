@@ -441,21 +441,32 @@ export class Studio {
     return (studio.vms ?? []).map((sv) => new Vm(buildVmSnapshot(studio, sv), this.daemon));
   }
 
-  /** Start an in-Studio multiplayer test (server only — connect players via
-   *  `connectClient()` on the returned handle). Requires this Studio to be
-   *  open: the server DataModel is spawned from its edit DataModel. The
-   *  returned server is an ordinary Vm (run code via `runCode`) with the test
-   *  lifecycle layered on top; `close()` tears down the whole test. */
-  async startMultiplayerTest(): Promise<MultiplayerTestServer> {
+  /** Start an in-Studio multiplayer test with `numPlayers` client DataModels
+   *  spawned UP FRONT (a single `ExecuteMultiplayerTestAsync(numPlayers)`).
+   *  Access the spawned players with `server.getPlayer(i)`. Requires this Studio
+   *  to be open: the server DataModel is spawned from its edit DataModel.
+   *  `close()` tears down the whole test at once.
+   *
+   *  Prefer requesting the client count here over growing a running session
+   *  later with `connectClient()`: `StudioTestService:AddPlayers` crashes the
+   *  Studio server on some engine versions (observed on 0.726: SIGSEGV the
+   *  moment a client is added to a running test). Defaults to 0 clients. */
+  async startMultiplayerTest(numPlayers: number = 0): Promise<MultiplayerTestServer> {
     const resp = await this.daemon.request<{
       mpHandle: string;
       serverVmId: string;
-    }>("studio.startMultiplayerTest", { studioHandle: this.studioHandle });
+      clientVmIds?: string[];
+    }>("studio.startMultiplayerTest", { studioHandle: this.studioHandle, numPlayers });
 
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
     const snap = findVmSnapshot(state, resp.serverVmId);
     if (!snap) throw new Error(`server VM ${resp.serverVmId} not found`);
-    return new MultiplayerTestServer(resp.mpHandle, snap, this.daemon);
+    const players = (resp.clientVmIds ?? []).map((clientVmId) => {
+      const csnap = findVmSnapshot(state, clientVmId);
+      if (!csnap) throw new Error(`client VM ${clientVmId} not found`);
+      return new MultiplayerTestClient(resp.mpHandle, csnap, this.daemon);
+    });
+    return new MultiplayerTestServer(resp.mpHandle, snap, this.daemon, players);
   }
 }
 
@@ -467,13 +478,26 @@ export class Studio {
 
 export class MultiplayerTestServer extends Vm {
   private mpHandle: string;
+  // Players (client DataModels) spawned up front by startMultiplayerTest(numPlayers).
+  private readonly players: MultiplayerTestClient[];
 
-  constructor(mpHandle: string, snap: VmSnapshotDTO, daemon: Daemon) {
+  constructor(mpHandle: string, snap: VmSnapshotDTO, daemon: Daemon, players: MultiplayerTestClient[] = []) {
     super(snap, daemon);
     this.mpHandle = mpHandle;
+    this.players = players;
   }
 
-  /** Connect one more client player; returns its Vm-shaped handle. */
+  /** The players (client DataModels) spawned up front by
+   *  `startMultiplayerTest(numPlayers)`, in spawn order. Clients added later via
+   *  `connectClient()` are not included. Returns a copy. */
+  getPlayers(): MultiplayerTestClient[] {
+    return [...this.players];
+  }
+
+  /** Connect one more client player to a *running* test; returns its handle.
+   *  WARNING: on some Studio engine versions (0.726) adding a player to a
+   *  running multiplayer test crashes the server (SIGSEGV). Prefer passing the
+   *  client count to `startMultiplayerTest(numPlayers)` up front. */
   async connectClient(): Promise<MultiplayerTestClient> {
     const resp = await this.daemon.request<{ clientVmId: string }>(
       "mp.connectClient", { mpHandle: this.mpHandle },

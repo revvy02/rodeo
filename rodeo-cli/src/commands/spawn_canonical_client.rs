@@ -360,12 +360,21 @@ async fn studio_get_vms(state: Arc<State>, params: Value) -> Result<Value> {
 
 async fn studio_start_multiplayer_test(state: Arc<State>, params: Value) -> Result<Value> {
     let studio = lookup_studio(&state, &params).await?;
-    // Always server-only: clients connect one at a time via mp.connectClient.
-    let mp = studio.lock().await.start_multiplayer_test(0).await?;
+    // Start the session with `numPlayers` clients UP FRONT (single
+    // ExecuteMultiplayerTestAsync(numPlayers) call). Growing a *running* session
+    // afterwards with StudioTestService:AddPlayers (mp.connectClient) crashes the
+    // Studio server on some engine versions (observed on 0.726: SIGSEGV / null
+    // deref on a worker thread the moment AddPlayers runs). Callers that know
+    // their client count should request it here and read the returned
+    // clientVmIds, rather than starting at 0 and growing via mp.connectClient.
+    // Defaults to 0 for backwards compatibility.
+    let num_players = params.get("numPlayers").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    let mp = studio.lock().await.start_multiplayer_test(num_players).await?;
     let server_vm_id = mp.server.vm_id.clone();
+    let client_vm_ids: Vec<String> = mp.clients().iter().map(|v| v.vm_id.clone()).collect();
     let handle = state.mint_handle("mp");
     state.mp_tests.lock().await.insert(handle.clone(), Arc::new(Mutex::new(mp)));
-    Ok(json!({ "mpHandle": handle, "serverVmId": server_vm_id }))
+    Ok(json!({ "mpHandle": handle, "serverVmId": server_vm_id, "clientVmIds": client_vm_ids }))
 }
 
 async fn lookup_mp(state: &State, params: &Value) -> Result<Arc<Mutex<MultiplayerTest>>> {
