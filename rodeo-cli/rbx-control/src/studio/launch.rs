@@ -508,13 +508,30 @@ impl Studio {
 
 /// Kill the StudioTestService child processes (`-task StartServer`/`StartClient`
 /// spawned by `ExecuteMultiplayerTestAsync`) belonging to the edit Studio
-/// `edit_pid`. They carry `editpid <edit_pid>` in their command line, which is
+/// `edit_pid`. They carry an `editpid <edit_pid>` token in their command line,
 /// stable even after the edit Studio dies and they reparent to launchd/init.
 /// Best-effort and fire-and-forget — never blocks Studio teardown.
+///
+/// The marker MUST be matched on a token boundary. A bare substring match
+/// (`editpid {edit_pid}` anywhere) ALSO matches `editpid {edit_pid}{digit}…` —
+/// i.e. the StudioTestService children of *other* live sessions whose edit pid
+/// merely has this pid as a numeric prefix (reaper pid `4761` matches a live
+/// server carrying `editpid 47612`). SIGKILLing those drops their plugin
+/// WebSocket ("Connection reset without closing handshake") and silently breaks
+/// unrelated multiplayer tests. So we require the pid to be followed by a
+/// non-digit or the end of the command line.
+///
+/// NOTE: a boundary match still cannot distinguish a *reused* pid — if
+/// `edit_pid` is freed and the OS later assigns it to a different edit Studio, a
+/// stale reap can exact-match the new session's children. Closing that fully
+/// needs tracking the real child PIDs captured at `ExecuteMultiplayerTestAsync`
+/// time rather than re-deriving them from the argv marker here.
 fn reap_test_children(edit_pid: u32) {
     #[cfg(unix)]
     {
-        let needle = format!("editpid {edit_pid}");
+        // `([^0-9]|$)` anchors the pid to a token boundary (see above) so a
+        // shorter pid does not match a longer pid that shares its prefix.
+        let needle = format!("editpid {edit_pid}([^0-9]|$)");
         let Ok(out) = std::process::Command::new("pgrep").arg("-f").arg(&needle).output() else {
             return;
         };
@@ -531,8 +548,12 @@ fn reap_test_children(edit_pid: u32) {
     {
         // Best-effort: terminate processes whose command line carries the editpid
         // marker. taskkill can't filter by command line, so use WMIC (deprecated
-        // but still present on supported Windows versions).
-        let filter = format!("CommandLine like '%editpid {edit_pid}%'");
+        // but still present on supported Windows versions). SQL LIKE has no regex,
+        // so anchor the token boundary with two patterns: the pid followed by a
+        // space (another arg follows) or sitting at the end of the command line.
+        let filter = format!(
+            "(CommandLine like '%editpid {edit_pid} %' or CommandLine like '%editpid {edit_pid}')"
+        );
         let _ = std::process::Command::new("wmic")
             .args(["process", "where", filter.as_str(), "call", "terminate"])
             .output();
