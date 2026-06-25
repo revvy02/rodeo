@@ -204,8 +204,11 @@ local function getRequireInstance(requireString: string, currentScript: Instance
 	local success, result = pcall(function()
 		local tempModule = Instance.new("ModuleScript")
 		tempModule.Name = "__rodeo_resolver"
-		-- Assign script to currentScript so child paths like script.SomeChild work
-		tempModule.Source = 'local ok, r = pcall(function()\nscript = script.Parent and script.Parent["' .. currentScript.Name .. '"]\nreturn ' .. pathExpr .. '\nend)\nreturn ok and r or nil'
+		-- Assign script to currentScript so child paths like script.SomeChild work.
+		-- %q-escape the name: inline scripts are named after their own source, which
+		-- can contain quotes/newlines that would otherwise break this string literal
+		-- (e.g. a require written as game:GetService("ReplicatedStorage").Foo).
+		tempModule.Source = 'local ok, r = pcall(function()\nscript = script.Parent and script.Parent[' .. string.format("%q", currentScript.Name) .. ']\nreturn ' .. pathExpr .. '\nend)\nreturn ok and r or nil'
 		tempModule.Parent = currentScript.Parent
 		local resolved = require(tempModule)
 		tempModule:Destroy()

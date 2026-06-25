@@ -612,6 +612,22 @@ export function uncachedRequireTraversal(run: RunFn): void {
     expect(result.return).toBe("original");
   });
 
+  it("quoted-service require still gets fresh state", async () => {
+    // Regression: a require written with a quoted form —
+    // game:GetService("ReplicatedStorage") — puts a `"` in the inline source.
+    // For inline scripts the module's Name *is* that source, and the resolver
+    // embeds the Name into generated Luau (script.Parent["<name>"]) to
+    // re-anchor `script`. The unescaped quote breaks that temp resolver module,
+    // so the require silently fails to resolve and the module is never cloned
+    // for fresh state — leaving this require to hit Roblox's cache ("mutated")
+    // instead of the uncached "original". The compile error lands in Studio's
+    // output before execution, so it never reaches rodeo; the only observable
+    // symptom is the wrong (cached) value here.
+    const result = await exec('return require(game:GetService("ReplicatedStorage").leaf).value');
+    expect(result.ok).toBe(true);
+    expect(result.return).toBe("original");
+  });
+
   it("sibling require gets fresh state", async () => {
     const result = await exec("return require(game.ReplicatedStorage.mid).value");
     expect(result.ok).toBe(true);
