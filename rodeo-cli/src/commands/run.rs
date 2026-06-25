@@ -3,7 +3,6 @@ use crate::cli::{FflagArgs, PlaceArgs, ServerArgs};
 use crate::cli_run::{self, RunRequest};
 use rodeo_client::RodeoClient;
 use crate::commands::process_source::{self, ProcessedSource};
-use crate::util::config;
 use rodeo_proto as proto;
 
 /// All run command arguments
@@ -81,25 +80,32 @@ pub async fn main(mut args: RunArgs) -> Result<()> {
     Ok(())
 }
 
-/// Persistent mode: start serve + launch Studio, stay alive until Ctrl-C.
-/// Other terminals can `rodeo run --port N --source "..."` against it.
+/// Persistent mode (`rodeo run --place …` with no script): ensure a serve on
+/// the port, launch the place onto it, and — only if we started the serve
+/// ourselves — stay alive to host it until Ctrl-C. If a serve is already
+/// running we reuse it and return, leaving it and its other studios untouched.
+/// Other terminals can `rodeo run --source "..."` against the same port with
+/// no flags.
 async fn persistent_mode(args: RunArgs) -> Result<()> {
-    let mut port = args.server.port;
+    let port = args.server.port;
+    let host = args.server.host.clone();
     let place_target = args.place.to_target();
 
-    if port == config::SERVE_PORT {
-        port = config::ONCE_PORT;
-    }
+    // Ensure a serve exists on `port`: reuse a healthy one (None — not ours to
+    // tear down), otherwise start and own it (Some — we hold it open below).
+    let owned: Option<super::serve::ServeHandle> =
+        if RodeoClient::connect(&host, port)?.is_healthy().await {
+            None
+        } else {
+            Some(super::serve::start_full_serve(port).await?)
+        };
 
     if is_play_target(args.target.as_deref()) {
-        // Play mode persistent: start serve, launch play processes via RPC
-        let handle = super::serve::start_full_serve(port).await?;
-
         let target_str = args.target.as_deref().unwrap_or("play:server");
         let parsed = crate::shared::target::parse(target_str)?;
 
         let mut play_handles = launch_play_processes(
-            &args.server.host,
+            &host,
             port,
             &parsed,
             place_target.as_ref(),
@@ -109,18 +115,16 @@ async fn persistent_mode(args: RunArgs) -> Result<()> {
             args.place.profile.is_some(),
         ).await?;
 
-        tracing::info!("Play mode running on port {port}. Press Ctrl-C to stop.");
-        handle.wait_for_shutdown().await;
-        play_handles.cleanup();
-    } else {
-        // Studio persistent mode
-        let mut handle = super::serve::start_full_serve(port).await?;
-
-        if let Some(target) = place_target {
-            let req = build_launch_request(&target, !args.place.focus, args.place.save, args.fflags, args.place.detached, args.place.no_hud, args.place.profile.is_some(), &args.server.host, port).await?;
-            // Race Studio launch against ctrl-c. Bind the RodeoClient to a
-            // local so its borrow outlives the tokio::select! future.
-            let rc = RodeoClient::connect(&args.server.host, port)?;
+        if let Some(handle) = owned {
+            tracing::info!("Play mode running on port {port}. Press Ctrl-C to stop.");
+            handle.wait_for_shutdown().await;
+            play_handles.cleanup();
+        }
+    } else if let Some(target) = place_target {
+        let req = build_launch_request(&target, !args.place.focus, args.place.save, args.fflags, args.place.detached, args.place.no_hud, args.place.profile.is_some(), &host, port).await?;
+        let rc = RodeoClient::connect(&host, port)?;
+        if let Some(mut handle) = owned {
+            // We own the serve: race the launch against ctrl-c, then hold it open.
             tokio::select! {
                 r = rc.launch_studio_raw(req) => { r?; }
                 _ = handle.shutdown_rx.recv() => {
@@ -129,8 +133,14 @@ async fn persistent_mode(args: RunArgs) -> Result<()> {
                     return Ok(());
                 }
             }
+            handle.wait_for_shutdown().await;
+        } else {
+            // Reused an existing serve: launch onto it and return, leaving it up.
+            rc.launch_studio_raw(req).await?;
         }
-
+    } else if let Some(handle) = owned {
+        // No place target (persistent mode implies --place; defensive), but we
+        // started a serve — hold it open.
         handle.wait_for_shutdown().await;
     }
 
@@ -216,13 +226,10 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
     );
 
     let host = args.server.host.clone();
-    let mut port = args.server.port;
+    let port = args.server.port;
     let place_target = args.place.to_target();
     let _is_play = is_play_target(args.target.as_deref());
     let should_launch = place_target.is_some();
-    if should_launch && port == config::SERVE_PORT {
-        port = config::ONCE_PORT;
-    }
 
     // Always generate a run_id for correlation
     let _run_id = uuid::Uuid::new_v4().to_string().split('-').next().unwrap().to_string();
