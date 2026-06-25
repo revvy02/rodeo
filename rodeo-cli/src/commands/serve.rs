@@ -110,15 +110,9 @@ pub async fn run_master(port: u16, master_id: String) -> Result<()> {
 pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) -> Result<()> {
     ensure_mcp_enabled();
 
-    // Sweep stale rodeo plugin files left behind by prior backend processes
-    // that died ungracefully (SIGKILL / crash / OOM / etc — anything that
-    // skipped Drop), then take an fd-lock for our own port. The kernel
-    // releases the lock when this process terminates for any reason, which
-    // is what makes the next backend's sweep able to detect "owner is
-    // dead." See studio_backend::plugin_lock for the full rationale.
-    crate::studio_backend::plugin_lock::sweep_stale_plugins();
-    crate::studio_backend::plugin_lock::acquire_lock(port)
-        .context("failed to acquire studio-backend plugin lock")?;
+    // The rodeo plugin is a single static install (`rodeo.rbxm`); launches no
+    // longer drop per-launch plugin files, so there's nothing to sweep or lock.
+    // Two backends on the same port are already prevented by the socket bind.
 
     let state = Arc::new(Mutex::new(BackendState::new()));
     state.lock().await.port = port;

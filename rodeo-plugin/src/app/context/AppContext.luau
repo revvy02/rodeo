@@ -15,7 +15,6 @@ local RunService = game:GetService("RunService")
 local MessageHandler = require(script.Parent.MessageHandler)
 local rodeoProto = require(script.Parent.Parent.Parent.Parent.proto.rodeo)
 local constants = require(script.Parent.Parent.Parent.library.constants)
-local flags = require(script.Parent.Parent.Parent.library.flags)
 local studio = require(script.Parent.Parent.Parent.library.studio)
 
 local e = React.createElement
@@ -110,14 +109,14 @@ end
 -- Provider component
 local function AppProvider(props: AppProviderProps)
 	-- Default values (used as placeholders and fallbacks)
-	local defaultHost = props.initialSettings.host or flags.SETTINGS.host
-	local defaultPort = tostring(props.initialSettings.port or flags.SETTINGS.port)
+	local defaultHost = props.initialSettings.host or constants.DEFAULT_HOST
+	local defaultPort = tostring(props.initialSettings.port or constants.DEFAULT_PORT)
 
 	-- Current override values (empty means use default)
 	local currentHost, setCurrentHost = React.useState("")
 	local currentPort, setCurrentPort = React.useState("")
 	local autoConnect, setAutoConnect = React.useState(props.initialSettings.autoConnect)
-	local verbose, setVerbose = React.useState(flags.VERBOSE)
+	local verbose, setVerbose = React.useState(constants.VERBOSE)
 
 	-- WebSocket state
 	local wsUrl, setWsUrl = React.useState(nil :: string?)
@@ -193,10 +192,13 @@ local function AppProvider(props: AppProviderProps)
 							name = state.clientInfo.name,
 							userId = state.clientInfo.userId,
 						}) or nil,
-						-- Rodeo session identity baked in at plugin install. Master
-						-- matches this to its StudioInstanceInfo and stamps
-						-- VmConnection.session_guid synchronously on the first message.
-						sessionGuid = flags.SESSION_GUID,
+						-- Rodeo session identity, written by the launch's RunScript
+						-- bootstrap as the `rodeoSession` Workspace attribute. Read at
+						-- send time (always after connect, so the bootstrap has run);
+						-- nil for a manual Studio. Master matches it to its
+						-- StudioInstanceInfo and stamps VmConnection.session_guid on the
+						-- first message.
+						sessionGuid = game:GetService("Workspace"):GetAttribute("rodeoSession"),
 					}) },
 				})
 				newClient:Send(HttpService:JSONEncode(msg:jsonEncode()))
@@ -267,10 +269,12 @@ local function AppProvider(props: AppProviderProps)
 		setVerbose(newVerbose)
 	end
 
-	-- Connect handler uses current host:port (falls back to defaults if empty)
+	-- Connect handler uses current host:port (falls back to the launch's
+	-- rodeoPort attribute, then the default, if no manual override).
 	local function handleConnect()
 		local connectHost = if currentHost == "" then defaultHost else currentHost
-		local portNum = tonumber(currentPort) or tonumber(defaultPort)
+		local bootstrapPort = game:GetService("Workspace"):GetAttribute("rodeoPort")
+		local portNum = tonumber(currentPort) or bootstrapPort or tonumber(defaultPort)
 		setWsUrl(`ws://{connectHost}:{portNum}`)
 	end
 
@@ -288,12 +292,16 @@ local function AppProvider(props: AppProviderProps)
 			return
 		end
 
-		-- Delay before attempting reconnect
+		-- Delay before attempting reconnect. The 1s wait also guarantees a
+		-- rodeo launch's RunScript bootstrap has already stamped `rodeoPort`
+		-- (worst-case it lands ~200ms after the plugin mounts), so a plain read
+		-- here picks up the launch's port with no ordering dance.
 		local shouldReconnect = true
 		task.delay(1, function()
 			if shouldReconnect then
 				local connectHost = if currentHost == "" then defaultHost else currentHost
-				local portNum = tonumber(currentPort) or tonumber(defaultPort)
+				local bootstrapPort = game:GetService("Workspace"):GetAttribute("rodeoPort")
+				local portNum = tonumber(currentPort) or bootstrapPort or tonumber(defaultPort)
 				setWsUrl(`ws://{connectHost}:{portNum}`)
 			end
 		end)
@@ -328,7 +336,7 @@ local function AppProvider(props: AppProviderProps)
 			},
 
 			-- UI visibility
-			settingsPanelEnabled = flags.SETTINGS_PANEL_ENABLED,
+			settingsPanelEnabled = true,
 
 			-- Setters
 			setHost = handleHostChange,

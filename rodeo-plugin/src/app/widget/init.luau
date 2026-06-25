@@ -10,7 +10,6 @@ local Row = require(script.Row)
 local StatusIndicator = require(script.StatusIndicator)
 local TextInput = require(script.TextInput)
 local constants = require(script.Parent.Parent.library.constants)
-local flags = require(script.Parent.Parent.library.flags)
 
 local AppProvider = AppContext.AppProvider
 local useAppContext = AppContext.useAppContext
@@ -187,7 +186,7 @@ local function AppContent()
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			Text = `v{flags.VERSION}`,
+			Text = `v{constants.VERSION}`,
 			TextColor3 = COLORS.textDim,
 			TextSize = 14,
 			Font = Enum.Font.Arcade,

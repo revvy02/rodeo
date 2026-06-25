@@ -61,6 +61,12 @@ pub struct StudioOptions {
     /// Strip non-essential Studio UI (Explorer/Properties/Toolbox/etc.) by
     /// patching the dock-layout plist before launch. Restored on cleanup.
     pub no_hud: bool,
+    /// If set, launch via `-task RunScript -runScriptFile <path>` so Studio runs
+    /// this Luau (command-bar identity) right after the place loads. File/PlaceId
+    /// targets are passed as `-localPlaceFile`/`-placeId` alongside it. Used by
+    /// rodeo to stamp the plugin's bootstrap attributes; `None` keeps the plain
+    /// open-the-place launch.
+    pub run_script_file: Option<PathBuf>,
 }
 
 impl Default for SaveMode {
@@ -137,6 +143,16 @@ impl Studio {
         let parent_args: Vec<String> =
             vec!["-parentPid".to_string(), std::process::id().to_string()];
 
+        // When a RunScript bootstrap is requested, every target launches via
+        // `-task RunScript ... -runScriptFile <path>` (verified to open local
+        // files and run the script). Direct-exec rather than shell-open so the
+        // explicit args reach Studio intact.
+        let run_script_file = opts
+            .run_script_file
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string());
+        let use_run_script = run_script_file.is_some();
+
         match target {
             PlaceTarget::PlaceId { place_id, universe_id } => {
                 if !matches!(opts.save, SaveMode::NoSave) {
@@ -148,12 +164,17 @@ impl Studio {
                 };
                 tracing::info!(place_id, universe_id = uid, "launching Studio for place");
 
-                let handle = launch_control::Command::new(&studio_path)
-                    .args([
-                        "-task", "EditPlace",
-                        "-placeId", &place_id.to_string(),
-                        "-universeId", &uid.to_string(),
-                    ])
+                let mut cmd = launch_control::Command::new(&studio_path);
+                let task = if use_run_script { "RunScript" } else { "EditPlace" };
+                cmd.args([
+                    "-task", task,
+                    "-placeId", &place_id.to_string(),
+                    "-universeId", &uid.to_string(),
+                ]);
+                if let Some(ref script) = run_script_file {
+                    cmd.args(["-runScriptFile", script]);
+                }
+                let handle = cmd
                     .args(&parent_args)
                     .background(opts.background)
                     .detached(opts.detached)
@@ -192,18 +213,28 @@ impl Studio {
                     .map(str::to_string)
                     .unwrap_or(place_str);
 
-                tracing::info!(place = %place_str, "launching Studio");
-                let handle = launch_control::Command::new(&studio_path)
-                    .arg(&place_str)
+                tracing::info!(place = %place_str, use_run_script, "launching Studio");
+                let mut cmd = launch_control::Command::new(&studio_path);
+                if use_run_script {
+                    // RunScript + local file: pass the place explicitly and run
+                    // the bootstrap. Direct-exec (no shell_open) so the args reach
+                    // Studio intact, as verified.
+                    cmd.args(["-task", "RunScript", "-localPlaceFile", &place_str]);
+                    if let Some(ref script) = run_script_file {
+                        cmd.args(["-runScriptFile", script]);
+                    }
+                } else {
+                    // Plain launch: open the place file directly. When detached,
+                    // open it through the shell so Studio is rooted at explorer
+                    // (persistent) rather than the daemon — otherwise Studio's
+                    // launcher-watch reaps it when the daemon dies. No effect when
+                    // not detached. (The first arg is the place file explorer opens.)
+                    cmd.arg(&place_str).shell_open(true);
+                }
+                let handle = cmd
                     .args(&parent_args)
                     .background(opts.background)
                     .detached(opts.detached)
-                    // When detached, open the place through the shell so Studio
-                    // is rooted at explorer (persistent) rather than the daemon —
-                    // otherwise Studio's launcher-watch reaps it when the daemon
-                    // dies. No effect when not detached. (File launches only; the
-                    // first arg is the place file explorer opens.)
-                    .shell_open(true)
                     .stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::piped())
                     .spawn()
@@ -226,8 +257,15 @@ impl Studio {
                 bail!("Content variant is for the multiplayer-test flow; use File or PlaceId for edit-mode launch");
             }
             PlaceTarget::Empty => {
-                tracing::info!("launching Studio with no place file");
-                let handle = launch_control::Command::new(&studio_path)
+                tracing::info!(use_run_script, "launching Studio with no place file");
+                let mut cmd = launch_control::Command::new(&studio_path);
+                if use_run_script {
+                    cmd.args(["-task", "RunScript"]);
+                    if let Some(ref script) = run_script_file {
+                        cmd.args(["-runScriptFile", script]);
+                    }
+                }
+                let handle = cmd
                     .args(&parent_args)
                     .background(opts.background)
                     .detached(opts.detached)

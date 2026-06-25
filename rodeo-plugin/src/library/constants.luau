@@ -2,6 +2,19 @@ return {
 	-- Suffix used to rename modules during uncacheable require traversal
 	IGNORE_SUFFIX = ".rodeo.ignore.",
 
+	-- Rodeo version, injected at build time by darklua (inject_global_value).
+	VERSION = RODEO_VERSION,
+
+	-- Default connection settings. The static plugin auto-connects to the
+	-- studio backend's WebSocket on this port (= rodeo-cli's SERVE_PORT + 1;
+	-- keep in sync with rodeo-cli/src/util/config.rs::SERVE_PORT). A rodeo
+	-- launch overrides the port via the `rodeoPort` workspace attribute (set
+	-- by the RunScript bootstrap) and supplies its session via `rodeoSession`.
+	DEFAULT_HOST = "localhost",
+	DEFAULT_PORT = 44873,
+	DEFAULT_AUTO_CONNECT = true,
+	VERBOSE = false,
+
 	-- Bit positions for context bitset
 	-- Order: Server, Client, Running, Edit, Studio
 	CONTEXT_BITS = {

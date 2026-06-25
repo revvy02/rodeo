@@ -9,7 +9,7 @@ local HttpService = game:GetService("HttpService")
 
 local runtime = require(script.Parent.Parent.Parent.library.runtime)
 local utils = require(script.Parent.Parent.Parent.library.utils)
-local flags = require(script.Parent.Parent.Parent.library.flags)
+local constants = require(script.Parent.Parent.Parent.library.constants)
 local mode_driver = require(script.Parent.Parent.Parent.library.mode_driver)
 local rodeoProto = require(script.Parent.Parent.Parent.Parent.proto.rodeo)
 local runtimeProto = require(script.Parent.Parent.Parent.Parent.proto.runtime)
@@ -55,8 +55,8 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 
 		if serverMsg.msg and serverMsg.msg.type == "welcome" then
 			local welcome = serverMsg.msg.value
-			if welcome.version and welcome.version ~= flags.VERSION then
-				warn(`[rodeo] Version mismatch: plugin is v{flags.VERSION}, server is v{welcome.version}`)
+			if welcome.version and welcome.version ~= constants.VERSION then
+				warn(`[rodeo] Version mismatch: plugin is v{constants.VERSION}, server is v{welcome.version}`)
 			end
 		elseif serverMsg.msg and serverMsg.msg.type == "run" then
 			local run = serverMsg.msg.value

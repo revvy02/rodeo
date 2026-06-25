@@ -1,8 +1,10 @@
 //! Rodeo-specific Studio launch wrappers.
 //!
 //! Composes [`rbx_control::studio::launch::Studio`] with rodeo orchestration:
-//! rodeo plugin install, `__RODEO_SESSION_GUID__` attribute stamping onto
-//! place files, and log-scanner binding.
+//! installs the static rodeo plugin, generates the RunScript bootstrap that
+//! stamps `rodeoSession`/`rodeoPort` onto the Workspace at launch (so the
+//! plugin routes to this launch), and binds the log scanner. No place-file
+//! mutation: the original file opens unchanged.
 
 use anyhow::{bail, Context, Result};
 use rbx_dom_weak::{InstanceBuilder, WeakDom};
@@ -68,7 +70,8 @@ pub fn inject_profile_fflags(fflags: FflagConfig) -> FflagConfig {
 
 #[derive(Clone, Debug)]
 pub struct StudioOptions {
-    /// Port the rodeo plugin connects to (baked into the plugin's `flags` module).
+    /// Port the rodeo plugin connects to. Stamped as the `rodeoPort` Workspace
+    /// attribute by the RunScript bootstrap so the static plugin connects here.
     pub port: u16,
     pub background: bool,
     pub save: SaveMode,
@@ -76,10 +79,9 @@ pub struct StudioOptions {
     pub detached: bool,
     /// Strip Studio dock UI panels for a minimal launch (restored on cleanup).
     pub no_hud: bool,
-    /// Master-minted session identity. Stamped into the plugin's
-    /// `flags.SESSION_GUID` and (for local-file launches) into the place file's
-    /// `__RODEO_SESSION_GUID__` attribute, so the plugin's activation gate
-    /// matches this launch.
+    /// Master-minted session identity. Stamped as the `rodeoSession` Workspace
+    /// attribute by the RunScript bootstrap; the plugin sends it on the WS
+    /// handshake so master correlates the connecting VM to this launch.
     pub session_guid: String,
 }
 
@@ -89,14 +91,13 @@ pub struct StudioOptions {
 
 /// Handle to a rodeo-managed Studio instance. Composes:
 /// - `inner`: generic process + fflag + save-on-exit mechanics
-/// - `plugin_path`: rodeo plugin file to delete on cleanup
 /// - `log_path`: paired by the log scanner shortly after launch
+///
+/// The rodeo plugin is a permanent static install (shared with manual use), so
+/// there's no per-launch plugin file to track or delete.
 pub struct Studio {
     /// Master-minted session identity.
     session_guid: String,
-    /// Rodeo plugin file written by `install_launch_plugin` — deleted on cleanup
-    /// so a subsequent launch doesn't pick up this launch's plugin.
-    plugin_path: Option<PathBuf>,
     /// Inner generic Studio. Drop runs save + kill + fflag restore.
     inner: rbx_control::studio::launch::Studio,
 }
@@ -109,11 +110,19 @@ impl Studio {
         let session_guid = opts.session_guid.clone();
         let sg_short = &session_guid[..8.min(session_guid.len())];
 
-        tracing::info!(session_guid = sg_short, "spawn: installing launch plugin");
-        let plugin_path = install_launch_plugin(&target, opts.port, &session_guid)?;
+        tracing::info!(session_guid = sg_short, "spawn: ensuring static plugin installed");
+        install_static_plugin()?;
 
-        // Prepare the place file (stamp __RODEO_SESSION_GUID__, handle temp
-        // files for NoSave mode). For PlaceId targets, skip prep — Studio
+        // Generate the RunScript bootstrap. It stamps `rodeoSession`/`rodeoPort`
+        // onto the Workspace once Studio is up, so the static plugin routes to
+        // this launch's serve port and master can correlate the VM. No place
+        // mutation needed.
+        tracing::info!(session_guid = sg_short, "spawn: writing RunScript bootstrap");
+        let bootstrap = write_bootstrap_script(&session_guid, opts.port)?;
+
+        // Prepare the place file (temp copy for NoSave, original for SaveInPlace,
+        // output copy for SaveToPath; synthesize a minimal place for Empty so
+        // RunScript has a file to open). For PlaceId targets, skip prep — Studio
         // downloads the file from Roblox.
         let prepared_target = match &target {
             PlaceTarget::PlaceId { .. } => target.clone(),
@@ -126,7 +135,7 @@ impl Studio {
                     _ => None,
                 };
                 tracing::info!(session_guid = sg_short, "spawn: preparing place file");
-                let place_path = prepare_place(place_str, &opts.save, &session_guid)?;
+                let place_path = prepare_place(place_str, &opts.save)?;
                 PlaceTarget::File(place_path.to_string_lossy().to_string())
             }
         };
@@ -140,13 +149,13 @@ impl Studio {
                 fflags: opts.fflags,
                 detached: opts.detached,
                 no_hud: opts.no_hud,
+                run_script_file: Some(bootstrap),
             },
         )?;
         tracing::info!(session_guid = sg_short, pid = inner.pid(), "spawn: Studio process spawned");
 
         Ok(Studio {
             session_guid,
-            plugin_path: Some(plugin_path),
             inner,
         })
     }
@@ -163,13 +172,10 @@ impl Studio {
     pub fn warm_save_menu_once(&self) -> bool { self.inner.warm_save_menu_once() }
     pub fn kill(&self) { self.inner.kill() }
 
-    /// Full cleanup — delegates to inner (save + kill + fflag restore) and
-    /// removes the rodeo plugin file.
+    /// Full cleanup — delegates to inner (save + kill + fflag restore). The
+    /// static plugin is a permanent install and is intentionally left in place.
     pub fn cleanup(&self) {
         self.inner.cleanup();
-        if let Some(ref path) = self.plugin_path {
-            let _ = std::fs::remove_file(path);
-        }
     }
 }
 
@@ -186,8 +192,8 @@ impl Drop for Studio {
         if detached {
             // Caller asked Studio to survive parent exit. Skip cleanup —
             // inner Drop handles fflag/layout restore and leaves the Studio
-            // process alone. Plugin file stays installed so the running
-            // Studio keeps it loaded; explicit `cleanup()` removes it.
+            // process alone. The static plugin is a permanent install, so
+            // there's nothing launch-specific to remove either way.
             return;
         }
         self.cleanup();
@@ -195,68 +201,68 @@ impl Drop for Studio {
 }
 
 // ---------------------------------------------------------------------------
-// Rodeo-specific helpers: plugin install, place prep, session_guid stamping
+// Rodeo-specific helpers: static plugin install, RunScript bootstrap, place prep
 // ---------------------------------------------------------------------------
 
-/// Install a patched rodeo plugin for this launch into the Studio plugins
-/// directory. Returns the path the plugin was written to (for cleanup).
+/// Ensure the static rodeo plugin is installed in the Studio plugins directory.
 ///
-/// For local-file launches we stamped `__RODEO_SESSION_GUID__` onto the staged
-/// place's Workspace, so the plugin's activation gate checks the attribute
-/// matches `flags.SESSION_GUID`. For published-place launches the place is
-/// downloaded by Studio and we can't stamp it — the plugin relies on MATCH
-/// (placeId/universeId) for isolation and skips the attribute gate.
-fn install_launch_plugin(target: &PlaceTarget, port: u16, session_guid: &str) -> Result<PathBuf> {
+/// The plugin carries no launch-specific config — config arrives at runtime via
+/// the `rodeoPort`/`rodeoSession` Workspace attributes the RunScript bootstrap
+/// sets — so this writes the same `rodeo.rbxm` the manual `rodeo plugin` command
+/// does. One shared static plugin per machine: never deleted on cleanup, and
+/// overwriting keeps the installed plugin in lockstep with the running CLI.
+fn install_static_plugin() -> Result<()> {
     let studio = roblox_install::RobloxStudio::locate()
         .context("failed to locate Roblox Studio install")?;
     let plugins_dir = studio.plugins_path();
     std::fs::create_dir_all(plugins_dir).context("failed to create plugins directory")?;
-
-    let (match_place_id, match_universe_id, check_workspace_session_guid_attr_matches) = match target {
-        PlaceTarget::PlaceId { place_id, universe_id } => {
-            // Published place — can't stamp attribute on a downloaded place,
-            // so skip the attribute gate. MATCH (placeId + universeId) gates.
-            (Some(*place_id), *universe_id, false)
-        }
-        PlaceTarget::File(_) | PlaceTarget::Empty | PlaceTarget::Content(_) => {
-            // Local file / empty place / downloaded bytes — we stamped
-            // __RODEO_SESSION_GUID__ when preparing the place, so the plugin
-            // enforces the match.
-            (Some(0), Some(0), true)
-        }
-    };
-
-    let config = plugin_embed::PluginConfig {
-        port,
-        host: "localhost".to_string(),
-        auto_connect: true,
-        settings_panel_enabled: false,
-        match_place_id,
-        match_universe_id,
-        session_guid: Some(session_guid.to_string()),
-        check_workspace_session_guid_attr_matches,
-    };
-
-    // Filename is unique per launch so concurrent launches on the same port
-    // don't race on a shared file (and one launch's Drop cleanup can't delete
-    // another launch's plugin mid-boot).
-    let plugin_path = plugins_dir.join(format!("rodeo-{port}-{session_guid}.rbxm"));
-    plugin_embed::write_patched_plugin(&plugin_path.to_string_lossy(), &config)?;
-
-    Ok(plugin_path)
+    let plugin_path = plugins_dir.join("rodeo.rbxm");
+    plugin_embed::write_embedded_plugin(&plugin_path.to_string_lossy())
 }
 
-/// Prepare a place file for Studio based on SaveMode. Stamps
-/// `__RODEO_SESSION_GUID__` onto the Workspace so the plugin's activation
-/// gate matches this launch's plugin.
-fn prepare_place(place: Option<&str>, save: &SaveMode, session_guid: &str) -> Result<PathBuf> {
+/// Write the per-launch RunScript bootstrap to the temp dir. Run by Studio at
+/// launch (command-bar identity), it stamps `rodeoSession`/`rodeoPort` onto the
+/// Workspace so the static plugin connects to this launch's serve port and
+/// reports its session on the WS handshake.
+fn write_bootstrap_script(session_guid: &str, port: u16) -> Result<PathBuf> {
+    // Absolute path: Studio's working directory differs from rodeo's, so
+    // `-runScriptFile` must be absolute (a relative path makes Studio report
+    // "Failed to read script file"). current_dir().join avoids the Windows
+    // `\\?\` prefix that canonicalize would add.
+    let temp_dir = std::env::current_dir()
+        .context("failed to resolve current dir")?
+        .join(".rodeo/.temp");
+    std::fs::create_dir_all(&temp_dir).context("failed to create temp dir")?;
+    let path = temp_dir.join(format!("rodeo-bootstrap-{session_guid}.luau"));
+    // session_guid is a master-minted UUID (no quotes/backslashes), so embedding
+    // it in a string literal is safe.
+    let source = format!(
+        "local ws = game:GetService(\"Workspace\")\n\
+         ws:SetAttribute(\"rodeoSession\", \"{session_guid}\")\n\
+         ws:SetAttribute(\"rodeoPort\", {port})\n"
+    );
+    std::fs::write(&path, source).context("failed to write bootstrap script")?;
+    Ok(path)
+}
+
+/// Prepare a place file for Studio based on SaveMode. The place contents are
+/// never mutated — routing happens at runtime via the RunScript bootstrap, so
+/// the original file opens unchanged.
+fn prepare_place(place: Option<&str>, save: &SaveMode) -> Result<PathBuf> {
     let temp_dir = Path::new(".rodeo/.temp");
     std::fs::create_dir_all(temp_dir).context("failed to create temp dir")?;
 
     let has_place = place.is_some_and(|p| !p.is_empty() && Path::new(p).is_file());
+    if has_place {
+        // Validate up front. The old DOM-parse-and-stamp step implicitly
+        // rejected non-place files; without it a corrupted file would copy
+        // fine and Studio would hang opening garbage instead of failing fast.
+        validate_place_file(place.unwrap())?;
+    }
 
     match save {
         SaveMode::NoSave => {
+            // Copy to a temp file so any in-Studio edits never touch the original.
             let ext = if has_place {
                 Path::new(place.unwrap())
                     .extension()
@@ -269,21 +275,19 @@ fn prepare_place(place: Option<&str>, save: &SaveMode, session_guid: &str) -> Re
             if has_place {
                 std::fs::copy(place.unwrap(), &temp_path)
                     .context("failed to copy place file")?;
-                patch_place_session_guid(&temp_path, session_guid)?;
             } else {
-                let dom = create_minimal_place_with_session_guid(session_guid);
+                let dom = create_minimal_place();
                 rbx_control::studio::launch::write_place(&dom, &temp_path)?;
             }
             Ok(temp_path)
         }
         SaveMode::SaveInPlace => {
             if has_place {
-                let path = PathBuf::from(place.unwrap());
-                patch_place_session_guid(&path, session_guid)?;
-                Ok(path)
+                // Open the user's file directly so Studio saves back to it.
+                Ok(PathBuf::from(place.unwrap()))
             } else {
                 let temp_path = temp_dir.join(format!("rodeo-{}.rbxl", uuid::Uuid::new_v4()));
-                let dom = create_minimal_place_with_session_guid(session_guid);
+                let dom = create_minimal_place();
                 rbx_control::studio::launch::write_place(&dom, &temp_path)?;
                 Ok(temp_path)
             }
@@ -299,9 +303,8 @@ fn prepare_place(place: Option<&str>, save: &SaveMode, session_guid: &str) -> Re
             if has_place {
                 std::fs::copy(place.unwrap(), &out_path)
                     .context("failed to copy place file")?;
-                patch_place_session_guid(&out_path, session_guid)?;
             } else {
-                let dom = create_minimal_place_with_session_guid(session_guid);
+                let dom = create_minimal_place();
                 rbx_control::studio::launch::write_place(&dom, &out_path)?;
             }
             Ok(out_path)
@@ -309,83 +312,26 @@ fn prepare_place(place: Option<&str>, save: &SaveMode, session_guid: &str) -> Re
     }
 }
 
-/// Create a minimal DataModel with a Workspace stamped with `__RODEO_SESSION_GUID__`.
-fn create_minimal_place_with_session_guid(session_guid: &str) -> WeakDom {
-    let mut attrs = rbx_dom_weak::types::Attributes::new();
-    attrs.insert(
-        "__RODEO_SESSION_GUID__".into(),
-        rbx_dom_weak::types::Variant::String(session_guid.into()),
-    );
-
-    let workspace = InstanceBuilder::new("Workspace")
-        .with_property("Attributes", rbx_dom_weak::types::Variant::Attributes(attrs));
-
+/// Create a minimal DataModel with an empty Workspace, for empty-place launches
+/// (gives RunScript a file to open).
+fn create_minimal_place() -> WeakDom {
+    let workspace = InstanceBuilder::new("Workspace");
     WeakDom::new(InstanceBuilder::new("DataModel").with_child(workspace))
 }
 
-/// Patch an existing place file with a `__RODEO_SESSION_GUID__` attribute on Workspace.
-fn patch_place_session_guid(path: &Path, session_guid: &str) -> Result<()> {
-    let data = std::fs::read(path).context("failed to read place file")?;
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    let mut dom = if ext == "rbxlx" {
-        rbx_xml::from_reader(std::io::Cursor::new(data), rbx_xml::DecodeOptions::default())
-            .context("failed to parse XML place")?
+/// Cheap, read-only sanity check that a path looks like a Roblox place file —
+/// binary `rbxl` (magic `<roblox!`) or XML `rbxlx` (`<roblox` / `<?xml`). Just
+/// the header, no full DOM parse: enough to fail fast on a corrupted/non-place
+/// file rather than hand garbage to Studio and hang waiting for a connection.
+fn validate_place_file(path: &str) -> Result<()> {
+    use std::io::Read;
+    let mut head = [0u8; 8];
+    let mut f = std::fs::File::open(path).context("failed to open place file")?;
+    let n = f.read(&mut head).context("failed to read place file")?;
+    let head = &head[..n];
+    if head.starts_with(b"<roblox") || head.starts_with(b"<?xml") {
+        Ok(())
     } else {
-        rbx_binary::from_reader(std::io::Cursor::new(data))
-            .context("failed to parse binary place")?
-    };
-
-    // Find or create Workspace in the DataModel's children
-    let ws_ref = {
-        let root = dom.root();
-        let mut found = None;
-        for &child_ref in root.children() {
-            if let Some(child) = dom.get_by_ref(child_ref) {
-                if child.class == "Workspace" {
-                    found = Some(child_ref);
-                    break;
-                }
-            }
-            // Workspace may be nested inside DataModel
-            if let Some(child) = dom.get_by_ref(child_ref) {
-                for &grandchild_ref in child.children() {
-                    if let Some(gc) = dom.get_by_ref(grandchild_ref) {
-                        if gc.class == "Workspace" {
-                            found = Some(grandchild_ref);
-                            break;
-                        }
-                    }
-                }
-            }
-            if found.is_some() {
-                break;
-            }
-        }
-        match found {
-            Some(r) => r,
-            None => {
-                // Rojo-built files may not include Workspace — create it
-                let root_ref = dom.root_ref();
-                dom.insert(root_ref, InstanceBuilder::new("Workspace"))
-            }
-        }
-    };
-
-    // Build attributes — preserve existing attributes if any
-    let ws = dom.get_by_ref_mut(ws_ref).context("invalid Workspace ref")?;
-    let attr_key: rbx_dom_weak::Ustr = "Attributes".into();
-    let mut attrs = match ws.properties.get(&attr_key) {
-        Some(rbx_dom_weak::types::Variant::Attributes(existing)) => existing.clone(),
-        _ => rbx_dom_weak::types::Attributes::new(),
-    };
-    attrs.insert(
-        "__RODEO_SESSION_GUID__".into(),
-        rbx_dom_weak::types::Variant::String(session_guid.into()),
-    );
-    ws.properties.insert(
-        attr_key,
-        rbx_dom_weak::types::Variant::Attributes(attrs),
-    );
-
-    rbx_control::studio::launch::write_place(&dom, path)
+        bail!("failed to parse place file (not a valid rbxl/rbxlx): {path}");
+    }
 }
