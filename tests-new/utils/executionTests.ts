@@ -335,6 +335,60 @@ export function returnFile(run: RunFn): void {
       rmIfExists(relPath);
     }
   });
+
+  // Regression: integer-keyed (non-array-like) maps must keep BOTH the numeric
+  // key and its value. The serializer stringified keys (`tostring(k)`) then
+  // re-indexed the table with the string key, so values stored under an integer
+  // key were lost (emitted as `["100"] = nil`); Luau supports `[100] = ...`.
+  // See rodeo-shared/serialize.luau (getSortedKeys / walk).
+  it("preserves a numeric map key and its Vector3 value (.luau)", async () => {
+    const path = mkTmp(".luau");
+    try {
+      const result = await run({
+        source: "return { [100] = Vector3.new(13, 14, 15) }",
+        returnFile: path,
+      });
+      expect(result.ok).toBe(true);
+      const content = readFileSync(path, "utf-8");
+      expect(content).toContain("[100] = vector.create(13, 14, 15)");
+      expect(content).not.toContain('["100"] = nil');
+    } finally {
+      rmIfExists(path);
+    }
+  });
+
+  it("preserves a large/sparse numeric map key and its value (.luau)", async () => {
+    const path = mkTmp(".luau");
+    try {
+      const result = await run({
+        source: "return { [1234005] = Vector3.new(1, 2, 3) }",
+        returnFile: path,
+      });
+      expect(result.ok).toBe(true);
+      const content = readFileSync(path, "utf-8");
+      expect(content).toContain("[1234005] = vector.create(1, 2, 3)");
+      expect(content).not.toContain('["1234005"]');
+    } finally {
+      rmIfExists(path);
+    }
+  });
+
+  it("preserves both integer and string keys in a mixed map (.luau)", async () => {
+    const path = mkTmp(".luau");
+    try {
+      const result = await run({
+        source: "return { [999] = Vector3.new(1, 2, 3), bare = Vector3.new(7, 8, 9) }",
+        returnFile: path,
+      });
+      expect(result.ok).toBe(true);
+      const content = readFileSync(path, "utf-8");
+      expect(content).toContain("[999] = vector.create(1, 2, 3)");
+      expect(content).toContain('["bare"] = vector.create(7, 8, 9)');
+      expect(content).not.toContain('["999"] = nil');
+    } finally {
+      rmIfExists(path);
+    }
+  });
 }
 
 // ── scriptFile (2 tests) ─────────────────────────────────────────────────

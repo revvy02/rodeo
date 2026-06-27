@@ -31,9 +31,19 @@ end
 local function getSortedKeys(t)
 	local keys = {}
 	for k in t do
-		table.insert(keys, tostring(k))
+		table.insert(keys, k)
 	end
-	table.sort(keys)
+	-- Preserve original key types — stringifying here loses integer keys, which
+	-- then mis-index the table later as `value[tostring(k)]` (= nil), dropping
+	-- the value. Sort deterministically: group by type name, then by value
+	-- within a type, so mixed number/string keys don't error in table.sort.
+	table.sort(keys, function(a, b)
+		local ta, tb = type(a), type(b)
+		if ta == tb then
+			return a < b
+		end
+		return ta < tb
+	end)
 	return keys
 end
 
@@ -67,8 +77,16 @@ local TYPE_EMITTERS = {
 
 local function walk(key, value, depth)
 	local lua = getIndent(depth)
-	if key then
-		lua = lua .. '["' .. escapeString(key) .. '"] = '
+	if key ~= nil then
+		if type(key) == "number" then
+			-- Luau supports numeric keys: `[100] = ...`. Emitting `["100"]`
+			-- would change the key's type on round-trip.
+			lua = lua .. "[" .. tostring(key) .. "] = "
+		elseif type(key) == "string" then
+			lua = lua .. '["' .. escapeString(key) .. '"] = '
+		else
+			lua = lua .. '["' .. escapeString(tostring(key)) .. '"] = '
+		end
 	end
 	local valueType = typeof(value)
 	if valueType == "string" then
