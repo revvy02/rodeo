@@ -451,7 +451,7 @@ impl RodeoServer {
             Studio state and may take several seconds. Append `:elevated` to a target \
             (e.g. `edit:elevated`) to run at command-bar identity instead of plugin \
             identity; required for privileged Roblox APIs like `DebuggerManager`. \
-            Use `get_studios` to see what VMs are currently alive.",
+            Use `get_state` to see what VMs are currently alive.",
         input_schema = run_code_input_schema(),
         output_schema = run_code_output_schema(),
         annotations(destructive_hint = true, idempotent_hint = false, open_world_hint = true),
@@ -475,25 +475,7 @@ impl RodeoServer {
     }
 
     #[tool(
-        description = "Get connected Studio instances with mode, VMs, and place info.",
-        input_schema = empty_object_schema(),
-        annotations(read_only_hint = true, idempotent_hint = true),
-    )]
-    async fn get_studios(&self, ct: CancellationToken) -> CallToolResult {
-        json_or_cancel(&ct, handle_get_slice(&self.host, self.port, "studios")).await
-    }
-
-    #[tool(
-        description = "Get connected backend devices with names and VM counts.",
-        input_schema = empty_object_schema(),
-        annotations(read_only_hint = true, idempotent_hint = true),
-    )]
-    async fn get_backends(&self, ct: CancellationToken) -> CallToolResult {
-        json_or_cancel(&ct, handle_get_slice(&self.host, self.port, "backends")).await
-    }
-
-    #[tool(
-        description = "List all processes (queued, running, completed).",
+        description = "List rodeo processes (queued, running, completed) with their IDs and state. Use a process ID with kill_process.",
         input_schema = empty_object_schema(),
         annotations(read_only_hint = true, idempotent_hint = true),
     )]
@@ -747,6 +729,23 @@ async fn add_studio_proxy_tools(
 
 pub async fn main(host: &str, port: u16) -> Result<()> {
     eprintln!("[rodeo mcp] starting, host={host} port={port}");
+
+    // Ensure a serve backs the serve-dependent tools, so `rodeo mcp` works
+    // without a separately-launched `rodeo serve`. Reuse a healthy one;
+    // otherwise start one we own for this MCP session (its handle is held in
+    // `_serve_handle` until `main` returns, then torn down). Localhost only —
+    // a remote host must already be serving.
+    let _serve_handle = if host == "localhost" || host == "127.0.0.1" {
+        if RodeoClient::connect(host, port)?.is_healthy().await {
+            eprintln!("[rodeo mcp] reusing serve on {host}:{port}");
+            None
+        } else {
+            eprintln!("[rodeo mcp] no serve on {port}; starting one");
+            Some(super::serve::start_full_serve(port).await?)
+        }
+    } else {
+        None
+    };
 
     let studio_mcp_holder: Arc<Mutex<Option<StudioMcpClient>>> = Arc::new(Mutex::new(None));
     let mut server = RodeoServer::new(host.to_string(), port, studio_mcp_holder.clone());
