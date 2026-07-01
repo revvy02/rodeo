@@ -14,13 +14,13 @@
 -- Underscore-prefix on these locals: they're only referenced via `typeof()`
 -- and as namespaces for type re-exports. Selene flags `local x = require(...)`
 -- as unused if not referenced at runtime; type-level use doesn't count.
-local _fs = require("./fs")
-local _io = require("./io")
-local _process = require("./process")
-local _stream = require("./stream")
-local _roblox = require("./roblox")
+local _fs = require("@self/fs")
+local _io = require("@self/io")
+local _process = require("@self/process")
+local _roblox = require("@self/roblox")
+local _stream = require("@self/stream")
 
-local singleton = require("./_internal/singleton")
+local singleton = require("@self/_internal/singleton")
 
 -- Per-module type aliases derived from the modules themselves (single source of truth).
 export type Fs = typeof(_fs)
