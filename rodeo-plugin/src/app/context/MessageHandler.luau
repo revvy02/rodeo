@@ -119,12 +119,38 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 				onRpc = function(msg)
 					-- msg.callJson is canonical ClientRpcCall JSON minus executionId.
 					-- Stamp executionId, decode to typed, wrap, encode to wire.
+					--
+					-- This runs on the outgoing-event thread, NOT the thread blocked
+					-- in rpc.call's event:Wait(). If encoding/sending throws here
+					-- (e.g. JSONEncode rejects a string field carrying non-UTF-8
+					-- bytes — the wire is a UTF-8-locked WebSocket text frame), the
+					-- error would otherwise be swallowed and the caller would hang
+					-- forever. Catch it and deliver an error response for this id so
+					-- rpc.call's event:Wait() returns and errors at the call site.
 					msg.callJson.executionId = executionId
-					local typedCall = runtimeProto.ClientRpcCall.jsonDecode(msg.callJson)
-					local rpcMsg = rodeoProto.PluginMessage.new({
-						msg = { type = "rpc", value = typedCall },
-					})
-					client:Send(HttpService:JSONEncode(rpcMsg:jsonEncode()))
+					local ok, err = pcall(function()
+						local typedCall = runtimeProto.ClientRpcCall.jsonDecode(msg.callJson)
+						local rpcMsg = rodeoProto.PluginMessage.new({
+							msg = { type = "rpc", value = typedCall },
+						})
+						client:Send(HttpService:JSONEncode(rpcMsg:jsonEncode()))
+					end)
+					if not ok then
+						-- Defer the error response. onRpc runs synchronously inside
+						-- rpc.call's send() (BindableEvent:Fire is synchronous), so a
+						-- direct Fire here would land before rpc.call reaches
+						-- event:Wait() and be missed, hanging the caller forever.
+						-- task.defer resumes after the caller is parked on Wait().
+						local errValue = tostring(err)
+						local id = msg.callJson.id
+						task.defer(function()
+							ctx.incomingEvent:Fire({
+								type = "rpc:response",
+								id = id,
+								res = { type = "error", value = errValue },
+							})
+						end)
+					end
 				end,
 			})
 
