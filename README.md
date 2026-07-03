@@ -11,12 +11,127 @@
 
 > **Status:** macOS and Windows are fully supported. Linux currently is not. Breaking changes to API may happen.
 
+## Examples
+
+### Open a place, run a script, close it
+
+`--place` opens a place ID or a local file, runs the script against it, and closes it when done.
+
+```bash
+$ rodeo run --place 1234567890 --show-return --source "return game.Workspace.Name"
+"Workspace"
+
+$ rodeo run --place ./game.rbxl script.luau
+
+# Studio opens in the background by default; --focus brings it to the front
+$ rodeo run --place ./game.rbxl --focus script.luau
+```
+
+### Keep the place open
+
+`--detached` leaves the Studio open after the run.
+
+```bash
+$ rodeo serve                 # terminal 1
+
+$ rodeo run --place 1234567890 --detached --source "print('studio is up')"
+studio is up
+
+$ rodeo run --show-return --source "return game.PlaceId"
+1234567890
+```
+
+### Pipe stdio between the terminal and Studio
+
+Scripts read the terminal's stdin and write to its stdout.
+
+```lua
+-- greet.luau
+local io = require("@rodeo/io")
+local stream = require("@rodeo/stream")
+
+local name = stream.read(io.stdin)
+stream.write(io.stdout, `hello, {name}\n`)
+```
+
+```bash
+$ echo "frank" | rodeo run greet.luau
+hello, frank
+```
+
+### Run code in any script context or Studio mode
+
+`--target <mode>:<dom>[:<identity>]` picks where the script runs. If Studio isn't in the target mode, rodeo auto transitions it when possible.
+
+| Target | Runs as |
+|--------|---------|
+| `edit:plugin` | ModuleScript in edit mode (default) |
+| `edit:elevated` | elevated identity in edit mode |
+| `run:server` | server Script in run mode |
+| `test:server` | server Script in a play test |
+| `test:client` | LocalScript in a play test |
+| `play:server` | server Script in a multiplayer test |
+| `play:client` | LocalScript on a client in a multiplayer test |
+| `play:client:<n>` | LocalScript on a client, session sized to `n` clients |
+
+Append `:plugin` or `:elevated` to any target to override the script identity.
+
+```bash
+$ rodeo run --target run:server --show-return --source "return game:GetService('RunService'):IsRunning()"
+true
+```
+
+### Access live module state in a play test
+
+`--target test:client` runs the script as a LocalScript in a play test. With `--cache-requires`, the execution has access to the same module state as your running game code. Mutate it in one run, read it back in the next.
+
+```bash
+$ rodeo run --target test:client --cache-requires --source '
+local m = require(game.ReplicatedStorage.Counter)
+m.value += 1
+print("value is now", m.value)'
+value is now 1
+
+$ rodeo run --target test:client --cache-requires --show-return --source "return require(game.ReplicatedStorage.Counter).value"
+1
+```
+
+### Export and import models
+
+```bash
+$ rodeo run --source '
+local roblox = require("@rodeo/roblox")
+roblox.export("map.rbxm", { workspace.Map })'
+
+$ rodeo run --source '
+local roblox = require("@rodeo/roblox")
+local roots = roblox.import("map.rbxm")
+print(roots[1].ClassName, roots[1].Name)'
+Model Map
+```
+
+### Write return values to a file
+
+`--return` writes the script's return value to a file. A `.luau` file gets the value serialized as Luau source, preserving data types like `Vector3` or `CFrame`. The output is valid Luau you can `require` from other code.
+
+```bash
+$ rodeo run --return dump.luau --source "return { coins = 120, spawn = workspace.Map.Spawn.Position }"
+```
+
+```lua
+-- dump.luau
+return {
+	["coins"] = 120,
+	["spawn"] = vector.create(0, 5, 0),
+}
+```
+
 ## Docs
 
-**[revvy02.github.io/rodeo](https://revvy02.github.io/rodeo/)** — full reference site with search.
+**[revvy02.github.io/rodeo](https://revvy02.github.io/rodeo/)**
 
-- [CLI reference](https://revvy02.github.io/rodeo/cli/) — every subcommand and flag (auto-generated from source).
-- [@rodeo runtime](https://revvy02.github.io/rodeo/runtime/) — the runtime library scripts get inside Studio (fs, io, stream, process, roblox).
+- [CLI reference](https://revvy02.github.io/rodeo/cli/)
+- [@rodeo standard library](https://revvy02.github.io/rodeo/runtime/)
 
 ## Companion tools
 
