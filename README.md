@@ -23,7 +23,7 @@ $ rodeo run --place 1234567890 --show-return --source "return game.Workspace.Nam
 
 $ rodeo run --place ./game.rbxl script.luau
 
-# Studio opens in the background by default; --focus brings it to the front
+# rodeo opens Studio in the background by default; --focus brings it to the front
 $ rodeo run --place ./game.rbxl --focus script.luau
 ```
 
