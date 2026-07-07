@@ -469,7 +469,6 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
         return_file: params.get("returnFile").and_then(|v| v.as_str()).map(String::from),
         output_file: params.get("outputFile").and_then(|v| v.as_str()).map(String::from),
         profile_dir,
-        job: params.get("job").and_then(|v| v.as_str()).map(String::from),
         // Daemon callers route by vmId (the Vm handle pins its own session).
         session: None,
     };

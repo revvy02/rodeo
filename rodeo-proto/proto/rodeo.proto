@@ -276,7 +276,7 @@ message SubmitRequest {
   string target = 3;
   optional string session = 4;
   optional string vm_id = 5;
-  optional string job = 6;
+  reserved 6;  // old `job` filter — removed, was never implemented server-side
   reserved 7, 8, 9, 10, 11;  // old flat enable_warn/error/info/output/logs
   optional bool cache_requires = 12;
   repeated string script_args = 13;

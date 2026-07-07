@@ -119,12 +119,6 @@ impl BackendState {
                 continue;
             }
 
-            // Job filter: match by gameInstanceId if specified
-            if let Some(ref wanted_job) = run.job {
-                // TODO: check vm.state.job_id once live VMs report it
-                let _ = wanted_job; // placeholder
-            }
-
             // Session filter — `run.session` is the master-minted session_guid.
             // Applies regardless of target: a default-target run pinned to a
             // session (e.g. the Studio `run --place` just launched) must never
@@ -1058,7 +1052,6 @@ mod tests {
             target: target.to_string(),
             session: None,
             vm_id: None,
-            job: None,
             log_filter: rodeo_proto::LogFilter::default(),
             cache_requires: None,
             script_args: None,

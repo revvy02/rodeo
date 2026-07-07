@@ -426,7 +426,6 @@ impl proto::RunService for RodeoServices {
                 target: submit.target,
                 session: submit.session,
                 vm_id: submit.vm_id,
-                job: submit.job,
                 log_filter: submit.log_filter.into_option().unwrap_or_default(),
                 cache_requires: submit.cache_requires,
                 script_args: if submit.script_args.is_empty() { None } else { Some(submit.script_args) },

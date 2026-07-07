@@ -56,7 +56,6 @@ struct RunConfig {
     detached: bool,
     no_hud: bool,
     // Targeting fields
-    job: Option<String>,
     vm: Option<String>,
     // Profiling
     profile: Option<std::path::PathBuf>,
@@ -268,7 +267,6 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         fflags,
         detached: args.place.detached,
         no_hud: args.place.no_hud,
-        job: args.place.job,
         vm: args.place.vm,
         profile,
     })
@@ -368,7 +366,6 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         // Pin to the studio we launched (if any) so the script runs in the
         // requested place even when other studios share this serve.
         session: launched_studio_id.clone(),
-        job: cfg.job,
         log_filter: cfg.log_filter,
         cache_requires: cfg.cache_requires,
         script_args: cfg.script_args,

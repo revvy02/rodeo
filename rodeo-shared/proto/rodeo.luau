@@ -766,7 +766,6 @@ type _SubmitRequestFields = {
 	target: string,
 	session: string?,
 	vmId: string?,
-	job: string?,
 	cacheRequires: boolean?,
 	scriptArgs: { string },
 	returnFile: string?,
@@ -786,7 +785,6 @@ export type _SubmitRequestPartialFields = {
 	target: string?,
 	session: string?,
 	vmId: string?,
-	job: string?,
 	cacheRequires: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
@@ -5787,7 +5785,6 @@ do
 			target = if data == nil or data.target == nil then "" else data.target,
 			session = if data == nil or data.session == nil then nil else data.session,
 			vmId = if data == nil or data.vmId == nil then nil else data.vmId,
-			job = if data == nil or data.job == nil then nil else data.job,
 			cacheRequires = if data == nil or data.cacheRequires == nil then nil else data.cacheRequires,
 			scriptArgs = if data == nil or data.scriptArgs == nil then {} else data.scriptArgs,
 			returnFile = if data == nil or data.returnFile == nil then nil else data.returnFile,
@@ -5834,11 +5831,6 @@ do
 		if self.vmId ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.vmId)
-		end
-
-		if self.job ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.job)
 		end
 
 		if self.cacheRequires ~= nil then
@@ -5963,11 +5955,6 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.vmId = proto.decodeString(value)
 					continue
-				elseif field == 6 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.job = proto.decodeString(value)
-					continue
 				elseif field == 13 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
@@ -6050,10 +6037,6 @@ do
 			output.vmId = self.vmId
 		end
 
-		if self.job ~= nil then
-			output.job = self.job
-		end
-
 		if self.cacheRequires ~= nil then
 			output.cacheRequires = self.cacheRequires
 		end
@@ -6126,10 +6109,6 @@ do
 
 		if input.vmId ~= nil then
 			self.vmId = input.vmId
-		end
-
-		if input.job ~= nil then
-			self.job = input.job
 		end
 
 		if input.cacheRequires ~= nil then

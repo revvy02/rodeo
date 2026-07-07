@@ -31,7 +31,6 @@ VM Targeting (--target): <mode>:<dom>[:<identity>]
 
 Direct targeting:
 - vm: target a specific VM by ID (from get_state)
-- job: target a specific game server by job ID
 
 Launch:
 - launch_studio: open a standalone Studio (place = empty/ID/file path), optionally with profiling; stays alive for later run_code calls
@@ -296,8 +295,6 @@ fn run_code_input_schema() -> Arc<JsonObject> {
                 ]
             },
             "vm": { "type": "string", "description": "Direct VM ID (bypasses target matching)" },
-            "job": { "type": "string", "description": "Filter by game server job ID" },
-            "backend": { "type": "string", "description": "Target specific backend device (name or ID)" },
             "place": { "type": "string", "description": "Launch Studio: empty = new place, number = place ID, path = .rbxl file" },
             "args": { "type": "array", "items": { "type": "string" }, "description": "Script arguments (accessible via require('@rodeo/process').args)" },
             "cache_requires": { "type": "boolean", "description": "Use cached module state" },
@@ -908,7 +905,6 @@ async fn handle_run_code(
     let code = args["code"].as_str().unwrap_or("").to_string();
     let target = args["target"].as_str().unwrap_or("").to_string();
     let vm_id = args["vm"].as_str().map(String::from);
-    let job = args["job"].as_str().map(String::from);
     let script_args: Vec<String> = args["args"]
         .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
@@ -957,7 +953,6 @@ async fn handle_run_code(
         target,
         vm_id,
         session: None,
-        job,
         log_filter: proto::LogFilter {
             enable_warn: true,
             enable_error: true,
@@ -1152,7 +1147,6 @@ async fn handle_luau_tool(
         target,
         vm_id: None,
         session: None,
-        job: None,
         log_filter: proto::LogFilter {
             enable_warn: true,
             enable_error: true,

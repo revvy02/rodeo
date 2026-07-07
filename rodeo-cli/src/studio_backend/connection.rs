@@ -15,8 +15,6 @@ pub struct RunRequest {
     pub session: Option<String>,
     /// Direct VM targeting (bypasses mode/dom matching)
     pub vm_id: Option<String>,
-    /// Filter by job ID (gameInstanceId)
-    pub job: Option<String>,
     pub log_filter: proto::LogFilter,
     pub cache_requires: Option<bool>,
     pub script_args: Option<Vec<String>>,

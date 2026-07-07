@@ -234,17 +234,9 @@ pub struct PlaceArgs {
     #[arg(long = "place", num_args = 0..=1, default_missing_value = "", help_heading = "Launch")]
     pub place: Option<String>,
 
-    /// Target a specific server instance by job ID (gameInstanceId)
-    #[arg(long, help_heading = "Targeting")]
-    pub job: Option<String>,
-
     /// Target a specific VM directly by ID
     #[arg(long, help_heading = "Targeting")]
     pub vm: Option<String>,
-
-    /// Target a specific backend device (by name or ID)
-    #[arg(long, help_heading = "Targeting")]
-    pub backend: Option<String>,
 
     /// Universe ID (resolved from place ID if omitted)
     #[arg(long = "place.universe", value_name = "UNIVERSE_ID", help_heading = "Launch")]

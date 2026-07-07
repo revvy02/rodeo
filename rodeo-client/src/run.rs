@@ -27,7 +27,6 @@ pub struct RunCodeOpts {
     pub return_file: Option<String>,
     pub output_file: Option<String>,
     pub profile_dir: Option<std::path::PathBuf>,
-    pub job: Option<String>,
     /// Session filter for target-routed submissions (empty `vm_id`): the
     /// server only matches VMs belonging to this studio session. Lets a
     /// caller that just launched a Studio pin its run to that Studio instead
@@ -100,7 +99,6 @@ async fn run_inner(
         target: opts.target.unwrap_or_default(),
         session: session_guid,
         vm_id: if vm_id.is_empty() { None } else { Some(vm_id.to_string()) },
-        job: opts.job,
         log_filter: opts.log_filter.map(buffa::MessageField::some).unwrap_or_else(buffa::MessageField::none),
         cache_requires: if opts.cache_requires { Some(true) } else { None },
         script_args: opts.script_args,
