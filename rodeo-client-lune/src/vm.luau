@@ -83,13 +83,15 @@ local function create(snap: VmSnapshot, daemon: Daemon): Vm
 	function self.runCode(opts)
 		local processed = processSource(opts)
 
-		local executionId = uuid.v4()
+		-- Local tag for the default profile-dir name only — NOT the run id
+		-- (the master mints that; it comes back on the result as executionId).
+		local profileTag = uuid.v4()
 		-- profile is a directory path sent straight to the daemon. The daemon
 		-- passes it to rodeo-client, which writes files directly to disk — this
 		-- process never sees the bytes.
 		local profileDir: string? = nil
 		if opts.profile ~= nil then
-			profileDir = if opts.profile ~= "" then opts.profile else `.rodeo/.temp/profiles/{executionId}`
+			profileDir = if opts.profile ~= "" then opts.profile else `.rodeo/.temp/profiles/{profileTag}`
 		end
 
 		local streamId = uuid.v4()
@@ -130,6 +132,7 @@ local function create(snap: VmSnapshot, daemon: Daemon): Vm
 					ok = r.ok == true,
 					output = output,
 					exitCode = r.exitCode or 0,
+					executionId = if type(r.executionId) == "string" then r.executionId else nil,
 					["return"] = parsedReturn,
 				}
 				task.spawn(co)
@@ -152,7 +155,6 @@ local function create(snap: VmSnapshot, daemon: Daemon): Vm
 			scriptArgs = opts.scriptArgs or {},
 			profileDir = profileDir,
 			returnFile = opts.returnFile,
-			processName = opts.processName,
 			instancePath = processed.instancePath,
 			scriptPath = processed.scriptPath,
 			logFilter = opts.logFilter,

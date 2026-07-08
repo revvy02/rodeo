@@ -230,9 +230,7 @@ impl BackendState {
 
         for (i, vm_id) in routed.into_iter().rev() {
             let run = self.pending_runs.remove(i);
-            let label = run.process_name.as_deref()
-                .unwrap_or(&run.execution_id[..8.min(run.execution_id.len())]);
-            info!(pid = run.process_id, label, vm = &vm_id[..8.min(vm_id.len())], "routed from queue");
+            info!(id = run.execution_id.as_str(), vm = &vm_id[..8.min(vm_id.len())], "routed from queue");
             if let Some(vm) = self.vms.get_mut(&vm_id) {
                 vm.start_run(run);
             }
@@ -259,7 +257,6 @@ pub struct MasterState {
     pub active_runs: HashMap<String, ActiveRun>,
     /// Pending run requests waiting for a matching VM
     pub pending_runs: Vec<RunRequest>,
-    pub next_process_id: u32,
     /// In-flight save RPCs: master sends a typed SaveCommand on the control
     /// stream, studio backend replies with SaveResult, and this map routes the
     /// reply back to the awaiting save_place handler via a one-shot channel
@@ -281,8 +278,6 @@ pub struct MasterState {
 pub struct ActiveRun {
     pub execution_id: String,
     pub vm_id: String,
-    pub process_id: u32,
-    pub process_name: Option<String>,
     pub client_tx: mpsc::UnboundedSender<ClientMsg>,
     pub state: ProcessState,
     pub profile: Option<bool>,
@@ -296,15 +291,23 @@ impl MasterState {
             backends: HashMap::new(),
             active_runs: HashMap::new(),
             pending_runs: Vec::new(),
-            next_process_id: 0,
             pending_saves: HashMap::new(),
             target_modes: HashMap::new(),
         }
     }
 
-    pub fn next_pid(&mut self) -> u32 {
-        self.next_process_id += 1;
-        self.next_process_id
+    /// Mint a run id: 12 hex chars, unique among live runs. The master is the
+    /// sole id authority — clients never supply one — so uniqueness is a
+    /// server guarantee rather than a client promise.
+    pub fn mint_execution_id(&self) -> String {
+        loop {
+            let id = uuid::Uuid::new_v4().simple().to_string()[..12].to_string();
+            if !self.active_runs.contains_key(&id)
+                && !self.pending_runs.iter().any(|r| r.execution_id == id)
+            {
+                return id;
+            }
+        }
     }
 
     /// Get all VMs across all backends from their latest snapshots.
@@ -466,12 +469,10 @@ impl MasterState {
             studio
         };
         tracing::info!(
-            pid = run.process_id,
+            id = run.execution_id.as_str(),
             vm = &vm_id[..8.min(vm_id.len())],
             target = run.target.as_str(),
             studio = studio.as_deref().map(|s| &s[..8.min(s.len())]).unwrap_or("-"),
-            execution_id = run.execution_id.as_str(),
-            process_name = run.process_name.as_deref().unwrap_or(""),
             "dispatch"
         );
         let cmd = Self::build_run_command(&run);
@@ -479,8 +480,6 @@ impl MasterState {
         self.active_runs.insert(run.execution_id.clone(), ActiveRun {
             execution_id: run.execution_id.clone(),
             vm_id: vm_id.to_string(),
-            process_id: run.process_id,
-            process_name: run.process_name.clone(),
             client_tx: run.client_tx,
             state: ProcessState::PROCESS_STATE_RUNNING,
             profile: run.profile,
@@ -521,9 +520,7 @@ impl MasterState {
         }
         for (i, vm_id) in routed.into_iter().rev() {
             let run = self.pending_runs.remove(i);
-            let label = run.process_name.as_deref()
-                .unwrap_or(&run.execution_id[..8.min(run.execution_id.len())]);
-            info!(pid = run.process_id, label, vm = &vm_id[..8.min(vm_id.len())], "routed from queue");
+            info!(id = run.execution_id.as_str(), vm = &vm_id[..8.min(vm_id.len())], "routed from queue");
             self.dispatch_run(&vm_id, run);
         }
     }
@@ -565,8 +562,7 @@ impl MasterState {
                 )));
                 let _ = run.client_tx.send(ClientMsg::Complete);
                 info!(
-                    pid = run.process_id,
-                    label = run.execution_id[..8.min(run.execution_id.len())].to_string().as_str(),
+                    id = run.execution_id.as_str(),
                     session = &scope_session[..8.min(scope_session.len())],
                     "pending run dropped: target session no longer alive",
                 );
@@ -749,7 +745,7 @@ impl MasterState {
                     ProcessState::PROCESS_STATE_KILLED => "killed",
                     _ => "unknown",
                 };
-                info!(pid = run.process_id, label = run.execution_id[..8.min(run.execution_id.len())].to_string().as_str(), state = state_str, "completed");
+                info!(id = run.execution_id.as_str(), state = state_str, "completed");
             }
         }
 
@@ -765,8 +761,8 @@ impl MasterState {
     }
 
     /// Disconnect a run client: remove from pending, auto-kill if running.
-    pub fn disconnect_run(&mut self, process_id: u32, execution_id: &str) {
-        info!(pid = process_id, "run client disconnected");
+    pub fn disconnect_run(&mut self, execution_id: &str) {
+        info!(id = execution_id, "run client disconnected");
         self.pending_runs.retain(|r| r.execution_id != execution_id);
 
         if let Some(run) = self.active_runs.get(execution_id) {
@@ -781,17 +777,6 @@ impl MasterState {
             let vm_id_owned = run.vm_id.clone();
             self.send_to_vm(&vm_id_owned, kill_msg);
         }
-    }
-
-    /// Find a run by process ID.
-    pub fn find_by_process_id(&self, pid: u32) -> Option<(&str, &str)> {
-        // Check active runs
-        for (eid, run) in &self.active_runs {
-            if run.process_id == pid {
-                return Some((eid.as_str(), &run.vm_id));
-            }
-        }
-        None
     }
 
     /// Get the mode for a specific session from backend snapshots.
@@ -837,7 +822,6 @@ impl MasterState {
 
         let processes: Vec<rodeo_proto::ProcessInfo> = self.active_runs.values()
             .map(|r| rodeo_proto::ProcessInfo {
-                process_id: r.process_id,
                 execution_id: r.execution_id.clone(),
                 state: match r.state {
                     ProcessState::PROCESS_STATE_RUNNING => "running",
@@ -846,15 +830,12 @@ impl MasterState {
                     ProcessState::PROCESS_STATE_KILLED => "killed",
                     _ => "queued",
                 }.to_string(),
-                name: r.process_name.clone(),
                 created_at: r.created_at,
                 ..Default::default()
             })
             .chain(self.pending_runs.iter().map(|r| rodeo_proto::ProcessInfo {
-                process_id: r.process_id,
                 execution_id: r.execution_id.clone(),
                 state: "queued".to_string(),
-                name: r.process_name.clone(),
                 created_at: r.created_at,
                 ..Default::default()
             }))
@@ -1061,10 +1042,8 @@ mod tests {
             verbose: None,
             instance_path: None,
             script_path: None,
-            process_name: None,
             profile: None,
             client_tx,
-            process_id: 1,
             state: rodeo_proto::ProcessState::PROCESS_STATE_QUEUED,
             created_at: 0.0,
         };

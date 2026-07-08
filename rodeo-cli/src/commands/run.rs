@@ -375,7 +375,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         verbose: cfg.verbose,
         instance_path: cfg.instance_path,
         script_path: cfg.script_path,
-        process_name: None,
+        on_created: None,
         profile: is_profiling,
         profile_dir: cfg.profile.clone(),
     };

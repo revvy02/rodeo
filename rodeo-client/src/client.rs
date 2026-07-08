@@ -70,12 +70,15 @@ impl RodeoClient {
             .processes)
     }
 
-    pub async fn kill(&self, process_id: u32) -> Result<()> {
+    pub async fn kill(&self, execution_id: &str) -> Result<()> {
         self.transport
             .master()
-            .kill_process(proto::KillProcessRequest { process_id, ..Default::default() })
+            .kill_process(proto::KillProcessRequest {
+                execution_id: execution_id.to_string(),
+                ..Default::default()
+            })
             .await
-            .map_err(|e| anyhow!("kill_process({process_id}) failed: {e}"))?;
+            .map_err(|e| anyhow!("kill_process({execution_id}) failed: {e}"))?;
         Ok(())
     }
 

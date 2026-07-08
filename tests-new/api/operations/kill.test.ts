@@ -7,20 +7,20 @@ describe("kill", () => {
     const runPromise = ctx.editVm.runCode({ source: "task.wait(30) return nil" });
 
     // Wait for the process to appear as running
-    let processId: number | undefined;
+    let executionId: string | undefined;
     for (let i = 0; i < 30; i++) {
       const processes = await ctx.client.listProcesses();
       const running = processes.find((p) => p.state === "running");
       if (running) {
-        processId = running.processId;
+        executionId = running.executionId as string;
         break;
       }
       await Bun.sleep(500);
     }
-    expect(processId).toBeDefined();
+    expect(executionId).toBeDefined();
 
     // Kill it
-    await ctx.client.kill(processId!);
+    await ctx.client.kill(executionId!);
 
     // Wait for the run to finish
     const result = await runPromise;
@@ -28,6 +28,6 @@ describe("kill", () => {
   });
 
   it("kill nonexistent process returns error", async () => {
-    await expect(ctx.client.kill(999999)).rejects.toThrow();
+    await expect(ctx.client.kill("nonexistent")).rejects.toThrow();
   });
 });

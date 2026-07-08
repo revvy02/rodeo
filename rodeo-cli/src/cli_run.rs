@@ -37,16 +37,19 @@ pub struct RunRequest {
     pub verbose: bool,
     pub instance_path: Option<String>,
     pub script_path: Option<String>,
-    pub process_name: Option<String>,
     pub profile: bool,
     pub profile_dir: Option<std::path::PathBuf>,
+    /// Fired with the master-minted run id when the Created event arrives.
+    /// Lets callers (e.g. the MCP server) kill the run on cancellation.
+    pub on_created: Option<tokio::sync::oneshot::Sender<String>>,
 }
 
 /// Execute a run against a live server. Writes script stdout/stderr to the
 /// CLI's real stdio as chunks arrive and returns a final `RunResult` whose
 /// `output` field holds the merged captured text.
-pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<RunResult> {
+pub async fn run_piped(host: &str, port: u16, mut request: RunRequest) -> Result<RunResult> {
     let client = RodeoClient::connect(host, port)?;
+    let mut on_created = request.on_created.take();
     let opts = RunCodeOpts {
         source: request.script,
         target: if request.target.is_empty() { None } else { Some(request.target) },
@@ -55,7 +58,6 @@ pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<Run
         verbose: request.verbose,
         script_args: request.script_args,
         profile: request.profile,
-        process_name: request.process_name,
         log_filter: Some(request.log_filter),
         instance_path: request.instance_path,
         script_path: request.script_path,
@@ -78,6 +80,11 @@ pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<Run
     let mut final_result: Option<RunResult> = None;
     while let Some(ev) = stream.next().await {
         match ev {
+            RunStreamEvent::Created { execution_id } => {
+                if let Some(tx) = on_created.take() {
+                    let _ = tx.send(execution_id);
+                }
+            }
             RunStreamEvent::Output { kind, chunk } => {
                 match kind {
                     CapturedStreamKind::Stdout => {
@@ -100,6 +107,7 @@ pub async fn run_piped(host: &str, port: u16, request: RunRequest) -> Result<Run
     }
 
     let mut result = final_result.unwrap_or(RunResult {
+        execution_id: None,
         exit_code: 2, ok: false, output: String::new(), files: HashMap::new(), return_value: None,
     });
     if result.output.is_empty() { result.output = buffered_output; }

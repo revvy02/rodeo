@@ -1,23 +1,6 @@
 import { beforeAll, afterAll } from "bun:test";
-import { RodeoClient, Vm, type Studio, type StudioBackend } from "../../rodeo-client-ts/src/index.js";
+import { RodeoClient, type Vm, type Studio, type StudioBackend } from "../../rodeo-client-ts/src/index.js";
 import type { RunCodeOpts, RunResult } from "../../rodeo-client-ts/src/run.js";
-
-// Stamp processName with caller file:line so master logs can be greppped by
-// test origin after a failure. Runs once at module load.
-const originalRunCode = Vm.prototype.runCode;
-Vm.prototype.runCode = function (this: Vm, opts: RunCodeOpts): Promise<RunResult> {
-  const processName = opts.processName ?? callerTag();
-  return originalRunCode.call(this, { ...opts, processName });
-};
-
-function callerTag(): string | undefined {
-  const stack = new Error().stack ?? "";
-  for (const line of stack.split("\n")) {
-    const m = line.match(/([A-Za-z0-9._-]+\.test\.ts):(\d+):\d+/);
-    if (m) return `${m[1]}:${m[2]}`;
-  }
-  return undefined;
-}
 
 let nextPort = 46400;
 

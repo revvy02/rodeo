@@ -20,7 +20,6 @@ pub struct RunCodeOpts {
     pub verbose: bool,
     pub script_args: Vec<String>,
     pub profile: bool,
-    pub process_name: Option<String>,
     pub log_filter: Option<proto::LogFilter>,
     pub instance_path: Option<String>,
     pub script_path: Option<String>,
@@ -38,6 +37,9 @@ pub struct RunCodeOpts {
 /// Buffered result of `Vm::run_code` — aligns with the TS RunResult shape.
 #[derive(Default)]
 pub struct RunResult {
+    /// Master-minted run id (from the ProcessCreated event). `None` only if
+    /// the stream died before the first event arrived.
+    pub execution_id: Option<String>,
     pub exit_code: i32,
     pub ok: bool,
     pub output: String,
@@ -55,6 +57,9 @@ pub struct RunResult {
 /// Streaming event emitted by `Vm::run_code_stream`. Mirrors the JSON-RPC
 /// daemon's `stream.data` payload shapes so the daemon can emit these directly.
 pub enum RunStreamEvent {
+    /// First event on every run: the master-minted run id. Callers that may
+    /// need to kill the run (e.g. on cancellation) capture it here.
+    Created { execution_id: String },
     /// A chunk of bytes the running script wrote to its stdout or stderr.
     Output { kind: runtime::CapturedStreamKind, chunk: String },
     RpcCall { call: Box<proto::runtime::ClientRpcCall> },
@@ -92,9 +97,9 @@ async fn run_inner(
     let mut bidi = client.run().await
         .map_err(|e| anyhow!("failed to open run stream (is 'rodeo serve' running?): {e}"))?;
 
-    let execution_id = uuid::Uuid::new_v4().to_string();
+    // No id in the submit — the master mints the run id and returns it as the
+    // first event on the stream (ProcessCreated).
     let submit = proto::SubmitRequest {
-        execution_id: execution_id.clone(),
         script: opts.source,
         target: opts.target.unwrap_or_default(),
         session: session_guid,
@@ -108,7 +113,6 @@ async fn run_inner(
         verbose: if opts.verbose { Some(true) } else { None },
         instance_path: opts.instance_path,
         script_path: opts.script_path,
-        process_name: opts.process_name,
         profile: if opts.profile { Some(true) } else { None },
         ..Default::default()
     };
@@ -123,7 +127,7 @@ async fn run_inner(
     let profile_dir = opts.profile_dir.clone();
 
     let task = tokio::spawn(async move {
-        message_loop(&mut bidi, &execution_id, profile_dir, event_tx).await;
+        message_loop(&mut bidi, profile_dir, event_tx).await;
     });
 
     Ok((event_rx, task))
@@ -166,6 +170,7 @@ pub(crate) async fn run_buffered(
     opts: RunCodeOpts,
 ) -> Result<RunResult> {
     let (mut rx, task) = run_inner(transport, vm_id, session_guid, opts).await?;
+    let mut execution_id: Option<String> = None;
     let mut output = String::new();
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
     let mut exit_code = 0;
@@ -173,6 +178,7 @@ pub(crate) async fn run_buffered(
     let mut return_value: Option<String> = None;
     while let Some(ev) = rx.recv().await {
         match ev {
+            RunStreamEvent::Created { execution_id: id } => execution_id = Some(id),
             RunStreamEvent::Output { kind: _, chunk } => output.push_str(&chunk),
             RunStreamEvent::FileChunk { filename, data, is_last: _ } => {
                 files.entry(filename).or_default().extend_from_slice(&data);
@@ -189,7 +195,7 @@ pub(crate) async fn run_buffered(
         }
     }
     let _ = task.await;
-    Ok(RunResult { exit_code, ok, output, files, return_value })
+    Ok(RunResult { execution_id, exit_code, ok, output, files, return_value })
 }
 
 /// The bidi message loop — drains incoming events, forwards them as
@@ -197,10 +203,11 @@ pub(crate) async fn run_buffered(
 /// filesystem/stdio. Returns after `Done`, `Killed`, or `Disconnected`.
 async fn message_loop(
     bidi: &mut connectrpc::client::BidiStream<hyper::body::Incoming, proto::RunClientMessage, proto::RunEventView<'static>>,
-    execution_id: &str,
     profile_dir: Option<std::path::PathBuf>,
     event_tx: mpsc::UnboundedSender<RunStreamEvent>,
 ) {
+    // Master-minted run id, learned from the first stream event (Created).
+    let mut execution_id: Option<String> = None;
     // The runtime unconditionally routes script stdout/stderr writes through
     // this channel — it never touches the process's real std streams. Each
     // consumer (CLI, daemon, programmatic) decides where the bytes go.
@@ -237,7 +244,11 @@ async fn message_loop(
                         if let Some(evt) = event.event {
                             match evt {
                                 proto::run_event::Event::Created(created) => {
-                                    tracing::debug!(pid = created.process_id, "process created");
+                                    tracing::debug!(id = created.execution_id.as_str(), "process created");
+                                    execution_id = Some(created.execution_id.clone());
+                                    let _ = event_tx.send(RunStreamEvent::Created {
+                                        execution_id: created.execution_id,
+                                    });
                                 }
                                 proto::run_event::Event::RpcCall(call) => {
                                     let state = rpc_state.clone();
@@ -295,6 +306,7 @@ async fn message_loop(
                                     let files_out = std::mem::take(&mut file_buffers);
                                     let _ = event_tx.send(RunStreamEvent::Done {
                                         result: RunResult {
+                                            execution_id: execution_id.clone(),
                                             exit_code: 2,
                                             ok: false,
                                             output: String::new(),
@@ -313,6 +325,7 @@ async fn message_loop(
                                     // writes through + accumulates).
                                     let _ = event_tx.send(RunStreamEvent::Done {
                                         result: RunResult {
+                                            execution_id: execution_id.clone(),
                                             exit_code,
                                             ok,
                                             output: String::new(),
@@ -357,6 +370,11 @@ async fn message_loop(
                     forward_captured(kind, bytes);
                 }
             }
+            // The consumer dropped its RunStream: without this branch the
+            // detached task would keep the bidi open and the script would run
+            // to completion in Studio. Breaking drops `bidi`, the master sees
+            // the stream close, and `disconnect_run` auto-kills the run.
+            _ = event_tx.closed() => break,
         }
     }
 
@@ -374,10 +392,14 @@ async fn message_loop(
     }
     drop(guard);
 
-    // Clean up any leftover temp files keyed by execution_id (same behavior as CLI)
-    if let Some(content_path) = studio_content_path_fallback() {
-        let temp_dir = std::path::Path::new(&content_path).join("rodeo-temp").join(execution_id);
-        if temp_dir.exists() { let _ = std::fs::remove_dir_all(&temp_dir); }
+    // Clean up any leftover temp files keyed by execution_id (same behavior as
+    // CLI). If the stream died before Created arrived, no run was dispatched,
+    // so there's no temp dir to clean.
+    if let Some(eid) = execution_id.as_deref() {
+        if let Some(content_path) = studio_content_path_fallback() {
+            let temp_dir = std::path::Path::new(&content_path).join("rodeo-temp").join(eid);
+            if temp_dir.exists() { let _ = std::fs::remove_dir_all(&temp_dir); }
+        }
     }
 }
 

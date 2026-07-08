@@ -24,14 +24,12 @@ pub struct RunRequest {
     pub verbose: Option<bool>,
     pub instance_path: Option<String>,
     pub script_path: Option<String>,
-    pub process_name: Option<String>,
     /// Whether this run has profiling enabled
     pub profile: Option<bool>,
     /// Channel to send output back to the run client
     pub client_tx: mpsc::UnboundedSender<crate::master::ClientMsg>,
 
     // Process metadata
-    pub process_id: u32,
     pub state: ProcessState,
     pub created_at: f64,
 }
@@ -156,8 +154,7 @@ impl VmConnection {
 
         let msg = serde_json::to_string(&run_cmd).unwrap();
 
-        let label = run.process_name.as_deref().unwrap_or(&run.execution_id);
-        tracing::info!(pid = run.process_id, label, target = run.target.as_str(), "executing");
+        tracing::info!(id = run.execution_id.as_str(), target = run.target.as_str(), "executing");
 
         run.state = ProcessState::PROCESS_STATE_RUNNING;
         let _ = self.studio_tx.send(msg);
@@ -168,8 +165,7 @@ impl VmConnection {
     /// Complete a run, removing it from active_runs and returning it.
     pub fn complete_run(&mut self, execution_id: &str, state: &ProcessState) -> Option<RunRequest> {
         if let Some(run) = self.active_runs.remove(execution_id) {
-            let label = run.process_name.as_deref().unwrap_or(execution_id);
-            tracing::info!(pid = run.process_id, label, state = crate::master::grpc::process_state_str(state), "completed");
+            tracing::info!(id = execution_id, state = crate::master::grpc::process_state_str(state), "completed");
             Some(run)
         } else {
             None
@@ -180,8 +176,7 @@ impl VmConnection {
     /// Returns true if the run was found and marked.
     pub fn mark_done(&mut self, execution_id: &str, state: &ProcessState) -> bool {
         if let Some(run) = self.active_runs.get_mut(execution_id) {
-            let label = run.process_name.as_deref().unwrap_or(execution_id);
-            tracing::info!(pid = run.process_id, label, state = crate::master::grpc::process_state_str(state), "completed (draining files)");
+            tracing::info!(id = execution_id, state = crate::master::grpc::process_state_str(state), "completed (draining files)");
             run.state = state.clone();
             true
         } else {

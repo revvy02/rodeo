@@ -28,12 +28,12 @@ describe("ps (CLI)", () => {
     ]);
 
     try {
-      const pid = await waitForProcess(PORT, "running");
-      expect(pid).not.toBeNull();
+      const id = await waitForProcess(PORT, "running");
+      expect(id).not.toBeNull();
 
       const result = runRodeo(["ps", "--port", String(PORT)]);
       expect(result.ok).toBe(true);
-      expect(result.stdout + result.stderr).toContain(`#${pid}`);
+      expect(result.stdout + result.stderr).toContain(id!);
     } finally {
       scriptProc.kill();
       await scriptProc.exited;
@@ -47,8 +47,8 @@ describe("ps (CLI)", () => {
     ]);
 
     try {
-      const pid = await waitForProcess(PORT, "running");
-      expect(pid).not.toBeNull();
+      const id = await waitForProcess(PORT, "running");
+      expect(id).not.toBeNull();
 
       const result = runRodeo(["ps", "--port", String(PORT)]);
       expect(result.ok).toBe(true);

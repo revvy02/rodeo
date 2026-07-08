@@ -99,9 +99,11 @@ export class Vm {
     // already-processed script as `source`.
     const processed = processSource({ source: opts.source, file: opts.file, sourcemap: opts.sourcemap });
 
-    const executionId = crypto.randomUUID();
+    // Local tag for the default profile-dir name only — NOT the run id (the
+    // master mints that; it comes back on the result as `executionId`).
+    const profileTag = crypto.randomUUID();
     const profileDir = opts.profile !== undefined
-      ? (opts.profile || `.rodeo/.temp/profiles/${executionId}`)
+      ? (opts.profile || `.rodeo/.temp/profiles/${profileTag}`)
       : undefined;
 
     // Client-allocated streamId: we register the callback BEFORE sending the
@@ -129,6 +131,7 @@ export class Vm {
           ok?: boolean;
           output?: string;
           exitCode?: number;
+          executionId?: string | null;
           returnValue?: string | null;
         };
         // The daemon ships the script's return value as a JSON string
@@ -148,6 +151,7 @@ export class Vm {
           ok: r.ok ?? false,
           output: (r.output && r.output.length > 0) ? r.output : bufferedOutput,
           exitCode: r.exitCode ?? 0,
+          executionId: r.executionId ?? undefined,
           return: parsedReturn,
         });
       } else if (method === "stream.error") {
@@ -168,7 +172,6 @@ export class Vm {
         scriptArgs: opts.scriptArgs ?? [],
         profileDir: profileDir ?? null,
         returnFile: opts.returnFile ?? null,
-        processName: opts.processName ?? null,
         instancePath: processed.instancePath ?? null,
         scriptPath: processed.scriptPath ?? null,
         logFilter: opts.logFilter ?? null,
@@ -238,8 +241,8 @@ export class RodeoClient {
     return await this.daemon.request<ProcessInfoDTO[]>("client.listProcesses");
   }
 
-  async kill(processId: number): Promise<void> {
-    await this.daemon.request<null>("client.kill", { processId });
+  async kill(executionId: string): Promise<void> {
+    await this.daemon.request<null>("client.kill", { executionId });
   }
 
   // Backend discovery

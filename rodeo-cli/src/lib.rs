@@ -267,7 +267,7 @@ pub async fn run() {
             }).await
         }
         Commands::Ps { server } => commands::ps::main(&server.host, server.port).await,
-        Commands::Kill { id, server } => commands::kill::main(id, &server.host, server.port).await,
+        Commands::Kill { id, server } => commands::kill::main(&id, &server.host, server.port).await,
         Commands::Save { out, server } => commands::save::main(&server.host, server.port, out).await,
         Commands::Plugin => commands::plugin::main(),
         Commands::Setup => commands::setup::main(),

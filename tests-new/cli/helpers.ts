@@ -154,20 +154,20 @@ export function spawnBackground(args: string[]): BackgroundProcess {
 }
 
 // Polls the master for a process in the requested state (e.g. "running",
-// "done"). Returns the first matching process ID, or null on timeout.
+// "done"). Returns the first matching run ID, or null on timeout.
 // Replaces tests/utils/waitForProcess.luau.
 export async function waitForProcess(
   port: number,
   state: string,
   timeoutMs = 30_000,
-): Promise<number | null> {
+): Promise<string | null> {
   const client = await RodeoClient.connect(`http://localhost:${port}`);
   const start = Date.now();
   try {
     while (Date.now() - start < timeoutMs) {
       const procs = await client.listProcesses().catch(() => []);
-      for (const p of procs as Array<{ processId: number; state: string }>) {
-        if (p.state === state) return p.processId;
+      for (const p of procs as Array<{ executionId: string; state: string }>) {
+        if (p.state === state) return p.executionId;
       }
       await Bun.sleep(200);
     }

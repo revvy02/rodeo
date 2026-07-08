@@ -79,9 +79,7 @@ Run a script in Studio
 
   Default value: `44872`
 * `--place <PLACE>` — Launch Studio: empty (no value), place ID (number), or file path (.rbxl/.rbxlx)
-* `--job <JOB>` — Target a specific server instance by job ID (gameInstanceId)
 * `--vm <VM>` — Target a specific VM directly by ID
-* `--backend <BACKEND>` — Target a specific backend device (by name or ID)
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
 * `--focus` — Bring Studio to the foreground on launch (default: background)
 * `--detached` — Keep Studio/Player running after rodeo exits
@@ -118,7 +116,7 @@ Kill a running process
 
 ###### **Arguments:**
 
-* `<ID>` — Process ID to kill
+* `<ID>` — Run ID to kill (from `rodeo ps`)
 
 ###### **Options:**
 

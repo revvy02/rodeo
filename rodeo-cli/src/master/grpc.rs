@@ -364,8 +364,6 @@ impl proto::RunService for RodeoServices {
             _ => return Err(ConnectError::invalid_argument("first message must be SubmitRequest")),
         };
 
-        let execution_id = submit.execution_id.clone();
-
         // Channel for events back to client
         let (event_tx, event_rx) = mpsc::unbounded_channel::<proto::RunEvent>();
 
@@ -415,10 +413,23 @@ impl proto::RunService for RodeoServices {
             }
         });
 
-        // Route the run
-        let process_id = {
+        // Mint the run id and route the run. The Created event goes into
+        // event_tx BEFORE route_or_queue: routing can synchronously push
+        // events (e.g. drain_dead_sessions killing the run) into client_tx,
+        // and the pump task above forwards those without holding this lock —
+        // sending Created first makes it provably the first event the client
+        // sees (event_tx is FIFO).
+        let execution_id = {
             let mut guard = state.lock().await;
-            let pid = guard.next_pid();
+            let execution_id = guard.mint_execution_id();
+
+            let _ = event_tx.send(proto::RunEvent {
+                event: Some(proto::run_event::Event::Created(Box::new(proto::ProcessCreated {
+                    execution_id: execution_id.clone(),
+                    ..Default::default()
+                }))),
+                ..Default::default()
+            });
 
             let run_request = crate::studio_backend::connection::RunRequest {
                 execution_id: execution_id.clone(),
@@ -435,27 +446,20 @@ impl proto::RunService for RodeoServices {
                 verbose: submit.verbose,
                 instance_path: submit.instance_path,
                 script_path: submit.script_path,
-                process_name: submit.process_name,
                 profile: submit.profile,
                 client_tx,
-                process_id: pid,
                 state: proto::ProcessState::PROCESS_STATE_QUEUED,
                 created_at: crate::util::time::now(),
             };
 
             let routed = guard.route_or_queue(run_request);
-            if routed { tracing::info!(pid, "routed"); } else { tracing::info!(pid, "queued (no matching vm)"); }
+            if routed {
+                tracing::info!(id = execution_id.as_str(), "routed");
+            } else {
+                tracing::info!(id = execution_id.as_str(), "queued (no matching vm)");
+            }
 
-            let _ = event_tx.send(proto::RunEvent {
-                event: Some(proto::run_event::Event::Created(Box::new(proto::ProcessCreated {
-                    process_id: pid,
-                    execution_id: execution_id.clone(),
-                    ..Default::default()
-                }))),
-                ..Default::default()
-            });
-
-            pid
+            execution_id
         };
 
         // Spawn task to read client messages (typed RpcResponse + typed Kill).
@@ -496,7 +500,7 @@ impl proto::RunService for RodeoServices {
 
             // Client disconnected
             let mut guard = client_state.lock().await;
-            guard.disconnect_run(process_id, &eid);
+            guard.disconnect_run(&eid);
         });
 
         let output_stream = tokio_stream::wrappers::UnboundedReceiverStream::new(event_rx)
@@ -552,24 +556,23 @@ impl proto::MasterService for RodeoServices {
     }
 
     async fn kill_process(&self, _ctx: Context, req: OwnedView<proto::KillProcessRequestView<'static>>) -> Result<(proto::KillResponse, Context), ConnectError> {
-        let pid = req.process_id;
+        let execution_id = req.execution_id.to_string();
         let guard = self.state.lock().await;
-        if let Some((eid, vm_id)) = guard.find_by_process_id(pid) {
-            let eid_owned = eid.to_string();
-            let vm_id_owned = vm_id.to_string();
-            tracing::info!(pid, execution_id = eid_owned.as_str(), vm = &vm_id_owned[..8.min(vm_id_owned.len())], "kill: dispatching to vm");
+        if let Some(run) = guard.active_runs.get(&execution_id) {
+            let vm_id_owned = run.vm_id.clone();
+            tracing::info!(id = execution_id.as_str(), vm = &vm_id_owned[..8.min(vm_id_owned.len())], "kill: dispatching to vm");
             let kill_msg = proto::ServerMessage {
                 msg: Some(proto::server_message::Msg::Kill(Box::new(proto::KillCommand {
-                    execution_id: eid_owned.clone(),
+                    execution_id: execution_id.clone(),
                     ..Default::default()
                 }))),
                 ..Default::default()
             };
             guard.send_to_vm(&vm_id_owned, kill_msg);
-            Ok((proto::KillResponse { killed: true, process_id: pid, ..Default::default() }, Context::default()))
+            Ok((proto::KillResponse { killed: true, execution_id, ..Default::default() }, Context::default()))
         } else {
-            tracing::warn!(pid, "kill: process not found");
-            Err(ConnectError::not_found(format!("process {pid} not found")))
+            tracing::warn!(id = execution_id.as_str(), "kill: run not found");
+            Err(ConnectError::not_found(format!("run {execution_id} not found")))
         }
     }
 

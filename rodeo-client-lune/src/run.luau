@@ -22,7 +22,6 @@ export type RunCodeOpts = {
 	-- emits Luau source (e.g. `return { pos = Vector3.new(1,2,3) }`); any
 	-- other extension emits JSON-encoded tagged structs.
 	returnFile: string?,
-	processName: string?,
 	logFilter: LogFilter?,
 }
 
@@ -30,6 +29,8 @@ export type RunResult = {
 	ok: boolean,
 	output: string,
 	exitCode: number,
+	-- Master-minted run id, usable with `client.kill` / `listProcesses`.
+	executionId: string?,
 	-- JSON-parsed script return value. `nil` if the script returned nothing,
 	-- if a return file captured the value instead, if the value exceeded the
 	-- 2MiB wire cap with showReturn set (printed in full, omitted here;

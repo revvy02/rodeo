@@ -49,7 +49,7 @@ export type ConnectOpts = {
 export type RodeoClient = {
 	getState: () -> StateSnapshot,
 	listProcesses: () -> { ProcessInfo },
-	kill: (processId: number) -> (),
+	kill: (executionId: string) -> (),
 	listBackends: (kind: string?) -> { BackendInfo },
 	getLocalStudio: () -> studioMod.StudioBackend,
 	getStudio: (idOrName: string) -> studioMod.StudioBackend,
@@ -75,8 +75,8 @@ local function connect(opts: ConnectOpts): RodeoClient
 		return daemon.call("client.listProcesses", {})
 	end
 
-	function self.kill(processId)
-		daemon.call("client.kill", { processId = processId })
+	function self.kill(executionId)
+		daemon.call("client.kill", { executionId = executionId })
 	end
 
 	function self.listBackends(kind)

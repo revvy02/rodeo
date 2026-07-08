@@ -194,9 +194,9 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
             Ok(serde_json::to_value(list)?)
         }
         "client.kill" => {
-            let pid = params.get("processId").and_then(|v| v.as_u64())
-                .ok_or_else(|| anyhow!("processId required"))? as u32;
-            state.client.kill(pid).await?;
+            let id = params.get("executionId").and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("executionId required"))?;
+            state.client.kill(id).await?;
             Ok(Value::Null)
         }
 
@@ -462,7 +462,6 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
             .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())
             .unwrap_or_default(),
         profile: profile_dir.is_some(),
-        process_name: params.get("processName").and_then(|v| v.as_str()).map(String::from),
         log_filter: Some(log_filter),
         instance_path: params.get("instancePath").and_then(|v| v.as_str()).map(String::from),
         script_path: params.get("scriptPath").and_then(|v| v.as_str()).map(String::from),
@@ -494,6 +493,10 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
                 ev = stream.next() => {
                     let Some(ev) = ev else { break; };
                     match ev {
+                        rodeo_client::run::RunStreamEvent::Created { .. } => {
+                            // The run id also arrives on stream.done (from
+                            // RunResult); no separate notification needed.
+                        }
                         rodeo_client::run::RunStreamEvent::Output { kind, chunk } => {
                             let wire_kind = match kind {
                                 rodeo_client::runtime::CapturedStreamKind::Stdout => "stdout",
@@ -520,6 +523,8 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
                                     "ok": result.ok,
                                     "exitCode": result.exit_code,
                                     "output": result.output,
+                                    // Master-minted run id (from ProcessCreated).
+                                    "executionId": result.execution_id,
                                     // JSON-encoded return value (as emitted by the
                                     // plugin runner). Carried through verbatim;
                                     // clients parse it as `result.return`.

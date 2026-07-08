@@ -132,8 +132,8 @@ pub enum Commands {
 
     /// Kill a running process
     Kill {
-        /// Process ID to kill
-        id: u32,
+        /// Run ID to kill (from `rodeo ps`)
+        id: String,
 
         #[command(flatten)]
         server: ServerArgs,

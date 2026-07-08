@@ -331,7 +331,7 @@ fn kill_process_input_schema() -> Arc<JsonObject> {
     obj_arc(serde_json::json!({
         "type": "object",
         "properties": {
-            "id": { "type": "integer", "description": "Process ID (from get_processes)" }
+            "id": { "type": "string", "description": "Run ID (from get_processes)" }
         },
         "required": ["id"]
     }))
@@ -369,7 +369,7 @@ fn launch_studio_input_schema() -> Arc<JsonObject> {
 #[derive(Debug, serde::Deserialize)]
 struct KillProcessArgs {
     #[serde(default)]
-    id: u32,
+    id: String,
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -458,8 +458,7 @@ impl RodeoServer {
         Parameters(args): Parameters<serde_json::Value>,
         ct: CancellationToken,
     ) -> CallToolResult {
-        let process_name = format!("rodeo-mcp-{}", uuid::Uuid::new_v4());
-        handle_run_code_with_cancel(&self.host, self.port, args, process_name, &ct).await
+        handle_run_code_with_cancel(&self.host, self.port, args, &ct).await
     }
 
     #[tool(
@@ -472,7 +471,7 @@ impl RodeoServer {
     }
 
     #[tool(
-        description = "List rodeo processes (queued, running, completed) with their IDs and state. Use a process ID with kill_process.",
+        description = "List rodeo processes (queued, running, completed) with their run IDs and state. Use a run ID with kill_process.",
         input_schema = empty_object_schema(),
         annotations(read_only_hint = true, idempotent_hint = true),
     )]
@@ -481,7 +480,7 @@ impl RodeoServer {
     }
 
     #[tool(
-        description = "Kill a running process by ID.",
+        description = "Kill a running process by run ID.",
         input_schema = kill_process_input_schema(),
         annotations(destructive_hint = true, idempotent_hint = true),
     )]
@@ -490,7 +489,7 @@ impl RodeoServer {
         Parameters(args): Parameters<KillProcessArgs>,
         ct: CancellationToken,
     ) -> CallToolResult {
-        text_or_cancel(&ct, handle_kill_process(&self.host, self.port, args.id)).await
+        text_or_cancel(&ct, handle_kill_process(&self.host, self.port, &args.id)).await
     }
 
     #[tool(
@@ -841,41 +840,36 @@ impl RunCodeOutput {
 }
 
 /// Race a run_code execution against the request CT. On cancel, we send a
-/// best-effort kill via the master service (looking up the process by the
-/// unique `process_name` we assigned) and short-circuit to an isError result.
+/// best-effort kill via the master service using the run id captured from the
+/// Created event, and short-circuit to an isError result.
 async fn handle_run_code_with_cancel(
     host: &str,
     port: u16,
     args: serde_json::Value,
-    process_name: String,
     ct: &CancellationToken,
 ) -> CallToolResult {
     let host_owned = host.to_string();
-    let process_name_for_run = process_name.clone();
+    let (created_tx, mut created_rx) = tokio::sync::oneshot::channel::<String>();
 
     let run_fut = async move {
-        handle_run_code(&host_owned, port, &args, Some(process_name_for_run)).await
+        handle_run_code(&host_owned, port, &args, Some(created_tx)).await
     };
 
     tokio::select! {
         biased;
         _ = ct.cancelled() => {
-            // Best-effort: kill the matching process by name. The future racing the
-            // cancellation is dropped so the run client tears down; the master may
-            // still be running the script — try to kill it.
-            let host_owned = host.to_string();
-            let pname = process_name.clone();
-            tokio::spawn(async move {
-                if let Ok(client) = RodeoClient::connect(&host_owned, port) {
-                    if let Ok(processes) = client.list_processes().await {
-                        for p in processes {
-                            if p.name.as_deref() == Some(pname.as_str()) {
-                                let _ = client.kill(p.process_id).await;
-                            }
-                        }
+            // Best-effort: kill by the run id if the Created event already
+            // arrived (a sent oneshot value survives the sender drop). If it
+            // hadn't, dropping the run future closes the run stream and the
+            // master's disconnect_run auto-kill covers it.
+            if let Ok(id) = created_rx.try_recv() {
+                let host_owned = host.to_string();
+                tokio::spawn(async move {
+                    if let Ok(client) = RodeoClient::connect(&host_owned, port) {
+                        let _ = client.kill(&id).await;
                     }
-                }
-            });
+                });
+            }
             let mut result = CallToolResult::error(vec![Content::text("cancelled by client")]);
             result.structured_content = Some(serde_json::json!({
                 "stdout": "",
@@ -893,7 +887,7 @@ async fn handle_run_code(
     host: &str,
     port: u16,
     args: &serde_json::Value,
-    process_name: Option<String>,
+    on_created: Option<tokio::sync::oneshot::Sender<String>>,
 ) -> RunCodeOutput {
     let fail = |msg: String| RunCodeOutput {
         stdout: String::new(),
@@ -969,9 +963,9 @@ async fn handle_run_code(
         verbose: false,
         instance_path,
         script_path: sourcemap,
-        process_name,
         profile,
         profile_dir,
+        on_created,
     };
 
     let result = match cli_run::run_piped(host, port, request).await {
@@ -1034,13 +1028,13 @@ async fn handle_get_slice(host: &str, port: u16, key: &str) -> serde_json::Value
     state.get(key).cloned().unwrap_or(serde_json::json!([]))
 }
 
-async fn handle_kill_process(host: &str, port: u16, id: u32) -> Result<String, String> {
+async fn handle_kill_process(host: &str, port: u16, id: &str) -> Result<String, String> {
     RodeoClient::connect(host, port)
         .map_err(|e| e.to_string())?
         .kill(id)
         .await
         .map_err(|e| e.to_string())?;
-    Ok(format!("Killed process #{id}"))
+    Ok(format!("Killed {id}"))
 }
 
 async fn handle_save_place(host: &str, port: u16, out: Option<String>) -> Result<String, String> {
@@ -1163,9 +1157,9 @@ async fn handle_luau_tool(
         verbose: false,
         instance_path: None,
         script_path: None,
-        process_name: None,
         profile: false,
         profile_dir: None,
+        on_created: None,
     };
 
     let result = cli_run::run_piped(host, port, request)
