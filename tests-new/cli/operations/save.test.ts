@@ -3,7 +3,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import {
   runRodeo,
   spawnBackground,
-  waitForVm,
+  waitForDom,
   type BackgroundProcess,
 } from "../helpers.js";
 
@@ -49,7 +49,7 @@ describe("rodeo save (CLI)", () => {
 
   beforeAll(async () => {
     bg = spawnBackground(["run", "--port", String(PORT), "--place"]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => { bg.kill(); await bg.exited; });
 
@@ -88,7 +88,7 @@ describe("save targets correct Studio by PID (CLI)", () => {
   beforeAll(async () => {
     procA = spawnBackground(["run", "--port", String(portA), "--place", "--focus"]);
     procB = spawnBackground(["run", "--port", String(portB), "--place"]);
-    await Promise.all([waitForVm(portA), waitForVm(portB)]);
+    await Promise.all([waitForDom(portA), waitForDom(portB)]);
   });
   afterAll(async () => {
     procA.kill();

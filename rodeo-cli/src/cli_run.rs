@@ -24,7 +24,7 @@ use rodeo_proto as proto;
 pub struct RunRequest {
     pub script: String,
     pub target: String,
-    pub vm_id: Option<String>,
+    pub dom_id: Option<String>,
     /// Pin target-routed execution to this studio session (e.g. the Studio
     /// this run just launched via `--place`).
     pub session: Option<String>,
@@ -67,10 +67,10 @@ pub async fn run_piped(host: &str, port: u16, mut request: RunRequest) -> Result
         session: request.session,
     };
 
-    let mut stream = match request.vm_id.as_deref() {
-        Some(vm_id) if !vm_id.is_empty() => {
-            let vm = client.get_vm(vm_id).await?;
-            vm.run_code_stream(opts).await?
+    let mut stream = match request.dom_id.as_deref() {
+        Some(dom_id) if !dom_id.is_empty() => {
+            let dom = client.get_dom(dom_id).await?;
+            dom.run_code_stream(opts).await?
         }
         _ => client.submit_run_stream(opts).await?,
     };

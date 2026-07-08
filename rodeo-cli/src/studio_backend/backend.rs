@@ -1,6 +1,6 @@
 //! Studio backend mode: connects to master via connectrpc gRPC.
 //!
-//! Uses connectrpc-generated client stubs for typed RPC. Plugin VMs are uplifted
+//! Uses connectrpc-generated client stubs for typed RPC. Plugin DOMs are uplifted
 //! to master via the Control bidirectional stream. File transfers (profile dumps)
 //! use the SendFile client streaming RPC.
 
@@ -94,15 +94,15 @@ pub async fn run_master_loop(
         guard.relay_tx = Some(relay_tx.clone());
     }
 
-    // Send vm_connect for already-connected VMs
+    // Send dom_connect for already-connected DOMs
     {
         let guard = state.lock().await;
-        for (vm_id, vm) in &guard.vms {
-            if vm.connected {
-                let state_json = serde_json::to_string(&vm.state).unwrap_or_default();
+        for (dom_id, dom) in &guard.doms {
+            if dom.connected {
+                let state_json = serde_json::to_string(&dom.state).unwrap_or_default();
                 let _ = bidi.send(proto::BackendMessage {
-                    msg: Some(proto::backend_message::Msg::VmConnect(Box::new(proto::VmConnect {
-                        vm_id: vm_id.clone(), state_json,
+                    msg: Some(proto::backend_message::Msg::DomConnect(Box::new(proto::DomConnect {
+                        dom_id: dom_id.clone(), state_json,
                         ..Default::default()
                     }))),
                     ..Default::default()
@@ -209,9 +209,9 @@ async fn handle_master_msg(
     state: &SharedBackendState,
 ) {
     match msg {
-        proto::master_message::Msg::VmServerMessage(vm_server) => {
-            let vm_id = vm_server.vm_id.clone();
-            let server_msg = match vm_server.message.into_option() {
+        proto::master_message::Msg::DomServerMessage(dom_server) => {
+            let dom_id = dom_server.dom_id.clone();
+            let server_msg = match dom_server.message.into_option() {
                 Some(m) => m,
                 None => return,
             };
@@ -225,8 +225,8 @@ async fn handle_master_msg(
                 // Scanner is keyed by execution_id (label embedded in dump file).
                 if run_cmd.profile == Some(true) {
                     let guard = state.lock().await;
-                    let session_guid = guard.vms.get(&vm_id)
-                        .and_then(|vm| vm.session_guid.clone())
+                    let session_guid = guard.doms.get(&dom_id)
+                        .and_then(|dom| dom.session_guid.clone())
                         .unwrap_or_default();
                     if let Some(ref scanner) = guard.profile_scanner {
                         let mut dump_rx = scanner.register(execution_id.clone());
@@ -268,7 +268,7 @@ async fn handle_master_msg(
                 }
             }
 
-            // Serialize the typed ServerMessage once and forward to the VM's plugin
+            // Serialize the typed ServerMessage once and forward to the DOM's plugin
             // over the WebSocket (which still speaks JSON-encoded proto).
             let kind = match &server_msg.msg {
                 Some(proto::server_message::Msg::Welcome(_)) => "welcome",
@@ -278,16 +278,16 @@ async fn handle_master_msg(
                 Some(proto::server_message::Msg::SetTargetMode(_)) => "set_target_mode",
                 None => "empty",
             };
-            let vm_short = &vm_id[..8.min(vm_id.len())];
+            let dom_short = &dom_id[..8.min(dom_id.len())];
             let json = serde_json::to_string(&server_msg).unwrap();
             let guard = state.lock().await;
-            if let Some(vm_conn) = guard.vms.get(&vm_id) {
-                match vm_conn.studio_tx.send(json) {
-                    Ok(_) => tracing::debug!(vm = vm_short, kind, "backend → plugin: forwarded"),
-                    Err(e) => tracing::warn!(vm = vm_short, kind, "backend → plugin: channel closed: {e}"),
+            if let Some(dom_conn) = guard.doms.get(&dom_id) {
+                match dom_conn.studio_tx.send(json) {
+                    Ok(_) => tracing::debug!(dom = dom_short, kind, "backend → plugin: forwarded"),
+                    Err(e) => tracing::warn!(dom = dom_short, kind, "backend → plugin: channel closed: {e}"),
                 }
             } else {
-                tracing::warn!(vm = vm_short, kind, "backend → plugin: vm not found in backend state");
+                tracing::warn!(dom = dom_short, kind, "backend → plugin: dom not found in backend state");
             }
         }
         proto::master_message::Msg::Save(cmd) => {
@@ -623,9 +623,9 @@ async fn handle_master_msg(
                 // Event-driven exit handler — replaces the old 2-second polling
                 // monitor. `Child::on_exit` fires via OS-level wait/kqueue, so we
                 // learn about death immediately. The callback synthesizes a
-                // SessionExited message; master handles per-VM run cleanup via
-                // the existing VmDisconnect path (the OS closes the plugin's
-                // WebSocket when the process dies → WS reader fires VmDisconnect).
+                // SessionExited message; master handles per-DOM run cleanup via
+                // the existing DomDisconnect path (the OS closes the plugin's
+                // WebSocket when the process dies → WS reader fires DomDisconnect).
                 let exit_state = ls.clone();
                 let exit_session_guid = session_guid.clone();
                 let exit_out_tx = out_tx.clone();
@@ -690,23 +690,23 @@ async fn handle_master_msg(
                     inst.studio.clone()
                 });
 
-                // Eagerly prune VMs belonging to the closing Studio so master's routing
+                // Eagerly prune DOMs belonging to the closing Studio so master's routing
                 // view excludes them before the SIGTERM actually lands. Without this, the
                 // window between kill-issue and WebSocket EOF allows new runs to match and
                 // dispatch to a plugin that's about to die (and never reply).
-                let dying: Vec<String> = guard.vms.iter()
-                    .filter(|(_, vm)| vm.session_guid.as_deref() == Some(session_guid.as_str()))
+                let dying: Vec<String> = guard.doms.iter()
+                    .filter(|(_, dom)| dom.session_guid.as_deref() == Some(session_guid.as_str()))
                     .map(|(id, _)| id.clone())
                     .collect();
-                for vm_id in &dying {
-                    if let Some(vm) = guard.vms.get_mut(vm_id) {
-                        vm.disconnect();
+                for dom_id in &dying {
+                    if let Some(dom) = guard.doms.get_mut(dom_id) {
+                        dom.disconnect();
                     }
-                    guard.vms.remove(vm_id);
+                    guard.doms.remove(dom_id);
                     if let Some(ref relay_tx) = guard.relay_tx {
                         let _ = relay_tx.send(proto::BackendMessage {
-                            msg: Some(proto::backend_message::Msg::VmDisconnect(Box::new(proto::VmDisconnect {
-                                vm_id: vm_id.clone(),
+                            msg: Some(proto::backend_message::Msg::DomDisconnect(Box::new(proto::DomDisconnect {
+                                dom_id: dom_id.clone(),
                                 ..Default::default()
                             }))),
                             ..Default::default()
@@ -714,7 +714,7 @@ async fn handle_master_msg(
                     }
                 }
                 if !dying.is_empty() {
-                    tracing::info!(session_guid = session_guid.as_str(), count = dying.len(), "pruned vms for closing studio");
+                    tracing::info!(session_guid = session_guid.as_str(), count = dying.len(), "pruned doms for closing studio");
                 }
 
                 if let Some(ref notify) = trigger {
@@ -769,19 +769,23 @@ pub fn stream_file_chunks(filename: &str, execution_id: &str, data: &[u8]) -> Ve
 
 async fn build_state_snapshot(state: &SharedBackendState) -> proto::StateSnapshot {
     let guard = state.lock().await;
-    let vms = guard.vms.iter().map(|(vm_id, vm)| proto::VmSnapshot {
-        vm_id: vm_id.clone(),
-        mode: vm.state.as_ref().map(|s| s.mode.clone()),
-        dom: vm.state.as_ref().map(|s| s.dom.clone()),
-        session_guid: vm.session_guid.clone(),
-        place_id: vm.state.as_ref().map(|s| s.place_id),
-        game_name: vm.state.as_ref().map(|s| s.game_name.clone()),
-        active_runs: vm.active_count() as u32,
-        connected: vm.connected,
-        // Player name for client VMs, so master can populate StudioVm.client_name.
-        client_name: vm.state.as_ref()
+    let doms = guard.doms.iter().map(|(dom_id, dom)| proto::DomSnapshot {
+        dom_id: dom_id.clone(),
+        mode: dom.state.as_ref().map(|s| s.mode.clone()),
+        dom_kind: dom.state.as_ref().map(|s| s.dom_kind.clone()),
+        session_guid: dom.session_guid.clone(),
+        place_id: dom.state.as_ref().map(|s| s.place_id),
+        game_name: dom.state.as_ref().map(|s| s.game_name.clone()),
+        active_runs: dom.active_count() as u32,
+        connected: dom.connected,
+        // Player identity for client DOMs, so master can populate
+        // StudioDom.user_name / user_id.
+        user_name: dom.state.as_ref()
             .and_then(|s| s.client_info.clone().into_option())
             .map(|ci| ci.name),
+        user_id: dom.state.as_ref()
+            .and_then(|s| s.client_info.clone().into_option())
+            .map(|ci| ci.user_id),
         ..Default::default()
     }).collect();
     let studios = guard.studios.iter().map(|(_, s)| proto::StudioSnapshot {
@@ -792,9 +796,8 @@ async fn build_state_snapshot(state: &SharedBackendState) -> proto::StateSnapsho
         session_guid: inst.session_guid.clone(),
         status: inst.status.clone(),
         error: inst.error.clone(),
-        mcp_studio_id: inst.mcp_studio_id.clone(),
         ..Default::default()
     }).collect();
-    proto::StateSnapshot { vms, studios, studio_instances, ..Default::default() }
+    proto::StateSnapshot { doms, studios, studio_instances, ..Default::default() }
 }
 

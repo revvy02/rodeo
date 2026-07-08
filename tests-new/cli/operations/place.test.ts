@@ -3,7 +3,7 @@ import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import {
   runRodeo,
   spawnBackground,
-  waitForVm,
+  waitForDom,
   type BackgroundProcess,
 } from "../helpers.js";
 
@@ -77,7 +77,7 @@ describe("run --place guarantees a place is opened (CLI)", () => {
   beforeAll(async () => {
     // Resident serve + Studio on the port, stamped with an identifying marker.
     bg = spawnBackground(["run", "--port", String(PORT), "--place"]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
     const mark = runRodeo([
       "run", "--port", String(PORT), "--source",
       `game.Workspace:SetAttribute("__resident_place", "resident") return nil`,

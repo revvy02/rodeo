@@ -3,7 +3,7 @@ import {
   runRodeo,
   spawnBackground,
   waitForProcess,
-  waitForVm,
+  waitForDom,
   type BackgroundProcess,
 } from "../helpers.js";
 
@@ -14,7 +14,7 @@ describe("kill spawner (CLI)", () => {
 
   beforeAll(async () => {
     bg = spawnBackground(["run", "--port", String(PORT), "--place"]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => { bg.kill(); await bg.exited; });
 
@@ -37,8 +37,8 @@ describe("kill spawner (CLI)", () => {
       await Bun.sleep(500);
     }
 
-    // Verify the VM is actually free by running a second script.
-    // If the first execution wasn't killed in Studio, the VM pipeline
+    // Verify the DOM is actually free by running a second script.
+    // If the first execution wasn't killed in Studio, the DOM pipeline
     // would still be busy and this would hang/timeout.
     const result = runRodeo(["run", "--port", String(PORT), "--source", "return 'freed'"]);
     expect(result.ok).toBe(true);

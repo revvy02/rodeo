@@ -24,7 +24,7 @@ describe("save frontmost Studio (no focus transition)", () => {
     const backend = await ctx.client.getLocalStudio();
     studio = await backend.open({ background: false });
     
-    await studio.editVm.runCode({
+    await studio.editDom.runCode({
         source: "game.Workspace:SetAttribute('frontmost_reprod', 'persisted')",
     });
   });
@@ -45,7 +45,7 @@ describe("save frontmost Studio (no focus transition)", () => {
     const backend = await ctx.client.getLocalStudio();
     const verify = await backend.openFile(save.path!, { background: true });
    
-    const read = await verify.editVm.runCode({
+    const read = await verify.editDom.runCode({
         source: "return game.Workspace:GetAttribute('frontmost_reprod')",
         showReturn: true,
     });
@@ -70,10 +70,10 @@ describe("save targets correct studio with multiple places open", () => {
     studioA = await backend.open({ background: false });
     studioB = await backend.open({ background: true });
 
-    await studioA.editVm.runCode({
+    await studioA.editDom.runCode({
       source: "game.Workspace:SetAttribute('save_target_test', 'from_A')",
     });
-    await studioB.editVm.runCode({
+    await studioB.editDom.runCode({
       source: "game.Workspace:SetAttribute('save_target_test', 'from_B')",
     });
   });
@@ -91,7 +91,7 @@ describe("save targets correct studio with multiple places open", () => {
     const backend = await ctx.client.getLocalStudio();
     const verify = await backend.openFile(saveB.path!, { background: true });
 
-    const read = await verify.editVm.runCode({
+    const read = await verify.editDom.runCode({
         source: "return game.Workspace:GetAttribute('save_target_test')",
         showReturn: true,
     });
@@ -111,7 +111,7 @@ describe("save targets correct studio with multiple places open", () => {
     const backend = await ctx.client.getLocalStudio();
     const verify = await backend.openFile(saveA.path!, { background: true });
 
-    const read = await verify.editVm.runCode({
+    const read = await verify.editDom.runCode({
         source: "return game.Workspace:GetAttribute('save_target_test')",
         showReturn: true,
     });
@@ -129,8 +129,8 @@ describe("save targets correct studio with multiple places open", () => {
     // Dirty both first so each save is a real write with a confirmable mtime
     // bump. (This also exercises the genuinely-concurrent save path.)
     await Promise.all([
-      studioA.editVm.runCode({ source: "game.Workspace:SetAttribute('save_routing', 'A')" }),
-      studioB.editVm.runCode({ source: "game.Workspace:SetAttribute('save_routing', 'B')" }),
+      studioA.editDom.runCode({ source: "game.Workspace:SetAttribute('save_routing', 'A')" }),
+      studioB.editDom.runCode({ source: "game.Workspace:SetAttribute('save_routing', 'B')" }),
     ]);
     const [saveA, saveB] = await Promise.all([studioA.save(), studioB.save()]);
     expect(saveA.path).toBeDefined();

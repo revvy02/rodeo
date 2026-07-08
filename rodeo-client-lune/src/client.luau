@@ -5,34 +5,35 @@ local task = require("@lune/task")
 
 local daemonMod = require("./daemon")
 local studioMod = require("./studio")
-local vmMod = require("./vm")
+local domMod = require("./dom")
 
 export type BackendInfo = { id: string, kind: string, name: string }
 export type ProcessInfo = { [string]: any }
 
-type StudioVmEntry = {
-	vmId: string,
-	dom: string,
-	clientName: string?,
+type StudioDomEntry = {
+	domId: string,
+	domKind: string,
+	userName: string?,
+	userId: number?,
 }
 
 type StudioSnapshot = {
-	id: string,
+	studioId: string,
 	backendId: string,
-	mcpStudioId: string?,
-	name: string,
+	-- Launch session identity; absent for manually-connected studios.
+	sessionId: string?,
+	placeName: string,
 	placeId: number,
-	active: boolean,
 	status: string,
-	mode: string,
-	vms: { StudioVmEntry },
+	studioMode: string,
+	-- The root edit DOM's id; absent if no edit DOM is connected.
+	editDomId: string?,
+	doms: { StudioDomEntry },
 }
 
 type StateSnapshot = {
 	backends: { any }?,
 	processes: { any }?,
-	-- DEPRECATED: prefer `studios[].vms`. Still present for now.
-	vms: { vmMod.VmSnapshot }?,
 	studios: { StudioSnapshot },
 }
 
@@ -53,8 +54,8 @@ export type RodeoClient = {
 	listBackends: (kind: string?) -> { BackendInfo },
 	getLocalStudio: () -> studioMod.StudioBackend,
 	getStudio: (idOrName: string) -> studioMod.StudioBackend,
-	getVms: () -> { vmMod.Vm },
-	getVm: (vmId: string) -> vmMod.Vm,
+	getDoms: () -> { domMod.Dom },
+	getDom: (domId: string) -> domMod.Dom,
 	close: () -> (),
 }
 
@@ -94,36 +95,37 @@ local function connect(opts: ConnectOpts): RodeoClient
 		return studioMod.createStudioBackend(resp.backendHandle, resp.info, daemon)
 	end
 
-	function self.getVms()
+	function self.getDoms()
 		local state = self.getState()
 		local out = {}
 		for _, studio in state.studios or {} do
-			for _, sv in studio.vms or {} do
-				local snap: vmMod.VmSnapshot = {
-					vmId = sv.vmId,
-					dom = sv.dom,
-					mode = if sv.dom == "edit" then "edit" else studio.mode,
+			for _, sv in studio.doms or {} do
+				local snap: domMod.DomSnapshot = {
+					domId = sv.domId,
+					domKind = sv.domKind,
+					mode = if sv.domKind == "edit" then "edit" else studio.studioMode,
 					backendId = studio.backendId,
-					sessionGuid = studio.id,
+					sessionGuid = studio.sessionId,
 					placeId = studio.placeId,
-					gameName = studio.name,
+					gameName = studio.placeName,
 					connected = true,
 					activeRuns = 0,
-					clientName = sv.clientName,
+					userName = sv.userName,
+					userId = sv.userId,
 				}
-				table.insert(out, vmMod.create(snap, daemon))
+				table.insert(out, domMod.create(snap, daemon))
 			end
 		end
 		return out
 	end
 
-	function self.getVm(vmId)
-		for _, v in self.getVms() do
-			if v.vmId == vmId then
+	function self.getDom(domId)
+		for _, v in self.getDoms() do
+			if v.domId == domId then
 				return v
 			end
 		end
-		error(`vm '{vmId}' not found`)
+		error(`dom '{domId}' not found`)
 	end
 
 	function self.close()

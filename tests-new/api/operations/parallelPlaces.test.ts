@@ -23,14 +23,14 @@ describe("parallel places", () => {
 
     // Set unique markers on each
     for (let i = 0; i < 3; i++) {
-      await studios[i].editVm.runCode({
+      await studios[i].editDom.runCode({
         source: `game.Workspace:SetAttribute("__test_marker", "${markers[i]}") return nil`,
       });
     }
 
     // Verify each sees its own marker
     for (let i = 0; i < 3; i++) {
-      const result = await studios[i].editVm.runCode({
+      const result = await studios[i].editDom.runCode({
         source: 'return game.Workspace:GetAttribute("__test_marker")',
       });
       expect(result.ok).toBe(true);

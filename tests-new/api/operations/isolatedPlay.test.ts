@@ -5,8 +5,8 @@ import type { Studio, MultiplayerTestServer, MultiplayerTestClient } from "../..
 
 describe("isolated play mode (multi-process)", () => {
   // Empty-place suite: open an edit Studio (empty place), then start a
-  // multiplayer test off it. The returned server is an ordinary Vm handle;
-  // players join via mp.connectClient() (each returning its own client Vm
+  // multiplayer test off it. The returned server is an ordinary Dom handle;
+  // players join via mp.connectClient() (each returning its own client Dom
   // handle with .disconnect()), and mp.close() tears the whole test down.
   describe("empty place", () => {
     const ctx = setupStudio();

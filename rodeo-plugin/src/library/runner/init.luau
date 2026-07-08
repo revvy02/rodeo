@@ -73,7 +73,7 @@ local success, result = xpcall(function()
 		local TestService = game:GetService("TestService")
 		local RunService = game:GetService("RunService")
 		-- StudioMCP's execute_luau requires the datamodel_type its command bar
-		-- should run in. This VM knows its own DataModel via RunService; map it
+		-- should run in. This DOM knows its own DataModel via RunService; map it
 		-- to StudioMCP's enum (Edit / Server / Client). Without it the call is
 		-- rejected with "datamodel_type is required".
 		local datamodelType = if RunService:IsEdit()

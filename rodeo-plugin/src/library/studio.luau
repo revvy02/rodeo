@@ -56,7 +56,13 @@ elseif isClient then
 	RODEO_UNIFIER_MODULE = RODEO_UNIFIER:WaitForChild("ModuleScript") :: ModuleScript
 end
 
-local vmId = require(RODEO_UNIFIER_MODULE)
+-- The DOM id. The shared RODEO_UNIFIER ModuleScript's source is a GenerateGUID
+-- call, and Luau caches module results per VM — so each DOM's require executes
+-- it fresh and mints a distinct id. This yields exactly one id per DOM only
+-- because rodeo has a single entry-point VM per DOM (the plugin in edit, the
+-- runner in server/client). A second require site in another VM of the same
+-- DOM would mint a second id and break the invariant.
+local domId = require(RODEO_UNIFIER_MODULE)
 
 -- Inputs: mutable values updated by events. The Heartbeat reads these to compute state.
 -- `*mcpStudioId*` values are StudioMCP's own ids (propagated via the RODEO_UNIFIER
@@ -66,9 +72,9 @@ local inputs = {
 	-- From BindableEvent (MCP → edit/server VM)
 	bindableMcpStudioId = nil :: string?,
 	-- From RemoteEvent (cross-VM)
-	serverVmId = nil :: string?,
+	serverDomId = nil :: string?,
 	serverMcpStudioId = nil :: string?,
-	clientVmIds = {} :: { [string]: Player },
+	clientDomIds = {} :: { [string]: Player },
 	clientMcpStudioIds = {} :: { [string]: Player },
 	-- Players
 	players = {} :: { [Player]: boolean },
@@ -78,7 +84,7 @@ local inputs = {
 local currentState: State? = nil
 
 export type State = {
-	vmId: string,
+	domId: string,
 	-- StudioMCP's assigned id for this Studio (set via reconciliation).
 	-- Distinct from the master-assigned canonical studio_id, which is tracked
 	-- server-side and not known to the plugin.
@@ -90,7 +96,7 @@ export type State = {
 	isEdit: boolean,
 
 	mode: "edit" | "run" | "test" | "play",
-	dom: "edit" | "server" | "client",
+	domKind: "edit" | "server" | "client",
 
 	gameName: string,
 	placeId: number,
@@ -101,7 +107,7 @@ export type State = {
 		userId: number,
 	}?,
 
-	clientVmIds: { [string]: {
+	clientDomIds: { [string]: {
 		name: string,
 		userId: number,
 	} }?,
@@ -129,25 +135,25 @@ local function computeState(): State
 		elseif serverMcpStudioId and clientMcpStudioId and serverMcpStudioId == clientMcpStudioId then "test"
 		else "play"
 
-	local clientVmIds = nil
+	local clientDomIds = nil
 	if isServer then
 		local ids = {}
-		for id, player in inputs.clientVmIds do
+		for id, player in inputs.clientDomIds do
 			ids[id] = {
 				name = player.Name,
 				userId = player.UserId,
 			}
 		end
-		clientVmIds = ids
+		clientDomIds = ids
 	end
 
-	local dom: "edit" | "server" | "client" = if isClient and isServer
+	local domKind: "edit" | "server" | "client" = if isClient and isServer
 		then "edit"
 		elseif isServer then "server"
 		else "client"
 
 	return {
-		vmId = vmId,
+		domId = domId,
 		mcpStudioId = if isClient then clientMcpStudioId else serverMcpStudioId,
 
 		isServer = isServer,
@@ -156,7 +162,7 @@ local function computeState(): State
 		isEdit = isEdit,
 
 		mode = mode,
-		dom = dom,
+		domKind = domKind,
 
 		gameName = game.Name,
 		placeId = game.PlaceId,
@@ -169,7 +175,7 @@ local function computeState(): State
 			}
 			else nil,
 
-		clientVmIds = clientVmIds,
+		clientDomIds = clientDomIds,
 	}
 end
 
@@ -232,8 +238,8 @@ end)
 
 if isServer then
 	RODEO_UNIFIER_REMOTE.OnServerEvent:Connect(function(player, action, id)
-		if action == "register_client_vm_id" then
-			inputs.clientVmIds[id] = player
+		if action == "register_client_dom_id" then
+			inputs.clientDomIds[id] = player
 		elseif action == "studio_id_from_client" then
 			-- "id" is the client's mcp_studio_id (from reconciliation)
 			inputs.clientMcpStudioIds[id] = player
@@ -242,7 +248,7 @@ if isServer then
 
 	local function playerAdded(player: Player)
 		inputs.players[player] = true
-		RODEO_UNIFIER_REMOTE:FireClient(player, "register_server_vm_id", vmId)
+		RODEO_UNIFIER_REMOTE:FireClient(player, "register_server_dom_id", domId)
 	end
 
 	for _, player in Players:GetPlayers() do
@@ -256,14 +262,14 @@ end
 
 if isClient then
 	RODEO_UNIFIER_REMOTE.OnClientEvent:Connect(function(action, id)
-		if action == "register_server_vm_id" then
-			inputs.serverVmId = id
+		if action == "register_server_dom_id" then
+			inputs.serverDomId = id
 		elseif action == "studio_id_from_server" then
 			-- "id" is the server's mcp_studio_id (from reconciliation)
 			inputs.serverMcpStudioId = id
 		end
 	end)
-	RODEO_UNIFIER_REMOTE:FireServer("register_client_vm_id", vmId)
+	RODEO_UNIFIER_REMOTE:FireServer("register_client_dom_id", domId)
 end
 
 RODEO_UNIFIER_BINDABLE.Event:Connect(function(id)
@@ -272,7 +278,7 @@ RODEO_UNIFIER_BINDABLE.Event:Connect(function(id)
 end)
 
 return {
-	vmId = vmId,
+	domId = domId,
 	listen = listen,
 	getState = function(): State?
 		return currentState

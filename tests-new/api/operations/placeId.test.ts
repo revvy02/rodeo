@@ -16,7 +16,7 @@ describe("place id", () => {
       placeId: 72824109308551,
       background: true,
     });
-    const result = await extraStudio.editVm.runCode({
+    const result = await extraStudio.editDom.runCode({
       source: "return game.PlaceId",
     });
     expect(result.ok).toBe(true);

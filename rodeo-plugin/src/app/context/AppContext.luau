@@ -177,14 +177,14 @@ local function AppProvider(props: AppProviderProps)
 				if not state then return end
 				local msg = rodeoProto.PluginMessage.new({
 					msg = { type = "studioState", value = rodeoProto.StudioStateMsg.new({
-						vmId = state.vmId,
+						domId = state.domId,
 						mcpStudioId = state.mcpStudioId,
 						isServer = state.isServer,
 						isClient = state.isClient,
 						isRunning = state.isRunning,
 						isEdit = state.isEdit,
 						mode = state.mode,
-						dom = state.dom,
+						domKind = state.domKind,
 						gameName = state.gameName,
 						placeId = state.placeId,
 						gameId = state.gameId,
@@ -196,7 +196,7 @@ local function AppProvider(props: AppProviderProps)
 						-- bootstrap as the `rodeoSession` Workspace attribute. Read at
 						-- send time (always after connect, so the bootstrap has run);
 						-- nil for a manual Studio. Master matches it to its
-						-- StudioInstanceInfo and stamps VmConnection.session_guid on the
+						-- StudioInstanceInfo and stamps DomConnection.session_guid on the
 						-- first message.
 						sessionGuid = game:GetService("Workspace"):GetAttribute("rodeoSession"),
 					}) },

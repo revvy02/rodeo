@@ -1,7 +1,7 @@
 //! Thin JSON-RPC wrappers over `rodeo __spawn_canonical_client`.
 //!
 //! Public API is preserved 1:1 from the pre-daemon client so `tests-new/`
-//! needs no changes. All Studio lifecycle / VM discovery / runCode streaming
+//! needs no changes. All Studio lifecycle / DOM discovery / runCode streaming
 //! logic lives in the `rodeo-client` Rust crate; this file is just handle
 //! plumbing + a runCode-to-final-RunResult collector.
 
@@ -14,43 +14,45 @@ export type { LogFilter, RunCodeOpts, RunResult };
 // Shape of daemon responses
 // ---------------------------------------------------------------------------
 
-type VmSnapshotDTO = {
-  vmId: string;
+type DomSnapshotDTO = {
+  domId: string;
   backendId: string;
   mode: string;
-  dom: string;
+  domKind: string;
   sessionGuid?: string | null;
   placeId: number;
   gameName: string;
   connected: boolean;
   activeRuns: number;
-  clientName?: string | null;
+  userName?: string | null;
+  userId?: number | null;
 };
 
-// Minimal per-VM entry on a studio in the studio-first snapshot.
-type StudioVmEntryDTO = {
-  vmId: string;
-  dom: string;
-  clientName?: string | null;
+// Minimal per-DOM entry on a studio in the studio-first snapshot.
+type StudioDomEntryDTO = {
+  domId: string;
+  domKind: string;
+  userName?: string | null;
+  userId?: number | null;
 };
 
 type StudioDTO = {
-  id: string;
+  studioId: string;
   backendId: string;
-  mcpStudioId?: string | null;
-  name: string;
+  /** Launch session identity; absent for manually-connected studios. */
+  sessionId?: string | null;
+  placeName: string;
   placeId: number;
-  active: boolean;
   status: string;
-  mode: string;
-  vms: StudioVmEntryDTO[];
+  studioMode: string;
+  /** The root edit DOM's id; absent if no edit DOM is connected. */
+  editDomId?: string | null;
+  doms: StudioDomEntryDTO[];
 };
 
 type StateSnapshotDTO = {
   backends?: BackendInfoDTO[];
   processes?: ProcessInfoDTO[];
-  /** @deprecated still present for now; VM discovery reads `studios[].vms`. */
-  vms: VmSnapshotDTO[];
   studios: StudioDTO[];
 };
 
@@ -63,33 +65,35 @@ type BackendInfoDTO = {
 type ProcessInfoDTO = Record<string, unknown>;
 
 // ---------------------------------------------------------------------------
-// Vm
+// Dom
 // ---------------------------------------------------------------------------
 
-export class Vm {
-  readonly vmId: string;
+export class Dom {
+  readonly domId: string;
   readonly backendId: string;
   readonly mode: string;
-  readonly dom: string;
+  readonly domKind: string;
   readonly sessionGuid: string | undefined;
   readonly placeId: number;
   readonly gameName: string;
   readonly connected: boolean;
   readonly activeRuns: number;
-  readonly clientName: string | undefined;
+  readonly userName: string | undefined;
+  readonly userId: number | undefined;
   protected daemon: Daemon;
 
-  constructor(snap: VmSnapshotDTO, daemon: Daemon) {
-    this.vmId = snap.vmId;
+  constructor(snap: DomSnapshotDTO, daemon: Daemon) {
+    this.domId = snap.domId;
     this.backendId = snap.backendId ?? "";
     this.mode = snap.mode ?? "";
-    this.dom = snap.dom ?? "";
+    this.domKind = snap.domKind ?? "";
     this.sessionGuid = snap.sessionGuid ?? undefined;
     this.placeId = Number(snap.placeId ?? 0);
     this.gameName = snap.gameName ?? "";
     this.connected = snap.connected;
     this.activeRuns = snap.activeRuns;
-    this.clientName = snap.clientName ?? undefined;
+    this.userName = snap.userName ?? undefined;
+    this.userId = snap.userId ?? undefined;
     this.daemon = daemon;
   }
 
@@ -161,8 +165,8 @@ export class Vm {
     });
 
     try {
-      await this.daemon.request<{ streamId: string }>("vm.runCode", {
-        vmId: this.vmId,
+      await this.daemon.request<{ streamId: string }>("dom.runCode", {
+        domId: this.domId,
         streamId,
         source: processed.script,
         target: opts.target ?? null,
@@ -261,17 +265,17 @@ export class RodeoClient {
     return new StudioBackend(resp.backendHandle, resp.info, this.daemon);
   }
 
-  // VM discovery
+  // DOM discovery
 
-  async getVms(): Promise<Vm[]> {
+  async getDoms(): Promise<Dom[]> {
     const state = await this.getState();
-    return vmsFromStudios(state, this.daemon);
+    return domsFromStudios(state, this.daemon);
   }
 
-  async getVm(vmId: string): Promise<Vm> {
-    const vms = await this.getVms();
-    const found = vms.find((v) => v.vmId === vmId);
-    if (!found) throw new Error(`vm '${vmId}' not found`);
+  async getDom(domId: string): Promise<Dom> {
+    const doms = await this.getDoms();
+    const found = doms.find((v) => v.domId === domId);
+    if (!found) throw new Error(`dom '${domId}' not found`);
     return found;
   }
 }
@@ -360,16 +364,16 @@ export class StudioBackend {
     const resp = await this.daemon.request<{
       studioHandle: string;
       sessionGuid: string;
-      editVmId: string;
+      editDomId: string;
     }>(method, params);
     const studio = new Studio(resp.studioHandle, resp.sessionGuid, this.id, this.daemon);
-    // Populate editVm by querying VMs — the daemon guaranteed it's connected.
-    const vms = await studio.getVms();
-    const editVm = vms.find((v) => v.vmId === resp.editVmId);
-    if (!editVm) {
-      throw new Error(`edit VM ${resp.editVmId} not found in studio ${resp.studioHandle}`);
+    // Populate editDom by querying DOMs — the daemon guaranteed it's connected.
+    const doms = await studio.getDoms();
+    const editDom = doms.find((v) => v.domId === resp.editDomId);
+    if (!editDom) {
+      throw new Error(`edit DOM ${resp.editDomId} not found in studio ${resp.studioHandle}`);
     }
-    studio.editVm = editVm;
+    studio.editDom = editDom;
     return studio;
   }
 }
@@ -382,13 +386,13 @@ export class Studio {
   readonly sessionGuid: string;
   readonly backendId: string;
   /** Opaque daemon handle for this Studio. Used by RPCs keyed on the Studio
-   *  (setMode / getVms / startMultiplayerTest / save / close). */
+   *  (setMode / getDoms / startMultiplayerTest / save / close). */
   readonly studioHandle: string;
   private daemon: Daemon;
 
-  editVm!: Vm;
-  serverVm: Vm | null = null;
-  clientVm: Vm | null = null;
+  editDom!: Dom;
+  serverDom: Dom | null = null;
+  clientDom: Dom | null = null;
 
   constructor(handle: string, sessionGuid: string, backendId: string, daemon: Daemon) {
     this.studioHandle = handle;
@@ -399,26 +403,26 @@ export class Studio {
 
   async setMode(mode: string): Promise<void> {
     const resp = await this.daemon.request<{
-      serverVmId?: string | null;
-      clientVmId?: string | null;
+      serverDomId?: string | null;
+      clientDomId?: string | null;
     }>("studio.setMode", { studioHandle: this.studioHandle, mode });
 
     if (mode === "edit") {
-      this.serverVm = null;
-      this.clientVm = null;
+      this.serverDom = null;
+      this.clientDom = null;
       return;
     }
 
-    // Look up VM objects by ID from the studio-first snapshot.
+    // Look up DOM objects by ID from the studio-first snapshot.
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
     const byId = (id: string | null | undefined) => {
       if (!id) return null;
-      const snap = findVmSnapshot(state, id);
-      return snap ? new Vm(snap, this.daemon) : null;
+      const snap = findDomSnapshot(state, id);
+      return snap ? new Dom(snap, this.daemon) : null;
     };
 
-    this.serverVm = byId(resp.serverVmId);
-    this.clientVm = (mode === "test" || mode === "play") ? byId(resp.clientVmId) : null;
+    this.serverDom = byId(resp.serverDomId);
+    this.clientDom = (mode === "test" || mode === "play") ? byId(resp.clientDomId) : null;
   }
 
   async getMode(): Promise<string> {
@@ -435,13 +439,13 @@ export class Studio {
     await this.daemon.request<null>("studio.close", { studioHandle: this.studioHandle });
   }
 
-  async getVms(): Promise<Vm[]> {
-    // Studio-first snapshot: this Studio's VMs live under its entry in
-    // state.studios[].vms (keyed by sessionGuid == studio.id).
+  async getDoms(): Promise<Dom[]> {
+    // Studio-first snapshot: this Studio's DOMs live under its entry in
+    // state.studios[].doms (keyed by studioId).
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
-    const studio = (state.studios ?? []).find((s) => s.id === this.sessionGuid);
+    const studio = (state.studios ?? []).find((s) => s.studioId === this.sessionGuid);
     if (!studio) return [];
-    return (studio.vms ?? []).map((sv) => new Vm(buildVmSnapshot(studio, sv), this.daemon));
+    return (studio.doms ?? []).map((sv) => new Dom(buildDomSnapshot(studio, sv), this.daemon));
   }
 
   /** Start an in-Studio multiplayer test with `numPlayers` client DataModels
@@ -457,16 +461,16 @@ export class Studio {
   async startMultiplayerTest(numPlayers: number = 0): Promise<MultiplayerTestServer> {
     const resp = await this.daemon.request<{
       mpHandle: string;
-      serverVmId: string;
-      clientVmIds?: string[];
+      serverDomId: string;
+      clientDomIds?: string[];
     }>("studio.startMultiplayerTest", { studioHandle: this.studioHandle, numPlayers });
 
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
-    const snap = findVmSnapshot(state, resp.serverVmId);
-    if (!snap) throw new Error(`server VM ${resp.serverVmId} not found`);
-    const players = (resp.clientVmIds ?? []).map((clientVmId) => {
-      const csnap = findVmSnapshot(state, clientVmId);
-      if (!csnap) throw new Error(`client VM ${clientVmId} not found`);
+    const snap = findDomSnapshot(state, resp.serverDomId);
+    if (!snap) throw new Error(`server DOM ${resp.serverDomId} not found`);
+    const players = (resp.clientDomIds ?? []).map((clientDomId) => {
+      const csnap = findDomSnapshot(state, clientDomId);
+      if (!csnap) throw new Error(`client DOM ${clientDomId} not found`);
       return new MultiplayerTestClient(resp.mpHandle, csnap, this.daemon);
     });
     return new MultiplayerTestServer(resp.mpHandle, snap, this.daemon, players);
@@ -474,17 +478,17 @@ export class Studio {
 }
 
 // ---------------------------------------------------------------------------
-// MultiplayerTestServer / MultiplayerTestClient — Vm-with-extras. Same data
-// plane (.runCode, .vmId, ...) as any Vm, plus the test lifecycle keyed by the
+// MultiplayerTestServer / MultiplayerTestClient — Dom-with-extras. Same data
+// plane (.runCode, .domId, ...) as any Dom, plus the test lifecycle keyed by the
 // daemon-side `mpHandle`.
 // ---------------------------------------------------------------------------
 
-export class MultiplayerTestServer extends Vm {
+export class MultiplayerTestServer extends Dom {
   private mpHandle: string;
   // Players (client DataModels) spawned up front by startMultiplayerTest(numPlayers).
   private readonly players: MultiplayerTestClient[];
 
-  constructor(mpHandle: string, snap: VmSnapshotDTO, daemon: Daemon, players: MultiplayerTestClient[] = []) {
+  constructor(mpHandle: string, snap: DomSnapshotDTO, daemon: Daemon, players: MultiplayerTestClient[] = []) {
     super(snap, daemon);
     this.mpHandle = mpHandle;
     this.players = players;
@@ -502,12 +506,12 @@ export class MultiplayerTestServer extends Vm {
    *  running multiplayer test crashes the server (SIGSEGV). Prefer passing the
    *  client count to `startMultiplayerTest(numPlayers)` up front. */
   async connectClient(): Promise<MultiplayerTestClient> {
-    const resp = await this.daemon.request<{ clientVmId: string }>(
+    const resp = await this.daemon.request<{ clientDomId: string }>(
       "mp.connectClient", { mpHandle: this.mpHandle },
     );
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
-    const snap = findVmSnapshot(state, resp.clientVmId);
-    if (!snap) throw new Error(`client VM ${resp.clientVmId} not found`);
+    const snap = findDomSnapshot(state, resp.clientDomId);
+    if (!snap) throw new Error(`client DOM ${resp.clientDomId} not found`);
     return new MultiplayerTestClient(this.mpHandle, snap, this.daemon);
   }
 
@@ -517,10 +521,10 @@ export class MultiplayerTestServer extends Vm {
   }
 }
 
-export class MultiplayerTestClient extends Vm {
+export class MultiplayerTestClient extends Dom {
   private mpHandle: string;
 
-  constructor(mpHandle: string, snap: VmSnapshotDTO, daemon: Daemon) {
+  constructor(mpHandle: string, snap: DomSnapshotDTO, daemon: Daemon) {
     super(snap, daemon);
     this.mpHandle = mpHandle;
   }
@@ -528,7 +532,7 @@ export class MultiplayerTestClient extends Vm {
   /** Disconnect this client from the test. */
   async disconnect(): Promise<void> {
     await this.daemon.request<null>(
-      "mp.disconnectClient", { mpHandle: this.mpHandle, vmId: this.vmId },
+      "mp.disconnectClient", { mpHandle: this.mpHandle, domId: this.domId },
     );
   }
 }
@@ -537,41 +541,42 @@ export class MultiplayerTestClient extends Vm {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Build a full VmSnapshotDTO from a studio-first snapshot's parent studio +
-// its minimal vm entry. The studio entries carry only vmId/dom/clientName, so
+// Build a full DomSnapshotDTO from a studio-first snapshot's parent studio +
+// its minimal dom entry. The studio entries carry only domId/domKind/userName/userId, so
 // the remaining fields are sourced from the owning studio.
-function buildVmSnapshot(studio: StudioDTO, sv: StudioVmEntryDTO): VmSnapshotDTO {
+function buildDomSnapshot(studio: StudioDTO, sv: StudioDomEntryDTO): DomSnapshotDTO {
   return {
-    vmId: sv.vmId,
-    dom: sv.dom,
-    mode: sv.dom === "edit" ? "edit" : studio.mode,
+    domId: sv.domId,
+    domKind: sv.domKind,
+    mode: sv.domKind === "edit" ? "edit" : studio.studioMode,
     backendId: studio.backendId,
-    sessionGuid: studio.id,
+    sessionGuid: studio.sessionId ?? undefined,
     placeId: studio.placeId,
-    gameName: studio.name,
+    gameName: studio.placeName,
     connected: true,
     activeRuns: 0,
-    clientName: sv.clientName ?? undefined,
+    userName: sv.userName ?? undefined,
+    userId: sv.userId ?? undefined,
   };
 }
 
-// Build every Vm across all studios in a studio-first snapshot.
-function vmsFromStudios(state: StateSnapshotDTO, daemon: Daemon): Vm[] {
-  const out: Vm[] = [];
+// Build every Dom across all studios in a studio-first snapshot.
+function domsFromStudios(state: StateSnapshotDTO, daemon: Daemon): Dom[] {
+  const out: Dom[] = [];
   for (const studio of state.studios ?? []) {
-    for (const sv of studio.vms ?? []) {
-      out.push(new Vm(buildVmSnapshot(studio, sv), daemon));
+    for (const sv of studio.doms ?? []) {
+      out.push(new Dom(buildDomSnapshot(studio, sv), daemon));
     }
   }
   return out;
 }
 
-// Find a vmId across state.studios[].vms and return the built VmSnapshotDTO,
+// Find a domId across state.studios[].doms and return the built DomSnapshotDTO,
 // or undefined if no studio owns it.
-function findVmSnapshot(state: StateSnapshotDTO, vmId: string): VmSnapshotDTO | undefined {
+function findDomSnapshot(state: StateSnapshotDTO, domId: string): DomSnapshotDTO | undefined {
   for (const studio of state.studios ?? []) {
-    for (const sv of studio.vms ?? []) {
-      if (sv.vmId === vmId) return buildVmSnapshot(studio, sv);
+    for (const sv of studio.doms ?? []) {
+      if (sv.domId === domId) return buildDomSnapshot(studio, sv);
     }
   }
   return undefined;

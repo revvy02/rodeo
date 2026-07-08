@@ -22,7 +22,7 @@ use rmcp::{ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 const SERVER_INSTRUCTIONS: &str = "\
 rodeo executes Luau code inside Roblox Studio via WebSocket.
 
-VM Targeting (--target): <mode>:<dom>[:<identity>]
+DOM Targeting (--target): <mode>:<domKind>[:<identity>]
 - edit:plugin (default) — edit DataModel, ModuleScript
 - run:server — run mode server, Script
 - test:server / test:client — play test server/client
@@ -30,14 +30,14 @@ VM Targeting (--target): <mode>:<dom>[:<identity>]
 - Append :plugin or :elevated to override identity
 
 Direct targeting:
-- vm: target a specific VM by ID (from get_state)
+- dom: target a specific DOM by ID (from get_state)
 
 Launch:
 - launch_studio: open a standalone Studio (place = empty/ID/file path), optionally with profiling; stays alive for later run_code calls
 - run_code place: launch Studio inline when running code (empty = new place, number = place ID, string = file path)
 
 Return values: Scripts can return values. Use run_code to both query data and make changes.
-Use get_state to discover available VMs, studios, and processes.
+Use get_state to discover available DOMs, studios, and processes.
 ";
 
 // --- Luau tool discovery ---
@@ -54,7 +54,7 @@ struct LuauTool {
 /// Parse the leading `--[[ ... ]]` header of a Luau tool source.
 ///
 /// Supported directives:
-///   `@rodeo run --target <target>` — inline; sets the VM target
+///   `@rodeo run --target <target>` — inline; sets the DOM target
 ///   `@rodeo schema` — claims subsequent non-`@rodeo` lines as JSON inputSchema
 ///   `@rodeo annotations` — claims subsequent non-`@rodeo` lines as JSON annotations
 ///
@@ -279,8 +279,8 @@ fn run_code_input_schema() -> Arc<JsonObject> {
             "code": { "type": "string", "description": "Luau code to execute. Can return a value." },
             "target": {
                 "type": "string",
-                "description": "VM target. Grammar: <mode>:<dom>[:plugin|:elevated]. \
-                    Modes: edit, run, test, play. Doms: plugin, server, client. \
+                "description": "DOM target. Grammar: <mode>:<domKind>[:plugin|:elevated]. \
+                    Modes: edit, run, test, play. Dom kinds: server, client (implicit for edit). \
                     Requesting a mode that isn't currently active will transition Studio into it. \
                     Append :elevated for command-bar identity (privileged Roblox APIs).",
                 "examples": [
@@ -294,7 +294,7 @@ fn run_code_input_schema() -> Arc<JsonObject> {
                     "play:client"
                 ]
             },
-            "vm": { "type": "string", "description": "Direct VM ID (bypasses target matching)" },
+            "dom": { "type": "string", "description": "Direct DOM ID (bypasses target matching)" },
             "place": { "type": "string", "description": "Launch Studio: empty = new place, number = place ID, path = .rbxl file" },
             "args": { "type": "array", "items": { "type": "string" }, "description": "Script arguments (accessible via require('@rodeo/process').args)" },
             "cache_requires": { "type": "boolean", "description": "Use cached module state" },
@@ -442,13 +442,13 @@ where
 #[tool_router(router = tool_router)]
 impl RodeoServer {
     #[tool(
-        description = "Execute Luau code in a Roblox Studio VM matched by `target`. \
-            If no live VM matches the requested target, Studio will transition into \
+        description = "Execute Luau code in a Roblox Studio DOM matched by `target`. \
+            If no live DOM matches the requested target, Studio will transition into \
             that mode first (e.g. entering play test) before running — this mutates \
             Studio state and may take several seconds. Append `:elevated` to a target \
             (e.g. `edit:elevated`) to run at command-bar identity instead of plugin \
             identity; required for privileged Roblox APIs like `DebuggerManager`. \
-            Use `get_state` to see what VMs are currently alive.",
+            Use `get_state` to see what DOMs are currently alive.",
         input_schema = run_code_input_schema(),
         output_schema = run_code_output_schema(),
         annotations(destructive_hint = true, idempotent_hint = false, open_world_hint = true),
@@ -462,7 +462,7 @@ impl RodeoServer {
     }
 
     #[tool(
-        description = "Get the full canonical rodeo state: studios, backends, VMs, and processes.",
+        description = "Get the full canonical rodeo state: studios, backends, DOMs, and processes.",
         input_schema = empty_object_schema(),
         annotations(read_only_hint = true, idempotent_hint = true),
     )]
@@ -898,7 +898,7 @@ async fn handle_run_code(
 
     let code = args["code"].as_str().unwrap_or("").to_string();
     let target = args["target"].as_str().unwrap_or("").to_string();
-    let vm_id = args["vm"].as_str().map(String::from);
+    let dom_id = args["dom"].as_str().map(String::from);
     let script_args: Vec<String> = args["args"]
         .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
@@ -945,7 +945,7 @@ async fn handle_run_code(
             }
         },
         target,
-        vm_id,
+        dom_id,
         session: None,
         log_filter: proto::LogFilter {
             enable_warn: true,
@@ -1139,7 +1139,7 @@ async fn handle_luau_tool(
     let request = RunRequest {
         script,
         target,
-        vm_id: None,
+        dom_id: None,
         session: None,
         log_filter: proto::LogFilter {
             enable_warn: true,

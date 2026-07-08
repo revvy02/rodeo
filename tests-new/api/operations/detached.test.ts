@@ -55,7 +55,7 @@ describe("detached", () => {
     const before = studioPids();
 
     const studio = await backend.open({ background: true, detached: true });
-    await studio.editVm.runCode({ source: "return 'alive'" });
+    await studio.editDom.runCode({ source: "return 'alive'" });
 
     const newPid = studioPids().find((p) => !before.includes(p))!;
     expect(newPid).toBeDefined();
@@ -84,7 +84,7 @@ describe("detached", () => {
       const before = studioPids();
 
       const studio = await backend.open({ background: true, detached: true });
-      await studio.editVm.runCode({ source: "return 'alive'" });
+      await studio.editDom.runCode({ source: "return 'alive'" });
 
       newPid = studioPids().find((p) => !before.includes(p));
       expect(newPid).toBeDefined();

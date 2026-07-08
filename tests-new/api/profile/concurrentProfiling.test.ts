@@ -27,8 +27,8 @@ describe("concurrent profile runs", () => {
     studios.push(studio1, studio2);
 
     const [result1, result2] = await Promise.all([
-      studio1.editVm.runCode({ source: PROFILE_SCRIPT, profile: profileDir1 }),
-      studio2.editVm.runCode({ source: PROFILE_SCRIPT, profile: profileDir2 }),
+      studio1.editDom.runCode({ source: PROFILE_SCRIPT, profile: profileDir1 }),
+      studio2.editDom.runCode({ source: PROFILE_SCRIPT, profile: profileDir2 }),
     ]);
 
     expect(result1.ok).toBe(true);

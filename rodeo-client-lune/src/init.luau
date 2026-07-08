@@ -4,15 +4,15 @@
 local client = require("@self/client")
 local run = require("@self/run")
 local studio = require("@self/studio")
-local vm = require("@self/vm")
+local dom = require("@self/dom")
 
 export type RodeoClient = client.RodeoClient
 export type ConnectOpts = client.ConnectOpts
 export type BackendInfo = client.BackendInfo
 export type ProcessInfo = client.ProcessInfo
 
-export type Vm = vm.Vm
-export type VmSnapshot = vm.VmSnapshot
+export type Dom = dom.Dom
+export type DomSnapshot = dom.DomSnapshot
 
 export type StudioBackend = studio.StudioBackend
 export type Studio = studio.Studio

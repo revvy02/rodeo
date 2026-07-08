@@ -7,7 +7,7 @@ Studio's real Roblox runtime, then committing the results into your source
 tree. The shipped game reads the precomputed data or assets instead of
 recomputing them every session.
 
-It works because rodeo runs your script in an actual Studio VM, so you have the
+It works because rodeo runs your script in an actual Studio DOM, so you have the
 full Roblox runtime available (`ContentProvider`, `Animator`, sound playback, the
 asset providers), and because rodeo can write a script's output straight back
 into your repo. There are two things worth baking: **data** and **instances**.

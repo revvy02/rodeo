@@ -1,5 +1,5 @@
 import { beforeAll, afterAll } from "bun:test";
-import { RodeoClient, type Vm, type Studio, type StudioBackend } from "../../rodeo-client-ts/src/index.js";
+import { RodeoClient, type Dom, type Studio, type StudioBackend } from "../../rodeo-client-ts/src/index.js";
 import type { RunCodeOpts, RunResult } from "../../rodeo-client-ts/src/run.js";
 
 let nextPort = 46400;
@@ -7,7 +7,7 @@ let nextPort = 46400;
 export type StudioCtx = {
   client: RodeoClient;
   studio: Studio;
-  editVm: Vm;
+  editDom: Dom;
   port: number;
 };
 
@@ -23,7 +23,7 @@ export function setupStudio(port: number = nextPort++): StudioCtx {
     ctx.client = await RodeoClient.connect(`http://localhost:${port}`);
     const rbxStudio = await ctx.client.getLocalStudio();
     ctx.studio = await rbxStudio.open({ background: true });
-    ctx.editVm = ctx.studio.editVm;
+    ctx.editDom = ctx.studio.editDom;
   });
 
   afterAll(async () => {
@@ -73,7 +73,7 @@ export function setupBackend(port: number = nextPort++): BackendCtx {
 //     const studio = studioHandle(46600);
 //     beforeAll(studio.spawn);
 //     afterAll(studio.close);
-//     describe("...", () => factory((o) => studio.ctx.editVm.runCode(o)));
+//     describe("...", () => factory((o) => studio.ctx.editDom.runCode(o)));
 //   });
 //
 // Use this when one Studio should back multiple nested describes (the shared
@@ -85,11 +85,11 @@ export type StudioHandle = {
   close: () => Promise<void>;
 };
 
-// RunFn-shaped wrapper around `ctx.editVm.runCode`. Lets the shared factories
+// RunFn-shaped wrapper around `ctx.editDom.runCode`. Lets the shared factories
 // in tests-new/utils/executionTests.ts run end-to-end against the API path
 // the same way `makeCliRunFn` does for the CLI subprocess.
 export function makeApiRunFn(ctx: StudioCtx): (opts: RunCodeOpts) => Promise<RunResult> {
-  return (opts) => ctx.editVm.runCode(opts);
+  return (opts) => ctx.editDom.runCode(opts);
 }
 
 export function studioHandle(port: number): StudioHandle {
@@ -105,7 +105,7 @@ export function studioHandle(port: number): StudioHandle {
       ctx.client = await RodeoClient.connect(`http://localhost:${port}`);
       const rbxStudio = await ctx.client.getLocalStudio();
       ctx.studio = await rbxStudio.open({ background: true });
-      ctx.editVm = ctx.studio.editVm;
+      ctx.editDom = ctx.studio.editDom;
     },
     close: async () => {
       await ctx.studio?.close();

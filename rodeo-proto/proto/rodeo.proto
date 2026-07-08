@@ -49,9 +49,9 @@ service MasterService {
 message BackendMessage {
   oneof msg {
     RegisterRequest register = 1;
-    VmConnect vm_connect = 2;
-    VmDisconnect vm_disconnect = 3;
-    VmPluginMessage vm_plugin_message = 4;
+    DomConnect dom_connect = 2;
+    DomDisconnect dom_disconnect = 3;
+    DomPluginMessage dom_plugin_message = 4;
     StateSnapshot state_snapshot = 5;
     PlayerStatus player_status = 6;
     FilesComplete files_complete = 7;
@@ -61,7 +61,7 @@ message BackendMessage {
     // uniformly for edit Studios, MP test servers, and MP test clients.
     // Master responds: drop session_meta + studio_instances entries, fire
     // Error on any open launch RPC stream for that session_guid, run reconcile.
-    // Per-VM run cleanup is handled separately by VmDisconnect (which fires
+    // Per-DOM run cleanup is handled separately by DomDisconnect (which fires
     // from WS-close when the OS closes the plugin's socket).
     SessionExited session_exited = 10;
     SaveResult save_result = 11;
@@ -88,29 +88,29 @@ message RegisterRequest {
   optional uint32 port = 3; // local HTTP port (for studio backends)
 }
 
-message VmConnect {
-  string vm_id = 1;
+message DomConnect {
+  string dom_id = 1;
   string state_json = 2;
 }
 
-message VmDisconnect {
-  string vm_id = 1;
+message DomDisconnect {
+  string dom_id = 1;
 }
 
-// Backend → Master: typed plugin message from a specific VM.
-message VmPluginMessage {
-  string vm_id = 1;
+// Backend → Master: typed plugin message from a specific DOM.
+message DomPluginMessage {
+  string dom_id = 1;
   PluginMessage message = 2;
 }
 
-// Master → Backend: typed server message destined for a specific VM's plugin.
-message VmServerMessage {
-  string vm_id = 1;
+// Master → Backend: typed server message destined for a specific DOM's plugin.
+message DomServerMessage {
+  string dom_id = 1;
   ServerMessage message = 2;
 }
 
 message StateSnapshot {
-  repeated VmSnapshot vms = 1;
+  repeated DomSnapshot doms = 1;
   repeated StudioSnapshot studios = 2;
   repeated StudioInstanceState studio_instances = 3;
 }
@@ -119,45 +119,47 @@ message StudioInstanceState {
   string session_guid = 1;
   string status = 2;              // "launching" | "running" | "closing"
   optional string error = 3;
-  // StudioMCP's id for this Studio (resolved via reconciliation). Surfaced so
-  // master can populate StudioState.mcp_studio_id in the studio-first snapshot.
-  optional string mcp_studio_id = 4;
 }
 
-message VmSnapshot {
-  string vm_id = 1;
+message DomSnapshot {
+  string dom_id = 1;
   optional string backend_id = 2;
   optional string mode = 3;
-  optional string dom = 4;
+  optional string dom_kind = 4;
   optional string session_guid = 5;
   optional int64 place_id = 6;
   optional string game_name = 7;
   uint32 active_runs = 8;
   bool connected = 9;
-  // Player name for client VMs (from the plugin's client_info). Used to
-  // populate StudioVm.client_name in the master's studio-first snapshot.
-  optional string client_name = 10;
+  // Player identity for client DOMs (from the plugin's client_info). Used to
+  // populate StudioDom.user_name / user_id in the studio-first snapshot.
+  optional string user_name = 10;
+  optional int64 user_id = 11;
 }
 
-// Canonical studio-first state (master → client, in RodeoSnapshot). Modeled on
-// Roblox Studio's MCP studio entry (id/name/active) extended with mode + a
-// nested vms array. Master derives one per session_guid by grouping VMs.
+// Canonical studio-first state (master → client, in RodeoSnapshot).
+// Master derives one per session_guid by grouping DOMs; a session-less DOM
+// (e.g. a manually-installed plugin) becomes its own studio keyed "dom:<id>".
 message StudioState {
-  string id = 1;                     // canonical studio id = session_guid
+  string studio_id = 1;              // canonical studio id
   string backend_id = 2;
-  optional string mcp_studio_id = 3; // StudioMCP's id (set_active_studio / elevated)
-  string name = 4;                   // place / game name
+  // Launch session identity (session_guid). Absent for manually-connected
+  // studios that weren't launched via a rodeo session.
+  optional string session_id = 3;
+  string place_name = 4;
   int64 place_id = 5;
-  bool active = 6;                   // the MCP-active studio (best-effort)
-  string status = 7;                 // launching | connected | closing | error
-  string mode = 8;                   // edit | run | test | play (derived)
-  repeated StudioVm vms = 9;
+  string status = 6;                 // launching | connected | closing | error
+  string studio_mode = 7;            // edit | run | test | play (derived)
+  // The root edit DOM's id. Absent if no edit DOM is connected.
+  optional string edit_dom_id = 8;
+  repeated StudioDom doms = 9;
 }
 
-message StudioVm {
-  string vm_id = 1;
-  string dom = 2;                    // edit | server | client
-  optional string client_name = 3;   // player name for client VMs
+message StudioDom {
+  string dom_id = 1;
+  string dom_kind = 2;               // edit | server | client
+  optional string user_name = 3;     // player name for client DOMs
+  optional int64 user_id = 4;        // player userId for client DOMs
 }
 
 message StudioSnapshot {
@@ -180,7 +182,7 @@ message PlayerStatus {
 message MasterMessage {
   oneof msg {
     RegisterResponse registered = 1;
-    VmServerMessage vm_server_message = 2;
+    DomServerMessage dom_server_message = 2;
     SaveCommand save = 3;
     // 4 was LaunchLivePlayerCommand, 5 was ExitLivePlayerCommand —
     // reserved for the live-runtime work.
@@ -276,7 +278,7 @@ message SubmitRequest {
   string script = 1;
   string target = 2;
   optional string session = 3;
-  optional string vm_id = 4;
+  optional string dom_id = 4;
   optional bool cache_requires = 5;
   repeated string script_args = 6;
   optional string return_file = 7;
@@ -448,19 +450,19 @@ message LogFilter {
 message HealthResponse {
   bool launched = 1;
   uint32 context_count = 2;
-  uint32 total_vms = 3;
+  uint32 total_doms = 3;
   uint32 total_queued = 4;
   repeated ContextInfo contexts = 5;
 }
 
 message ContextInfo {
   uint32 bitset = 1;
-  uint32 vm_count = 2;
+  uint32 dom_count = 2;
   uint32 total_queued = 3;
-  repeated VmInfo vms = 4;
+  repeated DomInfo doms = 4;
 }
 
-message VmInfo {
+message DomInfo {
   string rodeo_id = 1;
   uint32 active_count = 2;
   bool is_idle = 3;
@@ -468,10 +470,16 @@ message VmInfo {
 
 message ProcessInfo {
   string execution_id = 1;
-  string state = 2;
+  string state = 2;                  // queued | running | done | error | killed
+  // Requested target (e.g. "edit:elevated"). Empty for --dom-pinned runs that
+  // gave no target (the DOM's native target applies).
   string target = 3;
-  optional uint32 vm_bitset = 4;
-  double created_at = 5;
+  string context = 4;                // identity: plugin | elevated | server | client
+  // Where the run executes — set once dispatched, absent while queued.
+  optional string studio_id = 5;
+  optional string session_id = 6;
+  optional string dom_id = 7;
+  double created_at = 8;
 }
 
 message ProcessListResponse {
@@ -514,7 +522,7 @@ message ServerMessage {
   }
 }
 
-// Declarative target mode for the edit VM to converge toward.
+// Declarative target mode for the edit DOM to converge toward.
 // Backend writes this whenever the pending-run queue's target changes;
 // the plugin fires the appropriate StudioTestService transition.
 message SetTargetModeMsg {
@@ -522,7 +530,7 @@ message SetTargetModeMsg {
 }
 
 message StudioStateMsg {
-  string vm_id = 1;
+  string dom_id = 1;
   // The StudioMCP-assigned id for this Studio (propagated via reconciliation).
   // Used only at the elevated-call boundary (set_active_studio). NOT the
   // rodeo session identity — for that, see session_guid below.
@@ -532,16 +540,16 @@ message StudioStateMsg {
   bool is_running = 5;
   bool is_edit = 6;
   string mode = 7;
-  string dom = 8;
+  string dom_kind = 8;
   string game_name = 9;
   int64 place_id = 10;
   int64 game_id = 11;
   optional ClientInfo client_info = 12;
   optional string job_id = 13;
-  optional string client_vm_ids_json = 14;
+  optional string client_dom_ids_json = 14;
   // Rodeo session identity (baked into the plugin at install time as
   // flags.SESSION_GUID). Sent on the plugin's first WS message so master can
-  // stamp VmConnection.session_guid synchronously. Absent for manually-
+  // stamp DomConnection.session_guid synchronously. Absent for manually-
   // installed plugins that weren't launched via a rodeo session.
   optional string session_guid = 15;
 }

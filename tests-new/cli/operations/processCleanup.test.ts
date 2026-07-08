@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { runRodeo, spawnBackground, waitForVm, pidsMatching, waitForPidsGone } from "../helpers.js";
+import { runRodeo, spawnBackground, waitForDom, pidsMatching, waitForPidsGone } from "../helpers.js";
 
 // Studio's temp place is named `rodeo-<uuid>.rbxl` (studio_backend/launch.rs),
 // so that pattern identifies a live rodeo Studio. Teardown is async (the run
@@ -31,7 +31,7 @@ describe("process cleanup (CLI)", () => {
   it("serve --place kills Studio on SIGTERM", async () => {
     const preExisting = new Set(pidsMatching(RODEO_STUDIO));
     const bg = spawnBackground(["run", "--port", "46218", "--place"]);
-    await waitForVm(46218);
+    await waitForDom(46218);
 
     // Capture the Studio pid(s) this serve launched, then kill the serve and
     // confirm they're reaped.

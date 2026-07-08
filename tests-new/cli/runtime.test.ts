@@ -18,7 +18,7 @@ import {
   cliStudioHandle,
   makeCliRunFn,
   spawnBackground,
-  waitForVm,
+  waitForDom,
   type BackgroundProcess,
 } from "./helpers.js";
 
@@ -50,7 +50,7 @@ describe("uncached require traversal (CLI)", () => {
   beforeAll(async () => {
     execSync(`rojo build ${FIXTURE}/default.project.json -o ${PLACE}`, { stdio: "inherit" });
     bg = spawnBackground(["run", "--port", String(PORT), "--place", PLACE]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => {
     bg.kill();
@@ -71,7 +71,7 @@ describe("cached require traversal (CLI)", () => {
       execSync(`rojo build ${FIXTURE}/default.project.json -o ${PLACE}`, { stdio: "inherit" });
     }
     bg = spawnBackground(["run", "--port", String(PORT), "--place", PLACE]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => {
     bg.kill();
@@ -90,7 +90,7 @@ describe("target cache requires (CLI)", () => {
   beforeAll(async () => {
     execSync(`rojo build ${FIXTURE}/default.project.json -o ${PLACE}`, { stdio: "inherit" });
     bg = spawnBackground(["run", "--port", String(PORT), "--place", PLACE]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => {
     bg.kill();

@@ -16,9 +16,9 @@ hero:
 
 ## What rodeo is
 
-`rodeo`, in contrast to Lune, extends Roblox Studio's own Luau runtime with a canonical standard library, so the code is written and executed inside the actual Studio VMs. Lune runs Luau as a separate runtime and provides APIs to interface with Roblox files from the outside.
+`rodeo`, in contrast to Lune, extends Roblox Studio's own Luau runtime with a canonical standard library, so the code is written and executed inside the actual Studio DOMs. Lune runs Luau as a separate runtime and provides APIs to interface with Roblox files from the outside.
 
-The CLI is a workflow tool built around that runtime. It launches Studio, lets you orchestrate Studio and its modes, and runs scripts in different VMs with full host system access as a typical language runtime, giving you headless-like Studio workflows.
+The CLI is a workflow tool built around that runtime. It launches Studio, lets you orchestrate Studio and its modes, and runs scripts in different DOMs with full host system access as a typical language runtime, giving you headless-like Studio workflows.
 
 ## Where to go next
 

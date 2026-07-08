@@ -40,7 +40,7 @@ impl StudioMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Dom {
+pub enum DomKind {
     Edit,
     Server,
     Client,
@@ -49,7 +49,7 @@ pub enum Dom {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Target {
     pub mode: StudioMode,
-    pub dom: Dom,
+    pub dom_kind: DomKind,
     pub identity: ScriptIdentity,
     /// For play:client — the client index (1-based). None = append (spawn new client).
     pub client_index: Option<u32>,
@@ -59,7 +59,7 @@ pub struct Target {
 impl std::fmt::Display for Target {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // play:client has dynamic index — format it specially
-        if self.mode == StudioMode::Play && self.dom == Dom::Client {
+        if self.mode == StudioMode::Play && self.dom_kind == DomKind::Client {
             write!(f, "play:client")?;
             if let Some(idx) = self.client_index {
                 write!(f, ":{idx}")?;
@@ -74,26 +74,26 @@ impl std::fmt::Display for Target {
 }
 
 fn to_str(t: &Target) -> &'static str {
-    match (t.mode, t.dom, t.identity) {
-        (StudioMode::Edit, Dom::Edit, ScriptIdentity::Plugin) => "edit:plugin",
-        (StudioMode::Edit, Dom::Edit, ScriptIdentity::Elevated) => "edit:elevated",
+    match (t.mode, t.dom_kind, t.identity) {
+        (StudioMode::Edit, DomKind::Edit, ScriptIdentity::Plugin) => "edit:plugin",
+        (StudioMode::Edit, DomKind::Edit, ScriptIdentity::Elevated) => "edit:elevated",
 
-        (StudioMode::Run, Dom::Server, ScriptIdentity::Server) => "run:server",
-        (StudioMode::Run, Dom::Server, ScriptIdentity::Plugin) => "run:server:plugin",
-        (StudioMode::Run, Dom::Server, ScriptIdentity::Elevated) => "run:server:elevated",
+        (StudioMode::Run, DomKind::Server, ScriptIdentity::Server) => "run:server",
+        (StudioMode::Run, DomKind::Server, ScriptIdentity::Plugin) => "run:server:plugin",
+        (StudioMode::Run, DomKind::Server, ScriptIdentity::Elevated) => "run:server:elevated",
 
-        (StudioMode::Test, Dom::Server, ScriptIdentity::Server) => "test:server",
-        (StudioMode::Test, Dom::Server, ScriptIdentity::Plugin) => "test:server:plugin",
-        (StudioMode::Test, Dom::Server, ScriptIdentity::Elevated) => "test:server:elevated",
-        (StudioMode::Test, Dom::Client, ScriptIdentity::Client) => "test:client",
-        (StudioMode::Test, Dom::Client, ScriptIdentity::Plugin) => "test:client:plugin",
-        (StudioMode::Test, Dom::Client, ScriptIdentity::Elevated) => "test:client:elevated",
+        (StudioMode::Test, DomKind::Server, ScriptIdentity::Server) => "test:server",
+        (StudioMode::Test, DomKind::Server, ScriptIdentity::Plugin) => "test:server:plugin",
+        (StudioMode::Test, DomKind::Server, ScriptIdentity::Elevated) => "test:server:elevated",
+        (StudioMode::Test, DomKind::Client, ScriptIdentity::Client) => "test:client",
+        (StudioMode::Test, DomKind::Client, ScriptIdentity::Plugin) => "test:client:plugin",
+        (StudioMode::Test, DomKind::Client, ScriptIdentity::Elevated) => "test:client:elevated",
 
-        (StudioMode::Play, Dom::Server, ScriptIdentity::Server) => "play:server",
-        (StudioMode::Play, Dom::Server, ScriptIdentity::Plugin) => "play:server:plugin",
-        (StudioMode::Play, Dom::Server, ScriptIdentity::Elevated) => "play:server:elevated",
+        (StudioMode::Play, DomKind::Server, ScriptIdentity::Server) => "play:server",
+        (StudioMode::Play, DomKind::Server, ScriptIdentity::Plugin) => "play:server:plugin",
+        (StudioMode::Play, DomKind::Server, ScriptIdentity::Elevated) => "play:server:elevated",
         // play:client handled by Display impl (dynamic index)
-        (StudioMode::Play, Dom::Client, _) => "play:client",
+        (StudioMode::Play, DomKind::Client, _) => "play:client",
 
         _ => "unknown",
     }
@@ -106,23 +106,23 @@ pub fn parse(s: &str) -> Result<Target> {
     }
 
     let t = match s {
-        "edit:plugin" => Target { mode: StudioMode::Edit, dom: Dom::Edit, identity: ScriptIdentity::Plugin, client_index: None },
-        "edit:elevated" => Target { mode: StudioMode::Edit, dom: Dom::Edit, identity: ScriptIdentity::Elevated, client_index: None },
+        "edit:plugin" => Target { mode: StudioMode::Edit, dom_kind: DomKind::Edit, identity: ScriptIdentity::Plugin, client_index: None },
+        "edit:elevated" => Target { mode: StudioMode::Edit, dom_kind: DomKind::Edit, identity: ScriptIdentity::Elevated, client_index: None },
 
-        "run:server" => Target { mode: StudioMode::Run, dom: Dom::Server, identity: ScriptIdentity::Server, client_index: None },
-        "run:server:plugin" => Target { mode: StudioMode::Run, dom: Dom::Server, identity: ScriptIdentity::Plugin, client_index: None },
-        "run:server:elevated" => Target { mode: StudioMode::Run, dom: Dom::Server, identity: ScriptIdentity::Elevated, client_index: None },
+        "run:server" => Target { mode: StudioMode::Run, dom_kind: DomKind::Server, identity: ScriptIdentity::Server, client_index: None },
+        "run:server:plugin" => Target { mode: StudioMode::Run, dom_kind: DomKind::Server, identity: ScriptIdentity::Plugin, client_index: None },
+        "run:server:elevated" => Target { mode: StudioMode::Run, dom_kind: DomKind::Server, identity: ScriptIdentity::Elevated, client_index: None },
 
-        "test:server" => Target { mode: StudioMode::Test, dom: Dom::Server, identity: ScriptIdentity::Server, client_index: None },
-        "test:server:plugin" => Target { mode: StudioMode::Test, dom: Dom::Server, identity: ScriptIdentity::Plugin, client_index: None },
-        "test:server:elevated" => Target { mode: StudioMode::Test, dom: Dom::Server, identity: ScriptIdentity::Elevated, client_index: None },
-        "test:client" => Target { mode: StudioMode::Test, dom: Dom::Client, identity: ScriptIdentity::Client, client_index: None },
-        "test:client:plugin" => Target { mode: StudioMode::Test, dom: Dom::Client, identity: ScriptIdentity::Plugin, client_index: None },
-        "test:client:elevated" => Target { mode: StudioMode::Test, dom: Dom::Client, identity: ScriptIdentity::Elevated, client_index: None },
+        "test:server" => Target { mode: StudioMode::Test, dom_kind: DomKind::Server, identity: ScriptIdentity::Server, client_index: None },
+        "test:server:plugin" => Target { mode: StudioMode::Test, dom_kind: DomKind::Server, identity: ScriptIdentity::Plugin, client_index: None },
+        "test:server:elevated" => Target { mode: StudioMode::Test, dom_kind: DomKind::Server, identity: ScriptIdentity::Elevated, client_index: None },
+        "test:client" => Target { mode: StudioMode::Test, dom_kind: DomKind::Client, identity: ScriptIdentity::Client, client_index: None },
+        "test:client:plugin" => Target { mode: StudioMode::Test, dom_kind: DomKind::Client, identity: ScriptIdentity::Plugin, client_index: None },
+        "test:client:elevated" => Target { mode: StudioMode::Test, dom_kind: DomKind::Client, identity: ScriptIdentity::Elevated, client_index: None },
 
-        "play:server" => Target { mode: StudioMode::Play, dom: Dom::Server, identity: ScriptIdentity::Server, client_index: None },
-        "play:server:plugin" => Target { mode: StudioMode::Play, dom: Dom::Server, identity: ScriptIdentity::Plugin, client_index: None },
-        "play:server:elevated" => Target { mode: StudioMode::Play, dom: Dom::Server, identity: ScriptIdentity::Elevated, client_index: None },
+        "play:server" => Target { mode: StudioMode::Play, dom_kind: DomKind::Server, identity: ScriptIdentity::Server, client_index: None },
+        "play:server:plugin" => Target { mode: StudioMode::Play, dom_kind: DomKind::Server, identity: ScriptIdentity::Plugin, client_index: None },
+        "play:server:elevated" => Target { mode: StudioMode::Play, dom_kind: DomKind::Server, identity: ScriptIdentity::Elevated, client_index: None },
 
         _ => bail!(
             "unknown target '{s}'\n\
@@ -150,7 +150,7 @@ pub fn parse(s: &str) -> Result<Target> {
 fn parse_play_client(rest: &str) -> Result<Target> {
     let base = Target {
         mode: StudioMode::Play,
-        dom: Dom::Client,
+        dom_kind: DomKind::Client,
         identity: ScriptIdentity::Client,
         client_index: None,
     };
@@ -201,7 +201,7 @@ fn parse_identity(s: &str) -> Option<ScriptIdentity> {
 pub fn default() -> Target {
     Target {
         mode: StudioMode::Edit,
-        dom: Dom::Edit,
+        dom_kind: DomKind::Edit,
         identity: ScriptIdentity::Plugin,
         client_index: None,
     }

@@ -266,7 +266,7 @@ pub async fn run() {
                 verbose,
             }).await
         }
-        Commands::Ps { server } => commands::ps::main(&server.host, server.port).await,
+        Commands::State { json, server } => commands::state::main(&server.host, server.port, json).await,
         Commands::Kill { id, server } => commands::kill::main(&id, &server.host, server.port).await,
         Commands::Save { out, server } => commands::save::main(&server.host, server.port, out).await,
         Commands::Plugin => commands::plugin::main(),

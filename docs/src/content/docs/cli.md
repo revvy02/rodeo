@@ -13,7 +13,7 @@ Command-line interface for Roblox Studio
 
 * `serve` — Start persistent server (no Studio launch — use `run --place` for that)
 * `run` — Run a script in Studio
-* `ps` — List active processes
+* `state` — Show the canonical rodeo state: studios, their DOMs, and runs
 * `kill` — Kill a running process
 * `save` — Save the Studio place
 * `plugin` — Build and install the rodeo plugin
@@ -63,7 +63,7 @@ Run a script in Studio
 * `--output <OUTPUT>` — Path to file for execution output (prints/logs)
 * `--return <RETURN_FILE>` — Path to file for return value JSON
 * `--show-return` — Print return value to stdout
-* `--target <TARGET>` — Target: mode:dom[:identity] (e.g. edit:plugin, test:server, play:client:plugin)
+* `--target <TARGET>` — Target: mode:domKind[:identity] (e.g. edit:plugin, test:server, play:client:plugin)
 * `--studio <STUDIO>` — Studio instance to target (id, name, or "active")
 * `--no-warn` — Disable warning output
 * `--no-error` — Disable error output
@@ -79,7 +79,7 @@ Run a script in Studio
 
   Default value: `44872`
 * `--place <PLACE>` — Launch Studio: empty (no value), place ID (number), or file path (.rbxl/.rbxlx)
-* `--vm <VM>` — Target a specific VM directly by ID
+* `--dom <DOM>` — Target a specific DOM directly by ID (from `rodeo state`)
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
 * `--focus` — Bring Studio to the foreground on launch (default: background)
 * `--detached` — Keep Studio/Player running after rodeo exits
@@ -91,14 +91,15 @@ Run a script in Studio
 
 
 
-## `rodeo ps`
+## `rodeo state`
 
-List active processes
+Show the canonical rodeo state: studios, their DOMs, and runs
 
-**Usage:** `rodeo ps [OPTIONS]`
+**Usage:** `rodeo state [OPTIONS]`
 
 ###### **Options:**
 
+* `--json` — Print the raw state snapshot as JSON
 * `--host <HOST>` — Host of running server
 
   Default value: `localhost`
@@ -116,7 +117,7 @@ Kill a running process
 
 ###### **Arguments:**
 
-* `<ID>` — Run ID to kill (from `rodeo ps`)
+* `<ID>` — Run ID to kill (from `rodeo state`)
 
 ###### **Options:**
 

@@ -8,7 +8,7 @@ When you pass a file to `rodeo run`, rodeo resolves and bundles its dependencies
 rodeo run my-script.luau
 ```
 
-Filesystem requires (`require("./util")`, `require("../helpers")`), Wally / pesde package requires (via sourcemap), and `@rodeo` runtime requires are all handled automatically. The resulting bundle runs inside the Studio VM.
+Filesystem requires (`require("./util")`, `require("../helpers")`), Wally / pesde package requires (via sourcemap), and `@rodeo` runtime requires are all handled automatically. The resulting bundle runs inside the Studio DOM.
 
 ## Cross-runtime adapters
 

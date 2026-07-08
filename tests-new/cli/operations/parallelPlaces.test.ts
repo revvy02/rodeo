@@ -50,7 +50,7 @@ describe("token prevents cross-connection (CLI)", () => {
     await Promise.all([procA.exited, procB.exited]);
   });
 
-  async function getVmCount(port: number): Promise<number> {
+  async function getDomCount(port: number): Promise<number> {
     try {
       const resp = await fetch(`http://localhost:${port}/rodeo.MasterService/Health`, {
         method: "POST",
@@ -58,26 +58,26 @@ describe("token prevents cross-connection (CLI)", () => {
         body: "{}",
       });
       if (!resp.ok) return 0;
-      const health = await resp.json() as { totalVms?: number };
-      return health.totalVms ?? 0;
+      const health = await resp.json() as { totalDoms?: number };
+      return health.totalDoms ?? 0;
     } catch {
       return 0;
     }
   }
 
-  it("each server sees exactly 1 VM", async () => {
-    // Wait for both to have a VM. Windows Studio boots slower than macOS and
+  it("each server sees exactly 1 DOM", async () => {
+    // Wait for both to have a DOM. Windows Studio boots slower than macOS and
     // the two launches serialize through the daemon login-gate slot, so allow
     // up to 45s (macOS breaks out of this loop in a few seconds).
     for (let i = 0; i < 90; i++) {
-      if ((await getVmCount(portA)) >= 1 && (await getVmCount(portB)) >= 1) break;
+      if ((await getDomCount(portA)) >= 1 && (await getDomCount(portB)) >= 1) break;
       await Bun.sleep(500);
     }
     // Brief pause for any stray cross-connections to appear.
     await Bun.sleep(2000);
 
-    expect(await getVmCount(portA)).toBe(1);
-    expect(await getVmCount(portB)).toBe(1);
+    expect(await getDomCount(portA)).toBe(1);
+    expect(await getDomCount(portB)).toBe(1);
   });
 
   it("scripts execute in the correct Studio", () => {

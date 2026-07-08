@@ -9,12 +9,12 @@ pub struct RunRequest {
     pub execution_id: String,
     pub script: String,
     pub target: String,
-    /// Session filter — matches a VM's master-minted `session_guid`. Used by
-    /// Vm-scoped callers (TS `Vm.runCode`) to narrow target-based search to a
+    /// Session filter — matches a DOM's master-minted `session_guid`. Used by
+    /// Dom-scoped callers (TS `Dom.runCode`) to narrow target-based search to a
     /// specific Studio launch.
     pub session: Option<String>,
-    /// Direct VM targeting (bypasses mode/dom matching)
-    pub vm_id: Option<String>,
+    /// Direct DOM targeting (bypasses mode/dom matching)
+    pub dom_id: Option<String>,
     pub log_filter: proto::LogFilter,
     pub cache_requires: Option<bool>,
     pub script_args: Option<Vec<String>>,
@@ -44,8 +44,8 @@ pub fn diff_state(new: &StudioStateMsg, old: &StudioStateMsg) -> Option<String> 
     if new.mode != old.mode {
         changes.push(format!("mode: {} → {}", opt(&old.mode), opt(&new.mode)));
     }
-    if new.dom != old.dom {
-        changes.push(format!("dom: {} → {}", opt(&old.dom), opt(&new.dom)));
+    if new.dom_kind != old.dom_kind {
+        changes.push(format!("domKind: {} → {}", opt(&old.dom_kind), opt(&new.dom_kind)));
     }
     if new.mcp_studio_id != old.mcp_studio_id {
         let short = |s: &Option<String>| s.as_deref().map(|v| &v[..8.min(v.len())]).unwrap_or("none").to_string();
@@ -67,43 +67,43 @@ pub fn diff_state(new: &StudioStateMsg, old: &StudioStateMsg) -> Option<String> 
     if changes.is_empty() { None } else { Some(changes.join(", ")) }
 }
 
-/// A Studio instance, derived from connected VMs grouped by session_guid.
+/// A Studio instance, derived from connected DOMs grouped by session_guid.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StudioInstance {
     /// Master-minted session identity. Same value as the `session_guid` stamped
-    /// on each VM belonging to this Studio.
+    /// on each DOM belonging to this Studio.
     pub session_guid: String,
     /// "edit" | "run" | "test" | "play"
     pub mode: String,
     pub name: String,
     pub place_id: i64,
     pub universe_id: i64,
-    pub edit_vm: Option<String>,
-    pub server_vm: Option<String>,
-    pub client_vms: Vec<String>,
+    pub edit_dom: Option<String>,
+    pub server_dom: Option<String>,
+    pub client_doms: Vec<String>,
 }
 
-/// Per-VM connection state, keyed by vmId.
-pub struct VmConnection {
+/// Per-DOM connection state, keyed by domId.
+pub struct DomConnection {
     #[allow(dead_code)]
-    pub vm_id: String,
+    pub dom_id: String,
     pub studio_tx: mpsc::UnboundedSender<String>,
     pub connected: bool,
     pub active_runs: HashMap<String, RunRequest>,
     /// Canonicalized state from the plugin (updated via studio_state messages)
     pub state: Option<StudioStateMsg>,
-    /// Master-minted session identity, stamped on the VM when the plugin
+    /// Master-minted session identity, stamped on the DOM when the plugin
     /// connects to a launched `StudioInstance`. This is the single routing key
     /// across master, backends, and clients (replaces the old dual
     /// `canonical_studio_id` + `session_uid` identities).
     pub session_guid: Option<String>,
 }
 
-impl VmConnection {
-    pub fn new(vm_id: String, studio_tx: mpsc::UnboundedSender<String>) -> Self {
+impl DomConnection {
+    pub fn new(dom_id: String, studio_tx: mpsc::UnboundedSender<String>) -> Self {
         Self {
-            vm_id,
+            dom_id,
             studio_tx,
             connected: true,
             active_runs: HashMap::new(),
@@ -112,7 +112,7 @@ impl VmConnection {
         }
     }
 
-    /// Update the VM state from a studio_state message.
+    /// Update the DOM state from a studio_state message.
     /// Returns a diff string if anything meaningful changed.
     pub fn update_state(&mut self, new_state: StudioStateMsg) -> Option<String> {
         let diff = self.state.as_ref().and_then(|old| diff_state(&new_state, old));
@@ -120,7 +120,7 @@ impl VmConnection {
         diff
     }
 
-    /// Start a run on this VM
+    /// Start a run on this DOM
     pub fn start_run(&mut self, mut run: RunRequest) {
         let identity = if run.target.is_empty() {
             "plugin".to_string()
@@ -229,13 +229,13 @@ impl VmConnection {
         self.active_runs.len()
     }
 
-    /// Get the mode from VM state, if available.
+    /// Get the mode from DOM state, if available.
     pub fn mode(&self) -> Option<&str> {
         self.state.as_ref().map(|s| if s.mode.is_empty() { None } else { Some(s.mode.as_str()) }).flatten()
     }
 
-    /// Get the dom from VM state, if available.
-    pub fn dom(&self) -> Option<&str> {
-        self.state.as_ref().map(|s| if s.dom.is_empty() { None } else { Some(s.dom.as_str()) }).flatten()
+    /// Get the dom from DOM state, if available.
+    pub fn dom_kind(&self) -> Option<&str> {
+        self.state.as_ref().map(|s| if s.dom_kind.is_empty() { None } else { Some(s.dom_kind.as_str()) }).flatten()
     }
 }

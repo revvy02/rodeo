@@ -2,9 +2,9 @@ import { describe, it, expect } from "bun:test";
 import { setupStudio } from "../helpers.js";
 const ctx = setupStudio();
 describe("kill spawner", () => {
-  it("killing a running process frees the VM for new runs", async () => {
+  it("killing a running process frees the DOM for new runs", async () => {
     // Start a long-running script
-    const runPromise = ctx.editVm.runCode({ source: "task.wait(30) return nil" });
+    const runPromise = ctx.editDom.runCode({ source: "task.wait(30) return nil" });
 
     // Wait until the process is actually running
     let executionId: string | undefined;
@@ -23,8 +23,8 @@ describe("kill spawner", () => {
     await ctx.client.kill(executionId!);
     await runPromise;
 
-    // Verify the VM is actually free by running a second script
-    const result = await ctx.editVm.runCode({
+    // Verify the DOM is actually free by running a second script
+    const result = await ctx.editDom.runCode({
       source: "return 'freed'",
     });
     expect(result.ok).toBe(true);

@@ -1,6 +1,6 @@
 // Shared @rodeo/* API test cases — port of tests/utils/pkgTests.luau.
 // Each module is a function taking a `run(opts)` closure that executes against
-// some VM. No case names or script sources are modified from the lute version.
+// some DOM. No case names or script sources are modified from the lute version.
 
 import { it, expect } from "bun:test";
 import { rmSync } from "node:fs";

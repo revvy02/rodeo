@@ -23,7 +23,7 @@ describe("--profile with Studio", () => {
   it("every dump from a profiled run contains the script's marker", async () => {
     rmSync(profileDir, { recursive: true, force: true });
 
-    const result = await profileStudio.editVm.runCode({ source: PROFILE_SCRIPT, profile: profileDir });
+    const result = await profileStudio.editDom.runCode({ source: PROFILE_SCRIPT, profile: profileDir });
     expect(result.ok).toBe(true);
 
     assertEveryDumpContains(profileDir, extractMarker(result.output));

@@ -1,5 +1,5 @@
 import { describe, beforeAll, afterAll, it, expect } from "bun:test";
-import { makeCliRunFn, spawnBackground, waitForVm, type BackgroundProcess } from "../helpers.js";
+import { makeCliRunFn, spawnBackground, waitForDom, type BackgroundProcess } from "../helpers.js";
 
 const PORT = 46200;
 
@@ -9,7 +9,7 @@ describe("auto-connect (CLI)", () => {
 
   beforeAll(async () => {
     bg = spawnBackground(["run", "--port", String(PORT), "--place"]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => { bg.kill(); await bg.exited; });
 

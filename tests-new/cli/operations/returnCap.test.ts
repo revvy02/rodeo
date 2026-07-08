@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import {
   runRodeo,
   spawnBackground,
-  waitForVm,
+  waitForDom,
   type BackgroundProcess,
 } from "../helpers.js";
 
@@ -23,7 +23,7 @@ describe("return value wire cap (CLI)", () => {
   let bg: BackgroundProcess;
   beforeAll(async () => {
     bg = spawnBackground(["run", "--port", String(PORT), "--place"]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => { bg.kill(); await bg.exited; });
 

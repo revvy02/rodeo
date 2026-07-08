@@ -116,7 +116,7 @@ impl proto::BackendService for RodeoServices {
             }
 
             // Backend disconnected — clean up. Complete any runs still active
-            // on this backend's VMs: no VmDisconnect can arrive for them
+            // on this backend's DOMs: no DomDisconnect can arrive for them
             // anymore (this stream WAS its delivery channel), so without the
             // sweep their run clients block forever on a Complete that never
             // comes.
@@ -124,7 +124,7 @@ impl proto::BackendService for RodeoServices {
             let mut guard = relay_state.lock().await;
             guard.backends.remove(&bid);
             let orphaned: Vec<String> = guard.active_runs.values()
-                .filter(|r| guard.backend_for_vm(&r.vm_id).is_none())
+                .filter(|r| guard.backend_for_dom(&r.dom_id).is_none())
                 .map(|r| r.execution_id.clone())
                 .collect();
             for eid in orphaned {
@@ -179,35 +179,35 @@ async fn handle_backend_msg(
     use proto::backend_message::Msg;
     match msg {
         Msg::Register(_) => {} // Already handled as first message
-        Msg::VmConnect(vc_box) => {
+        Msg::DomConnect(vc_box) => {
             let vc = *vc_box;
-            let vm_id = vc.vm_id;
-            let vm_state: Option<proto::StudioStateMsg> = serde_json::from_str(&vc.state_json).ok();
+            let dom_id = vc.dom_id;
+            let dom_state: Option<proto::StudioStateMsg> = serde_json::from_str(&vc.state_json).ok();
 
-            if let Some(ref s) = vm_state {
-                let dom = if s.dom.is_empty() { "?" } else { s.dom.as_str() };
+            if let Some(ref s) = dom_state {
+                let dom_kind = if s.dom_kind.is_empty() { "?" } else { s.dom_kind.as_str() };
                 let mode = if s.mode.is_empty() { "?" } else { s.mode.as_str() };
-                tracing::info!(vm = &vm_id[..8.min(vm_id.len())], dom, mode, "uplifted vm");
+                tracing::info!(dom = &dom_id[..8.min(dom_id.len())], dom_kind, mode, "uplifted dom");
             }
 
-            // VM will be routable once the backend's snapshot includes it
+            // DOM will be routable once the backend's snapshot includes it
             let mut guard = state.lock().await;
             guard.reconcile();
         }
-        Msg::VmDisconnect(vd) => {
-            let vm_id = &vd.vm_id;
-            tracing::info!(vm = &vm_id[..8.min(vm_id.len())], "uplifted vm disconnected");
+        Msg::DomDisconnect(vd) => {
+            let dom_id = &vd.dom_id;
+            tracing::info!(dom = &dom_id[..8.min(dom_id.len())], "uplifted dom disconnected");
             let mut guard = state.lock().await;
-            // Sweep active_runs for entries targeting the now-gone VM and
+            // Sweep active_runs for entries targeting the now-gone DOM and
             // complete them as killed. Without this, `listProcesses` keeps
             // reporting them as "running" and subsequent `kill(pid)` calls
-            // can't route (send_to_vm: no backend found).
+            // can't route (send_to_dom: no backend found).
             let orphaned: Vec<String> = guard.active_runs.values()
-                .filter(|r| r.vm_id == *vm_id)
+                .filter(|r| r.dom_id == *dom_id)
                 .map(|r| r.execution_id.clone())
                 .collect();
             for eid in orphaned {
-                tracing::info!(execution_id = eid.as_str(), vm = &vm_id[..8.min(vm_id.len())], "vm disconnect: completing orphaned run as killed");
+                tracing::info!(execution_id = eid.as_str(), dom = &dom_id[..8.min(dom_id.len())], "dom disconnect: completing orphaned run as killed");
                 // Tell the run client this is a disconnect, not a clean
                 // completion — a bare Complete leaves its exit_code at 0,
                 // reporting a run whose output/return value just vanished
@@ -215,20 +215,20 @@ async fn handle_backend_msg(
                 // ExecutionKilled via the plugin's ack before completing.)
                 if let Some(run) = guard.active_runs.get(&eid) {
                     let _ = run.client_tx.send(crate::master::ClientMsg::Disconnect(
-                        format!("vm {} disconnected while the run was active", &vm_id[..8.min(vm_id.len())]),
+                        format!("dom {} disconnected while the run was active", &dom_id[..8.min(dom_id.len())]),
                     ));
                 }
                 guard.complete_run(&eid, proto::ProcessState::PROCESS_STATE_KILLED);
             }
-            // Also drop any pending_runs that were waiting for this specific VM.
-            guard.pending_runs.retain(|r| r.vm_id.as_deref() != Some(vm_id.as_str()));
+            // Also drop any pending_runs that were waiting for this specific DOM.
+            guard.pending_runs.retain(|r| r.dom_id.as_deref() != Some(dom_id.as_str()));
             guard.reconcile();
         }
-        Msg::VmPluginMessage(vm_plugin) => {
+        Msg::DomPluginMessage(dom_plugin) => {
             // Backend relayed a typed PluginMessage. Dispatch by oneof case directly —
             // no JSON string-matching, no payload parsing.
-            let vm_id = vm_plugin.vm_id;
-            let message = match vm_plugin.message.into_option() {
+            let dom_id = dom_plugin.dom_id;
+            let message = match dom_plugin.message.into_option() {
                 Some(m) => m,
                 None => return,
             };
@@ -253,7 +253,7 @@ async fn handle_backend_msg(
                         // scripts). Dispatch with a one-shot RpcState using the server's env,
                         // then route the typed response back to the plugin via the backend.
                         let state_clone = state.clone();
-                        let vm_id_owned = vm_id.clone();
+                        let dom_id_owned = dom_id.clone();
                         tokio::spawn(async move {
                             // Server-initiated scripts (e.g. mode-transition scripts) are
                             // internal — their stdout/stderr bytes go nowhere. Give them
@@ -271,7 +271,7 @@ async fn handle_backend_msg(
                                 ..Default::default()
                             };
                             let guard = state_clone.lock().await;
-                            guard.send_to_vm(&vm_id_owned, server_msg);
+                            guard.send_to_dom(&dom_id_owned, server_msg);
                         });
                     }
                 }
@@ -296,8 +296,8 @@ async fn handle_backend_msg(
             if let Some(backend) = guard.backends.get(backend_id) {
                 let _ = backend.state_tx.send(*ss);
             }
-            // Backend's VM snapshot changed — rerun the reconciliation so
-            // pending runs route to newly-matched VMs and target_modes reflect
+            // Backend's DOM snapshot changed — rerun the reconciliation so
+            // pending runs route to newly-matched DOMs and target_modes reflect
             // the current studio set.
             guard.reconcile();
         }
@@ -309,9 +309,9 @@ async fn handle_backend_msg(
             guard.handle_files_complete(&fc.execution_id);
         }
         Msg::SessionExited(e) => {
-            // Session-level death event. Per-VM run cleanup is handled
-            // separately by `Msg::VmDisconnect` (the OS closes the plugin's
-            // socket when the process dies, the WS reader fires VmDisconnect,
+            // Session-level death event. Per-DOM run cleanup is handled
+            // separately by `Msg::DomDisconnect` (the OS closes the plugin's
+            // socket when the process dies, the WS reader fires DomDisconnect,
             // master's existing handler orphans active_runs as KILLED). Open
             // launch_studio streams are NOT resolved here — they watch the
             // backend snapshot, where the backend marks the failed instance
@@ -436,7 +436,7 @@ impl proto::RunService for RodeoServices {
                 script: submit.script,
                 target: submit.target,
                 session: submit.session,
-                vm_id: submit.vm_id,
+                dom_id: submit.dom_id,
                 log_filter: submit.log_filter.into_option().unwrap_or_default(),
                 cache_requires: submit.cache_requires,
                 script_args: if submit.script_args.is_empty() { None } else { Some(submit.script_args) },
@@ -456,7 +456,7 @@ impl proto::RunService for RodeoServices {
             if routed {
                 tracing::info!(id = execution_id.as_str(), "routed");
             } else {
-                tracing::info!(id = execution_id.as_str(), "queued (no matching vm)");
+                tracing::info!(id = execution_id.as_str(), "queued (no matching dom)");
             }
 
             execution_id
@@ -472,15 +472,15 @@ impl proto::RunService for RodeoServices {
                 match client_msg.msg {
                     Some(proto::run_client_message::Msg::RpcResponse(resp)) => {
                         // Typed ClientRpcResponse → typed ServerMessage::RpcResponse.
-                        // send_to_vm wraps in MasterMessage::VmServerMessage for the backend.
+                        // send_to_dom wraps in MasterMessage::DomServerMessage for the backend.
                         let plugin_msg = proto::ServerMessage {
                             msg: Some(proto::server_message::Msg::RpcResponse(resp)),
                             ..Default::default()
                         };
                         let guard = client_state.lock().await;
                         if let Some(run) = guard.active_runs.get(&eid) {
-                            let vm_id = run.vm_id.clone();
-                            guard.send_to_vm(&vm_id, plugin_msg);
+                            let dom_id = run.dom_id.clone();
+                            guard.send_to_dom(&dom_id, plugin_msg);
                         }
                     }
                     Some(proto::run_client_message::Msg::Kill(kill)) => {
@@ -490,8 +490,8 @@ impl proto::RunService for RodeoServices {
                         };
                         let guard = client_state.lock().await;
                         if let Some(run) = guard.active_runs.get(&eid) {
-                            let vm_id = run.vm_id.clone();
-                            guard.send_to_vm(&vm_id, plugin_msg);
+                            let dom_id = run.dom_id.clone();
+                            guard.send_to_dom(&dom_id, plugin_msg);
                         }
                     }
                     _ => {}
@@ -517,25 +517,25 @@ impl proto::RunService for RodeoServices {
 impl proto::MasterService for RodeoServices {
     async fn health(&self, _ctx: Context, _req: OwnedView<proto::HealthRequestView<'static>>) -> Result<(proto::HealthResponse, Context), ConnectError> {
         let guard = self.state.lock().await;
-        let all = guard.all_vms();
-        let vms: Vec<proto::VmInfo> = all.iter().map(|(vm_id, vm)| proto::VmInfo {
-            rodeo_id: vm_id.clone(),
-            active_count: vm.active_runs,
-            is_idle: vm.connected && vm.active_runs == 0,
+        let all = guard.all_doms();
+        let doms: Vec<proto::DomInfo> = all.iter().map(|(dom_id, dom)| proto::DomInfo {
+            rodeo_id: dom_id.clone(),
+            active_count: dom.active_runs,
+            is_idle: dom.connected && dom.active_runs == 0,
             ..Default::default()
         }).collect();
-        let total_vms = vms.len() as u32;
+        let total_doms = doms.len() as u32;
         let total_queued = guard.pending_runs.len() as u32;
         Ok((proto::HealthResponse {
             launched: !guard.backends.is_empty(),
             context_count: 0,
-            total_vms,
+            total_doms,
             total_queued,
             contexts: vec![proto::ContextInfo {
                 bitset: 0,
-                vm_count: total_vms,
+                dom_count: total_doms,
                 total_queued,
-                vms,
+                doms,
                 ..Default::default()
             }],
             ..Default::default()
@@ -559,8 +559,8 @@ impl proto::MasterService for RodeoServices {
         let execution_id = req.execution_id.to_string();
         let guard = self.state.lock().await;
         if let Some(run) = guard.active_runs.get(&execution_id) {
-            let vm_id_owned = run.vm_id.clone();
-            tracing::info!(id = execution_id.as_str(), vm = &vm_id_owned[..8.min(vm_id_owned.len())], "kill: dispatching to vm");
+            let dom_id_owned = run.dom_id.clone();
+            tracing::info!(id = execution_id.as_str(), dom = &dom_id_owned[..8.min(dom_id_owned.len())], "kill: dispatching to dom");
             let kill_msg = proto::ServerMessage {
                 msg: Some(proto::server_message::Msg::Kill(Box::new(proto::KillCommand {
                     execution_id: execution_id.clone(),
@@ -568,7 +568,7 @@ impl proto::MasterService for RodeoServices {
                 }))),
                 ..Default::default()
             };
-            guard.send_to_vm(&vm_id_owned, kill_msg);
+            guard.send_to_dom(&dom_id_owned, kill_msg);
             Ok((proto::KillResponse { killed: true, execution_id, ..Default::default() }, Context::default()))
         } else {
             tracing::warn!(id = execution_id.as_str(), "kill: run not found");
@@ -672,7 +672,7 @@ impl proto::MasterService for RodeoServices {
             _ => return Err(ConnectError::invalid_argument(format!("unknown mode '{}'", mode))),
         }
 
-        // Write target_modes and push SetTargetModeMsg to the edit VM — plugin drives the transition.
+        // Write target_modes and push SetTargetModeMsg to the edit DOM — plugin drives the transition.
         let mut guard = self.state.lock().await;
         guard.set_target_mode(&session_guid, &mode);
         drop(guard);

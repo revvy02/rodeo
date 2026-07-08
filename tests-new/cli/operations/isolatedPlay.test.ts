@@ -1,5 +1,5 @@
 import { describe, beforeAll, afterAll, it, expect } from "bun:test";
-import { makeCliRunFn, spawnBackground, waitForVm, type BackgroundProcess } from "../helpers.js";
+import { makeCliRunFn, spawnBackground, waitForDom, type BackgroundProcess } from "../helpers.js";
 
 describe("isolated play mode (CLI)", () => {
   describe("empty place", () => {
@@ -11,7 +11,7 @@ describe("isolated play mode (CLI)", () => {
       bg = spawnBackground([
         "run", "--port", String(PORT), "--place", "--target", "play:server",
       ]);
-      await waitForVm(PORT);
+      await waitForDom(PORT);
     });
     afterAll(async () => { bg.kill(); await bg.exited; });
 
@@ -88,7 +88,7 @@ describe("isolated play mode (CLI)", () => {
         "--place", String(PLACE_ID),
         "--target", "play:server",
       ]);
-      await waitForVm(PORT);
+      await waitForDom(PORT);
     });
     afterAll(async () => { bg.kill(); await bg.exited; });
 

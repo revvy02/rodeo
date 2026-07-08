@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use crate::proto;
 use crate::studio::StudioBackend;
 use crate::transport::Transport;
-use crate::vm::Vm;
+use crate::dom::Dom;
 
 const POLL_INTERVAL_MS: u64 = 500;
 
@@ -117,42 +117,42 @@ impl RodeoClient {
     }
 
     // -----------------------------------------------------------------------
-    // VM discovery
+    // DOM discovery
     // -----------------------------------------------------------------------
 
-    pub async fn get_vms(&self) -> Result<Vec<Vm>> {
+    pub async fn get_doms(&self) -> Result<Vec<Dom>> {
         let state = self.get_state().await?;
         let mut out = Vec::new();
         for s in &state.studios {
-            for v in &s.vms {
-                out.push(Vm::from_studio_vm(s, v, self.transport.clone()));
+            for v in &s.doms {
+                out.push(Dom::from_studio_dom(s, v, self.transport.clone()));
             }
         }
         Ok(out)
     }
 
-    pub async fn get_vm(&self, vm_id: &str) -> Result<Vm> {
-        self.get_vms()
+    pub async fn get_dom(&self, dom_id: &str) -> Result<Dom> {
+        self.get_doms()
             .await?
             .into_iter()
-            .find(|v| v.vm_id == vm_id)
-            .ok_or_else(|| anyhow!("vm '{vm_id}' not found"))
+            .find(|v| v.dom_id == dom_id)
+            .ok_or_else(|| anyhow!("dom '{dom_id}' not found"))
     }
 
-    pub async fn get_live_servers(&self) -> Result<Vec<Vm>> {
+    pub async fn get_live_servers(&self) -> Result<Vec<Dom>> {
         Ok(self
-            .get_vms()
+            .get_doms()
             .await?
             .into_iter()
-            .filter(|v| v.mode == "live" && v.dom == "server")
+            .filter(|v| v.mode == "live" && v.dom_kind == "server")
             .collect())
     }
 
-    pub async fn get_live_server_for_place(&self, place_id: i64) -> Result<Vm> {
-        self.get_vms()
+    pub async fn get_live_server_for_place(&self, place_id: i64) -> Result<Dom> {
+        self.get_doms()
             .await?
             .into_iter()
-            .find(|v| v.mode == "live" && v.dom == "server" && v.place_id == place_id)
+            .find(|v| v.mode == "live" && v.dom_kind == "server" && v.place_id == place_id)
             .ok_or_else(|| anyhow!("no live server found for place {place_id}"))
     }
 
@@ -160,7 +160,7 @@ impl RodeoClient {
     // Direct master RPCs (low-level — used by CLI orchestration, not by TS)
     // -----------------------------------------------------------------------
 
-    /// Launch a Studio, blocking until the plugin VM connects (Ready event).
+    /// Launch a Studio, blocking until the plugin DOM connects (Ready event).
     /// Returns (backend_id, session_guid). Prefer `StudioBackend::open*` for
     /// higher-level use — this is for CLI orchestration that builds the
     /// LaunchStudioRequest manually.
@@ -201,9 +201,9 @@ impl RodeoClient {
         Ok(())
     }
 
-    /// Submit a run with no VM handle — server routes by target. Used by the
+    /// Submit a run with no DOM handle — server routes by target. Used by the
     /// CLI orchestration path where the target string (`run:server`, `play:client:2`)
-    /// is the canonical selector and master resolves it to a VM.
+    /// is the canonical selector and master resolves it to a DOM.
     pub async fn submit_run(&self, opts: crate::run::RunCodeOpts) -> Result<crate::run::RunResult> {
         crate::run::run_buffered_target(self.transport.clone(), opts).await
     }
@@ -232,4 +232,4 @@ impl RodeoClient {
 
 /// Re-exports from `rodeo_proto` that callers routinely reach for — saves them
 /// importing from the proto crate directly for the common cases.
-pub use proto::{BackendInfo, ProcessInfo, RodeoSnapshot, VmSnapshot};
+pub use proto::{BackendInfo, ProcessInfo, RodeoSnapshot, DomSnapshot};

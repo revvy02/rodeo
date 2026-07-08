@@ -81,7 +81,7 @@ pub struct StudioOptions {
     pub no_hud: bool,
     /// Master-minted session identity. Stamped as the `rodeoSession` Workspace
     /// attribute by the RunScript bootstrap; the plugin sends it on the WS
-    /// handshake so master correlates the connecting VM to this launch.
+    /// handshake so master correlates the connecting DOM to this launch.
     pub session_guid: String,
 }
 
@@ -115,7 +115,7 @@ impl Studio {
 
         // Generate the RunScript bootstrap. It stamps `rodeoSession`/`rodeoPort`
         // onto the Workspace once Studio is up, so the static plugin routes to
-        // this launch's serve port and master can correlate the VM. No place
+        // this launch's serve port and master can correlate the DOM. No place
         // mutation needed.
         tracing::info!(session_guid = sg_short, "spawn: writing RunScript bootstrap");
         let bootstrap = write_bootstrap_script(&session_guid, opts.port)?;

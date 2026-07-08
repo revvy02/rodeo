@@ -14,7 +14,7 @@ describe("place", () => {
   it("open empty place and execute inline source", async () => {
     const backend = await ctx.client.getLocalStudio();
     extraStudio = await backend.open({ background: true });
-    const result = await extraStudio.editVm.runCode({ source: "return 42" });
+    const result = await extraStudio.editDom.runCode({ source: "return 42" });
     expect(result.ok).toBe(true);
     expect(result.return).toBe(42);
   });

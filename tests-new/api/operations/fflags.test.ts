@@ -46,7 +46,7 @@ describe("fflags", () => {
   it("debug.loadmodule is unavailable without fflag", async () => {
     const backend = await ctx.client.getLocalStudio();
     const noFflagStudio = await backend.open({ background: true });
-    const result = await noFflagStudio.editVm.runCode({
+    const result = await noFflagStudio.editDom.runCode({
       source: LOADMODULE_BASELINE_SCRIPT,
       showReturn: true,
     });
@@ -62,7 +62,7 @@ describe("fflags", () => {
       fflags: ["EnableLoadModule=true"],
       background: true,
     });
-    const result = await fflagStudio.editVm.runCode({
+    const result = await fflagStudio.editDom.runCode({
       source: LOADMODULE_CACHE_SCRIPT,
       showReturn: true,
     });

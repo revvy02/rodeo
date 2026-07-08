@@ -177,21 +177,21 @@ export async function waitForProcess(
   }
 }
 
-// Waits until at least one connected VM shows up on the master. Used after
+// Waits until at least one connected DOM shows up on the master. Used after
 // spawnBackground(["run","--place",...]) to ensure Studio is ready before
 // the first `rodeo run --source` call. Without this, parallel test files
 // racing the studio-daemon's 4-slot pool can see `rodeo run` time out
-// waiting for a VM.
-export async function waitForVm(port: number, timeoutMs = 60_000): Promise<void> {
+// waiting for a DOM.
+export async function waitForDom(port: number, timeoutMs = 60_000): Promise<void> {
   const client = await RodeoClient.connect(`http://localhost:${port}`);
   const start = Date.now();
   try {
     while (Date.now() - start < timeoutMs) {
-      const vms = await client.getVms().catch(() => []);
+      const vms = await client.getDoms().catch(() => []);
       if (vms.some((v) => v.connected)) return;
       await Bun.sleep(250);
     }
-    throw new Error(`timed out waiting for VM on port ${port}`);
+    throw new Error(`timed out waiting for DOM on port ${port}`);
   } finally {
     await client.close();
   }
@@ -322,7 +322,7 @@ export function cliStudioHandle(port: number): CliStudioHandle {
     runFn: makeCliRunFn(port),
     spawn: async () => {
       bg = spawnBackground(["run", "--port", String(port), "--place"]);
-      await waitForVm(port);
+      await waitForDom(port);
     },
     close: async () => {
       bg?.kill();

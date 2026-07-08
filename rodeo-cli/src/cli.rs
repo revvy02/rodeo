@@ -74,7 +74,7 @@ pub enum Commands {
         #[arg(long)]
         show_return: bool,
 
-        /// Target: mode:dom[:identity] (e.g. edit:plugin, test:server, play:client:plugin)
+        /// Target: mode:domKind[:identity] (e.g. edit:plugin, test:server, play:client:plugin)
         #[arg(long)]
         target: Option<String>,
 
@@ -124,15 +124,19 @@ pub enum Commands {
         fflags: FflagArgs,
     },
 
-    /// List active processes
-    Ps {
+    /// Show the canonical rodeo state: studios, their DOMs, and runs
+    State {
+        /// Print the raw state snapshot as JSON
+        #[arg(long)]
+        json: bool,
+
         #[command(flatten)]
         server: ServerArgs,
     },
 
     /// Kill a running process
     Kill {
-        /// Run ID to kill (from `rodeo ps`)
+        /// Run ID to kill (from `rodeo state`)
         id: String,
 
         #[command(flatten)]
@@ -227,16 +231,16 @@ pub struct ServerArgs {
     pub port: u16,
 }
 
-/// Shared args for launching Studio/Player and targeting VMs
+/// Shared args for launching Studio/Player and targeting DOMs
 #[derive(clap::Args, Clone, Default)]
 pub struct PlaceArgs {
     /// Launch Studio: empty (no value), place ID (number), or file path (.rbxl/.rbxlx)
     #[arg(long = "place", num_args = 0..=1, default_missing_value = "", help_heading = "Launch")]
     pub place: Option<String>,
 
-    /// Target a specific VM directly by ID
+    /// Target a specific DOM directly by ID (from `rodeo state`)
     #[arg(long, help_heading = "Targeting")]
-    pub vm: Option<String>,
+    pub dom: Option<String>,
 
     /// Universe ID (resolved from place ID if omitted)
     #[arg(long = "place.universe", value_name = "UNIVERSE_ID", help_heading = "Launch")]

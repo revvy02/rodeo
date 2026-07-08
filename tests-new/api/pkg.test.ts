@@ -7,7 +7,7 @@ describe("rodeo pkg", () => {
   beforeAll(studio.spawn);
   afterAll(studio.close);
 
-  const run = (opts: Parameters<typeof studio.ctx.editVm.runCode>[0]) => studio.ctx.editVm.runCode(opts);
+  const run = (opts: Parameters<typeof studio.ctx.editDom.runCode>[0]) => studio.ctx.editDom.runCode(opts);
 
   describe("smoke", () => smoke(run));
   describe("rodeo.fs", () => fs(run));

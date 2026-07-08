@@ -56,7 +56,7 @@ struct RunConfig {
     detached: bool,
     no_hud: bool,
     // Targeting fields
-    vm: Option<String>,
+    dom: Option<String>,
     // Profiling
     profile: Option<std::path::PathBuf>,
 }
@@ -267,7 +267,7 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         fflags,
         detached: args.place.detached,
         no_hud: args.place.no_hud,
-        vm: args.place.vm,
+        dom: args.place.dom,
         profile,
     })
 }
@@ -362,7 +362,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
     let request = RunRequest {
         script: cfg.script_content,
         target: cfg.target.unwrap_or_default(),
-        vm_id: cfg.vm,
+        dom_id: cfg.dom,
         // Pin to the studio we launched (if any) so the script runs in the
         // requested place even when other studios share this serve.
         session: launched_studio_id.clone(),
@@ -462,7 +462,7 @@ pub(crate) async fn build_launch_request(
     })
 }
 
-/// Placeholder retained for the play call sites. Multiplayer-test VMs are now
+/// Placeholder retained for the play call sites. Multiplayer-test DOMs are now
 /// owned by the studio backend (the edit Studio hosts the in-Studio test via
 /// `StudioTestService:ExecuteMultiplayerTestAsync`), so the CLI holds no process
 /// handles to clean up.
@@ -483,28 +483,28 @@ async fn launch_play_processes(
     no_hud: bool,
     profile: bool,
 ) -> Result<PlayHandles> {
-    use crate::shared::target::Dom;
+    use crate::shared::target::DomKind;
     use crate::studio_backend::PlaceTarget;
     use rodeo_client::studio::{OpenOpts, OpenFileOpts, OpenPlaceOpts};
 
     let _ = port;
     let client = RodeoClient::connect(host, port)?;
 
-    let want_client = matches!(target.dom, Dom::Client);
+    let want_client = matches!(target.dom_kind, DomKind::Client);
 
-    // Existing play session? (a studio that already has a server VM)
+    // Existing play session? (a studio that already has a server DOM)
     let snapshot = client.get_state().await.ok();
     let server_studio = snapshot.as_ref().and_then(|s| {
-        s.studios.iter().find(|st| st.vms.iter().any(|v| v.dom == "server")).cloned()
+        s.studios.iter().find(|st| st.doms.iter().any(|v| v.dom_kind == "server")).cloned()
     });
 
     if let Some(st) = server_studio {
         // A multiplayer test is already running. Grow it to the target client
-        // count via AddPlayers on the server VM:
+        // count via AddPlayers on the server DOM:
         //   play:client:N  => N total clients
         //   play:client    => append one more than currently connected
         //   play:server    => leave as-is
-        let current = st.vms.iter().filter(|v| v.dom == "client").count() as u32;
+        let current = st.doms.iter().filter(|v| v.dom_kind == "client").count() as u32;
         let target_total = if want_client {
             match target.client_index {
                 Some(n) => n,
@@ -532,7 +532,7 @@ async fn launch_play_processes(
 
     // We need a place to open the edit Studio that will host the test.
     let Some(place) = place else {
-        tracing::info!("waiting for play VMs to connect...");
+        tracing::info!("waiting for play DOMs to connect...");
         wait_for_play_session(&client, initial_clients).await?;
         return Ok(PlayHandles);
     };
@@ -542,7 +542,7 @@ async fn launch_play_processes(
     let backend = client.get_local_studio().await?;
     let fflag_overrides = fflags.fflag_override.clone();
     let fflag_file = fflags.fflag_file.clone();
-    tracing::info!(dom = ?target.dom, initial_clients, "opening edit Studio for multiplayer test");
+    tracing::info!(dom = ?target.dom_kind, initial_clients, "opening edit Studio for multiplayer test");
     let studio = match place {
         PlaceTarget::File(p) => backend.open_file(OpenFileOpts {
             path: p.clone(),
@@ -568,15 +568,15 @@ async fn launch_play_processes(
     Ok(PlayHandles)
 }
 
-/// Poll the studio-first state until a play session (a studio with a server VM
-/// and at least `clients` client VMs) is present.
+/// Poll the studio-first state until a play session (a studio with a server DOM
+/// and at least `clients` client DOMs) is present.
 async fn wait_for_play_session(client: &RodeoClient, clients: u32) -> Result<()> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     loop {
         if let Ok(state) = client.get_state().await {
             let ready = state.studios.iter().any(|st| {
-                st.vms.iter().any(|v| v.dom == "server")
-                    && st.vms.iter().filter(|v| v.dom == "client").count() as u32 >= clients
+                st.doms.iter().any(|v| v.dom_kind == "server")
+                    && st.doms.iter().filter(|v| v.dom_kind == "client").count() as u32 >= clients
             });
             if ready {
                 return Ok(());

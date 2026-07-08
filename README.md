@@ -61,7 +61,7 @@ hello, frank
 
 ### Run code in any script context or Studio mode
 
-`--target <mode>:<dom>[:<identity>]` picks where the script runs. If Studio isn't in the target mode, rodeo auto transitions it when possible.
+`--target <mode>:<domKind>[:<identity>]` picks where the script runs. If Studio isn't in the target mode, rodeo auto transitions it when possible.
 
 | Target | Runs as |
 |--------|---------|

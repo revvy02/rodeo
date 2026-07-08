@@ -1,6 +1,6 @@
 // Shared execution test cases — port of tests/utils/executionTests.luau.
 // Each module is a function taking a `run(opts)` closure that executes against
-// some VM (caller chooses: edit:plugin, test:server, run:server, etc). Mode
+// some DOM (caller chooses: edit:plugin, test:server, run:server, etc). Mode
 // transitions are driven by opts.target on every runCode dispatch, so factories
 // never need to set Studio mode explicitly.
 
@@ -529,7 +529,7 @@ export function cacheRequires(run: RunFn): void {
 
 // ── execFiltering (11 tests) ─────────────────────────────────────────────
 
-const SOURCE_VM = `
+const SOURCE_DOM = `
     local RS = game:GetService('RunService')
     return {
         studio = RS:IsStudio(),
@@ -553,7 +553,7 @@ const SOURCE_PLUGIN = `
 export function execFiltering(run: RunFn): void {
   // Edit mode tests
 
-  it("edit:plugin targets edit VM", async () => {
+  it("edit:plugin targets edit DOM", async () => {
     const result = await run({ target: "edit:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
@@ -570,7 +570,7 @@ export function execFiltering(run: RunFn): void {
     expect(result.return).toBe(true);
   });
 
-  it("no target matches any VM", async () => {
+  it("no target matches any DOM", async () => {
     const result = await run({ source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     expect((result.return as Record<string, boolean>).studio).toBe(true);
@@ -578,8 +578,8 @@ export function execFiltering(run: RunFn): void {
 
   // Run mode tests
 
-  it("run:server targets server VM in run mode", async () => {
-    const result = await run({ target: "run:server", source: SOURCE_VM });
+  it("run:server targets server DOM in run mode", async () => {
+    const result = await run({ target: "run:server", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
@@ -595,7 +595,7 @@ export function execFiltering(run: RunFn): void {
     expect(result.return).toBe(true);
   });
 
-  it("run:server:plugin runs as ModuleScript on server VM", async () => {
+  it("run:server:plugin runs as ModuleScript on server DOM", async () => {
     const result = await run({ target: "run:server:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
@@ -606,15 +606,15 @@ export function execFiltering(run: RunFn): void {
 
   // Play/test mode tests
 
-  it("test:server targets server VM in play mode", async () => {
-    const result = await run({ target: "test:server", source: SOURCE_VM });
+  it("test:server targets server DOM in play mode", async () => {
+    const result = await run({ target: "test:server", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
     expect(r.server).toBe(true);
   });
 
-  it("test:server:plugin runs as ModuleScript on server VM", async () => {
+  it("test:server:plugin runs as ModuleScript on server DOM", async () => {
     const result = await run({ target: "test:server:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
@@ -623,8 +623,8 @@ export function execFiltering(run: RunFn): void {
     expect(r).toHaveProperty("edit");
   });
 
-  it("test:client targets client VM in play mode", async () => {
-    const result = await run({ target: "test:client", source: SOURCE_VM });
+  it("test:client targets client DOM in play mode", async () => {
+    const result = await run({ target: "test:client", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.client).toBe(true);
@@ -640,7 +640,7 @@ export function execFiltering(run: RunFn): void {
     expect(result.return).toBe(true);
   });
 
-  it("test:client:plugin runs as ModuleScript on client VM", async () => {
+  it("test:client:plugin runs as ModuleScript on client DOM", async () => {
     const result = await run({ target: "test:client:plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;

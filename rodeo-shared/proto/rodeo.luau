@@ -12,15 +12,15 @@ type _Messages = {
 	FileAck: _FileAckMessage,
 	FilesComplete: _FilesCompleteMessage,
 	RegisterRequest: _RegisterRequestMessage,
-	VmConnect: _VmConnectMessage,
-	VmDisconnect: _VmDisconnectMessage,
-	VmPluginMessage: _VmPluginMessageMessage,
-	VmServerMessage: _VmServerMessageMessage,
+	DomConnect: _DomConnectMessage,
+	DomDisconnect: _DomDisconnectMessage,
+	DomPluginMessage: _DomPluginMessageMessage,
+	DomServerMessage: _DomServerMessageMessage,
 	StateSnapshot: _StateSnapshotMessage,
 	StudioInstanceState: _StudioInstanceStateMessage,
-	VmSnapshot: _VmSnapshotMessage,
+	DomSnapshot: _DomSnapshotMessage,
 	StudioState: _StudioStateMessage,
-	StudioVm: _StudioVmMessage,
+	StudioDom: _StudioDomMessage,
 	StudioSnapshot: _StudioSnapshotMessage,
 	PlayerStatus: _PlayerStatusMessage,
 	MasterMessage: _MasterMessageMessage,
@@ -60,7 +60,7 @@ type _Messages = {
 	LogFilter: _LogFilterMessage,
 	HealthResponse: _HealthResponseMessage,
 	ContextInfo: _ContextInfoMessage,
-	VmInfo: _VmInfoMessage,
+	DomInfo: _DomInfoMessage,
 	ProcessInfo: _ProcessInfoMessage,
 	ProcessListResponse: _ProcessListResponseMessage,
 	KillResponse: _KillResponseMessage,
@@ -94,9 +94,9 @@ type _BackendMessageImpl = {
 type _BackendMessageFields = {
 	msg: (
 		{ type: "register", value: RegisterRequest }
-		| { type: "vmConnect", value: VmConnect }
-		| { type: "vmDisconnect", value: VmDisconnect }
-		| { type: "vmPluginMessage", value: VmPluginMessage }
+		| { type: "domConnect", value: DomConnect }
+		| { type: "domDisconnect", value: DomDisconnect }
+		| { type: "domPluginMessage", value: DomPluginMessage }
 		| { type: "stateSnapshot", value: StateSnapshot }
 		| { type: "playerStatus", value: PlayerStatus }
 		| { type: "filesComplete", value: FilesComplete }
@@ -108,9 +108,9 @@ type _BackendMessageFields = {
 export type _BackendMessagePartialFields = {
 	msg: (
 		{ type: "register", value: RegisterRequest | _RegisterRequestPartialFields }
-		| { type: "vmConnect", value: VmConnect | _VmConnectPartialFields }
-		| { type: "vmDisconnect", value: VmDisconnect | _VmDisconnectPartialFields }
-		| { type: "vmPluginMessage", value: VmPluginMessage | _VmPluginMessagePartialFields }
+		| { type: "domConnect", value: DomConnect | _DomConnectPartialFields }
+		| { type: "domDisconnect", value: DomDisconnect | _DomDisconnectPartialFields }
+		| { type: "domPluginMessage", value: DomPluginMessage | _DomPluginMessagePartialFields }
 		| { type: "stateSnapshot", value: StateSnapshot | _StateSnapshotPartialFields }
 		| { type: "playerStatus", value: PlayerStatus | _PlayerStatusPartialFields }
 		| { type: "filesComplete", value: FilesComplete | _FilesCompletePartialFields }
@@ -212,95 +212,95 @@ export type _RegisterRequestPartialFields = {
 export type RegisterRequest = typeof(setmetatable({} :: _RegisterRequestFields, {} :: _RegisterRequestImpl))
 type _RegisterRequestMessage = proto.Message<RegisterRequest, _RegisterRequestPartialFields>
 
-type _VmConnectImpl = {
-	__index: _VmConnectImpl,
-	new: (fields: _VmConnectPartialFields?) -> VmConnect,
-	encode: (self: VmConnect) -> buffer,
-	decode: (input: buffer) -> VmConnect,
-	jsonEncode: (self: VmConnect) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> VmConnect,
+type _DomConnectImpl = {
+	__index: _DomConnectImpl,
+	new: (fields: _DomConnectPartialFields?) -> DomConnect,
+	encode: (self: DomConnect) -> buffer,
+	decode: (input: buffer) -> DomConnect,
+	jsonEncode: (self: DomConnect) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> DomConnect,
 	descriptor: proto.Descriptor,
 }
 
-type _VmConnectFields = {
-	vmId: string,
+type _DomConnectFields = {
+	domId: string,
 	stateJson: string,
 }
 
-export type _VmConnectPartialFields = {
-	vmId: string?,
+export type _DomConnectPartialFields = {
+	domId: string?,
 	stateJson: string?,
 }
 
-export type VmConnect = typeof(setmetatable({} :: _VmConnectFields, {} :: _VmConnectImpl))
-type _VmConnectMessage = proto.Message<VmConnect, _VmConnectPartialFields>
+export type DomConnect = typeof(setmetatable({} :: _DomConnectFields, {} :: _DomConnectImpl))
+type _DomConnectMessage = proto.Message<DomConnect, _DomConnectPartialFields>
 
-type _VmDisconnectImpl = {
-	__index: _VmDisconnectImpl,
-	new: (fields: _VmDisconnectPartialFields?) -> VmDisconnect,
-	encode: (self: VmDisconnect) -> buffer,
-	decode: (input: buffer) -> VmDisconnect,
-	jsonEncode: (self: VmDisconnect) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> VmDisconnect,
+type _DomDisconnectImpl = {
+	__index: _DomDisconnectImpl,
+	new: (fields: _DomDisconnectPartialFields?) -> DomDisconnect,
+	encode: (self: DomDisconnect) -> buffer,
+	decode: (input: buffer) -> DomDisconnect,
+	jsonEncode: (self: DomDisconnect) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> DomDisconnect,
 	descriptor: proto.Descriptor,
 }
 
-type _VmDisconnectFields = {
-	vmId: string,
+type _DomDisconnectFields = {
+	domId: string,
 }
 
-export type _VmDisconnectPartialFields = {
-	vmId: string?,
+export type _DomDisconnectPartialFields = {
+	domId: string?,
 }
 
-export type VmDisconnect = typeof(setmetatable({} :: _VmDisconnectFields, {} :: _VmDisconnectImpl))
-type _VmDisconnectMessage = proto.Message<VmDisconnect, _VmDisconnectPartialFields>
+export type DomDisconnect = typeof(setmetatable({} :: _DomDisconnectFields, {} :: _DomDisconnectImpl))
+type _DomDisconnectMessage = proto.Message<DomDisconnect, _DomDisconnectPartialFields>
 
-type _VmPluginMessageImpl = {
-	__index: _VmPluginMessageImpl,
-	new: (fields: _VmPluginMessagePartialFields?) -> VmPluginMessage,
-	encode: (self: VmPluginMessage) -> buffer,
-	decode: (input: buffer) -> VmPluginMessage,
-	jsonEncode: (self: VmPluginMessage) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> VmPluginMessage,
+type _DomPluginMessageImpl = {
+	__index: _DomPluginMessageImpl,
+	new: (fields: _DomPluginMessagePartialFields?) -> DomPluginMessage,
+	encode: (self: DomPluginMessage) -> buffer,
+	decode: (input: buffer) -> DomPluginMessage,
+	jsonEncode: (self: DomPluginMessage) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> DomPluginMessage,
 	descriptor: proto.Descriptor,
 }
 
-type _VmPluginMessageFields = {
-	vmId: string,
+type _DomPluginMessageFields = {
+	domId: string,
 	message: PluginMessage?,
 }
 
-export type _VmPluginMessagePartialFields = {
-	vmId: string?,
+export type _DomPluginMessagePartialFields = {
+	domId: string?,
 	message: (PluginMessage | _PluginMessagePartialFields)?,
 }
 
-export type VmPluginMessage = typeof(setmetatable({} :: _VmPluginMessageFields, {} :: _VmPluginMessageImpl))
-type _VmPluginMessageMessage = proto.Message<VmPluginMessage, _VmPluginMessagePartialFields>
+export type DomPluginMessage = typeof(setmetatable({} :: _DomPluginMessageFields, {} :: _DomPluginMessageImpl))
+type _DomPluginMessageMessage = proto.Message<DomPluginMessage, _DomPluginMessagePartialFields>
 
-type _VmServerMessageImpl = {
-	__index: _VmServerMessageImpl,
-	new: (fields: _VmServerMessagePartialFields?) -> VmServerMessage,
-	encode: (self: VmServerMessage) -> buffer,
-	decode: (input: buffer) -> VmServerMessage,
-	jsonEncode: (self: VmServerMessage) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> VmServerMessage,
+type _DomServerMessageImpl = {
+	__index: _DomServerMessageImpl,
+	new: (fields: _DomServerMessagePartialFields?) -> DomServerMessage,
+	encode: (self: DomServerMessage) -> buffer,
+	decode: (input: buffer) -> DomServerMessage,
+	jsonEncode: (self: DomServerMessage) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> DomServerMessage,
 	descriptor: proto.Descriptor,
 }
 
-type _VmServerMessageFields = {
-	vmId: string,
+type _DomServerMessageFields = {
+	domId: string,
 	message: ServerMessage?,
 }
 
-export type _VmServerMessagePartialFields = {
-	vmId: string?,
+export type _DomServerMessagePartialFields = {
+	domId: string?,
 	message: (ServerMessage | _ServerMessagePartialFields)?,
 }
 
-export type VmServerMessage = typeof(setmetatable({} :: _VmServerMessageFields, {} :: _VmServerMessageImpl))
-type _VmServerMessageMessage = proto.Message<VmServerMessage, _VmServerMessagePartialFields>
+export type DomServerMessage = typeof(setmetatable({} :: _DomServerMessageFields, {} :: _DomServerMessageImpl))
+type _DomServerMessageMessage = proto.Message<DomServerMessage, _DomServerMessagePartialFields>
 
 type _StateSnapshotImpl = {
 	__index: _StateSnapshotImpl,
@@ -313,13 +313,13 @@ type _StateSnapshotImpl = {
 }
 
 type _StateSnapshotFields = {
-	vms: { VmSnapshot },
+	doms: { DomSnapshot },
 	studios: { StudioSnapshot },
 	studioInstances: { StudioInstanceState },
 }
 
 export type _StateSnapshotPartialFields = {
-	vms: { VmSnapshot | _VmSnapshotPartialFields }?,
+	doms: { DomSnapshot | _DomSnapshotPartialFields }?,
 	studios: { StudioSnapshot | _StudioSnapshotPartialFields }?,
 	studioInstances: { StudioInstanceState | _StudioInstanceStatePartialFields }?,
 }
@@ -341,57 +341,57 @@ type _StudioInstanceStateFields = {
 	sessionGuid: string,
 	status: string,
 	error: string?,
-	mcpStudioId: string?,
 }
 
 export type _StudioInstanceStatePartialFields = {
 	sessionGuid: string?,
 	status: string?,
 	error: string?,
-	mcpStudioId: string?,
 }
 
 export type StudioInstanceState = typeof(setmetatable({} :: _StudioInstanceStateFields, {} :: _StudioInstanceStateImpl))
 type _StudioInstanceStateMessage = proto.Message<StudioInstanceState, _StudioInstanceStatePartialFields>
 
-type _VmSnapshotImpl = {
-	__index: _VmSnapshotImpl,
-	new: (fields: _VmSnapshotPartialFields?) -> VmSnapshot,
-	encode: (self: VmSnapshot) -> buffer,
-	decode: (input: buffer) -> VmSnapshot,
-	jsonEncode: (self: VmSnapshot) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> VmSnapshot,
+type _DomSnapshotImpl = {
+	__index: _DomSnapshotImpl,
+	new: (fields: _DomSnapshotPartialFields?) -> DomSnapshot,
+	encode: (self: DomSnapshot) -> buffer,
+	decode: (input: buffer) -> DomSnapshot,
+	jsonEncode: (self: DomSnapshot) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> DomSnapshot,
 	descriptor: proto.Descriptor,
 }
 
-type _VmSnapshotFields = {
-	vmId: string,
+type _DomSnapshotFields = {
+	domId: string,
 	backendId: string?,
 	mode: string?,
-	dom: string?,
+	domKind: string?,
 	sessionGuid: string?,
 	placeId: number?,
 	gameName: string?,
 	activeRuns: number,
 	connected: boolean,
-	clientName: string?,
+	userName: string?,
+	userId: number?,
 }
 
-export type _VmSnapshotPartialFields = {
-	vmId: string?,
+export type _DomSnapshotPartialFields = {
+	domId: string?,
 	backendId: string?,
 	mode: string?,
-	dom: string?,
+	domKind: string?,
 	sessionGuid: string?,
 	placeId: number?,
 	gameName: string?,
 	activeRuns: number?,
 	connected: boolean?,
-	clientName: string?,
+	userName: string?,
+	userId: number?,
 }
 
-export type VmSnapshot = typeof(setmetatable({} :: _VmSnapshotFields, {} :: _VmSnapshotImpl))
-type _VmSnapshotMessage = proto.Message<VmSnapshot, _VmSnapshotPartialFields>
+export type DomSnapshot = typeof(setmetatable({} :: _DomSnapshotFields, {} :: _DomSnapshotImpl))
+type _DomSnapshotMessage = proto.Message<DomSnapshot, _DomSnapshotPartialFields>
 
 type _StudioStateImpl = {
 	__index: _StudioStateImpl,
@@ -404,56 +404,58 @@ type _StudioStateImpl = {
 }
 
 type _StudioStateFields = {
-	id: string,
+	studioId: string,
 	backendId: string,
-	mcpStudioId: string?,
-	name: string,
+	sessionId: string?,
+	placeName: string,
 	placeId: number,
-	active: boolean,
 	status: string,
-	mode: string,
-	vms: { StudioVm },
+	studioMode: string,
+	editDomId: string?,
+	doms: { StudioDom },
 }
 
 export type _StudioStatePartialFields = {
-	id: string?,
+	studioId: string?,
 	backendId: string?,
-	mcpStudioId: string?,
-	name: string?,
+	sessionId: string?,
+	placeName: string?,
 	placeId: number?,
-	active: boolean?,
 	status: string?,
-	mode: string?,
-	vms: { StudioVm | _StudioVmPartialFields }?,
+	studioMode: string?,
+	editDomId: string?,
+	doms: { StudioDom | _StudioDomPartialFields }?,
 }
 
 export type StudioState = typeof(setmetatable({} :: _StudioStateFields, {} :: _StudioStateImpl))
 type _StudioStateMessage = proto.Message<StudioState, _StudioStatePartialFields>
 
-type _StudioVmImpl = {
-	__index: _StudioVmImpl,
-	new: (fields: _StudioVmPartialFields?) -> StudioVm,
-	encode: (self: StudioVm) -> buffer,
-	decode: (input: buffer) -> StudioVm,
-	jsonEncode: (self: StudioVm) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> StudioVm,
+type _StudioDomImpl = {
+	__index: _StudioDomImpl,
+	new: (fields: _StudioDomPartialFields?) -> StudioDom,
+	encode: (self: StudioDom) -> buffer,
+	decode: (input: buffer) -> StudioDom,
+	jsonEncode: (self: StudioDom) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> StudioDom,
 	descriptor: proto.Descriptor,
 }
 
-type _StudioVmFields = {
-	vmId: string,
-	dom: string,
-	clientName: string?,
+type _StudioDomFields = {
+	domId: string,
+	domKind: string,
+	userName: string?,
+	userId: number?,
 }
 
-export type _StudioVmPartialFields = {
-	vmId: string?,
-	dom: string?,
-	clientName: string?,
+export type _StudioDomPartialFields = {
+	domId: string?,
+	domKind: string?,
+	userName: string?,
+	userId: number?,
 }
 
-export type StudioVm = typeof(setmetatable({} :: _StudioVmFields, {} :: _StudioVmImpl))
-type _StudioVmMessage = proto.Message<StudioVm, _StudioVmPartialFields>
+export type StudioDom = typeof(setmetatable({} :: _StudioDomFields, {} :: _StudioDomImpl))
+type _StudioDomMessage = proto.Message<StudioDom, _StudioDomPartialFields>
 
 type _StudioSnapshotImpl = {
 	__index: _StudioSnapshotImpl,
@@ -520,7 +522,7 @@ type _MasterMessageImpl = {
 type _MasterMessageFields = {
 	msg: (
 		{ type: "registered", value: RegisterResponse }
-		| { type: "vmServerMessage", value: VmServerMessage }
+		| { type: "domServerMessage", value: DomServerMessage }
 		| { type: "save", value: SaveCommand }
 		| { type: "runCompleted", value: RunCompleted }
 		| { type: "launchStudio", value: LaunchStudioCommand }
@@ -531,7 +533,7 @@ type _MasterMessageFields = {
 export type _MasterMessagePartialFields = {
 	msg: (
 		{ type: "registered", value: RegisterResponse | _RegisterResponsePartialFields }
-		| { type: "vmServerMessage", value: VmServerMessage | _VmServerMessagePartialFields }
+		| { type: "domServerMessage", value: DomServerMessage | _DomServerMessagePartialFields }
 		| { type: "save", value: SaveCommand | _SaveCommandPartialFields }
 		| { type: "runCompleted", value: RunCompleted | _RunCompletedPartialFields }
 		| { type: "launchStudio", value: LaunchStudioCommand | _LaunchStudioCommandPartialFields }
@@ -764,7 +766,7 @@ type _SubmitRequestFields = {
 	script: string,
 	target: string,
 	session: string?,
-	vmId: string?,
+	domId: string?,
 	cacheRequires: boolean?,
 	scriptArgs: { string },
 	returnFile: string?,
@@ -781,7 +783,7 @@ export type _SubmitRequestPartialFields = {
 	script: string?,
 	target: string?,
 	session: string?,
-	vmId: string?,
+	domId: string?,
 	cacheRequires: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
@@ -1392,7 +1394,7 @@ type _HealthResponseImpl = {
 type _HealthResponseFields = {
 	launched: boolean,
 	contextCount: number,
-	totalVms: number,
+	totalDoms: number,
 	totalQueued: number,
 	contexts: { ContextInfo },
 }
@@ -1400,7 +1402,7 @@ type _HealthResponseFields = {
 export type _HealthResponsePartialFields = {
 	launched: boolean?,
 	contextCount: number?,
-	totalVms: number?,
+	totalDoms: number?,
 	totalQueued: number?,
 	contexts: { ContextInfo | _ContextInfoPartialFields }?,
 }
@@ -1420,45 +1422,45 @@ type _ContextInfoImpl = {
 
 type _ContextInfoFields = {
 	bitset: number,
-	vmCount: number,
+	domCount: number,
 	totalQueued: number,
-	vms: { VmInfo },
+	doms: { DomInfo },
 }
 
 export type _ContextInfoPartialFields = {
 	bitset: number?,
-	vmCount: number?,
+	domCount: number?,
 	totalQueued: number?,
-	vms: { VmInfo | _VmInfoPartialFields }?,
+	doms: { DomInfo | _DomInfoPartialFields }?,
 }
 
 export type ContextInfo = typeof(setmetatable({} :: _ContextInfoFields, {} :: _ContextInfoImpl))
 type _ContextInfoMessage = proto.Message<ContextInfo, _ContextInfoPartialFields>
 
-type _VmInfoImpl = {
-	__index: _VmInfoImpl,
-	new: (fields: _VmInfoPartialFields?) -> VmInfo,
-	encode: (self: VmInfo) -> buffer,
-	decode: (input: buffer) -> VmInfo,
-	jsonEncode: (self: VmInfo) -> { [string]: any },
-	jsonDecode: (input: { [string]: any }) -> VmInfo,
+type _DomInfoImpl = {
+	__index: _DomInfoImpl,
+	new: (fields: _DomInfoPartialFields?) -> DomInfo,
+	encode: (self: DomInfo) -> buffer,
+	decode: (input: buffer) -> DomInfo,
+	jsonEncode: (self: DomInfo) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> DomInfo,
 	descriptor: proto.Descriptor,
 }
 
-type _VmInfoFields = {
+type _DomInfoFields = {
 	rodeoId: string,
 	activeCount: number,
 	isIdle: boolean,
 }
 
-export type _VmInfoPartialFields = {
+export type _DomInfoPartialFields = {
 	rodeoId: string?,
 	activeCount: number?,
 	isIdle: boolean?,
 }
 
-export type VmInfo = typeof(setmetatable({} :: _VmInfoFields, {} :: _VmInfoImpl))
-type _VmInfoMessage = proto.Message<VmInfo, _VmInfoPartialFields>
+export type DomInfo = typeof(setmetatable({} :: _DomInfoFields, {} :: _DomInfoImpl))
+type _DomInfoMessage = proto.Message<DomInfo, _DomInfoPartialFields>
 
 type _ProcessInfoImpl = {
 	__index: _ProcessInfoImpl,
@@ -1474,7 +1476,10 @@ type _ProcessInfoFields = {
 	executionId: string,
 	state: string,
 	target: string,
-	vmBitset: number?,
+	context: string,
+	studioId: string?,
+	sessionId: string?,
+	domId: string?,
 	createdAt: number,
 }
 
@@ -1482,7 +1487,10 @@ export type _ProcessInfoPartialFields = {
 	executionId: string?,
 	state: string?,
 	target: string?,
-	vmBitset: number?,
+	context: string?,
+	studioId: string?,
+	sessionId: string?,
+	domId: string?,
 	createdAt: number?,
 }
 
@@ -1650,38 +1658,38 @@ type _StudioStateMsgImpl = {
 }
 
 type _StudioStateMsgFields = {
-	vmId: string,
+	domId: string,
 	mcpStudioId: string?,
 	isServer: boolean,
 	isClient: boolean,
 	isRunning: boolean,
 	isEdit: boolean,
 	mode: string,
-	dom: string,
+	domKind: string,
 	gameName: string,
 	placeId: number,
 	gameId: number,
 	clientInfo: ClientInfo?,
 	jobId: string?,
-	clientVmIdsJson: string?,
+	clientDomIdsJson: string?,
 	sessionGuid: string?,
 }
 
 export type _StudioStateMsgPartialFields = {
-	vmId: string?,
+	domId: string?,
 	mcpStudioId: string?,
 	isServer: boolean?,
 	isClient: boolean?,
 	isRunning: boolean?,
 	isEdit: boolean?,
 	mode: string?,
-	dom: string?,
+	domKind: string?,
 	gameName: string?,
 	placeId: number?,
 	gameId: number?,
 	clientInfo: (ClientInfo | _ClientInfoPartialFields)?,
 	jobId: string?,
-	clientVmIdsJson: string?,
+	clientDomIdsJson: string?,
 	sessionGuid: string?,
 }
 
@@ -1882,23 +1890,23 @@ do
 				then
 					return { type = (v :: any).type, value = messages.RegisterRequest.new((v :: any).value) } :: any
 				elseif
-					(v :: any).type == "vmConnect"
+					(v :: any).type == "domConnect"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
 				then
-					return { type = (v :: any).type, value = messages.VmConnect.new((v :: any).value) } :: any
+					return { type = (v :: any).type, value = messages.DomConnect.new((v :: any).value) } :: any
 				elseif
-					(v :: any).type == "vmDisconnect"
+					(v :: any).type == "domDisconnect"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
 				then
-					return { type = (v :: any).type, value = messages.VmDisconnect.new((v :: any).value) } :: any
+					return { type = (v :: any).type, value = messages.DomDisconnect.new((v :: any).value) } :: any
 				elseif
-					(v :: any).type == "vmPluginMessage"
+					(v :: any).type == "domPluginMessage"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
 				then
-					return { type = (v :: any).type, value = messages.VmPluginMessage.new((v :: any).value) } :: any
+					return { type = (v :: any).type, value = messages.DomPluginMessage.new((v :: any).value) } :: any
 				elseif
 					(v :: any).type == "stateSnapshot"
 					and (v :: any).value ~= nil
@@ -1944,15 +1952,15 @@ do
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "vmConnect" then
+			elseif self.msg.type == "domConnect" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "vmDisconnect" then
+			elseif self.msg.type == "domDisconnect" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "vmPluginMessage" then
+			elseif self.msg.type == "domPluginMessage" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
@@ -2006,17 +2014,17 @@ do
 				elseif field == 2 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = { type = "vmConnect", value = messages.VmConnect.decode(value) }
+					self.msg = { type = "domConnect", value = messages.DomConnect.decode(value) }
 					continue
 				elseif field == 3 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = { type = "vmDisconnect", value = messages.VmDisconnect.decode(value) }
+					self.msg = { type = "domDisconnect", value = messages.DomDisconnect.decode(value) }
 					continue
 				elseif field == 4 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = { type = "vmPluginMessage", value = messages.VmPluginMessage.decode(value) }
+					self.msg = { type = "domPluginMessage", value = messages.DomPluginMessage.decode(value) }
 					continue
 				elseif field == 5 then
 					local value
@@ -2073,12 +2081,12 @@ do
 		if self.msg ~= nil then
 			if self.msg.type == "register" then
 				output.register = self.msg.value:jsonEncode()
-			elseif self.msg.type == "vmConnect" then
-				output.vmConnect = self.msg.value:jsonEncode()
-			elseif self.msg.type == "vmDisconnect" then
-				output.vmDisconnect = self.msg.value:jsonEncode()
-			elseif self.msg.type == "vmPluginMessage" then
-				output.vmPluginMessage = self.msg.value:jsonEncode()
+			elseif self.msg.type == "domConnect" then
+				output.domConnect = self.msg.value:jsonEncode()
+			elseif self.msg.type == "domDisconnect" then
+				output.domDisconnect = self.msg.value:jsonEncode()
+			elseif self.msg.type == "domPluginMessage" then
+				output.domPluginMessage = self.msg.value:jsonEncode()
 			elseif self.msg.type == "stateSnapshot" then
 				output.stateSnapshot = self.msg.value:jsonEncode()
 			elseif self.msg.type == "playerStatus" then
@@ -2102,16 +2110,17 @@ do
 			self.msg = { type = "register", value = messages.RegisterRequest.jsonDecode(input.register) }
 		end
 
-		if input.vmConnect ~= nil then
-			self.msg = { type = "vmConnect", value = messages.VmConnect.jsonDecode(input.vmConnect) }
+		if input.domConnect ~= nil then
+			self.msg = { type = "domConnect", value = messages.DomConnect.jsonDecode(input.domConnect) }
 		end
 
-		if input.vmDisconnect ~= nil then
-			self.msg = { type = "vmDisconnect", value = messages.VmDisconnect.jsonDecode(input.vmDisconnect) }
+		if input.domDisconnect ~= nil then
+			self.msg = { type = "domDisconnect", value = messages.DomDisconnect.jsonDecode(input.domDisconnect) }
 		end
 
-		if input.vmPluginMessage ~= nil then
-			self.msg = { type = "vmPluginMessage", value = messages.VmPluginMessage.jsonDecode(input.vmPluginMessage) }
+		if input.domPluginMessage ~= nil then
+			self.msg =
+				{ type = "domPluginMessage", value = messages.DomPluginMessage.jsonDecode(input.domPluginMessage) }
 		end
 
 		if input.stateSnapshot ~= nil then
@@ -2611,23 +2620,23 @@ do
 end
 
 do
-	local _VmConnectImpl = {}
-	_VmConnectImpl.__index = _VmConnectImpl
+	local _DomConnectImpl = {}
+	_DomConnectImpl.__index = _DomConnectImpl
 
-	function _VmConnectImpl.new(data: _VmConnectPartialFields?): VmConnect
+	function _DomConnectImpl.new(data: _DomConnectPartialFields?): DomConnect
 		return setmetatable({
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
+			domId = if data == nil or data.domId == nil then "" else data.domId,
 			stateJson = if data == nil or data.stateJson == nil then "" else data.stateJson,
-		}, _VmConnectImpl :: _VmConnectImpl)
+		}, _DomConnectImpl :: _DomConnectImpl)
 	end
 
-	function _VmConnectImpl.encode(self: VmConnect): buffer
+	function _DomConnectImpl.encode(self: DomConnect): buffer
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vmId ~= nil and self.vmId ~= "" then
+		if self.domId ~= nil and self.domId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		if self.stateJson ~= nil and self.stateJson ~= "" then
@@ -2640,8 +2649,8 @@ do
 		return shrunkBuffer
 	end
 
-	function _VmConnectImpl.decode(input: buffer): VmConnect
-		local self = _VmConnectImpl.new()
+	function _DomConnectImpl.decode(input: buffer): DomConnect
+		local self = _DomConnectImpl.new()
 		local cursor = 0
 
 		while cursor < buffer.len(input) do
@@ -2657,7 +2666,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				elseif field == 2 then
 					local value
@@ -2688,11 +2697,11 @@ do
 		return self
 	end
 
-	function _VmConnectImpl.jsonEncode(self: VmConnect): any
+	function _DomConnectImpl.jsonEncode(self: DomConnect): any
 		local output = {}
 
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
+		if self.domId ~= nil and self.domId ~= "" then
+			output.domId = self.domId
 		end
 
 		if self.stateJson ~= nil and self.stateJson ~= "" then
@@ -2702,11 +2711,11 @@ do
 		return output
 	end
 
-	function _VmConnectImpl.jsonDecode(input: { [string]: any }): VmConnect
-		local self = _VmConnectImpl.new()
+	function _DomConnectImpl.jsonDecode(input: { [string]: any }): DomConnect
+		local self = _DomConnectImpl.new()
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		if input.stateJson ~= nil then
@@ -2716,33 +2725,33 @@ do
 		return self
 	end
 
-	_VmConnectImpl.descriptor = {
-		name = "VmConnect",
-		fullName = "rodeo.VmConnect",
+	_DomConnectImpl.descriptor = {
+		name = "DomConnect",
+		fullName = "rodeo.DomConnect",
 	}
 
-	messages.VmConnect = _VmConnectImpl :: any -- Luau: Not sure why this intersection fails.
+	messages.DomConnect = _DomConnectImpl :: any -- Luau: Not sure why this intersection fails.
 
-	typeRegistry.default:register(messages.VmConnect)
+	typeRegistry.default:register(messages.DomConnect)
 end
 
 do
-	local _VmDisconnectImpl = {}
-	_VmDisconnectImpl.__index = _VmDisconnectImpl
+	local _DomDisconnectImpl = {}
+	_DomDisconnectImpl.__index = _DomDisconnectImpl
 
-	function _VmDisconnectImpl.new(data: _VmDisconnectPartialFields?): VmDisconnect
+	function _DomDisconnectImpl.new(data: _DomDisconnectPartialFields?): DomDisconnect
 		return setmetatable({
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
-		}, _VmDisconnectImpl :: _VmDisconnectImpl)
+			domId = if data == nil or data.domId == nil then "" else data.domId,
+		}, _DomDisconnectImpl :: _DomDisconnectImpl)
 	end
 
-	function _VmDisconnectImpl.encode(self: VmDisconnect): buffer
+	function _DomDisconnectImpl.encode(self: DomDisconnect): buffer
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vmId ~= nil and self.vmId ~= "" then
+		if self.domId ~= nil and self.domId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -2750,8 +2759,8 @@ do
 		return shrunkBuffer
 	end
 
-	function _VmDisconnectImpl.decode(input: buffer): VmDisconnect
-		local self = _VmDisconnectImpl.new()
+	function _DomDisconnectImpl.decode(input: buffer): DomDisconnect
+		local self = _DomDisconnectImpl.new()
 		local cursor = 0
 
 		while cursor < buffer.len(input) do
@@ -2767,7 +2776,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				end
 
@@ -2793,59 +2802,59 @@ do
 		return self
 	end
 
-	function _VmDisconnectImpl.jsonEncode(self: VmDisconnect): any
+	function _DomDisconnectImpl.jsonEncode(self: DomDisconnect): any
 		local output = {}
 
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
+		if self.domId ~= nil and self.domId ~= "" then
+			output.domId = self.domId
 		end
 
 		return output
 	end
 
-	function _VmDisconnectImpl.jsonDecode(input: { [string]: any }): VmDisconnect
-		local self = _VmDisconnectImpl.new()
+	function _DomDisconnectImpl.jsonDecode(input: { [string]: any }): DomDisconnect
+		local self = _DomDisconnectImpl.new()
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		return self
 	end
 
-	_VmDisconnectImpl.descriptor = {
-		name = "VmDisconnect",
-		fullName = "rodeo.VmDisconnect",
+	_DomDisconnectImpl.descriptor = {
+		name = "DomDisconnect",
+		fullName = "rodeo.DomDisconnect",
 	}
 
-	messages.VmDisconnect = _VmDisconnectImpl :: any -- Luau: Not sure why this intersection fails.
+	messages.DomDisconnect = _DomDisconnectImpl :: any -- Luau: Not sure why this intersection fails.
 
-	typeRegistry.default:register(messages.VmDisconnect)
+	typeRegistry.default:register(messages.DomDisconnect)
 end
 
 do
-	local _VmPluginMessageImpl = {}
-	_VmPluginMessageImpl.__index = _VmPluginMessageImpl
+	local _DomPluginMessageImpl = {}
+	_DomPluginMessageImpl.__index = _DomPluginMessageImpl
 
-	function _VmPluginMessageImpl.new(data: _VmPluginMessagePartialFields?): VmPluginMessage
+	function _DomPluginMessageImpl.new(data: _DomPluginMessagePartialFields?): DomPluginMessage
 		return setmetatable({
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
+			domId = if data == nil or data.domId == nil then "" else data.domId,
 			message = if data == nil or data.message == nil
 				then nil
 				elseif getmetatable(data.message :: any) == nil then messages.PluginMessage.new(
 					data.message :: any
 				)
 				else (data.message :: any) :: PluginMessage,
-		}, _VmPluginMessageImpl :: _VmPluginMessageImpl)
+		}, _DomPluginMessageImpl :: _DomPluginMessageImpl)
 	end
 
-	function _VmPluginMessageImpl.encode(self: VmPluginMessage): buffer
+	function _DomPluginMessageImpl.encode(self: DomPluginMessage): buffer
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vmId ~= nil and self.vmId ~= "" then
+		if self.domId ~= nil and self.domId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		if self.message ~= nil then
@@ -2859,8 +2868,8 @@ do
 		return shrunkBuffer
 	end
 
-	function _VmPluginMessageImpl.decode(input: buffer): VmPluginMessage
-		local self = _VmPluginMessageImpl.new()
+	function _DomPluginMessageImpl.decode(input: buffer): DomPluginMessage
+		local self = _DomPluginMessageImpl.new()
 		local cursor = 0
 
 		while cursor < buffer.len(input) do
@@ -2876,7 +2885,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				elseif field == 2 then
 					local value
@@ -2907,11 +2916,11 @@ do
 		return self
 	end
 
-	function _VmPluginMessageImpl.jsonEncode(self: VmPluginMessage): any
+	function _DomPluginMessageImpl.jsonEncode(self: DomPluginMessage): any
 		local output = {}
 
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
+		if self.domId ~= nil and self.domId ~= "" then
+			output.domId = self.domId
 		end
 
 		if self.message ~= nil then
@@ -2921,11 +2930,11 @@ do
 		return output
 	end
 
-	function _VmPluginMessageImpl.jsonDecode(input: { [string]: any }): VmPluginMessage
-		local self = _VmPluginMessageImpl.new()
+	function _DomPluginMessageImpl.jsonDecode(input: { [string]: any }): DomPluginMessage
+		local self = _DomPluginMessageImpl.new()
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		if input.message ~= nil then
@@ -2935,39 +2944,39 @@ do
 		return self
 	end
 
-	_VmPluginMessageImpl.descriptor = {
-		name = "VmPluginMessage",
-		fullName = "rodeo.VmPluginMessage",
+	_DomPluginMessageImpl.descriptor = {
+		name = "DomPluginMessage",
+		fullName = "rodeo.DomPluginMessage",
 	}
 
-	messages.VmPluginMessage = _VmPluginMessageImpl :: any -- Luau: Not sure why this intersection fails.
+	messages.DomPluginMessage = _DomPluginMessageImpl :: any -- Luau: Not sure why this intersection fails.
 
-	typeRegistry.default:register(messages.VmPluginMessage)
+	typeRegistry.default:register(messages.DomPluginMessage)
 end
 
 do
-	local _VmServerMessageImpl = {}
-	_VmServerMessageImpl.__index = _VmServerMessageImpl
+	local _DomServerMessageImpl = {}
+	_DomServerMessageImpl.__index = _DomServerMessageImpl
 
-	function _VmServerMessageImpl.new(data: _VmServerMessagePartialFields?): VmServerMessage
+	function _DomServerMessageImpl.new(data: _DomServerMessagePartialFields?): DomServerMessage
 		return setmetatable({
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
+			domId = if data == nil or data.domId == nil then "" else data.domId,
 			message = if data == nil or data.message == nil
 				then nil
 				elseif getmetatable(data.message :: any) == nil then messages.ServerMessage.new(
 					data.message :: any
 				)
 				else (data.message :: any) :: ServerMessage,
-		}, _VmServerMessageImpl :: _VmServerMessageImpl)
+		}, _DomServerMessageImpl :: _DomServerMessageImpl)
 	end
 
-	function _VmServerMessageImpl.encode(self: VmServerMessage): buffer
+	function _DomServerMessageImpl.encode(self: DomServerMessage): buffer
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vmId ~= nil and self.vmId ~= "" then
+		if self.domId ~= nil and self.domId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		if self.message ~= nil then
@@ -2981,8 +2990,8 @@ do
 		return shrunkBuffer
 	end
 
-	function _VmServerMessageImpl.decode(input: buffer): VmServerMessage
-		local self = _VmServerMessageImpl.new()
+	function _DomServerMessageImpl.decode(input: buffer): DomServerMessage
+		local self = _DomServerMessageImpl.new()
 		local cursor = 0
 
 		while cursor < buffer.len(input) do
@@ -2998,7 +3007,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				elseif field == 2 then
 					local value
@@ -3029,11 +3038,11 @@ do
 		return self
 	end
 
-	function _VmServerMessageImpl.jsonEncode(self: VmServerMessage): any
+	function _DomServerMessageImpl.jsonEncode(self: DomServerMessage): any
 		local output = {}
 
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
+		if self.domId ~= nil and self.domId ~= "" then
+			output.domId = self.domId
 		end
 
 		if self.message ~= nil then
@@ -3043,11 +3052,11 @@ do
 		return output
 	end
 
-	function _VmServerMessageImpl.jsonDecode(input: { [string]: any }): VmServerMessage
-		local self = _VmServerMessageImpl.new()
+	function _DomServerMessageImpl.jsonDecode(input: { [string]: any }): DomServerMessage
+		local self = _DomServerMessageImpl.new()
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		if input.message ~= nil then
@@ -3057,14 +3066,14 @@ do
 		return self
 	end
 
-	_VmServerMessageImpl.descriptor = {
-		name = "VmServerMessage",
-		fullName = "rodeo.VmServerMessage",
+	_DomServerMessageImpl.descriptor = {
+		name = "DomServerMessage",
+		fullName = "rodeo.DomServerMessage",
 	}
 
-	messages.VmServerMessage = _VmServerMessageImpl :: any -- Luau: Not sure why this intersection fails.
+	messages.DomServerMessage = _DomServerMessageImpl :: any -- Luau: Not sure why this intersection fails.
 
-	typeRegistry.default:register(messages.VmServerMessage)
+	typeRegistry.default:register(messages.DomServerMessage)
 end
 
 do
@@ -3073,16 +3082,16 @@ do
 
 	function _StateSnapshotImpl.new(data: _StateSnapshotPartialFields?): StateSnapshot
 		return setmetatable({
-			vms = (function()
-				local src = if data == nil then nil else data.vms
+			doms = (function()
+				local src = if data == nil then nil else data.doms
 				if src == nil then
 					return {}
 				end
 				local out = table.create(#src)
 				for i, v in src do
 					out[i] = if getmetatable(v :: any) == nil
-						then messages.VmSnapshot.new(v :: any)
-						else (v :: any) :: VmSnapshot
+						then messages.DomSnapshot.new(v :: any)
+						else (v :: any) :: DomSnapshot
 				end
 				return out
 			end)(),
@@ -3119,8 +3128,8 @@ do
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vms ~= nil and #self.vms > 0 then
-			for _, value in self.vms do
+		if self.doms ~= nil and #self.doms > 0 then
+			for _, value in self.doms do
 				local encoded = value:encode()
 				output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
@@ -3165,7 +3174,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.vms, messages.VmSnapshot.decode(value))
+					table.insert(self.doms, messages.DomSnapshot.decode(value))
 					continue
 				elseif field == 2 then
 					local value
@@ -3204,12 +3213,12 @@ do
 	function _StateSnapshotImpl.jsonEncode(self: StateSnapshot): any
 		local output = {}
 
-		if self.vms ~= nil and #self.vms > 0 then
+		if self.doms ~= nil and #self.doms > 0 then
 			local newOutput = {}
-			for _, value in self.vms do
+			for _, value in self.doms do
 				table.insert(newOutput, value:jsonEncode())
 			end
-			output.vms = newOutput
+			output.doms = newOutput
 		end
 
 		if self.studios ~= nil and #self.studios > 0 then
@@ -3234,13 +3243,13 @@ do
 	function _StateSnapshotImpl.jsonDecode(input: { [string]: any }): StateSnapshot
 		local self = _StateSnapshotImpl.new()
 
-		if input.vms ~= nil then
-			local newOutput: { VmSnapshot } = {}
-			for _, value in input.vms do
-				table.insert(newOutput, messages.VmSnapshot.jsonDecode(value))
+		if input.doms ~= nil then
+			local newOutput: { DomSnapshot } = {}
+			for _, value in input.doms do
+				table.insert(newOutput, messages.DomSnapshot.jsonDecode(value))
 			end
 
-			self.vms = newOutput
+			self.doms = newOutput
 		end
 
 		if input.studios ~= nil then
@@ -3283,7 +3292,6 @@ do
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
 			status = if data == nil or data.status == nil then "" else data.status,
 			error = if data == nil or data.error == nil then nil else data.error,
-			mcpStudioId = if data == nil or data.mcpStudioId == nil then nil else data.mcpStudioId,
 		}, _StudioInstanceStateImpl :: _StudioInstanceStateImpl)
 	end
 
@@ -3304,11 +3312,6 @@ do
 		if self.error ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.error)
-		end
-
-		if self.mcpStudioId ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.mcpStudioId)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -3344,11 +3347,6 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.error = proto.decodeString(value)
-					continue
-				elseif field == 4 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.mcpStudioId = proto.decodeString(value)
 					continue
 				end
 
@@ -3389,10 +3387,6 @@ do
 			output.error = self.error
 		end
 
-		if self.mcpStudioId ~= nil then
-			output.mcpStudioId = self.mcpStudioId
-		end
-
 		return output
 	end
 
@@ -3411,10 +3405,6 @@ do
 			self.error = input.error
 		end
 
-		if input.mcpStudioId ~= nil then
-			self.mcpStudioId = input.mcpStudioId
-		end
-
 		return self
 	end
 
@@ -3429,31 +3419,32 @@ do
 end
 
 do
-	local _VmSnapshotImpl = {}
-	_VmSnapshotImpl.__index = _VmSnapshotImpl
+	local _DomSnapshotImpl = {}
+	_DomSnapshotImpl.__index = _DomSnapshotImpl
 
-	function _VmSnapshotImpl.new(data: _VmSnapshotPartialFields?): VmSnapshot
+	function _DomSnapshotImpl.new(data: _DomSnapshotPartialFields?): DomSnapshot
 		return setmetatable({
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
+			domId = if data == nil or data.domId == nil then "" else data.domId,
 			backendId = if data == nil or data.backendId == nil then nil else data.backendId,
 			mode = if data == nil or data.mode == nil then nil else data.mode,
-			dom = if data == nil or data.dom == nil then nil else data.dom,
+			domKind = if data == nil or data.domKind == nil then nil else data.domKind,
 			sessionGuid = if data == nil or data.sessionGuid == nil then nil else data.sessionGuid,
 			placeId = if data == nil or data.placeId == nil then nil else data.placeId,
 			gameName = if data == nil or data.gameName == nil then nil else data.gameName,
 			activeRuns = if data == nil or data.activeRuns == nil then 0 else data.activeRuns,
 			connected = if data == nil or data.connected == nil then false else data.connected,
-			clientName = if data == nil or data.clientName == nil then nil else data.clientName,
-		}, _VmSnapshotImpl :: _VmSnapshotImpl)
+			userName = if data == nil or data.userName == nil then nil else data.userName,
+			userId = if data == nil or data.userId == nil then nil else data.userId,
+		}, _DomSnapshotImpl :: _DomSnapshotImpl)
 	end
 
-	function _VmSnapshotImpl.encode(self: VmSnapshot): buffer
+	function _DomSnapshotImpl.encode(self: DomSnapshot): buffer
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vmId ~= nil and self.vmId ~= "" then
+		if self.domId ~= nil and self.domId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		if self.backendId ~= nil then
@@ -3466,9 +3457,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.mode)
 		end
 
-		if self.dom ~= nil then
+		if self.domKind ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.dom)
+			output, cursor = proto.writeString(output, cursor, self.domKind)
 		end
 
 		if self.sessionGuid ~= nil then
@@ -3496,9 +3487,14 @@ do
 			output, cursor = proto.writeVarInt(output, cursor, if self.connected then 1 else 0)
 		end
 
-		if self.clientName ~= nil then
+		if self.userName ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.clientName)
+			output, cursor = proto.writeString(output, cursor, self.userName)
+		end
+
+		if self.userId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 11, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.userId)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -3506,8 +3502,8 @@ do
 		return shrunkBuffer
 	end
 
-	function _VmSnapshotImpl.decode(input: buffer): VmSnapshot
-		local self = _VmSnapshotImpl.new()
+	function _DomSnapshotImpl.decode(input: buffer): DomSnapshot
+		local self = _DomSnapshotImpl.new()
 		local cursor = 0
 
 		while cursor < buffer.len(input) do
@@ -3530,6 +3526,11 @@ do
 					value, cursor = proto.readVarInt(input, cursor)
 					self.connected = value ~= 0
 					continue
+				elseif field == 11 then
+					local value
+					value, cursor = proto.readVarIntI64(input, cursor)
+					self.userId = value
+					continue
 				end
 
 				local _
@@ -3538,7 +3539,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				elseif field == 2 then
 					local value
@@ -3553,7 +3554,7 @@ do
 				elseif field == 4 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.dom = proto.decodeString(value)
+					self.domKind = proto.decodeString(value)
 					continue
 				elseif field == 5 then
 					local value
@@ -3568,7 +3569,7 @@ do
 				elseif field == 10 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.clientName = proto.decodeString(value)
+					self.userName = proto.decodeString(value)
 					continue
 				end
 
@@ -3594,11 +3595,11 @@ do
 		return self
 	end
 
-	function _VmSnapshotImpl.jsonEncode(self: VmSnapshot): any
+	function _DomSnapshotImpl.jsonEncode(self: DomSnapshot): any
 		local output = {}
 
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
+		if self.domId ~= nil and self.domId ~= "" then
+			output.domId = self.domId
 		end
 
 		if self.backendId ~= nil then
@@ -3609,8 +3610,8 @@ do
 			output.mode = self.mode
 		end
 
-		if self.dom ~= nil then
-			output.dom = self.dom
+		if self.domKind ~= nil then
+			output.domKind = self.domKind
 		end
 
 		if self.sessionGuid ~= nil then
@@ -3633,18 +3634,22 @@ do
 			output.connected = self.connected
 		end
 
-		if self.clientName ~= nil then
-			output.clientName = self.clientName
+		if self.userName ~= nil then
+			output.userName = self.userName
+		end
+
+		if self.userId ~= nil then
+			output.userId = self.userId
 		end
 
 		return output
 	end
 
-	function _VmSnapshotImpl.jsonDecode(input: { [string]: any }): VmSnapshot
-		local self = _VmSnapshotImpl.new()
+	function _DomSnapshotImpl.jsonDecode(input: { [string]: any }): DomSnapshot
+		local self = _DomSnapshotImpl.new()
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		if input.backendId ~= nil then
@@ -3655,8 +3660,8 @@ do
 			self.mode = input.mode
 		end
 
-		if input.dom ~= nil then
-			self.dom = input.dom
+		if input.domKind ~= nil then
+			self.domKind = input.domKind
 		end
 
 		if input.sessionGuid ~= nil then
@@ -3679,21 +3684,25 @@ do
 			self.connected = input.connected
 		end
 
-		if input.clientName ~= nil then
-			self.clientName = input.clientName
+		if input.userName ~= nil then
+			self.userName = input.userName
+		end
+
+		if input.userId ~= nil then
+			self.userId = input.userId
 		end
 
 		return self
 	end
 
-	_VmSnapshotImpl.descriptor = {
-		name = "VmSnapshot",
-		fullName = "rodeo.VmSnapshot",
+	_DomSnapshotImpl.descriptor = {
+		name = "DomSnapshot",
+		fullName = "rodeo.DomSnapshot",
 	}
 
-	messages.VmSnapshot = _VmSnapshotImpl :: any -- Luau: Not sure why this intersection fails.
+	messages.DomSnapshot = _DomSnapshotImpl :: any -- Luau: Not sure why this intersection fails.
 
-	typeRegistry.default:register(messages.VmSnapshot)
+	typeRegistry.default:register(messages.DomSnapshot)
 end
 
 do
@@ -3702,24 +3711,24 @@ do
 
 	function _StudioStateImpl.new(data: _StudioStatePartialFields?): StudioState
 		return setmetatable({
-			id = if data == nil or data.id == nil then "" else data.id,
+			studioId = if data == nil or data.studioId == nil then "" else data.studioId,
 			backendId = if data == nil or data.backendId == nil then "" else data.backendId,
-			mcpStudioId = if data == nil or data.mcpStudioId == nil then nil else data.mcpStudioId,
-			name = if data == nil or data.name == nil then "" else data.name,
+			sessionId = if data == nil or data.sessionId == nil then nil else data.sessionId,
+			placeName = if data == nil or data.placeName == nil then "" else data.placeName,
 			placeId = if data == nil or data.placeId == nil then 0 else data.placeId,
-			active = if data == nil or data.active == nil then false else data.active,
 			status = if data == nil or data.status == nil then "" else data.status,
-			mode = if data == nil or data.mode == nil then "" else data.mode,
-			vms = (function()
-				local src = if data == nil then nil else data.vms
+			studioMode = if data == nil or data.studioMode == nil then "" else data.studioMode,
+			editDomId = if data == nil or data.editDomId == nil then nil else data.editDomId,
+			doms = (function()
+				local src = if data == nil then nil else data.doms
 				if src == nil then
 					return {}
 				end
 				local out = table.create(#src)
 				for i, v in src do
 					out[i] = if getmetatable(v :: any) == nil
-						then messages.StudioVm.new(v :: any)
-						else (v :: any) :: StudioVm
+						then messages.StudioDom.new(v :: any)
+						else (v :: any) :: StudioDom
 				end
 				return out
 			end)(),
@@ -3730,9 +3739,9 @@ do
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.id ~= nil and self.id ~= "" then
+		if self.studioId ~= nil and self.studioId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.id)
+			output, cursor = proto.writeString(output, cursor, self.studioId)
 		end
 
 		if self.backendId ~= nil and self.backendId ~= "" then
@@ -3740,14 +3749,14 @@ do
 			output, cursor = proto.writeString(output, cursor, self.backendId)
 		end
 
-		if self.mcpStudioId ~= nil then
+		if self.sessionId ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.mcpStudioId)
+			output, cursor = proto.writeString(output, cursor, self.sessionId)
 		end
 
-		if self.name ~= nil and self.name ~= "" then
+		if self.placeName ~= nil and self.placeName ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.name)
+			output, cursor = proto.writeString(output, cursor, self.placeName)
 		end
 
 		if self.placeId ~= nil and self.placeId ~= 0 then
@@ -3755,23 +3764,23 @@ do
 			output, cursor = proto.writeVarInt(output, cursor, self.placeId)
 		end
 
-		if self.active then
-			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.active then 1 else 0)
-		end
-
 		if self.status ~= nil and self.status ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.status)
 		end
 
-		if self.mode ~= nil and self.mode ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.mode)
+		if self.studioMode ~= nil and self.studioMode ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.studioMode)
 		end
 
-		if self.vms ~= nil and #self.vms > 0 then
-			for _, value in self.vms do
+		if self.editDomId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.editDomId)
+		end
+
+		if self.doms ~= nil and #self.doms > 0 then
+			for _, value in self.doms do
 				local encoded = value:encode()
 				output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
@@ -3797,11 +3806,6 @@ do
 					value, cursor = proto.readVarIntI64(input, cursor)
 					self.placeId = value
 					continue
-				elseif field == 6 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.active = value ~= 0
-					continue
 				end
 
 				local _
@@ -3810,7 +3814,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.id = proto.decodeString(value)
+					self.studioId = proto.decodeString(value)
 					continue
 				elseif field == 2 then
 					local value
@@ -3820,27 +3824,32 @@ do
 				elseif field == 3 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.mcpStudioId = proto.decodeString(value)
+					self.sessionId = proto.decodeString(value)
 					continue
 				elseif field == 4 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.name = proto.decodeString(value)
+					self.placeName = proto.decodeString(value)
 					continue
-				elseif field == 7 then
+				elseif field == 6 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.status = proto.decodeString(value)
 					continue
+				elseif field == 7 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.studioMode = proto.decodeString(value)
+					continue
 				elseif field == 8 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.mode = proto.decodeString(value)
+					self.editDomId = proto.decodeString(value)
 					continue
 				elseif field == 9 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.vms, messages.StudioVm.decode(value))
+					table.insert(self.doms, messages.StudioDom.decode(value))
 					continue
 				end
 
@@ -3869,44 +3878,44 @@ do
 	function _StudioStateImpl.jsonEncode(self: StudioState): any
 		local output = {}
 
-		if self.id ~= nil and self.id ~= "" then
-			output.id = self.id
+		if self.studioId ~= nil and self.studioId ~= "" then
+			output.studioId = self.studioId
 		end
 
 		if self.backendId ~= nil and self.backendId ~= "" then
 			output.backendId = self.backendId
 		end
 
-		if self.mcpStudioId ~= nil then
-			output.mcpStudioId = self.mcpStudioId
+		if self.sessionId ~= nil then
+			output.sessionId = self.sessionId
 		end
 
-		if self.name ~= nil and self.name ~= "" then
-			output.name = self.name
+		if self.placeName ~= nil and self.placeName ~= "" then
+			output.placeName = self.placeName
 		end
 
 		if self.placeId ~= nil and self.placeId ~= 0 then
 			output.placeId = self.placeId
 		end
 
-		if self.active then
-			output.active = self.active
-		end
-
 		if self.status ~= nil and self.status ~= "" then
 			output.status = self.status
 		end
 
-		if self.mode ~= nil and self.mode ~= "" then
-			output.mode = self.mode
+		if self.studioMode ~= nil and self.studioMode ~= "" then
+			output.studioMode = self.studioMode
 		end
 
-		if self.vms ~= nil and #self.vms > 0 then
+		if self.editDomId ~= nil then
+			output.editDomId = self.editDomId
+		end
+
+		if self.doms ~= nil and #self.doms > 0 then
 			local newOutput = {}
-			for _, value in self.vms do
+			for _, value in self.doms do
 				table.insert(newOutput, value:jsonEncode())
 			end
-			output.vms = newOutput
+			output.doms = newOutput
 		end
 
 		return output
@@ -3915,45 +3924,45 @@ do
 	function _StudioStateImpl.jsonDecode(input: { [string]: any }): StudioState
 		local self = _StudioStateImpl.new()
 
-		if input.id ~= nil then
-			self.id = input.id
+		if input.studioId ~= nil then
+			self.studioId = input.studioId
 		end
 
 		if input.backendId ~= nil then
 			self.backendId = input.backendId
 		end
 
-		if input.mcpStudioId ~= nil then
-			self.mcpStudioId = input.mcpStudioId
+		if input.sessionId ~= nil then
+			self.sessionId = input.sessionId
 		end
 
-		if input.name ~= nil then
-			self.name = input.name
+		if input.placeName ~= nil then
+			self.placeName = input.placeName
 		end
 
 		if input.placeId ~= nil then
 			self.placeId = input.placeId
 		end
 
-		if input.active ~= nil then
-			self.active = input.active
-		end
-
 		if input.status ~= nil then
 			self.status = input.status
 		end
 
-		if input.mode ~= nil then
-			self.mode = input.mode
+		if input.studioMode ~= nil then
+			self.studioMode = input.studioMode
 		end
 
-		if input.vms ~= nil then
-			local newOutput: { StudioVm } = {}
-			for _, value in input.vms do
-				table.insert(newOutput, messages.StudioVm.jsonDecode(value))
+		if input.editDomId ~= nil then
+			self.editDomId = input.editDomId
+		end
+
+		if input.doms ~= nil then
+			local newOutput: { StudioDom } = {}
+			for _, value in input.doms do
+				table.insert(newOutput, messages.StudioDom.jsonDecode(value))
 			end
 
-			self.vms = newOutput
+			self.doms = newOutput
 		end
 
 		return self
@@ -3970,34 +3979,40 @@ do
 end
 
 do
-	local _StudioVmImpl = {}
-	_StudioVmImpl.__index = _StudioVmImpl
+	local _StudioDomImpl = {}
+	_StudioDomImpl.__index = _StudioDomImpl
 
-	function _StudioVmImpl.new(data: _StudioVmPartialFields?): StudioVm
+	function _StudioDomImpl.new(data: _StudioDomPartialFields?): StudioDom
 		return setmetatable({
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
-			dom = if data == nil or data.dom == nil then "" else data.dom,
-			clientName = if data == nil or data.clientName == nil then nil else data.clientName,
-		}, _StudioVmImpl :: _StudioVmImpl)
+			domId = if data == nil or data.domId == nil then "" else data.domId,
+			domKind = if data == nil or data.domKind == nil then "" else data.domKind,
+			userName = if data == nil or data.userName == nil then nil else data.userName,
+			userId = if data == nil or data.userId == nil then nil else data.userId,
+		}, _StudioDomImpl :: _StudioDomImpl)
 	end
 
-	function _StudioVmImpl.encode(self: StudioVm): buffer
+	function _StudioDomImpl.encode(self: StudioDom): buffer
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vmId ~= nil and self.vmId ~= "" then
+		if self.domId ~= nil and self.domId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
-		if self.dom ~= nil and self.dom ~= "" then
+		if self.domKind ~= nil and self.domKind ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.dom)
+			output, cursor = proto.writeString(output, cursor, self.domKind)
 		end
 
-		if self.clientName ~= nil then
+		if self.userName ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.clientName)
+			output, cursor = proto.writeString(output, cursor, self.userName)
+		end
+
+		if self.userId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.userId)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -4005,8 +4020,8 @@ do
 		return shrunkBuffer
 	end
 
-	function _StudioVmImpl.decode(input: buffer): StudioVm
-		local self = _StudioVmImpl.new()
+	function _StudioDomImpl.decode(input: buffer): StudioDom
+		local self = _StudioDomImpl.new()
 		local cursor = 0
 
 		while cursor < buffer.len(input) do
@@ -4014,7 +4029,12 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				-- No fields
+				if field == 4 then
+					local value
+					value, cursor = proto.readVarIntI64(input, cursor)
+					self.userId = value
+					continue
+				end
 
 				local _
 				_, cursor = proto.readVarInt(input, cursor)
@@ -4022,17 +4042,17 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				elseif field == 2 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.dom = proto.decodeString(value)
+					self.domKind = proto.decodeString(value)
 					continue
 				elseif field == 3 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.clientName = proto.decodeString(value)
+					self.userName = proto.decodeString(value)
 					continue
 				end
 
@@ -4058,50 +4078,58 @@ do
 		return self
 	end
 
-	function _StudioVmImpl.jsonEncode(self: StudioVm): any
+	function _StudioDomImpl.jsonEncode(self: StudioDom): any
 		local output = {}
 
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
+		if self.domId ~= nil and self.domId ~= "" then
+			output.domId = self.domId
 		end
 
-		if self.dom ~= nil and self.dom ~= "" then
-			output.dom = self.dom
+		if self.domKind ~= nil and self.domKind ~= "" then
+			output.domKind = self.domKind
 		end
 
-		if self.clientName ~= nil then
-			output.clientName = self.clientName
+		if self.userName ~= nil then
+			output.userName = self.userName
+		end
+
+		if self.userId ~= nil then
+			output.userId = self.userId
 		end
 
 		return output
 	end
 
-	function _StudioVmImpl.jsonDecode(input: { [string]: any }): StudioVm
-		local self = _StudioVmImpl.new()
+	function _StudioDomImpl.jsonDecode(input: { [string]: any }): StudioDom
+		local self = _StudioDomImpl.new()
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
-		if input.dom ~= nil then
-			self.dom = input.dom
+		if input.domKind ~= nil then
+			self.domKind = input.domKind
 		end
 
-		if input.clientName ~= nil then
-			self.clientName = input.clientName
+		if input.userName ~= nil then
+			self.userName = input.userName
+		end
+
+		if input.userId ~= nil then
+			self.userId = input.userId
 		end
 
 		return self
 	end
 
-	_StudioVmImpl.descriptor = {
-		name = "StudioVm",
-		fullName = "rodeo.StudioVm",
+	_StudioDomImpl.descriptor = {
+		name = "StudioDom",
+		fullName = "rodeo.StudioDom",
 	}
 
-	messages.StudioVm = _StudioVmImpl :: any -- Luau: Not sure why this intersection fails.
+	messages.StudioDom = _StudioDomImpl :: any -- Luau: Not sure why this intersection fails.
 
-	typeRegistry.default:register(messages.StudioVm)
+	typeRegistry.default:register(messages.StudioDom)
 end
 
 do
@@ -4411,11 +4439,11 @@ do
 				then
 					return { type = (v :: any).type, value = messages.RegisterResponse.new((v :: any).value) } :: any
 				elseif
-					(v :: any).type == "vmServerMessage"
+					(v :: any).type == "domServerMessage"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
 				then
-					return { type = (v :: any).type, value = messages.VmServerMessage.new((v :: any).value) } :: any
+					return { type = (v :: any).type, value = messages.DomServerMessage.new((v :: any).value) } :: any
 				elseif
 					(v :: any).type == "save"
 					and (v :: any).value ~= nil
@@ -4455,7 +4483,7 @@ do
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
-			elseif self.msg.type == "vmServerMessage" then
+			elseif self.msg.type == "domServerMessage" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
@@ -4505,7 +4533,7 @@ do
 				elseif field == 2 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.msg = { type = "vmServerMessage", value = messages.VmServerMessage.decode(value) }
+					self.msg = { type = "domServerMessage", value = messages.DomServerMessage.decode(value) }
 					continue
 				elseif field == 3 then
 					local value
@@ -4557,8 +4585,8 @@ do
 		if self.msg ~= nil then
 			if self.msg.type == "registered" then
 				output.registered = self.msg.value:jsonEncode()
-			elseif self.msg.type == "vmServerMessage" then
-				output.vmServerMessage = self.msg.value:jsonEncode()
+			elseif self.msg.type == "domServerMessage" then
+				output.domServerMessage = self.msg.value:jsonEncode()
 			elseif self.msg.type == "save" then
 				output.save = self.msg.value:jsonEncode()
 			elseif self.msg.type == "runCompleted" then
@@ -4580,8 +4608,9 @@ do
 			self.msg = { type = "registered", value = messages.RegisterResponse.jsonDecode(input.registered) }
 		end
 
-		if input.vmServerMessage ~= nil then
-			self.msg = { type = "vmServerMessage", value = messages.VmServerMessage.jsonDecode(input.vmServerMessage) }
+		if input.domServerMessage ~= nil then
+			self.msg =
+				{ type = "domServerMessage", value = messages.DomServerMessage.jsonDecode(input.domServerMessage) }
 		end
 
 		if input.save ~= nil then
@@ -5773,7 +5802,7 @@ do
 			script = if data == nil or data.script == nil then "" else data.script,
 			target = if data == nil or data.target == nil then "" else data.target,
 			session = if data == nil or data.session == nil then nil else data.session,
-			vmId = if data == nil or data.vmId == nil then nil else data.vmId,
+			domId = if data == nil or data.domId == nil then nil else data.domId,
 			cacheRequires = if data == nil or data.cacheRequires == nil then nil else data.cacheRequires,
 			scriptArgs = if data == nil or data.scriptArgs == nil then {} else data.scriptArgs,
 			returnFile = if data == nil or data.returnFile == nil then nil else data.returnFile,
@@ -5811,9 +5840,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.session)
 		end
 
-		if self.vmId ~= nil then
+		if self.domId ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		if self.cacheRequires ~= nil then
@@ -5926,7 +5955,7 @@ do
 				elseif field == 4 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				elseif field == 6 then
 					local value
@@ -5997,8 +6026,8 @@ do
 			output.session = self.session
 		end
 
-		if self.vmId ~= nil then
-			output.vmId = self.vmId
+		if self.domId ~= nil then
+			output.domId = self.domId
 		end
 
 		if self.cacheRequires ~= nil then
@@ -6063,8 +6092,8 @@ do
 			self.session = input.session
 		end
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		if input.cacheRequires ~= nil then
@@ -9199,7 +9228,7 @@ do
 		return setmetatable({
 			launched = if data == nil or data.launched == nil then false else data.launched,
 			contextCount = if data == nil or data.contextCount == nil then 0 else data.contextCount,
-			totalVms = if data == nil or data.totalVms == nil then 0 else data.totalVms,
+			totalDoms = if data == nil or data.totalDoms == nil then 0 else data.totalDoms,
 			totalQueued = if data == nil or data.totalQueued == nil then 0 else data.totalQueued,
 			contexts = (function()
 				local src = if data == nil then nil else data.contexts
@@ -9231,9 +9260,9 @@ do
 			output, cursor = proto.writeVarInt(output, cursor, self.contextCount)
 		end
 
-		if self.totalVms ~= nil and self.totalVms ~= 0 then
+		if self.totalDoms ~= nil and self.totalDoms ~= 0 then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.totalVms)
+			output, cursor = proto.writeVarInt(output, cursor, self.totalDoms)
 		end
 
 		if self.totalQueued ~= nil and self.totalQueued ~= 0 then
@@ -9276,7 +9305,7 @@ do
 				elseif field == 3 then
 					local value
 					value, cursor = proto.readVarIntU32(input, cursor)
-					self.totalVms = value
+					self.totalDoms = value
 					continue
 				elseif field == 4 then
 					local value
@@ -9328,8 +9357,8 @@ do
 			output.contextCount = self.contextCount
 		end
 
-		if self.totalVms ~= nil and self.totalVms ~= 0 then
-			output.totalVms = self.totalVms
+		if self.totalDoms ~= nil and self.totalDoms ~= 0 then
+			output.totalDoms = self.totalDoms
 		end
 
 		if self.totalQueued ~= nil and self.totalQueued ~= 0 then
@@ -9358,8 +9387,8 @@ do
 			self.contextCount = input.contextCount
 		end
 
-		if input.totalVms ~= nil then
-			self.totalVms = input.totalVms
+		if input.totalDoms ~= nil then
+			self.totalDoms = input.totalDoms
 		end
 
 		if input.totalQueued ~= nil then
@@ -9395,18 +9424,18 @@ do
 	function _ContextInfoImpl.new(data: _ContextInfoPartialFields?): ContextInfo
 		return setmetatable({
 			bitset = if data == nil or data.bitset == nil then 0 else data.bitset,
-			vmCount = if data == nil or data.vmCount == nil then 0 else data.vmCount,
+			domCount = if data == nil or data.domCount == nil then 0 else data.domCount,
 			totalQueued = if data == nil or data.totalQueued == nil then 0 else data.totalQueued,
-			vms = (function()
-				local src = if data == nil then nil else data.vms
+			doms = (function()
+				local src = if data == nil then nil else data.doms
 				if src == nil then
 					return {}
 				end
 				local out = table.create(#src)
 				for i, v in src do
 					out[i] = if getmetatable(v :: any) == nil
-						then messages.VmInfo.new(v :: any)
-						else (v :: any) :: VmInfo
+						then messages.DomInfo.new(v :: any)
+						else (v :: any) :: DomInfo
 				end
 				return out
 			end)(),
@@ -9422,9 +9451,9 @@ do
 			output, cursor = proto.writeVarInt(output, cursor, self.bitset)
 		end
 
-		if self.vmCount ~= nil and self.vmCount ~= 0 then
+		if self.domCount ~= nil and self.domCount ~= 0 then
 			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.vmCount)
+			output, cursor = proto.writeVarInt(output, cursor, self.domCount)
 		end
 
 		if self.totalQueued ~= nil and self.totalQueued ~= 0 then
@@ -9432,8 +9461,8 @@ do
 			output, cursor = proto.writeVarInt(output, cursor, self.totalQueued)
 		end
 
-		if self.vms ~= nil and #self.vms > 0 then
-			for _, value in self.vms do
+		if self.doms ~= nil and #self.doms > 0 then
+			for _, value in self.doms do
 				local encoded = value:encode()
 				output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
@@ -9462,7 +9491,7 @@ do
 				elseif field == 2 then
 					local value
 					value, cursor = proto.readVarIntU32(input, cursor)
-					self.vmCount = value
+					self.domCount = value
 					continue
 				elseif field == 3 then
 					local value
@@ -9477,7 +9506,7 @@ do
 				if field == 4 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					table.insert(self.vms, messages.VmInfo.decode(value))
+					table.insert(self.doms, messages.DomInfo.decode(value))
 					continue
 				end
 
@@ -9510,20 +9539,20 @@ do
 			output.bitset = self.bitset
 		end
 
-		if self.vmCount ~= nil and self.vmCount ~= 0 then
-			output.vmCount = self.vmCount
+		if self.domCount ~= nil and self.domCount ~= 0 then
+			output.domCount = self.domCount
 		end
 
 		if self.totalQueued ~= nil and self.totalQueued ~= 0 then
 			output.totalQueued = self.totalQueued
 		end
 
-		if self.vms ~= nil and #self.vms > 0 then
+		if self.doms ~= nil and #self.doms > 0 then
 			local newOutput = {}
-			for _, value in self.vms do
+			for _, value in self.doms do
 				table.insert(newOutput, value:jsonEncode())
 			end
-			output.vms = newOutput
+			output.doms = newOutput
 		end
 
 		return output
@@ -9536,21 +9565,21 @@ do
 			self.bitset = input.bitset
 		end
 
-		if input.vmCount ~= nil then
-			self.vmCount = input.vmCount
+		if input.domCount ~= nil then
+			self.domCount = input.domCount
 		end
 
 		if input.totalQueued ~= nil then
 			self.totalQueued = input.totalQueued
 		end
 
-		if input.vms ~= nil then
-			local newOutput: { VmInfo } = {}
-			for _, value in input.vms do
-				table.insert(newOutput, messages.VmInfo.jsonDecode(value))
+		if input.doms ~= nil then
+			local newOutput: { DomInfo } = {}
+			for _, value in input.doms do
+				table.insert(newOutput, messages.DomInfo.jsonDecode(value))
 			end
 
-			self.vms = newOutput
+			self.doms = newOutput
 		end
 
 		return self
@@ -9567,18 +9596,18 @@ do
 end
 
 do
-	local _VmInfoImpl = {}
-	_VmInfoImpl.__index = _VmInfoImpl
+	local _DomInfoImpl = {}
+	_DomInfoImpl.__index = _DomInfoImpl
 
-	function _VmInfoImpl.new(data: _VmInfoPartialFields?): VmInfo
+	function _DomInfoImpl.new(data: _DomInfoPartialFields?): DomInfo
 		return setmetatable({
 			rodeoId = if data == nil or data.rodeoId == nil then "" else data.rodeoId,
 			activeCount = if data == nil or data.activeCount == nil then 0 else data.activeCount,
 			isIdle = if data == nil or data.isIdle == nil then false else data.isIdle,
-		}, _VmInfoImpl :: _VmInfoImpl)
+		}, _DomInfoImpl :: _DomInfoImpl)
 	end
 
-	function _VmInfoImpl.encode(self: VmInfo): buffer
+	function _DomInfoImpl.encode(self: DomInfo): buffer
 		local output = buffer.create(0)
 		local cursor = 0
 
@@ -9602,8 +9631,8 @@ do
 		return shrunkBuffer
 	end
 
-	function _VmInfoImpl.decode(input: buffer): VmInfo
-		local self = _VmInfoImpl.new()
+	function _DomInfoImpl.decode(input: buffer): DomInfo
+		local self = _DomInfoImpl.new()
 		local cursor = 0
 
 		while cursor < buffer.len(input) do
@@ -9655,7 +9684,7 @@ do
 		return self
 	end
 
-	function _VmInfoImpl.jsonEncode(self: VmInfo): any
+	function _DomInfoImpl.jsonEncode(self: DomInfo): any
 		local output = {}
 
 		if self.rodeoId ~= nil and self.rodeoId ~= "" then
@@ -9673,8 +9702,8 @@ do
 		return output
 	end
 
-	function _VmInfoImpl.jsonDecode(input: { [string]: any }): VmInfo
-		local self = _VmInfoImpl.new()
+	function _DomInfoImpl.jsonDecode(input: { [string]: any }): DomInfo
+		local self = _DomInfoImpl.new()
 
 		if input.rodeoId ~= nil then
 			self.rodeoId = input.rodeoId
@@ -9691,14 +9720,14 @@ do
 		return self
 	end
 
-	_VmInfoImpl.descriptor = {
-		name = "VmInfo",
-		fullName = "rodeo.VmInfo",
+	_DomInfoImpl.descriptor = {
+		name = "DomInfo",
+		fullName = "rodeo.DomInfo",
 	}
 
-	messages.VmInfo = _VmInfoImpl :: any -- Luau: Not sure why this intersection fails.
+	messages.DomInfo = _DomInfoImpl :: any -- Luau: Not sure why this intersection fails.
 
-	typeRegistry.default:register(messages.VmInfo)
+	typeRegistry.default:register(messages.DomInfo)
 end
 
 do
@@ -9710,7 +9739,10 @@ do
 			executionId = if data == nil or data.executionId == nil then "" else data.executionId,
 			state = if data == nil or data.state == nil then "" else data.state,
 			target = if data == nil or data.target == nil then "" else data.target,
-			vmBitset = if data == nil or data.vmBitset == nil then nil else data.vmBitset,
+			context = if data == nil or data.context == nil then "" else data.context,
+			studioId = if data == nil or data.studioId == nil then nil else data.studioId,
+			sessionId = if data == nil or data.sessionId == nil then nil else data.sessionId,
+			domId = if data == nil or data.domId == nil then nil else data.domId,
 			createdAt = if data == nil or data.createdAt == nil then 0 else data.createdAt,
 		}, _ProcessInfoImpl :: _ProcessInfoImpl)
 	end
@@ -9734,13 +9766,28 @@ do
 			output, cursor = proto.writeString(output, cursor, self.target)
 		end
 
-		if self.vmBitset ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.vmBitset)
+		if self.context ~= nil and self.context ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.context)
+		end
+
+		if self.studioId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.studioId)
+		end
+
+		if self.sessionId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.sessionId)
+		end
+
+		if self.domId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		if self.createdAt ~= nil and self.createdAt ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.i64)
+			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.i64)
 			output, cursor = proto.writeDouble(output, cursor, self.createdAt)
 		end
 
@@ -9758,12 +9805,7 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				if field == 4 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.vmBitset = value
-					continue
-				end
+				-- No fields
 
 				local _
 				_, cursor = proto.readVarInt(input, cursor)
@@ -9783,6 +9825,26 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.target = proto.decodeString(value)
 					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.context = proto.decodeString(value)
+					continue
+				elseif field == 5 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.studioId = proto.decodeString(value)
+					continue
+				elseif field == 6 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.sessionId = proto.decodeString(value)
+					continue
+				elseif field == 7 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.domId = proto.decodeString(value)
+					continue
 				end
 
 				local length
@@ -9795,7 +9857,7 @@ do
 				local _
 				_, cursor = proto.readFixed32(input, cursor)
 			elseif wireType == proto.wireTypes.i64 then
-				if field == 5 then
+				if field == 8 then
 					local value
 					value, cursor = proto.readDouble(input, cursor)
 					self.createdAt = value
@@ -9827,8 +9889,20 @@ do
 			output.target = self.target
 		end
 
-		if self.vmBitset ~= nil then
-			output.vmBitset = self.vmBitset
+		if self.context ~= nil and self.context ~= "" then
+			output.context = self.context
+		end
+
+		if self.studioId ~= nil then
+			output.studioId = self.studioId
+		end
+
+		if self.sessionId ~= nil then
+			output.sessionId = self.sessionId
+		end
+
+		if self.domId ~= nil then
+			output.domId = self.domId
 		end
 
 		if self.createdAt ~= nil and self.createdAt ~= 0 then
@@ -9853,8 +9927,20 @@ do
 			self.target = input.target
 		end
 
-		if input.vmBitset ~= nil then
-			self.vmBitset = input.vmBitset
+		if input.context ~= nil then
+			self.context = input.context
+		end
+
+		if input.studioId ~= nil then
+			self.studioId = input.studioId
+		end
+
+		if input.sessionId ~= nil then
+			self.sessionId = input.sessionId
+		end
+
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		if input.createdAt ~= nil then
@@ -10688,14 +10774,14 @@ do
 
 	function _StudioStateMsgImpl.new(data: _StudioStateMsgPartialFields?): StudioStateMsg
 		return setmetatable({
-			vmId = if data == nil or data.vmId == nil then "" else data.vmId,
+			domId = if data == nil or data.domId == nil then "" else data.domId,
 			mcpStudioId = if data == nil or data.mcpStudioId == nil then nil else data.mcpStudioId,
 			isServer = if data == nil or data.isServer == nil then false else data.isServer,
 			isClient = if data == nil or data.isClient == nil then false else data.isClient,
 			isRunning = if data == nil or data.isRunning == nil then false else data.isRunning,
 			isEdit = if data == nil or data.isEdit == nil then false else data.isEdit,
 			mode = if data == nil or data.mode == nil then "" else data.mode,
-			dom = if data == nil or data.dom == nil then "" else data.dom,
+			domKind = if data == nil or data.domKind == nil then "" else data.domKind,
 			gameName = if data == nil or data.gameName == nil then "" else data.gameName,
 			placeId = if data == nil or data.placeId == nil then 0 else data.placeId,
 			gameId = if data == nil or data.gameId == nil then 0 else data.gameId,
@@ -10706,7 +10792,7 @@ do
 				)
 				else (data.clientInfo :: any) :: ClientInfo,
 			jobId = if data == nil or data.jobId == nil then nil else data.jobId,
-			clientVmIdsJson = if data == nil or data.clientVmIdsJson == nil then nil else data.clientVmIdsJson,
+			clientDomIdsJson = if data == nil or data.clientDomIdsJson == nil then nil else data.clientDomIdsJson,
 			sessionGuid = if data == nil or data.sessionGuid == nil then nil else data.sessionGuid,
 		}, _StudioStateMsgImpl :: _StudioStateMsgImpl)
 	end
@@ -10715,9 +10801,9 @@ do
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.vmId ~= nil and self.vmId ~= "" then
+		if self.domId ~= nil and self.domId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.vmId)
+			output, cursor = proto.writeString(output, cursor, self.domId)
 		end
 
 		if self.mcpStudioId ~= nil then
@@ -10750,9 +10836,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.mode)
 		end
 
-		if self.dom ~= nil and self.dom ~= "" then
+		if self.domKind ~= nil and self.domKind ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 8, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.dom)
+			output, cursor = proto.writeString(output, cursor, self.domKind)
 		end
 
 		if self.gameName ~= nil and self.gameName ~= "" then
@@ -10781,9 +10867,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.jobId)
 		end
 
-		if self.clientVmIdsJson ~= nil then
+		if self.clientDomIdsJson ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 14, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.clientVmIdsJson)
+			output, cursor = proto.writeString(output, cursor, self.clientDomIdsJson)
 		end
 
 		if self.sessionGuid ~= nil then
@@ -10843,7 +10929,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.vmId = proto.decodeString(value)
+					self.domId = proto.decodeString(value)
 					continue
 				elseif field == 2 then
 					local value
@@ -10858,7 +10944,7 @@ do
 				elseif field == 8 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.dom = proto.decodeString(value)
+					self.domKind = proto.decodeString(value)
 					continue
 				elseif field == 9 then
 					local value
@@ -10878,7 +10964,7 @@ do
 				elseif field == 14 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.clientVmIdsJson = proto.decodeString(value)
+					self.clientDomIdsJson = proto.decodeString(value)
 					continue
 				elseif field == 15 then
 					local value
@@ -10912,8 +10998,8 @@ do
 	function _StudioStateMsgImpl.jsonEncode(self: StudioStateMsg): any
 		local output = {}
 
-		if self.vmId ~= nil and self.vmId ~= "" then
-			output.vmId = self.vmId
+		if self.domId ~= nil and self.domId ~= "" then
+			output.domId = self.domId
 		end
 
 		if self.mcpStudioId ~= nil then
@@ -10940,8 +11026,8 @@ do
 			output.mode = self.mode
 		end
 
-		if self.dom ~= nil and self.dom ~= "" then
-			output.dom = self.dom
+		if self.domKind ~= nil and self.domKind ~= "" then
+			output.domKind = self.domKind
 		end
 
 		if self.gameName ~= nil and self.gameName ~= "" then
@@ -10964,8 +11050,8 @@ do
 			output.jobId = self.jobId
 		end
 
-		if self.clientVmIdsJson ~= nil then
-			output.clientVmIdsJson = self.clientVmIdsJson
+		if self.clientDomIdsJson ~= nil then
+			output.clientDomIdsJson = self.clientDomIdsJson
 		end
 
 		if self.sessionGuid ~= nil then
@@ -10978,8 +11064,8 @@ do
 	function _StudioStateMsgImpl.jsonDecode(input: { [string]: any }): StudioStateMsg
 		local self = _StudioStateMsgImpl.new()
 
-		if input.vmId ~= nil then
-			self.vmId = input.vmId
+		if input.domId ~= nil then
+			self.domId = input.domId
 		end
 
 		if input.mcpStudioId ~= nil then
@@ -11006,8 +11092,8 @@ do
 			self.mode = input.mode
 		end
 
-		if input.dom ~= nil then
-			self.dom = input.dom
+		if input.domKind ~= nil then
+			self.domKind = input.domKind
 		end
 
 		if input.gameName ~= nil then
@@ -11030,8 +11116,8 @@ do
 			self.jobId = input.jobId
 		end
 
-		if input.clientVmIdsJson ~= nil then
-			self.clientVmIdsJson = input.clientVmIdsJson
+		if input.clientDomIdsJson ~= nil then
+			self.clientDomIdsJson = input.clientDomIdsJson
 		end
 
 		if input.sessionGuid ~= nil then
@@ -12025,15 +12111,15 @@ return {
 	FileAck = messages.FileAck,
 	FilesComplete = messages.FilesComplete,
 	RegisterRequest = messages.RegisterRequest,
-	VmConnect = messages.VmConnect,
-	VmDisconnect = messages.VmDisconnect,
-	VmPluginMessage = messages.VmPluginMessage,
-	VmServerMessage = messages.VmServerMessage,
+	DomConnect = messages.DomConnect,
+	DomDisconnect = messages.DomDisconnect,
+	DomPluginMessage = messages.DomPluginMessage,
+	DomServerMessage = messages.DomServerMessage,
 	StateSnapshot = messages.StateSnapshot,
 	StudioInstanceState = messages.StudioInstanceState,
-	VmSnapshot = messages.VmSnapshot,
+	DomSnapshot = messages.DomSnapshot,
 	StudioState = messages.StudioState,
-	StudioVm = messages.StudioVm,
+	StudioDom = messages.StudioDom,
 	StudioSnapshot = messages.StudioSnapshot,
 	PlayerStatus = messages.PlayerStatus,
 	MasterMessage = messages.MasterMessage,
@@ -12073,7 +12159,7 @@ return {
 	LogFilter = messages.LogFilter,
 	HealthResponse = messages.HealthResponse,
 	ContextInfo = messages.ContextInfo,
-	VmInfo = messages.VmInfo,
+	DomInfo = messages.DomInfo,
 	ProcessInfo = messages.ProcessInfo,
 	ProcessListResponse = messages.ProcessListResponse,
 	KillResponse = messages.KillResponse,

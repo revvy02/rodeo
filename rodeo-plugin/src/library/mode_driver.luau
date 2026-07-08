@@ -1,14 +1,14 @@
 --!strict
 --[[
 	mode_driver.luau — plugin-side convergence loop. Backend broadcasts
-	target_mode to every VM in a studio; each plugin retries its role-
+	target_mode to every DOM in a studio; each plugin retries its role-
 	appropriate action in a loop until its own mode satisfies the target
 	(or a new target arrives and supersedes this one).
 
 	Role dispatch:
-	- Edit VM (IsEdit) enters a session: ExecuteRunModeAsync / ExecutePlayModeAsync.
-	- Server VM (IsServer, not edit) exits: EndTest.
-	- Client VMs: no-op.
+	- Edit DOM (IsEdit) enters a session: ExecuteRunModeAsync / ExecutePlayModeAsync.
+	- Server DOM (IsServer, not edit) exits: EndTest.
+	- Client DOMs: no-op.
 
 	Each setTarget bumps a token; the running loop checks the token each
 	iteration and exits if the target was superseded.
@@ -46,7 +46,7 @@ local function needsAction(): boolean
 		return false
 	end
 	if isEdit then
-		-- Edit VM always reports mode="edit". If target is anything other than
+		-- Edit DOM always reports mode="edit". If target is anything other than
 		-- edit, we need to fire the enter script. If the studio happens to
 		-- already be in that mode, Roblox will reject the call and pcall
 		-- swallows — harmless spin.

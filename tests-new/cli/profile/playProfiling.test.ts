@@ -1,6 +1,6 @@
 import { describe, beforeAll, afterAll, it, expect } from "bun:test";
 import { rmSync } from "node:fs";
-import { runRodeo, spawnBackground, waitForVm, type BackgroundProcess } from "../helpers.js";
+import { runRodeo, spawnBackground, waitForDom, type BackgroundProcess } from "../helpers.js";
 import { PROFILE_SCRIPT, extractMarker, assertEveryDumpContains } from "../../utils/profiling.js";
 
 const PORT = 46276;
@@ -15,7 +15,7 @@ describe("--profile with play mode (CLI)", () => {
       "run", "--port", String(PORT), "--place",
       "--target", "play:server", "--profile",
     ]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
 
   afterAll(async () => {

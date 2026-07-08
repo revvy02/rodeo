@@ -5,10 +5,10 @@ use anyhow::{anyhow, bail, Result};
 
 use crate::proto;
 use crate::transport::Transport;
-use crate::vm::Vm;
+use crate::dom::Dom;
 
-const VM_WAIT_TIMEOUT_MS: u64 = 60_000;
-const VM_POLL_INTERVAL_MS: u64 = 200;
+const DOM_WAIT_TIMEOUT_MS: u64 = 60_000;
+const DOM_POLL_INTERVAL_MS: u64 = 200;
 
 
 // ---------------------------------------------------------------------------
@@ -127,18 +127,18 @@ impl StudioBackend {
                         session_guid: session_guid.clone(),
                         backend_id,
                         transport: self.transport.clone(),
-                        edit_vm: None,
-                        server_vm: None,
-                        client_vm: None,
+                        edit_dom: None,
+                        server_dom: None,
+                        client_dom: None,
                     };
-                    // Invariant: when open resolves, the edit VM is connected
+                    // Invariant: when open resolves, the edit DOM is connected
                     // under this Studio instance (waited via the canonical
                     // studio-first state).
                     let inst = studio.wait_for_instance(
-                        |s| s.vms.iter().any(|v| v.dom == "edit"),
-                        VM_WAIT_TIMEOUT_MS,
+                        |s| s.doms.iter().any(|v| v.dom_kind == "edit"),
+                        DOM_WAIT_TIMEOUT_MS,
                     ).await?;
-                    studio.edit_vm = studio.vm_by_dom(&inst, "edit");
+                    studio.edit_dom = studio.dom_by_kind(&inst, "edit");
                     return Ok(studio);
                 }
                 Some(proto::launch_studio_event::Event::Error(err)) => {
@@ -160,18 +160,18 @@ pub struct Studio {
     pub backend_id: String,
     transport: Arc<Transport>,
     /// Populated when open resolves.
-    pub edit_vm: Option<Vm>,
+    pub edit_dom: Option<Dom>,
     /// Populated by `set_mode("run"/"test"/"play")`.
-    pub server_vm: Option<Vm>,
+    pub server_dom: Option<Dom>,
     /// Populated by `set_mode("test"/"play")`.
-    pub client_vm: Option<Vm>,
+    pub client_dom: Option<Dom>,
 }
 
 impl Studio {
-    /// Returns the edit VM, panicking if `open` never resolved it (impossible
-    /// unless constructed by hand). Matches the TS `editVm!` non-null assert.
-    pub fn edit_vm(&self) -> &Vm {
-        self.edit_vm.as_ref().expect("edit_vm must be set after open")
+    /// Returns the edit DOM, panicking if `open` never resolved it (impossible
+    /// unless constructed by hand). Matches the TS `editDom!` non-null assert.
+    pub fn edit_dom(&self) -> &Dom {
+        self.edit_dom.as_ref().expect("edit_dom must be set after open")
     }
 
     /// This Studio's canonical state from the master's studio-first snapshot
@@ -182,12 +182,12 @@ impl Studio {
             .await
             .map_err(|e| anyhow!("get_state failed: {e}"))?
             .into_owned();
-        Ok(state.studios.into_iter().find(|s| s.id == self.session_guid))
+        Ok(state.studios.into_iter().find(|s| s.studio_id == self.session_guid))
     }
 
     /// Poll the canonical studio-first state until this Studio satisfies `pred`.
-    /// Replaces per-VM polling — callers express the whole-instance condition
-    /// they expect (e.g. "a server VM and N client VMs are present").
+    /// Replaces per-DOM polling — callers express the whole-instance condition
+    /// they expect (e.g. "a server DOM and N client DOMs are present").
     pub async fn wait_for_instance<F>(&self, pred: F, timeout_ms: u64) -> Result<proto::StudioState>
     where
         F: Fn(&proto::StudioState) -> bool,
@@ -202,15 +202,15 @@ impl Studio {
             if Instant::now() >= deadline {
                 bail!("timed out waiting for studio instance {} to reach expected state", self.session_guid);
             }
-            tokio::time::sleep(Duration::from_millis(VM_POLL_INTERVAL_MS)).await;
+            tokio::time::sleep(Duration::from_millis(DOM_POLL_INTERVAL_MS)).await;
         }
     }
 
-    /// Resolve the first VM in `studio` with the given `dom` to a VM handle.
-    pub(crate) fn vm_by_dom(&self, studio: &proto::StudioState, dom: &str) -> Option<Vm> {
-        studio.vms.iter()
-            .find(|v| v.dom == dom)
-            .map(|v| Vm::from_studio_vm(studio, v, self.transport.clone()))
+    /// Resolve the first DOM in `studio` with the given `dom` to a DOM handle.
+    pub(crate) fn dom_by_kind(&self, studio: &proto::StudioState, dom: &str) -> Option<Dom> {
+        studio.doms.iter()
+            .find(|v| v.dom_kind == dom)
+            .map(|v| Dom::from_studio_dom(studio, v, self.transport.clone()))
     }
 
     pub async fn set_mode(&mut self, mode: &str) -> Result<()> {
@@ -224,27 +224,27 @@ impl Studio {
             .map_err(|e| anyhow!("set_studio_mode failed: {e}"))?;
 
         if mode == "edit" {
-            self.server_vm = None;
-            self.client_vm = None;
+            self.server_dom = None;
+            self.client_dom = None;
             return Ok(());
         }
 
-        // Wait on the canonical studio state for the expected member VMs to
-        // appear. We gate on `dom` presence rather than per-VM mode strings —
+        // Wait on the canonical studio state for the expected member DOMs to
+        // appear. We gate on `dom` presence rather than per-DOM mode strings —
         // the studio reaching the requested config is what matters, and the
         // test/play distinction is a post-hoc reconciliation detail.
         let want_client = mode == "test" || mode == "play";
         let inst = self.wait_for_instance(
             move |s| {
-                let has_server = s.vms.iter().any(|v| v.dom == "server");
-                let has_client = !want_client || s.vms.iter().any(|v| v.dom == "client");
+                let has_server = s.doms.iter().any(|v| v.dom_kind == "server");
+                let has_client = !want_client || s.doms.iter().any(|v| v.dom_kind == "client");
                 has_server && has_client
             },
-            VM_WAIT_TIMEOUT_MS,
+            DOM_WAIT_TIMEOUT_MS,
         ).await?;
 
-        self.server_vm = self.vm_by_dom(&inst, "server");
-        self.client_vm = if want_client { self.vm_by_dom(&inst, "client") } else { None };
+        self.server_dom = self.dom_by_kind(&inst, "server");
+        self.client_dom = if want_client { self.dom_by_kind(&inst, "client") } else { None };
         Ok(())
     }
 
@@ -294,10 +294,10 @@ impl Studio {
         Ok(())
     }
 
-    pub async fn get_vms(&self) -> Result<Vec<Vm>> {
+    pub async fn get_doms(&self) -> Result<Vec<Dom>> {
         match self.instance_state().await? {
-            Some(s) => Ok(s.vms.iter()
-                .map(|v| Vm::from_studio_vm(&s, v, self.transport.clone()))
+            Some(s) => Ok(s.doms.iter()
+                .map(|v| Dom::from_studio_dom(&s, v, self.transport.clone()))
                 .collect()),
             None => Ok(Vec::new()),
         }
@@ -305,11 +305,11 @@ impl Studio {
 
     /// Start an in-Studio multiplayer test via
     /// `StudioTestService:ExecuteMultiplayerTestAsync` with `num_players` client
-    /// DataModels. Runs the start snippet on the edit VM (fire-and-forget — the
+    /// DataModels. Runs the start snippet on the edit DOM (fire-and-forget — the
     /// API yields for the session's life), then waits on the canonical studio
-    /// state for the server + N client VMs to register.
+    /// state for the server + N client DOMs to register.
     pub async fn start_multiplayer_test(&self, num_players: u32) -> Result<MultiplayerTest> {
-        let edit = self.edit_vm.as_ref()
+        let edit = self.edit_dom.as_ref()
             .ok_or_else(|| anyhow!("start_multiplayer_test requires an open edit Studio"))?;
 
         let snippet = format!(
@@ -324,17 +324,17 @@ impl Studio {
         let n = num_players as usize;
         let inst = self.wait_for_instance(
             move |s| {
-                s.vms.iter().any(|v| v.dom == "server")
-                    && s.vms.iter().filter(|v| v.dom == "client").count() == n
+                s.doms.iter().any(|v| v.dom_kind == "server")
+                    && s.doms.iter().filter(|v| v.dom_kind == "client").count() == n
             },
-            VM_WAIT_TIMEOUT_MS,
+            DOM_WAIT_TIMEOUT_MS,
         ).await?;
 
-        let server = self.vm_by_dom(&inst, "server")
-            .ok_or_else(|| anyhow!("multiplayer test started but no server VM appeared"))?;
-        let clients: Vec<Vm> = inst.vms.iter()
-            .filter(|v| v.dom == "client")
-            .map(|v| Vm::from_studio_vm(&inst, v, self.transport.clone()))
+        let server = self.dom_by_kind(&inst, "server")
+            .ok_or_else(|| anyhow!("multiplayer test started but no server DOM appeared"))?;
+        let clients: Vec<Dom> = inst.doms.iter()
+            .filter(|v| v.dom_kind == "client")
+            .map(|v| Dom::from_studio_dom(&inst, v, self.transport.clone()))
             .collect();
 
         Ok(MultiplayerTest {
@@ -349,48 +349,48 @@ impl Studio {
 // ---------------------------------------------------------------------------
 // MultiplayerTest — a running in-Studio multiplayer test (one server DataModel +
 // N client DataModels, all under the edit Studio's session). Control is just
-// `run_code` against the right VM (StudioTestService:AddPlayers/EndTest/LeaveTest).
+// `run_code` against the right DOM (StudioTestService:AddPlayers/EndTest/LeaveTest).
 // ---------------------------------------------------------------------------
 
 pub struct MultiplayerTest {
-    pub server: Vm,
-    pub clients: Vec<Vm>,
+    pub server: Dom,
+    pub clients: Vec<Dom>,
     session_guid: String,
     transport: Arc<Transport>,
 }
 
 impl MultiplayerTest {
-    pub fn server(&self) -> &Vm { &self.server }
-    pub fn clients(&self) -> &[Vm] { &self.clients }
+    pub fn server(&self) -> &Dom { &self.server }
+    pub fn clients(&self) -> &[Dom] { &self.clients }
 
     /// Connect one more client DataModel (`StudioTestService:AddPlayers(1)` on
-    /// the server), wait for it to register, and return its Vm handle.
-    pub async fn connect_client(&mut self) -> Result<Vm> {
+    /// the server), wait for it to register, and return its Dom handle.
+    pub async fn connect_client(&mut self) -> Result<Dom> {
         let known: std::collections::HashSet<String> =
-            self.clients.iter().map(|v| v.vm_id.clone()).collect();
+            self.clients.iter().map(|v| v.dom_id.clone()).collect();
         self.server.run_code(crate::run::RunCodeOpts {
             source: "game:GetService(\"StudioTestService\"):AddPlayers(1)\nreturn true".to_string(),
             ..Default::default()
         }).await?;
         let known_pred = known.clone();
         let inst = self.wait_for_instance(move |s| {
-            s.vms.iter().any(|v| v.dom == "client" && !known_pred.contains(&v.vm_id))
+            s.doms.iter().any(|v| v.dom_kind == "client" && !known_pred.contains(&v.dom_id))
         }).await?;
-        self.clients = inst.vms.iter()
-            .filter(|v| v.dom == "client")
-            .map(|v| Vm::from_studio_vm(&inst, v, self.transport.clone()))
+        self.clients = inst.doms.iter()
+            .filter(|v| v.dom_kind == "client")
+            .map(|v| Dom::from_studio_dom(&inst, v, self.transport.clone()))
             .collect();
         self.clients.iter()
-            .find(|v| !known.contains(&v.vm_id))
+            .find(|v| !known.contains(&v.dom_id))
             .cloned()
-            .ok_or_else(|| anyhow!("new client VM did not appear in studio state"))
+            .ok_or_else(|| anyhow!("new client DOM did not appear in studio state"))
     }
 
-    /// Disconnect one client (`StudioTestService:LeaveTest` on that client VM),
-    /// identified by its vmId.
-    pub async fn disconnect_client(&mut self, vm_id: &str) -> Result<()> {
-        let index = self.clients.iter().position(|v| v.vm_id == vm_id)
-            .ok_or_else(|| anyhow!("no client with vmId {vm_id} in this test"))?;
+    /// Disconnect one client (`StudioTestService:LeaveTest` on that client DOM),
+    /// identified by its domId.
+    pub async fn disconnect_client(&mut self, dom_id: &str) -> Result<()> {
+        let index = self.clients.iter().position(|v| v.dom_id == dom_id)
+            .ok_or_else(|| anyhow!("no client with domId {dom_id} in this test"))?;
         self.clients[index].run_code(crate::run::RunCodeOpts {
             source: "local s = game:GetService(\"StudioTestService\")\n\
                      if s:CanLeaveTest() then s:LeaveTest() end\nreturn true".to_string(),
@@ -414,14 +414,14 @@ impl MultiplayerTest {
     where
         F: Fn(&proto::StudioState) -> bool,
     {
-        let deadline = Instant::now() + Duration::from_millis(VM_WAIT_TIMEOUT_MS);
+        let deadline = Instant::now() + Duration::from_millis(DOM_WAIT_TIMEOUT_MS);
         loop {
             let state = self.transport.master()
                 .get_state(proto::GetStateRequest::default())
                 .await
                 .map_err(|e| anyhow!("get_state failed: {e}"))?
                 .into_owned();
-            if let Some(s) = state.studios.into_iter().find(|s| s.id == self.session_guid) {
+            if let Some(s) = state.studios.into_iter().find(|s| s.studio_id == self.session_guid) {
                 if pred(&s) {
                     return Ok(s);
                 }
@@ -429,7 +429,7 @@ impl MultiplayerTest {
             if Instant::now() >= deadline {
                 bail!("timed out waiting for multiplayer test state");
             }
-            tokio::time::sleep(Duration::from_millis(VM_POLL_INTERVAL_MS)).await;
+            tokio::time::sleep(Duration::from_millis(DOM_POLL_INTERVAL_MS)).await;
         }
     }
 }

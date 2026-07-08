@@ -3,7 +3,7 @@ import { setupStudio } from "../helpers.js";
 const ctx = setupStudio();
 describe("script file", () => {
   it("runs multi-line script and captures output", async () => {
-    const result = await ctx.editVm.runCode({
+    const result = await ctx.editDom.runCode({
       source: "print('from file')\nreturn 'ok'",
     });
     expect(result.ok).toBe(true);
@@ -12,7 +12,7 @@ describe("script file", () => {
   });
 
   it("runs script with show return", async () => {
-    const result = await ctx.editVm.runCode({
+    const result = await ctx.editDom.runCode({
       source: "return 'directive works'",
     });
     expect(result.ok).toBe(true);

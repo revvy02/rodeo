@@ -16,14 +16,14 @@ import { setupStudio, studioHandle } from "./helpers.js";
 import type { Studio } from "../../rodeo-client-ts/src/index.js";
 
 // One Studio backs every factory suite below — mode transitions happen via
-// opts.target on each runCode dispatch, so a single edit-VM handle is enough.
+// opts.target on each runCode dispatch, so a single edit-DOM handle is enough.
 
 describe("rodeo runtime", () => {
   const studio = studioHandle(46500);
   beforeAll(studio.spawn);
   afterAll(studio.close);
 
-  const run = (opts: Parameters<typeof studio.ctx.editVm.runCode>[0]) => studio.ctx.editVm.runCode(opts);
+  const run = (opts: Parameters<typeof studio.ctx.editDom.runCode>[0]) => studio.ctx.editDom.runCode(opts);
 
   describe("smoke", () => {
     it("executes a simple script", async () => {
@@ -95,10 +95,10 @@ function openTraversalStudio(): () => Studio {
 
 describe("uncached require traversal", () => {
   const getStudio = openTraversalStudio();
-  uncachedRequireTraversal((opts) => getStudio().editVm.runCode(opts));
+  uncachedRequireTraversal((opts) => getStudio().editDom.runCode(opts));
 });
 
 describe("cached require traversal", () => {
   const getStudio = openTraversalStudio();
-  cachedRequireTraversal((opts) => getStudio().editVm.runCode(opts));
+  cachedRequireTraversal((opts) => getStudio().editDom.runCode(opts));
 });

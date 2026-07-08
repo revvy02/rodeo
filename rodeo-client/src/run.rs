@@ -9,11 +9,11 @@ use crate::proto;
 use crate::runtime;
 use crate::transport::Transport;
 
-/// User-facing options for `Vm::run_code`.
+/// User-facing options for `Dom::run_code`.
 #[derive(Default, Clone)]
 pub struct RunCodeOpts {
     pub source: String,
-    /// Target override (e.g. "run:server"). Falls back to the VM's native target.
+    /// Target override (e.g. "run:server"). Falls back to the DOM's native target.
     pub target: Option<String>,
     pub show_return: bool,
     pub cache_requires: bool,
@@ -26,15 +26,15 @@ pub struct RunCodeOpts {
     pub return_file: Option<String>,
     pub output_file: Option<String>,
     pub profile_dir: Option<std::path::PathBuf>,
-    /// Session filter for target-routed submissions (empty `vm_id`): the
-    /// server only matches VMs belonging to this studio session. Lets a
+    /// Session filter for target-routed submissions (empty `dom_id`): the
+    /// server only matches DOMs belonging to this studio session. Lets a
     /// caller that just launched a Studio pin its run to that Studio instead
     /// of load-balancing across every session on the serve. Ignored on the
-    /// `Vm`-handle path, which pins by the VM's own session.
+    /// `Dom`-handle path, which pins by the DOM's own session.
     pub session: Option<String>,
 }
 
-/// Buffered result of `Vm::run_code` — aligns with the TS RunResult shape.
+/// Buffered result of `Dom::run_code` — aligns with the TS RunResult shape.
 #[derive(Default)]
 pub struct RunResult {
     /// Master-minted run id (from the ProcessCreated event). `None` only if
@@ -54,7 +54,7 @@ pub struct RunResult {
     pub return_value: Option<String>,
 }
 
-/// Streaming event emitted by `Vm::run_code_stream`. Mirrors the JSON-RPC
+/// Streaming event emitted by `Dom::run_code_stream`. Mirrors the JSON-RPC
 /// daemon's `stream.data` payload shapes so the daemon can emit these directly.
 pub enum RunStreamEvent {
     /// First event on every run: the master-minted run id. Callers that may
@@ -86,7 +86,7 @@ impl RunStream {
 /// buffered and streaming APIs.
 async fn run_inner(
     transport: Arc<Transport>,
-    vm_id: &str,
+    dom_id: &str,
     session_guid: Option<String>,
     opts: RunCodeOpts,
 ) -> Result<(
@@ -103,7 +103,7 @@ async fn run_inner(
         script: opts.source,
         target: opts.target.unwrap_or_default(),
         session: session_guid,
-        vm_id: if vm_id.is_empty() { None } else { Some(vm_id.to_string()) },
+        dom_id: if dom_id.is_empty() { None } else { Some(dom_id.to_string()) },
         log_filter: opts.log_filter.map(buffa::MessageField::some).unwrap_or_else(buffa::MessageField::none),
         cache_requires: if opts.cache_requires { Some(true) } else { None },
         script_args: opts.script_args,
@@ -135,15 +135,15 @@ async fn run_inner(
 
 pub(crate) async fn run_stream(
     transport: Arc<Transport>,
-    vm_id: &str,
+    dom_id: &str,
     session_guid: Option<String>,
     opts: RunCodeOpts,
 ) -> Result<RunStream> {
-    let (rx, task) = run_inner(transport, vm_id, session_guid, opts).await?;
+    let (rx, task) = run_inner(transport, dom_id, session_guid, opts).await?;
     Ok(RunStream { rx, _task: task })
 }
 
-/// Target-routed streaming variant — empty `vm_id` tells the server to route
+/// Target-routed streaming variant — empty `dom_id` tells the server to route
 /// by the opts' `target` field. Used by CLI paths that rely on master-side
 /// routing (e.g. `rodeo run --target play:server`).
 pub(crate) async fn run_stream_target(
@@ -158,18 +158,18 @@ pub(crate) async fn run_buffered_target(
     transport: Arc<Transport>,
     opts: RunCodeOpts,
 ) -> Result<RunResult> {
-    // vm_id empty → server routes by target (within opts.session if set)
+    // dom_id empty → server routes by target (within opts.session if set)
     let session = opts.session.clone();
     run_buffered(transport, "", session, opts).await
 }
 
 pub(crate) async fn run_buffered(
     transport: Arc<Transport>,
-    vm_id: &str,
+    dom_id: &str,
     session_guid: Option<String>,
     opts: RunCodeOpts,
 ) -> Result<RunResult> {
-    let (mut rx, task) = run_inner(transport, vm_id, session_guid, opts).await?;
+    let (mut rx, task) = run_inner(transport, dom_id, session_guid, opts).await?;
     let mut execution_id: Option<String> = None;
     let mut output = String::new();
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();

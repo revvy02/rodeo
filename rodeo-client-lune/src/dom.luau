@@ -1,5 +1,5 @@
--- Vm handle. Carries per-VM metadata + exposes runCode against the daemon.
--- Mirrors rodeo-client-ts/src/client.ts `class Vm`.
+-- Dom handle. Carries per-DOM metadata + exposes runCode against the daemon.
+-- Mirrors rodeo-client-ts/src/client.ts `class Dom`.
 
 local process = require("@lune/process")
 local serde = require("@lune/serde")
@@ -15,24 +15,25 @@ type Daemon = {
 	shutdown: () -> (),
 }
 
-export type VmSnapshot = {
-	vmId: string,
+export type DomSnapshot = {
+	domId: string,
 	backendId: string?,
 	mode: string?,
-	dom: string?,
+	domKind: string?,
 	sessionGuid: string?,
 	placeId: number?,
 	gameName: string?,
 	connected: boolean,
 	activeRuns: number,
-	clientName: string?,
+	userName: string?,
+	userId: number?,
 }
 
-export type Vm = {
-	vmId: string,
+export type Dom = {
+	domId: string,
 	backendId: string,
 	mode: string,
-	dom: string,
+	domKind: string,
 	sessionGuid: string?,
 	placeId: number,
 	gameName: string,
@@ -68,12 +69,12 @@ local function processSource(opts: run.RunCodeOpts): ProcessedSource
 	return serde.decode("json", result.stdout) :: ProcessedSource
 end
 
-local function create(snap: VmSnapshot, daemon: Daemon): Vm
-	local self = {} :: Vm
-	self.vmId = snap.vmId
+local function create(snap: DomSnapshot, daemon: Daemon): Dom
+	local self = {} :: Dom
+	self.domId = snap.domId
 	self.backendId = snap.backendId or ""
 	self.mode = snap.mode or ""
-	self.dom = snap.dom or ""
+	self.domKind = snap.domKind or ""
 	self.sessionGuid = snap.sessionGuid
 	self.placeId = snap.placeId or 0
 	self.gameName = snap.gameName or ""
@@ -144,8 +145,8 @@ local function create(snap: VmSnapshot, daemon: Daemon): Vm
 			end
 		end)
 
-		local callOk, callErr = pcall(daemon.call, "vm.runCode", {
-			vmId = self.vmId,
+		local callOk, callErr = pcall(daemon.call, "dom.runCode", {
+			domId = self.domId,
 			streamId = streamId,
 			source = processed.script,
 			target = opts.target,

@@ -109,30 +109,30 @@ async fn handle_websocket(ws_stream: hyper_tungstenite::HyperWebsocketStream, st
 }
 
 fn build_health_response(state: &BackendState) -> proto::HealthResponse {
-    let mut vms = Vec::new();
+    let mut doms = Vec::new();
 
-    for (vm_id, vm) in &state.vms {
-        vms.push(proto::VmInfo {
-            rodeo_id: vm_id.clone(),
-            active_count: vm.active_count() as u32,
-            is_idle: vm.connected && vm.active_runs.is_empty(),
+    for (dom_id, dom) in &state.doms {
+        doms.push(proto::DomInfo {
+            rodeo_id: dom_id.clone(),
+            active_count: dom.active_count() as u32,
+            is_idle: dom.connected && dom.active_runs.is_empty(),
             ..Default::default()
         });
     }
 
-    let total_vms = vms.len() as u32;
+    let total_doms = doms.len() as u32;
     let total_queued = state.pending_runs.len() as u32;
 
     proto::HealthResponse {
-        launched: !state.vms.is_empty(),
+        launched: !state.doms.is_empty(),
         context_count: 0,
-        total_vms,
+        total_doms,
         total_queued,
         contexts: vec![proto::ContextInfo {
             bitset: 0,
-            vm_count: total_vms,
+            dom_count: total_doms,
             total_queued,
-            vms,
+            doms,
             ..Default::default()
         }],
         ..Default::default()

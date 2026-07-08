@@ -2,7 +2,7 @@ pub mod kill;
 pub mod mcp;
 pub mod plugin;
 pub mod process_source;
-pub mod ps;
+pub mod state;
 pub mod run;
 pub mod save;
 pub mod serve;

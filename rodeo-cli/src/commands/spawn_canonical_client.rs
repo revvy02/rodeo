@@ -21,7 +21,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use rodeo_client::{
     MultiplayerTest, RodeoClient, RunCodeOpts,
-    Studio, StudioBackend, Vm,
+    Studio, StudioBackend, Dom,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -76,7 +76,7 @@ type Handles<T> = Mutex<HashMap<String, Arc<T>>>;
 struct State {
     client: RodeoClient,
     backends: Handles<StudioBackend>,
-    // `Studio` is mutable (setMode mutates its VM handles). Wrap in an extra
+    // `Studio` is mutable (setMode mutates its DOM handles). Wrap in an extra
     // Mutex so method handlers can take an exclusive borrow even when the
     // Arc itself is cloned out of the map.
     studios: Mutex<HashMap<String, Arc<Mutex<Studio>>>>,
@@ -85,7 +85,7 @@ struct State {
     /// client handles), so wrap each in a Mutex.
     mp_tests: Mutex<HashMap<String, Arc<Mutex<MultiplayerTest>>>>,
     next_handle: AtomicU64,
-    /// Cancel channels keyed by the client-provided streamId — `vm.cancelRun`
+    /// Cancel channels keyed by the client-provided streamId — `dom.cancelRun`
     /// drops the sender to signal the runCode task to stop.
     streams: Mutex<HashMap<String, tokio::sync::oneshot::Sender<()>>>,
     /// Serializes stdout writes across concurrent tasks.
@@ -121,7 +121,7 @@ pub async fn main(host: String, port: u16) -> Result<()> {
         let line = line.trim().to_string();
         if line.is_empty() { continue; }
         // Handle inline so the response is written before we consume the next
-        // line. Long-running work (vm.runCode streaming) spawns its own
+        // line. Long-running work (dom.runCode streaming) spawns its own
         // background task for emitting notifications — the initial RPC call
         // returns quickly with a streamId, so this doesn't block throughput.
         handle_line(state.clone(), line).await;
@@ -185,9 +185,9 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
             state.backends.lock().await.insert(handle.clone(), Arc::new(backend));
             Ok(json!({ "backendHandle": handle, "info": info }))
         }
-        "client.getVms" => {
-            let vms = state.client.get_vms().await?;
-            Ok(serde_json::to_value(vms.iter().map(vm_snapshot).collect::<Vec<_>>())?)
+        "client.getDoms" => {
+            let doms = state.client.get_doms().await?;
+            Ok(serde_json::to_value(doms.iter().map(dom_snapshot).collect::<Vec<_>>())?)
         }
         "client.listProcesses" => {
             let list = state.client.list_processes().await?;
@@ -208,19 +208,19 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
         "studio.getMode" => studio_get_mode(state, params).await,
         "studio.save" => studio_save(state, params).await,
         "studio.close" => studio_close(state, params).await,
-        "studio.getVms" => studio_get_vms(state, params).await,
+        "studio.getDoms" => studio_get_doms(state, params).await,
         "studio.startMultiplayerTest" => studio_start_multiplayer_test(state, params).await,
 
         // mp.* — in-Studio multiplayer test lifecycle, keyed by an `mpHandle`
-        // returned from studio.startMultiplayerTest. The server/client VMs are
-        // run via vm.runCode by vmId like any other VM.
+        // returned from studio.startMultiplayerTest. The server/client DOMs are
+        // run via dom.runCode by domId like any other DOM.
         "mp.connectClient" => mp_connect_client(state, params).await,
         "mp.disconnectClient" => mp_disconnect_client(state, params).await,
         "mp.close" => mp_close(state, params).await,
 
-        // vm.*
-        "vm.runCode" => vm_run_code(state, params).await,
-        "vm.cancelRun" => vm_cancel_run(state, params).await,
+        // dom.*
+        "dom.runCode" => dom_run_code(state, params).await,
+        "dom.cancelRun" => dom_cancel_run(state, params).await,
 
         _ => anyhow::bail!("unknown method: {method}"),
     }
@@ -269,9 +269,9 @@ async fn studio_open(state: Arc<State>, params: Value) -> Result<Value> {
     let backend = lookup_backend(&state, &params).await?;
     let studio = backend.open(parse_open_opts(&params)).await?;
     let session_guid = studio.session_guid.clone();
-    let edit_vm_id = studio.edit_vm().vm_id.clone();
+    let edit_dom_id = studio.edit_dom().dom_id.clone();
     let (handle, _arc) = insert_studio(&state, studio).await;
-    Ok(json!({ "studioHandle": handle, "sessionGuid": session_guid, "editVmId": edit_vm_id }))
+    Ok(json!({ "studioHandle": handle, "sessionGuid": session_guid, "editDomId": edit_dom_id }))
 }
 
 async fn studio_open_place(state: Arc<State>, params: Value) -> Result<Value> {
@@ -290,9 +290,9 @@ async fn studio_open_place(state: Arc<State>, params: Value) -> Result<Value> {
         no_hud: opts.no_hud,
     }).await?;
     let session_guid = studio.session_guid.clone();
-    let edit_vm_id = studio.edit_vm().vm_id.clone();
+    let edit_dom_id = studio.edit_dom().dom_id.clone();
     let (handle, _arc) = insert_studio(&state, studio).await;
-    Ok(json!({ "studioHandle": handle, "sessionGuid": session_guid, "editVmId": edit_vm_id }))
+    Ok(json!({ "studioHandle": handle, "sessionGuid": session_guid, "editDomId": edit_dom_id }))
 }
 
 async fn studio_open_file(state: Arc<State>, params: Value) -> Result<Value> {
@@ -312,9 +312,9 @@ async fn studio_open_file(state: Arc<State>, params: Value) -> Result<Value> {
         no_hud: opts.no_hud,
     }).await?;
     let session_guid = studio.session_guid.clone();
-    let edit_vm_id = studio.edit_vm().vm_id.clone();
+    let edit_dom_id = studio.edit_dom().dom_id.clone();
     let (handle, _arc) = insert_studio(&state, studio).await;
-    Ok(json!({ "studioHandle": handle, "sessionGuid": session_guid, "editVmId": edit_vm_id }))
+    Ok(json!({ "studioHandle": handle, "sessionGuid": session_guid, "editDomId": edit_dom_id }))
 }
 
 async fn studio_set_mode(state: Arc<State>, params: Value) -> Result<Value> {
@@ -325,8 +325,8 @@ async fn studio_set_mode(state: Arc<State>, params: Value) -> Result<Value> {
     let mut guard = studio.lock().await;
     guard.set_mode(&mode).await?;
     Ok(json!({
-        "serverVmId": guard.server_vm.as_ref().map(|v| v.vm_id.clone()),
-        "clientVmId": guard.client_vm.as_ref().map(|v| v.vm_id.clone()),
+        "serverDomId": guard.server_dom.as_ref().map(|v| v.dom_id.clone()),
+        "clientDomId": guard.client_dom.as_ref().map(|v| v.dom_id.clone()),
     }))
 }
 
@@ -352,10 +352,10 @@ async fn studio_close(state: Arc<State>, params: Value) -> Result<Value> {
     Ok(Value::Null)
 }
 
-async fn studio_get_vms(state: Arc<State>, params: Value) -> Result<Value> {
+async fn studio_get_doms(state: Arc<State>, params: Value) -> Result<Value> {
     let studio = lookup_studio(&state, &params).await?;
-    let vms = studio.lock().await.get_vms().await?;
-    Ok(serde_json::to_value(vms.iter().map(vm_snapshot).collect::<Vec<_>>())?)
+    let doms = studio.lock().await.get_doms().await?;
+    Ok(serde_json::to_value(doms.iter().map(dom_snapshot).collect::<Vec<_>>())?)
 }
 
 async fn studio_start_multiplayer_test(state: Arc<State>, params: Value) -> Result<Value> {
@@ -366,15 +366,15 @@ async fn studio_start_multiplayer_test(state: Arc<State>, params: Value) -> Resu
     // Studio server on some engine versions (observed on 0.726: SIGSEGV / null
     // deref on a worker thread the moment AddPlayers runs). Callers that know
     // their client count should request it here and read the returned
-    // clientVmIds, rather than starting at 0 and growing via mp.connectClient.
+    // clientDomIds, rather than starting at 0 and growing via mp.connectClient.
     // Defaults to 0 for backwards compatibility.
     let num_players = params.get("numPlayers").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
     let mp = studio.lock().await.start_multiplayer_test(num_players).await?;
-    let server_vm_id = mp.server.vm_id.clone();
-    let client_vm_ids: Vec<String> = mp.clients().iter().map(|v| v.vm_id.clone()).collect();
+    let server_dom_id = mp.server.dom_id.clone();
+    let client_dom_ids: Vec<String> = mp.clients().iter().map(|v| v.dom_id.clone()).collect();
     let handle = state.mint_handle("mp");
     state.mp_tests.lock().await.insert(handle.clone(), Arc::new(Mutex::new(mp)));
-    Ok(json!({ "mpHandle": handle, "serverVmId": server_vm_id, "clientVmIds": client_vm_ids }))
+    Ok(json!({ "mpHandle": handle, "serverDomId": server_dom_id, "clientDomIds": client_dom_ids }))
 }
 
 async fn lookup_mp(state: &State, params: &Value) -> Result<Arc<Mutex<MultiplayerTest>>> {
@@ -387,15 +387,15 @@ async fn lookup_mp(state: &State, params: &Value) -> Result<Arc<Mutex<Multiplaye
 async fn mp_connect_client(state: Arc<State>, params: Value) -> Result<Value> {
     let mp = lookup_mp(&state, &params).await?;
     let client = mp.lock().await.connect_client().await?;
-    Ok(json!({ "clientVmId": client.vm_id }))
+    Ok(json!({ "clientDomId": client.dom_id }))
 }
 
 async fn mp_disconnect_client(state: Arc<State>, params: Value) -> Result<Value> {
     let mp = lookup_mp(&state, &params).await?;
-    let vm_id = params.get("vmId").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("vmId required"))?
+    let dom_id = params.get("domId").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("domId required"))?
         .to_string();
-    mp.lock().await.disconnect_client(&vm_id).await?;
+    mp.lock().await.disconnect_client(&dom_id).await?;
     Ok(Value::Null)
 }
 
@@ -410,12 +410,12 @@ async fn mp_close(state: Arc<State>, params: Value) -> Result<Value> {
 }
 
 // ---------------------------------------------------------------------------
-// vm.* adapters
+// dom.* adapters
 // ---------------------------------------------------------------------------
 
-async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
-    let vm_id = params.get("vmId").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("vmId required"))?
+async fn dom_run_code(state: Arc<State>, params: Value) -> Result<Value> {
+    let dom_id = params.get("domId").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("domId required"))?
         .to_string();
     // Client-provided streamId (mandatory). This eliminates the race where a
     // server-minted ID could be included in a notification before the
@@ -468,12 +468,12 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
         return_file: params.get("returnFile").and_then(|v| v.as_str()).map(String::from),
         output_file: params.get("outputFile").and_then(|v| v.as_str()).map(String::from),
         profile_dir,
-        // Daemon callers route by vmId (the Vm handle pins its own session).
+        // Daemon callers route by domId (the Dom handle pins its own session).
         session: None,
     };
 
-    let vm = state.client.get_vm(&vm_id).await?;
-    let mut stream = vm.run_code_stream(opts).await?;
+    let dom = state.client.get_dom(&dom_id).await?;
+    let mut stream = dom.run_code_stream(opts).await?;
 
     let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
     state.streams.lock().await.insert(stream_id.clone(), cancel_tx);
@@ -546,7 +546,7 @@ async fn vm_run_code(state: Arc<State>, params: Value) -> Result<Value> {
     Ok(json!({ "streamId": stream_id }))
 }
 
-async fn vm_cancel_run(state: Arc<State>, params: Value) -> Result<Value> {
+async fn dom_cancel_run(state: Arc<State>, params: Value) -> Result<Value> {
     let stream_id = params.get("streamId").and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("streamId required"))?;
     if let Some(tx) = state.streams.lock().await.remove(stream_id) {
@@ -559,17 +559,19 @@ async fn vm_cancel_run(state: Arc<State>, params: Value) -> Result<Value> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn vm_snapshot(v: &Vm) -> serde_json::Value {
+fn dom_snapshot(v: &Dom) -> serde_json::Value {
     json!({
-        "vmId": v.vm_id,
+        "domId": v.dom_id,
         "backendId": v.backend_id,
         "mode": v.mode,
-        "dom": v.dom,
+        "domKind": v.dom_kind,
         "sessionGuid": v.session_guid,
         "placeId": v.place_id,
         "gameName": v.game_name,
         "connected": v.connected,
         "activeRuns": v.active_runs,
+        "userName": v.user_name,
+        "userId": v.user_id,
     })
 }
 

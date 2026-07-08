@@ -3,7 +3,7 @@ import {
   runRodeo,
   spawnBackground,
   waitForProcess,
-  waitForVm,
+  waitForDom,
   type BackgroundProcess,
 } from "../helpers.js";
 
@@ -14,7 +14,7 @@ describe("kill (CLI)", () => {
 
   beforeAll(async () => {
     bg = spawnBackground(["run", "--port", String(PORT), "--place"]);
-    await waitForVm(PORT);
+    await waitForDom(PORT);
   });
   afterAll(async () => { bg.kill(); await bg.exited; });
 

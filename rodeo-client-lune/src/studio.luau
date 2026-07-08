@@ -1,7 +1,7 @@
 -- StudioBackend + Studio + MultiplayerTestServer/MultiplayerTestClient.
 -- Mirrors the TS client's class hierarchy; dot-notation method surface.
 
-local vmMod = require("./vm")
+local domMod = require("./dom")
 
 type Daemon = {
 	call: (method: string, params: any?) -> any,
@@ -12,45 +12,46 @@ type Daemon = {
 
 type BackendInfo = { id: string, name: string }
 
--- Build a full VmSnapshot-shaped table from a parent studio + one of its
--- minimal (vmId/dom/clientName) vm entries.
-local function vmSnapshotFromStudio(studio: any, sv: any): vmMod.VmSnapshot
+-- Build a full DomSnapshot-shaped table from a parent studio + one of its
+-- minimal (domId/domKind/userName/userId) dom entries.
+local function domSnapshotFromStudio(studio: any, sv: any): domMod.DomSnapshot
 	return {
-		vmId = sv.vmId,
-		dom = sv.dom,
-		mode = if sv.dom == "edit" then "edit" else studio.mode,
+		domId = sv.domId,
+		domKind = sv.domKind,
+		mode = if sv.domKind == "edit" then "edit" else studio.studioMode,
 		backendId = studio.backendId,
-		sessionGuid = studio.id,
+		sessionGuid = studio.sessionId,
 		placeId = studio.placeId,
-		gameName = studio.name,
+		gameName = studio.placeName,
 		connected = true,
 		activeRuns = 0,
-		clientName = sv.clientName,
+		userName = sv.userName,
+		userId = sv.userId,
 	}
 end
 
--- Find a vmId across state.studios[].vms and return the built VmSnapshot table,
+-- Find a domId across state.studios[].doms and return the built DomSnapshot table,
 -- or nil if not present.
-local function vmFromStudios(state: any, vmId: string): vmMod.VmSnapshot?
+local function domFromStudios(state: any, domId: string): domMod.DomSnapshot?
 	for _, studio in state.studios or {} do
-		for _, sv in studio.vms or {} do
-			if sv.vmId == vmId then
-				return vmSnapshotFromStudio(studio, sv)
+		for _, sv in studio.doms or {} do
+			if sv.domId == domId then
+				return domSnapshotFromStudio(studio, sv)
 			end
 		end
 	end
 	return nil
 end
 
-local function vmListFromState(daemon: Daemon): { vmMod.Vm }
+local function domListFromState(daemon: Daemon): { domMod.Dom }
 	local state = daemon.call("client.getState", {})
-	local vms = {}
+	local doms = {}
 	for _, studio in state.studios or {} do
-		for _, sv in studio.vms or {} do
-			table.insert(vms, vmMod.create(vmSnapshotFromStudio(studio, sv), daemon))
+		for _, sv in studio.doms or {} do
+			table.insert(doms, domMod.create(domSnapshotFromStudio(studio, sv), daemon))
 		end
 	end
-	return vms
+	return doms
 end
 
 -- ---------------------------------------------------------------------------
@@ -64,16 +65,16 @@ export type SaveResult = {
 }
 
 -- ---------------------------------------------------------------------------
--- MultiplayerTestServer / MultiplayerTestClient — Vm-with-extras. Same data
--- plane (runCode, vmId, ...) as any Vm, plus the test lifecycle keyed by the
+-- MultiplayerTestServer / MultiplayerTestClient — Dom-with-extras. Same data
+-- plane (runCode, domId, ...) as any Dom, plus the test lifecycle keyed by the
 -- daemon-side mpHandle.
 -- ---------------------------------------------------------------------------
 
-export type MultiplayerTestClient = vmMod.Vm & {
+export type MultiplayerTestClient = domMod.Dom & {
 	disconnect: () -> (),
 }
 
-export type MultiplayerTestServer = vmMod.Vm & {
+export type MultiplayerTestServer = domMod.Dom & {
 	connectClient: () -> MultiplayerTestClient,
 	close: () -> (),
 }
@@ -81,14 +82,14 @@ export type MultiplayerTestServer = vmMod.Vm & {
 export type Studio = {
 	sessionGuid: string,
 	backendId: string,
-	editVm: vmMod.Vm,
-	serverVm: vmMod.Vm?,
-	clientVm: vmMod.Vm?,
+	editDom: domMod.Dom,
+	serverDom: domMod.Dom?,
+	clientDom: domMod.Dom?,
 	setMode: (mode: string) -> (),
 	getMode: () -> string,
 	save: () -> SaveResult,
 	close: () -> (),
-	getVms: () -> { vmMod.Vm },
+	getDoms: () -> { domMod.Dom },
 	startMultiplayerTest: () -> MultiplayerTestServer,
 }
 
@@ -96,21 +97,21 @@ local function createStudio(
 	handle: string,
 	sessionGuid: string,
 	backendId: string,
-	editVm: vmMod.Vm,
+	editDom: domMod.Dom,
 	daemon: Daemon
 ): Studio
 	local self = {} :: Studio
 	self.sessionGuid = sessionGuid
 	self.backendId = backendId
-	self.editVm = editVm
-	self.serverVm = nil
-	self.clientVm = nil
+	self.editDom = editDom
+	self.serverDom = nil
+	self.clientDom = nil
 
-	function self.getVms()
-		local list = daemon.call("studio.getVms", { studioHandle = handle })
+	function self.getDoms()
+		local list = daemon.call("studio.getDoms", { studioHandle = handle })
 		local out = {}
 		for _, s in list do
-			table.insert(out, vmMod.create(s, daemon))
+			table.insert(out, domMod.create(s, daemon))
 		end
 		return out
 	end
@@ -118,24 +119,24 @@ local function createStudio(
 	function self.setMode(mode)
 		local resp = daemon.call("studio.setMode", { studioHandle = handle, mode = mode })
 		if mode == "edit" then
-			self.serverVm = nil
-			self.clientVm = nil
+			self.serverDom = nil
+			self.clientDom = nil
 			return
 		end
-		local all = vmListFromState(daemon)
-		local function find(id: string?): vmMod.Vm?
+		local all = domListFromState(daemon)
+		local function find(id: string?): domMod.Dom?
 			if not id then
 				return nil
 			end
 			for _, v in all do
-				if v.vmId == id then
+				if v.domId == id then
 					return v
 				end
 			end
 			return nil
 		end
-		self.serverVm = find(resp.serverVmId)
-		self.clientVm = if mode == "test" or mode == "play" then find(resp.clientVmId) else nil
+		self.serverDom = find(resp.serverDomId)
+		self.clientDom = if mode == "test" or mode == "play" then find(resp.clientDomId) else nil
 	end
 
 	function self.getMode()
@@ -156,23 +157,23 @@ local function createStudio(
 		})
 		local mpHandle = resp.mpHandle
 
-		local function buildVm(vmId: string): vmMod.Vm
+		local function buildVm(domId: string): domMod.Dom
 			local state = daemon.call("client.getState", {})
-			local snap = vmFromStudios(state, vmId)
+			local snap = domFromStudios(state, domId)
 			if not snap then
-				error(`multiplayer VM {vmId} not found`)
+				error(`multiplayer DOM {domId} not found`)
 			end
-			return vmMod.create(snap, daemon)
+			return domMod.create(snap, daemon)
 		end
 
-		local server = buildVm(resp.serverVmId) :: any
+		local server = buildVm(resp.serverDomId) :: any
 
 		function server.connectClient(): MultiplayerTestClient
 			local r = daemon.call("mp.connectClient", { mpHandle = mpHandle })
-			local client = buildVm(r.clientVmId) :: any
+			local client = buildVm(r.clientDomId) :: any
 
 			function client.disconnect()
-				daemon.call("mp.disconnectClient", { mpHandle = mpHandle, vmId = client.vmId })
+				daemon.call("mp.disconnectClient", { mpHandle = mpHandle, domId = client.domId })
 			end
 
 			return client :: MultiplayerTestClient
@@ -229,19 +230,19 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 
 	local function launch(method: string, params: { [string]: any }): Studio
 		local resp = daemon.call(method, params)
-		-- Find the editVm among this studio's VMs.
-		local editVm: vmMod.Vm? = nil
-		local studioVms = daemon.call("studio.getVms", { studioHandle = resp.studioHandle })
-		for _, s in studioVms do
-			if s.vmId == resp.editVmId then
-				editVm = vmMod.create(s, daemon)
+		-- Find the editDom among this studio's DOMs.
+		local editDom: domMod.Dom? = nil
+		local studioDoms = daemon.call("studio.getDoms", { studioHandle = resp.studioHandle })
+		for _, s in studioDoms do
+			if s.domId == resp.editDomId then
+				editDom = domMod.create(s, daemon)
 				break
 			end
 		end
-		if not editVm then
-			error(`edit VM {resp.editVmId} not found in studio {resp.studioHandle}`)
+		if not editDom then
+			error(`edit DOM {resp.editDomId} not found in studio {resp.studioHandle}`)
 		end
-		return createStudio(resp.studioHandle, resp.sessionGuid, info.id, editVm :: vmMod.Vm, daemon)
+		return createStudio(resp.studioHandle, resp.sessionGuid, info.id, editDom :: domMod.Dom, daemon)
 	end
 
 	function self.open(opts)

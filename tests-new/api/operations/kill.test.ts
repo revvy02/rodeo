@@ -4,7 +4,7 @@ const ctx = setupStudio();
 describe("kill", () => {
   it("kill terminates running process", async () => {
     // Start a long-running script (don't await)
-    const runPromise = ctx.editVm.runCode({ source: "task.wait(30) return nil" });
+    const runPromise = ctx.editDom.runCode({ source: "task.wait(30) return nil" });
 
     // Wait for the process to appear as running
     let executionId: string | undefined;

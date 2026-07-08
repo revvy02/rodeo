@@ -1,4 +1,4 @@
--- Types for Vm.runCode — mirrors rodeo-client-ts/src/run.ts.
+-- Types for Dom.runCode — mirrors rodeo-client-ts/src/run.ts.
 
 export type LogFilter = {
 	enableWarn: boolean?,
