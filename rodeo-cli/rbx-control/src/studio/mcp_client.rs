@@ -1,6 +1,6 @@
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tracing::warn;
+use tracing::{debug, warn};
 
 /// Client for the StudioMCP subprocess (stdio JSON-RPC).
 ///
@@ -20,7 +20,14 @@ impl StudioMcpClient {
     pub async fn new(client_name: &str) -> Result<Self, String> {
         let mcp_path = crate::paths::studio_mcp_path()
             .ok_or_else(|| "could not locate StudioMCP binary".to_string())?;
-        let mut child = tokio::process::Command::new(&mcp_path)
+        let mut cmd = tokio::process::Command::new(&mcp_path);
+        // Debug aid: RODEO_STUDIOMCP_VERBOSE=1 runs StudioMCP with -v so its
+        // internals (port bind, proxy client, Studio connects) land on our
+        // inherited stderr next to the backend's own logs.
+        if std::env::var("RODEO_STUDIOMCP_VERBOSE").is_ok() {
+            cmd.arg("-v");
+        }
+        let mut child = cmd
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit())
@@ -128,7 +135,12 @@ impl StudioMcpClient {
             .to_string();
 
         if result["isError"].as_bool() == Some(true) {
-            warn!(tool, error = text.as_str(), "mcp tool error");
+            // Debug, not warn: the error is returned to the caller, which logs
+            // it at the appropriate level (the reconciliation loop's unifier
+            // fires into datamodel types that are expected to be absent in the
+            // current mode, so these "not available"/"not reachable" errors are
+            // routine noise; genuine failures surface via the run result).
+            debug!(tool, error = text.as_str(), "mcp tool error");
             return Err(text);
         }
         Ok(text)
@@ -149,6 +161,7 @@ impl StudioMcpClient {
     /// List all connected Studio DataModels (each is a "studio" with a UUID).
     pub async fn list_studios(&mut self) -> Result<Vec<StudioEntry>, String> {
         let text = self.call_tool("list_roblox_studios", &serde_json::json!({})).await?;
+        tracing::debug!(raw = text.as_str(), "list_roblox_studios raw response");
         // StudioMCP may return either a bare array or {"studios": [...]}
         let entries: Vec<StudioEntry> = if text.starts_with('{') {
             let wrapper: serde_json::Value =
