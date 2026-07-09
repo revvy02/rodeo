@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/motor6d_transform_hack --target run:server
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/motor6d_transform_hack --context server
 
 -- Benchmark: Motor6D.Transform via raw property setter (xpcall hack) with N constraints
 -- Uses chax rawcall to bypass normal property setter overhead

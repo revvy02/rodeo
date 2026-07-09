@@ -9,7 +9,7 @@ describe("isolated play mode (CLI)", () => {
 
     beforeAll(async () => {
       bg = spawnBackground([
-        "run", "--port", String(PORT), "--place", "--target", "play:server",
+        "run", "--port", String(PORT), "--place", "--mode", "play", "--context", "server",
       ]);
       await waitForDom(PORT);
     });
@@ -17,7 +17,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — IsRunning is true", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return game:GetService('RunService'):IsRunning()",
       });
       expect(result.ok).toBe(true);
@@ -26,7 +26,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — no LocalPlayer on server", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return game:GetService('Players').LocalPlayer == nil",
       });
       expect(result.ok).toBe(true);
@@ -35,7 +35,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client:1 — spawns client with LocalPlayer", async () => {
       const result = await run({
-        target: "play:client:1",
+        mode: "play", domKind: "client", clients: 1,
         source: "return game:GetService('Players').LocalPlayer ~= nil",
       });
       expect(result.ok).toBe(true);
@@ -44,7 +44,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — server sees connected player", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return #game:GetService('Players'):GetPlayers() > 0",
       });
       expect(result.ok).toBe(true);
@@ -53,7 +53,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client — append spawns second client", async () => {
       const result = await run({
-        target: "play:client",
+        mode: "play", domKind: "client",
         source: "task.wait(3); return game:GetService('Players').LocalPlayer ~= nil",
       });
       expect(result.ok).toBe(true);
@@ -62,7 +62,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — server sees two players", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return #game:GetService('Players'):GetPlayers() >= 2",
       });
       expect(result.ok).toBe(true);
@@ -86,7 +86,7 @@ describe("isolated play mode (CLI)", () => {
       bg = spawnBackground([
         "run", "--port", String(PORT),
         "--place", String(PLACE_ID),
-        "--target", "play:server",
+        "--mode", "play", "--context", "server",
       ]);
       await waitForDom(PORT);
     });
@@ -94,7 +94,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — IsRunning is true", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return game:GetService('RunService'):IsRunning()",
       });
       expect(result.ok).toBe(true);
@@ -103,7 +103,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — no LocalPlayer on server", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return game:GetService('Players').LocalPlayer == nil",
       });
       expect(result.ok).toBe(true);
@@ -112,7 +112,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — game.PlaceId matches the requested placeId", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return game.PlaceId",
       });
       expect(result.ok).toBe(true);
@@ -121,7 +121,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — game.GameId is the resolved universeId", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return game.GameId",
       });
       expect(result.ok).toBe(true);
@@ -135,7 +135,7 @@ describe("isolated play mode (CLI)", () => {
     // — PlaceId/GameId/DataStore still resolve correctly.
     it.skip("play:server — game.PlaceVersion is non-zero (N/A in studio-first multiplayer)", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return game.PlaceVersion ~= 0",
       });
       expect(result.ok).toBe(true);
@@ -144,7 +144,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — universe-scoped DataStoreService round-trip succeeds", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: `
           local DataStoreService = game:GetService("DataStoreService")
           local ds = DataStoreService:GetDataStore("rodeo_mptest_placeid_probe_cli")
@@ -159,7 +159,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client:1 — spawns client with LocalPlayer", async () => {
       const result = await run({
-        target: "play:client:1",
+        mode: "play", domKind: "client", clients: 1,
         source: "return game:GetService('Players').LocalPlayer ~= nil",
       });
       expect(result.ok).toBe(true);
@@ -168,7 +168,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client:1 — game.PlaceId matches the published placeId", async () => {
       const result = await run({
-        target: "play:client:1",
+        mode: "play", domKind: "client", clients: 1,
         source: "return game.PlaceId",
       });
       expect(result.ok).toBe(true);
@@ -177,7 +177,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — server sees connected player", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return #game:GetService('Players'):GetPlayers() > 0",
       });
       expect(result.ok).toBe(true);
@@ -186,7 +186,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client — append spawns second client", async () => {
       const result = await run({
-        target: "play:client",
+        mode: "play", domKind: "client",
         source: "task.wait(3); return game:GetService('Players').LocalPlayer ~= nil",
       });
       expect(result.ok).toBe(true);
@@ -195,7 +195,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:server — server sees two players", async () => {
       const result = await run({
-        target: "play:server",
+        mode: "play", context: "server",
         source: "return #game:GetService('Players'):GetPlayers() >= 2",
       });
       expect(result.ok).toBe(true);

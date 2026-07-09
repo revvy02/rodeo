@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/motor6d_transform --target run:server
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/motor6d_transform --context server
 
 -- Benchmark: Motor6D.Transform with N constraints
 -- Runs for ~10s at 60fps, profiler captures engine-level frame data

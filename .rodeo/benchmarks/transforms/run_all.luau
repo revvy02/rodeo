@@ -51,56 +51,56 @@ end
 -- bulkmoveto(baseline)
 profile({
 	file = SCENARIOS .. "/bulkmoveto.luau",
-	target = "play:server",
+	mode = "play", context = "server",
 	profile = PROFILES .. "/bulkmoveto",
 })
 
 -- bulkmoveto_raw_hack
 profile({
 	file = SCENARIOS .. "/bulkmoveto_raw_hack.luau",
-	target = "play:server",
+	mode = "play", context = "server",
 	profile = PROFILES .. "/bulkmoveto_hack",
 })
 
 -- attachment_cframe
 profile({
 	file = SCENARIOS .. "/attachment_cframe.luau",
-	target = "play:server",
+	mode = "play", context = "server",
 	profile = PROFILES .. "/attachment_cframe",
 })
 
 -- attachment_cframe_raw_hack
 profile({
 	file = SCENARIOS .. "/attachment_cframe_raw_hack.luau",
-	target = "play:server",
+	mode = "play", context = "server",
 	profile = PROFILES .. "/attachment_cframe_hack",
 })
 
 -- bone_transform
 profile({
 	file = SCENARIOS .. "/bone_transform.luau",
-	target = "play:server:plugin",
+	mode = "play", context = "plugin",
 	profile = PROFILES .. "/bone_transform",
 })
 
 -- bone_transform_raw_hack
 profile({
 	file = SCENARIOS .. "/bone_transform_raw_hack.luau",
-	target = "play:server:plugin",
+	mode = "play", context = "plugin",
 	profile = PROFILES .. "/bone_transform_hack",
 })
 
 -- motor6d_transform
 profile({
 	file = SCENARIOS .. "/motor6d_transform.luau",
-	target = "play:server",
+	mode = "play", context = "server",
 	profile = PROFILES .. "/motor6d_transform",
 })
 
 -- motor6d_transform_raw_hack
 profile({
 	file = SCENARIOS .. "/motor6d_transform_raw_hack.luau",
-	target = "play:server",
+	mode = "play", context = "server",
 	profile = PROFILES .. "/motor6d_transform_hack",
 })
 

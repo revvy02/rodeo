@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bone_transform_hack --target run:server:plugin
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bone_transform_hack --mode run --context plugin
 
 -- Benchmark: Bone.Transform via raw property setter (xpcall hack) with N bones
 

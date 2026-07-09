@@ -13,7 +13,7 @@ describe("--profile with play mode (CLI)", () => {
     rmSync(profileDir, { recursive: true, force: true });
     bg = spawnBackground([
       "run", "--port", String(PORT), "--place",
-      "--target", "play:server", "--profile",
+      "--mode", "play", "--context", "server", "--profile",
     ]);
     await waitForDom(PORT);
   });
@@ -27,7 +27,7 @@ describe("--profile with play mode (CLI)", () => {
   it("play:server — every dump contains the script's marker", () => {
     const result = runRodeo([
       "run", "--port", String(PORT),
-      "--target", "play:server",
+      "--mode", "play", "--context", "server",
       "--profile", profileDir,
       "--source", PROFILE_SCRIPT,
     ]);
@@ -41,7 +41,7 @@ describe("--profile with play mode (CLI)", () => {
 
     const result = runRodeo([
       "run", "--port", String(PORT),
-      "--target", "play:client:1",
+      "--mode", "play", "--dom-kind", "client", "--clients", "1",
       "--profile", clientProfileDir,
       "--source", PROFILE_SCRIPT,
     ]);

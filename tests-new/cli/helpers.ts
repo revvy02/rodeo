@@ -201,7 +201,6 @@ export async function waitForDom(port: number, timeoutMs = 60_000): Promise<void
 // in tests-new/utils/executionTests.ts run end-to-end against the CLI binary.
 export function makeCliRunFn(
   port: number,
-  baseTarget?: string,
 ): (opts: RunCodeOpts) => Promise<RunResult> {
   return async (opts: RunCodeOpts): Promise<RunResult> => {
     const args: string[] = ["run", "--port", String(port)];
@@ -210,6 +209,10 @@ export function makeCliRunFn(
     if (opts.sourcemap !== undefined) args.push("--sourcemap", opts.sourcemap);
     if (opts.showReturn) args.push("--show-return");
     if (opts.cacheRequires) args.push("--cache-requires");
+    if (opts.mode !== undefined) args.push("--mode", opts.mode);
+    if (opts.domKind !== undefined) args.push("--dom-kind", opts.domKind);
+    if (opts.context !== undefined) args.push("--context", opts.context);
+    if (opts.clients !== undefined) args.push("--clients", String(opts.clients));
 
     // CLI subprocesses don't see the wire-level ExecutionDone, so to give
     // tests a `result.return` to assert against we shadow it via the same
@@ -221,9 +224,6 @@ export function makeCliRunFn(
     if (opts.returnFile === undefined) {
       autoReturnFile = join(tmpdir(), `rodeo-cli-return-${randomUUID()}.json`);
     }
-
-    const target = opts.target ?? baseTarget;
-    if (target !== undefined) args.push("--target", target);
 
     if (opts.logFilter) {
       if (opts.logFilter.enableWarn === false) args.push("--no-warn");

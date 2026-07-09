@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/attachment_cframe --target run:server
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/attachment_cframe --context server
 
 -- Benchmark: Attachment.CFrame with N attachments
 

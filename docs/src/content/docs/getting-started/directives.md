@@ -7,7 +7,7 @@ A **directive** is a single-line comment at the top of a Luau script that pre-fi
 Directives have **full parity** with the [`rodeo run`](/rodeo/cli/#rodeo-run) subcommand. Any flag you can pass to `rodeo run` on the CLI can go inside a directive.
 
 ```luau
--- @rodeo run --place 12345 --target edit:elevated --save
+-- @rodeo run --place 12345 --context elevated --save
 
 local workspace = game:GetService("Workspace")
 print("running in", workspace.Name)
@@ -19,7 +19,7 @@ Then:
 rodeo run my-script.luau
 ```
 
-That's it. No flags needed at the call site; the script's directive runs it under `--place 12345 --target edit:elevated --save`.
+That's it. No flags needed at the call site; the script's directive runs it under `--place 12345 --context elevated --save`.
 
 ## Syntax
 
@@ -32,7 +32,7 @@ That's it. No flags needed at the call site; the script's directive runs it unde
 - The directive must be on a single line; it can sit anywhere in the file but is conventionally the first line.
 
 ```luau
--- @rodeo run --place ./game.rbxl --target test:client -- --user frank --rooms 4
+-- @rodeo run --place ./game.rbxl --context client -- --user frank --rooms 4
 
 local process = require("@rodeo/process")
 print(process.args)  --> { "--user", "frank", "--rooms", "4" }
@@ -43,8 +43,8 @@ print(process.args)  --> { "--user", "frank", "--rooms", "4" }
 User-supplied flags at the CLI call site override directive flags:
 
 ```bash
-rodeo run my-script.luau --target run:server
-# script ran with --target run:server, NOT the edit:elevated from its directive.
+rodeo run my-script.luau --context server
+# script ran with --context server, NOT the elevated context from its directive.
 ```
 
 This lets the directive set sensible defaults while leaving room for one-off overrides.

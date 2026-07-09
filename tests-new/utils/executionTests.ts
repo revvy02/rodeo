@@ -430,7 +430,7 @@ export function scriptFile(run: RunFn): void {
 export function targetIdentity(run: RunFn): void {
   it("edit:elevated can access DebuggerManager", async () => {
     const result = await run({
-      target: "edit:elevated",
+      context: "elevated",
       source: "return tostring(DebuggerManager())",
     });
     expect(result.ok).toBe(true);
@@ -439,7 +439,7 @@ export function targetIdentity(run: RunFn): void {
 
   it("edit:elevated can use @rodeo/fs", async () => {
     const result = await run({
-      target: "edit:elevated",
+      context: "elevated",
       source: 'return require("@rodeo/fs").exists(".")',
     });
     expect(result.ok).toBe(true);
@@ -455,7 +455,7 @@ export function targetIdentity(run: RunFn): void {
         ? '{"cmd", "/c", "echo", "hi"}'
         : '{"echo", "hi"}';
     const result = await run({
-      target: "edit:elevated",
+      context: "elevated",
       source: `local r = require("@rodeo/process").run(${argv}) return r.ok`,
     });
     expect(result.ok).toBe(true);
@@ -463,7 +463,7 @@ export function targetIdentity(run: RunFn): void {
   });
 
   it("edit:elevated propagates errors", async () => {
-    const result = await run({ target: "edit:elevated", source: 'error("boom")' });
+    const result = await run({ context: "elevated", source: 'error("boom")' });
     expect(result.ok).toBe(false);
   });
 
@@ -477,7 +477,7 @@ export function targetIdentity(run: RunFn): void {
 
   it("run:server can access ServerStorage", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       source: "return game:GetService('ServerStorage') ~= nil",
     });
     expect(result.ok).toBe(true);
@@ -486,7 +486,7 @@ export function targetIdentity(run: RunFn): void {
 
   it("test:client can access LocalPlayer", async () => {
     const result = await run({
-      target: "test:client",
+      context: "client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
     });
     expect(result.ok).toBe(true);
@@ -495,7 +495,7 @@ export function targetIdentity(run: RunFn): void {
 
   it("run:server cannot access LocalPlayer", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       source: "return game:GetService('Players').LocalPlayer == nil",
     });
     expect(result.ok).toBe(true);
@@ -508,7 +508,7 @@ export function targetIdentity(run: RunFn): void {
 export function cacheRequires(run: RunFn): void {
   it("run:server sees mutated global state with cache-requires", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       cacheRequires: true,
       source: "return require(game.ReplicatedStorage.globalState).value",
     });
@@ -518,7 +518,7 @@ export function cacheRequires(run: RunFn): void {
 
   it("test:client sees mutated global state with cache-requires", async () => {
     const result = await run({
-      target: "test:client",
+      context: "client",
       cacheRequires: true,
       source: "return require(game.ReplicatedStorage.globalState).value",
     });
@@ -554,7 +554,7 @@ export function execFiltering(run: RunFn): void {
   // Edit mode tests
 
   it("edit:plugin targets edit DOM", async () => {
-    const result = await run({ target: "edit:plugin", source: SOURCE_PLUGIN });
+    const result = await run({ context: "plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.edit).toBe(true);
@@ -563,7 +563,7 @@ export function execFiltering(run: RunFn): void {
 
   it("edit:plugin can call IsEdit", async () => {
     const result = await run({
-      target: "edit:plugin",
+      context: "plugin",
       source: "return game:GetService('RunService'):IsEdit()",
     });
     expect(result.ok).toBe(true);
@@ -579,7 +579,7 @@ export function execFiltering(run: RunFn): void {
   // Run mode tests
 
   it("run:server targets server DOM in run mode", async () => {
-    const result = await run({ target: "run:server", source: SOURCE_DOM });
+    const result = await run({ context: "server", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
@@ -588,7 +588,7 @@ export function execFiltering(run: RunFn): void {
 
   it("run:server runs as Script (can access ServerStorage)", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       source: "return game:GetService('ServerStorage') ~= nil",
     });
     expect(result.ok).toBe(true);
@@ -596,7 +596,7 @@ export function execFiltering(run: RunFn): void {
   });
 
   it("run:server:plugin runs as ModuleScript on server DOM", async () => {
-    const result = await run({ target: "run:server:plugin", source: SOURCE_PLUGIN });
+    const result = await run({ mode: "run", context: "plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
@@ -607,7 +607,7 @@ export function execFiltering(run: RunFn): void {
   // Play/test mode tests
 
   it("test:server targets server DOM in play mode", async () => {
-    const result = await run({ target: "test:server", source: SOURCE_DOM });
+    const result = await run({ mode: "test", context: "server", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
@@ -615,7 +615,7 @@ export function execFiltering(run: RunFn): void {
   });
 
   it("test:server:plugin runs as ModuleScript on server DOM", async () => {
-    const result = await run({ target: "test:server:plugin", source: SOURCE_PLUGIN });
+    const result = await run({ mode: "test", context: "plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
@@ -624,7 +624,7 @@ export function execFiltering(run: RunFn): void {
   });
 
   it("test:client targets client DOM in play mode", async () => {
-    const result = await run({ target: "test:client", source: SOURCE_DOM });
+    const result = await run({ context: "client", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.client).toBe(true);
@@ -633,7 +633,7 @@ export function execFiltering(run: RunFn): void {
 
   it("test:client runs as LocalScript (can access LocalPlayer)", async () => {
     const result = await run({
-      target: "test:client",
+      context: "client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
     });
     expect(result.ok).toBe(true);
@@ -641,7 +641,7 @@ export function execFiltering(run: RunFn): void {
   });
 
   it("test:client:plugin runs as ModuleScript on client DOM", async () => {
-    const result = await run({ target: "test:client:plugin", source: SOURCE_PLUGIN });
+    const result = await run({ mode: "test", domKind: "client", context: "plugin", source: SOURCE_PLUGIN });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
@@ -655,7 +655,7 @@ export function execFiltering(run: RunFn): void {
 export function uncachedRequireTraversal(run: RunFn): void {
   const exec = (source: string) =>
     run({
-      target: "run:server",
+      context: "server",
       source,
       verbose: true,
     });
@@ -718,7 +718,7 @@ export function uncachedRequireTraversal(run: RunFn): void {
 export function cachedRequireTraversal(run: RunFn): void {
   const exec = (source: string) =>
     run({
-      target: "run:server",
+      context: "server",
       source,
       verbose: true,
       cacheRequires: true,
@@ -750,14 +750,14 @@ export function cachedRequireTraversal(run: RunFn): void {
 }
 
 // ── autoTransition (6 tests) ─────────────────────────────────────────────
-// Verifies that passing `target: "run:server" | "test:client" | ...` to runCode
+// Verifies that passing `context: "server" | "test:client" | ...` to runCode
 // triggers the expected mode transition. Order of cases matters — they traverse
 // edit→run→test→run with specific expectations at each hop.
 
 export function autoTransition(run: RunFn): void {
   it("edit → run:server auto-enters run mode", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       source: "return game:GetService('RunService'):IsRunning() and game.Players.LocalPlayer == nil",
     });
     expect(result.ok).toBe(true);
@@ -766,7 +766,7 @@ export function autoTransition(run: RunFn): void {
 
   it("run → test:client auto-transitions to play mode", async () => {
     const result = await run({
-      target: "test:client",
+      context: "client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
     });
     expect(result.ok).toBe(true);
@@ -775,7 +775,7 @@ export function autoTransition(run: RunFn): void {
 
   it("test → run:server auto-transitions back to run mode", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       source: "return game:GetService('RunService'):IsRunning() and game:GetService('ServerStorage') ~= nil",
     });
     expect(result.ok).toBe(true);
@@ -784,7 +784,7 @@ export function autoTransition(run: RunFn): void {
 
   it("no transition when already in correct mode", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       source: "return game:GetService('RunService'):IsRunning()",
     });
     expect(result.ok).toBe(true);
@@ -793,7 +793,7 @@ export function autoTransition(run: RunFn): void {
 
   it("run → test:server auto-transitions to play mode", async () => {
     const result = await run({
-      target: "test:server",
+      mode: "test", context: "server",
       source: "return game:GetService('RunService'):IsRunning() and #game:GetService('Players'):GetPlayers() > 0",
     });
     expect(result.ok).toBe(true);
@@ -802,7 +802,7 @@ export function autoTransition(run: RunFn): void {
 
   it("test → run:server auto-transitions to run mode", async () => {
     const result = await run({
-      target: "run:server",
+      context: "server",
       source: "return game:GetService('RunService'):IsRunning() and #game:GetService('Players'):GetPlayers() == 0 and 'PASS' or 'FAIL'",
     });
     expect(result.ok).toBe(true);

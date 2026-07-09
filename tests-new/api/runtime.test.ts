@@ -23,7 +23,9 @@ describe("rodeo runtime", () => {
   beforeAll(studio.spawn);
   afterAll(studio.close);
 
-  const run = (opts: Parameters<typeof studio.ctx.editDom.runCode>[0]) => studio.ctx.editDom.runCode(opts);
+  // Routed (session-scoped) tier: the factories pass mode/context and the
+  // master picks the DOM (auto-transitioning the studio's mode as needed).
+  const run = (opts: Parameters<typeof studio.ctx.studio.runCode>[0]) => studio.ctx.studio.runCode(opts);
 
   describe("smoke", () => {
     it("executes a simple script", async () => {
@@ -95,10 +97,10 @@ function openTraversalStudio(): () => Studio {
 
 describe("uncached require traversal", () => {
   const getStudio = openTraversalStudio();
-  uncachedRequireTraversal((opts) => getStudio().editDom.runCode(opts));
+  uncachedRequireTraversal((opts) => getStudio().runCode(opts));
 });
 
 describe("cached require traversal", () => {
   const getStudio = openTraversalStudio();
-  cachedRequireTraversal((opts) => getStudio().editDom.runCode(opts));
+  cachedRequireTraversal((opts) => getStudio().runCode(opts));
 });

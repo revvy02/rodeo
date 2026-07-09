@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bone_transform --target run:server:plugin
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bone_transform --mode run --context plugin
 
 local RunService = game:GetService("RunService")
 

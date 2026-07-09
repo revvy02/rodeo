@@ -85,11 +85,12 @@ export type StudioHandle = {
   close: () => Promise<void>;
 };
 
-// RunFn-shaped wrapper around `ctx.editDom.runCode`. Lets the shared factories
-// in tests-new/utils/executionTests.ts run end-to-end against the API path
-// the same way `makeCliRunFn` does for the CLI subprocess.
+// RunFn-shaped wrapper around `ctx.studio.runCode` (the session-scoped routed
+// tier). Lets the shared factories in tests-new/utils/executionTests.ts pass
+// routing fields (mode/domKind/context) and have the master pick the DOM,
+// mirroring `makeCliRunFn`'s CLI-flag path.
 export function makeApiRunFn(ctx: StudioCtx): (opts: RunCodeOpts) => Promise<RunResult> {
-  return (opts) => ctx.editDom.runCode(opts);
+  return (opts) => ctx.studio.runCode(opts);
 }
 
 export function studioHandle(port: number): StudioHandle {

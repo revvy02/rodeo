@@ -61,38 +61,46 @@ hello, frank
 
 ### Run code in any script context or Studio mode
 
-`--target <mode>:<domKind>[:<identity>]` picks where the script runs. If Studio isn't in the target mode, rodeo auto transitions it when possible.
+Three orthogonal flags pick where the script runs — all optional, with sensible
+defaults. If Studio isn't in the requested mode, rodeo auto-transitions it when
+possible.
 
-| Target | Runs as |
-|--------|---------|
-| `edit:plugin` | ModuleScript in edit mode (default) |
-| `edit:elevated` | elevated identity in edit mode |
-| `run:server` | server Script in run mode |
-| `test:server` | server Script in a play test |
-| `test:client` | LocalScript in a play test |
-| `play:server` | server Script in a multiplayer test |
-| `play:client` | LocalScript on a client in a multiplayer test |
-| `play:client:<n>` | LocalScript on a client, session sized to `n` clients |
+- `--mode edit|run|test|play` — the Studio mode
+- `--context plugin|server|client|elevated` — the run context (cf. Roblox `Script.RunContext`)
+- `--dom-kind server|client` — which DataModel (usually inferred from context/mode)
 
-Append `:plugin` or `:elevated` to any target to override the script identity.
+| Flags | Runs as |
+|-------|---------|
+| *(none)* | ModuleScript in edit mode (default) |
+| `--context elevated` | elevated identity (command bar) in edit mode |
+| `--context server` | server Script in run mode |
+| `--mode test --context server` | server Script in a play test |
+| `--context client` | LocalScript in a play test |
+| `--mode play --context server` | server Script in a multiplayer test |
+| `--mode play --dom-kind client` | LocalScript on a client in a multiplayer test |
+| `--mode play --dom-kind client --clients <n>` | multiplayer test sized to `n` clients |
+
+`--context` composes with `--dom-id <id>` to run at a chosen context on one
+exact DOM (e.g. `--dom-id <id> --context elevated`). `--dom-id` / `--studio-id`
+accept a unique id prefix (from `rodeo state`).
 
 ```bash
-$ rodeo run --target run:server --show-return --source "return game:GetService('RunService'):IsRunning()"
+$ rodeo run --context server --show-return --source "return game:GetService('RunService'):IsRunning()"
 true
 ```
 
 ### Access live module state in a play test
 
-`--target test:client` runs the script as a LocalScript in a play test. With `--cache-requires`, the execution has access to the same module state as your running game code. Mutate it in one run, read it back in the next.
+`--context client` runs the script as a LocalScript in a play test. With `--cache-requires`, the execution has access to the same module state as your running game code. Mutate it in one run, read it back in the next.
 
 ```bash
-$ rodeo run --target test:client --cache-requires --source '
+$ rodeo run --context client --cache-requires --source '
 local m = require(game.ReplicatedStorage.Counter)
 m.value += 1
 print("value is now", m.value)'
 value is now 1
 
-$ rodeo run --target test:client --cache-requires --show-return --source "return require(game.ReplicatedStorage.Counter).value"
+$ rodeo run --context client --cache-requires --show-return --source "return require(game.ReplicatedStorage.Counter).value"
 1
 ```
 

@@ -60,6 +60,9 @@ describe("state (CLI)", () => {
       const snap = JSON.parse(json.stdout);
       const run = (snap.processes ?? []).find((p: any) => p.executionId === id);
       expect(run).toBeTruthy();
+      // Default route resolves to edit/edit/plugin.
+      expect(run.mode).toBe("edit");
+      expect(run.domKind).toBe("edit");
       expect(run.context).toBe("plugin");
       expect(run.domId).toBeTruthy();
       expect(run.studioId).toBe(snap.studios[0].studioId);
@@ -69,16 +72,46 @@ describe("state (CLI)", () => {
     }
   });
 
-  it("pins a run to a specific DOM via --dom", () => {
+  it("pins a run to a DOM via --dom-id (unique prefix ok)", () => {
     const json = runRodeo(["state", "--json", "--port", String(PORT)]);
-    const domId = JSON.parse(json.stdout).studios[0].editDomId;
+    const domId: string = JSON.parse(json.stdout).studios[0].editDomId;
     expect(domId).toBeTruthy();
 
-    const result = runRodeo([
-      "run", "--port", String(PORT), "--dom", domId,
+    // Full id.
+    const full = runRodeo([
+      "run", "--port", String(PORT), "--dom-id", domId,
       "--show-return", "--source", "return 'pinned'",
     ]);
-    expect(result.ok).toBe(true);
-    expect(result.stdout + result.stderr).toContain("pinned");
+    expect(full.ok).toBe(true);
+    expect(full.stdout + full.stderr).toContain("pinned");
+
+    // 8-char prefix (as shown in the state DOMS table) resolves the same DOM.
+    const prefix = runRodeo([
+      "run", "--port", String(PORT), "--dom-id", domId.slice(0, 8),
+      "--show-return", "--source", "return 'prefix'",
+    ]);
+    expect(prefix.ok).toBe(true);
+    expect(prefix.stdout + prefix.stderr).toContain("prefix");
+  });
+
+  it("rejects --dom-id combined with routing flags", () => {
+    const json = runRodeo(["state", "--json", "--port", String(PORT)]);
+    const domId: string = JSON.parse(json.stdout).studios[0].editDomId;
+    const result = runRodeo([
+      "run", "--port", String(PORT), "--dom-id", domId, "--mode", "run",
+      "--source", "return 1",
+    ]);
+    expect(result.ok).toBe(false);
+  });
+
+  it("--context elevated composes with --dom-id", () => {
+    const json = runRodeo(["state", "--json", "--port", String(PORT)]);
+    const domId: string = JSON.parse(json.stdout).studios[0].editDomId;
+    const result = runRodeo([
+      "run", "--port", String(PORT), "--dom-id", domId, "--context", "elevated",
+      "--show-return", "--source", "return tostring(DebuggerManager())",
+    ]);
+    // Elevated needs StudioMCP; assert it at least didn't reject at parse time.
+    expect(result.stdout + result.stderr).not.toContain("mode/dom-kind/clients don't apply");
   });
 });

@@ -76,15 +76,15 @@ describe("directives (CLI)", () => {
   // *before* user CLI args, so clap's last-arg-wins resolves to the CLI
   // value for scalar fields. Observable via RunService:IsRunning() —
   // true in run mode, false in edit mode.
-  it("CLI --target overrides directive --target", () => {
+  it("CLI --context overrides directive --context", () => {
     const script = writeScript(
-      `-- @rodeo run --target edit:plugin --show-return`,
+      `-- @rodeo run --context plugin --show-return`,
       `return game:GetService("RunService"):IsRunning()`,
     );
     try {
       const r = runRodeo([
         "run", "--port", String(PORT), script,
-        "--target", "run:server",
+        "--context", "server",
       ]);
       expect(r.ok).toBe(true);
       expect(r.stdout + r.stderr).toContain("true");

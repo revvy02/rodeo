@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bulkmoveto --target run:server
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bulkmoveto --context server
 
 -- Benchmark: workspace:BulkMoveTo() with N anchored parts
 -- Runs for ~10s at 60fps, profiler captures engine-level frame data
