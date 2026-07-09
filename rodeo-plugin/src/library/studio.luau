@@ -64,6 +64,26 @@ end
 -- DOM would mint a second id and break the invariant.
 local domId = require(RODEO_UNIFIER_MODULE)
 
+-- Canonical studio id: one per Studio *process*, shared across all its DOMs.
+-- The edit DOM mints it once as a Workspace attribute; the play server/client
+-- DataModels are clones of the edit DataModel (verified: a runtime-set
+-- Workspace attribute survives the play-solo clone), so they inherit it. This
+-- is the stable studio identity — independent of the launch `session_guid`
+-- (only owned/launched studios have one) and of StudioMCP's flaky id. Minted
+-- only in edit; other DOMs read the inherited value.
+local RODEO_STUDIO_ID_ATTR = "rodeoStudioId"
+local studioId: string = ""
+do
+	local ws = game:GetService("Workspace")
+	local existing = ws:GetAttribute(RODEO_STUDIO_ID_ATTR)
+	if type(existing) == "string" and existing ~= "" then
+		studioId = existing
+	elseif RunService:IsEdit() then
+		studioId = game:GetService("HttpService"):GenerateGUID(false)
+		ws:SetAttribute(RODEO_STUDIO_ID_ATTR, studioId)
+	end
+end
+
 -- Inputs: mutable values updated by events. The Heartbeat reads these to compute state.
 -- `*mcpStudioId*` values are StudioMCP's own ids (propagated via the RODEO_UNIFIER
 -- event channels by rodeo-cli's reconciliation loop). They are NOT the canonical
@@ -85,9 +105,11 @@ local currentState: State? = nil
 
 export type State = {
 	domId: string,
-	-- StudioMCP's assigned id for this Studio (set via reconciliation).
-	-- Distinct from the master-assigned canonical studio_id, which is tracked
-	-- server-side and not known to the plugin.
+	-- Canonical studio identity — same value for every DOM of one Studio
+	-- process (minted by the edit DOM, inherited by play children via clone).
+	studioId: string,
+	-- StudioMCP's assigned id for this Studio (set via reconciliation). Used
+	-- only for elevated-context routing (set_active_studio); NOT the identity.
 	mcpStudioId: string?,
 
 	isServer: boolean,
@@ -154,6 +176,7 @@ local function computeState(): State
 
 	return {
 		domId = domId,
+		studioId = studioId,
 		mcpStudioId = if isClient then clientMcpStudioId else serverMcpStudioId,
 
 		isServer = isServer,

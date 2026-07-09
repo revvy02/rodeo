@@ -178,6 +178,7 @@ local function AppProvider(props: AppProviderProps)
 				local msg = rodeoProto.PluginMessage.new({
 					msg = { type = "studioState", value = rodeoProto.StudioStateMsg.new({
 						domId = state.domId,
+						studioId = state.studioId,
 						mcpStudioId = state.mcpStudioId,
 						isServer = state.isServer,
 						isClient = state.isClient,

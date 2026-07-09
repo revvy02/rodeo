@@ -463,7 +463,7 @@ export class Studio {
     // Studio-first snapshot: this Studio's DOMs live under its entry in
     // state.studios[].doms (keyed by studioId).
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
-    const studio = (state.studios ?? []).find((s) => s.studioId === this.sessionGuid);
+    const studio = (state.studios ?? []).find((s) => s.sessionId === this.sessionGuid);
     if (!studio) return [];
     return (studio.doms ?? []).map((sv) => new Dom(buildDomSnapshot(studio, sv), this.daemon));
   }

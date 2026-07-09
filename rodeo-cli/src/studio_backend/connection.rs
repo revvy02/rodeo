@@ -11,9 +11,9 @@ pub struct RunRequest {
     /// Routing spec (sparse, as submitted). Validated via `resolve()` at
     /// submit time, so downstream `.resolve().unwrap()` is infallible.
     pub route: crate::shared::target::RouteSpec,
-    /// Session filter — matches a DOM's master-minted `session_guid`. Used by
-    /// studio-scoped callers (Studio.runCode, --studio-id) to narrow
-    /// route-based matching to a specific Studio launch.
+    /// Studio filter — restricts route matching to one studio. Matches a DOM
+    /// whose launch `session_guid` (owned-studio launch pin, e.g. `run --place`)
+    /// OR canonical `studio_id` (`--studio-id`, Studio.runCode) equals this.
     pub session: Option<String>,
     /// Direct DOM targeting (bypasses route matching; only `route.context`
     /// applies)
@@ -241,5 +241,17 @@ impl DomConnection {
     /// Get the dom from DOM state, if available.
     pub fn dom_kind(&self) -> Option<&str> {
         self.state.as_ref().map(|s| if s.dom_kind.is_empty() { None } else { Some(s.dom_kind.as_str()) }).flatten()
+    }
+
+    /// The canonical plugin studio id, if this DOM has reported its state.
+    pub fn studio_id(&self) -> Option<&str> {
+        self.state.as_ref().map(|s| if s.studio_id.is_empty() { None } else { Some(s.studio_id.as_str()) }).flatten()
+    }
+
+    /// Does this DOM belong to the studio identified by `wanted`? A run's
+    /// studio filter matches on either the launch `session_guid` (owned-studio
+    /// launch pin) or the canonical `studio_id` (`--studio-id`).
+    pub fn matches_studio(&self, wanted: &str) -> bool {
+        self.session_guid.as_deref() == Some(wanted) || self.studio_id() == Some(wanted)
     }
 }

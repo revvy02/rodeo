@@ -196,7 +196,7 @@ impl Studio {
             .await
             .map_err(|e| anyhow!("get_state failed: {e}"))?
             .into_owned();
-        Ok(state.studios.into_iter().find(|s| s.studio_id == self.session_guid))
+        Ok(state.studios.into_iter().find(|s| s.session_id.as_deref() == Some(self.session_guid.as_str())))
     }
 
     /// Poll the canonical studio-first state until this Studio satisfies `pred`.
@@ -435,7 +435,7 @@ impl MultiplayerTest {
                 .await
                 .map_err(|e| anyhow!("get_state failed: {e}"))?
                 .into_owned();
-            if let Some(s) = state.studios.into_iter().find(|s| s.studio_id == self.session_guid) {
+            if let Some(s) = state.studios.into_iter().find(|s| s.session_id.as_deref() == Some(self.session_guid.as_str())) {
                 if pred(&s) {
                     return Ok(s);
                 }

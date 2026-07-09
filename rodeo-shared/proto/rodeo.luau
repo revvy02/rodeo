@@ -368,6 +368,7 @@ type _DomSnapshotFields = {
 	mode: string?,
 	domKind: string?,
 	sessionGuid: string?,
+	studioId: string?,
 	placeId: number?,
 	gameName: string?,
 	activeRuns: number,
@@ -382,6 +383,7 @@ export type _DomSnapshotPartialFields = {
 	mode: string?,
 	domKind: string?,
 	sessionGuid: string?,
+	studioId: string?,
 	placeId: number?,
 	gameName: string?,
 	activeRuns: number?,
@@ -1681,6 +1683,7 @@ type _StudioStateMsgFields = {
 	jobId: string?,
 	clientDomIdsJson: string?,
 	sessionGuid: string?,
+	studioId: string,
 }
 
 export type _StudioStateMsgPartialFields = {
@@ -1699,6 +1702,7 @@ export type _StudioStateMsgPartialFields = {
 	jobId: string?,
 	clientDomIdsJson: string?,
 	sessionGuid: string?,
+	studioId: string?,
 }
 
 export type StudioStateMsg = typeof(setmetatable({} :: _StudioStateMsgFields, {} :: _StudioStateMsgImpl))
@@ -3437,6 +3441,7 @@ do
 			mode = if data == nil or data.mode == nil then nil else data.mode,
 			domKind = if data == nil or data.domKind == nil then nil else data.domKind,
 			sessionGuid = if data == nil or data.sessionGuid == nil then nil else data.sessionGuid,
+			studioId = if data == nil or data.studioId == nil then nil else data.studioId,
 			placeId = if data == nil or data.placeId == nil then nil else data.placeId,
 			gameName = if data == nil or data.gameName == nil then nil else data.gameName,
 			activeRuns = if data == nil or data.activeRuns == nil then 0 else data.activeRuns,
@@ -3473,6 +3478,11 @@ do
 		if self.sessionGuid ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
+		end
+
+		if self.studioId ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 12, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.studioId)
 		end
 
 		if self.placeId ~= nil then
@@ -3579,6 +3589,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.userName = proto.decodeString(value)
 					continue
+				elseif field == 12 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.studioId = proto.decodeString(value)
+					continue
 				end
 
 				local length
@@ -3624,6 +3639,10 @@ do
 
 		if self.sessionGuid ~= nil then
 			output.sessionGuid = self.sessionGuid
+		end
+
+		if self.studioId ~= nil then
+			output.studioId = self.studioId
 		end
 
 		if self.placeId ~= nil then
@@ -3674,6 +3693,10 @@ do
 
 		if input.sessionGuid ~= nil then
 			self.sessionGuid = input.sessionGuid
+		end
+
+		if input.studioId ~= nil then
+			self.studioId = input.studioId
 		end
 
 		if input.placeId ~= nil then
@@ -10878,6 +10901,7 @@ do
 			jobId = if data == nil or data.jobId == nil then nil else data.jobId,
 			clientDomIdsJson = if data == nil or data.clientDomIdsJson == nil then nil else data.clientDomIdsJson,
 			sessionGuid = if data == nil or data.sessionGuid == nil then nil else data.sessionGuid,
+			studioId = if data == nil or data.studioId == nil then "" else data.studioId,
 		}, _StudioStateMsgImpl :: _StudioStateMsgImpl)
 	end
 
@@ -10959,6 +10983,11 @@ do
 		if self.sessionGuid ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 15, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
+		end
+
+		if self.studioId ~= nil and self.studioId ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 16, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.studioId)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -11055,6 +11084,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.sessionGuid = proto.decodeString(value)
 					continue
+				elseif field == 16 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.studioId = proto.decodeString(value)
+					continue
 				end
 
 				local length
@@ -11142,6 +11176,10 @@ do
 			output.sessionGuid = self.sessionGuid
 		end
 
+		if self.studioId ~= nil and self.studioId ~= "" then
+			output.studioId = self.studioId
+		end
+
 		return output
 	end
 
@@ -11206,6 +11244,10 @@ do
 
 		if input.sessionGuid ~= nil then
 			self.sessionGuid = input.sessionGuid
+		end
+
+		if input.studioId ~= nil then
+			self.studioId = input.studioId
 		end
 
 		return self

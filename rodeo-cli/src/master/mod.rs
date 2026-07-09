@@ -120,13 +120,12 @@ impl BackendState {
                 continue;
             }
 
-            // Session filter — `run.session` is the master-minted session_guid.
-            // Applies regardless of route: a default-route run pinned to a
-            // session (e.g. the Studio `run --place` just launched) must never
-            // route into another session's DOMs.
+            // Studio filter — `run.session` restricts to one studio, matching a
+            // DOM by its launch session_guid (owned launch pin, e.g.
+            // `run --place`) or its canonical studio_id (`--studio-id`). Applies
+            // regardless of route so a scoped run never leaks into another studio.
             if let Some(ref wanted) = run.session {
-                let dom_session = dom.session_guid.as_deref();
-                if dom_session != Some(wanted.as_str()) {
+                if !dom.matches_studio(wanted) {
                     continue;
                 }
             }
@@ -395,7 +394,9 @@ impl MasterState {
             // find_match_for_run: a session-pinned default-route run must not
             // route into another session's DOMs.
             if let Some(ref wanted) = run.session {
-                if dom.session_guid.as_deref() != Some(wanted.as_str()) {
+                let matches = dom.session_guid.as_deref() == Some(wanted.as_str())
+                    || dom.studio_id.as_deref() == Some(wanted.as_str());
+                if !matches {
                     continue;
                 }
             }
@@ -598,22 +599,26 @@ impl MasterState {
     /// server DOM keeps trying EndTest — until its own mode matches (or the
     /// target changes). Backend just maintains the declarative state.
     pub fn derive_and_push_targets(&mut self) {
+        // Group DOMs by their canonical studio id (the same key build_studios /
+        // routing use): studio_id > session_guid > dom_id. `ident_to_group`
+        // maps every studio identifier a run might carry in `session` — either
+        // a launch session_guid or a canonical studio_id — back to its group,
+        // so both an owned launch-pin and a `--studio-id` run drive the right
+        // studio's transition. Session-less/id-less DOMs (a hand-opened Studio
+        // before its state lands) still get a standalone group so a session-less
+        // run can drive them too.
         let mut studio_doms: HashMap<String, Vec<String>> = HashMap::new();
+        let mut ident_to_group: HashMap<String, String> = HashMap::new();
         for backend in self.backends.values() {
             let snap = backend.state_rx.borrow();
             for dom in &snap.doms {
                 if !dom.connected { continue; }
-                // Session-bearing DOMs group by session. Session-less DOMs —
-                // manually-installed plugins report SESSION_GUID=nil — get their
-                // own dom_id as a standalone key, so a session-less run (the common
-                // `rodeo run --target X` / MCP run_code case) can still drive their
-                // mode transition. Skipping them here meant the master never pushed
-                // SetTargetMode to a hand-opened Studio, so auto-transition never
-                // fired and the run hung in pending_runs forever.
-                let key = match dom.session_guid.as_deref() {
-                    Some(s) if !s.is_empty() => s.to_string(),
-                    _ => dom.dom_id.clone(),
-                };
+                let non_empty = |s: &Option<String>| s.clone().filter(|v| !v.is_empty());
+                let key = non_empty(&dom.studio_id)
+                    .or_else(|| non_empty(&dom.session_guid))
+                    .unwrap_or_else(|| dom.dom_id.clone());
+                if let Some(sid) = non_empty(&dom.studio_id) { ident_to_group.insert(sid, key.clone()); }
+                if let Some(sg) = non_empty(&dom.session_guid) { ident_to_group.insert(sg, key.clone()); }
                 studio_doms.entry(key).or_default().push(dom.dom_id.clone());
             }
         }
@@ -635,9 +640,13 @@ impl MasterState {
             };
             match run.session.as_deref() {
                 Some(s) if !s.is_empty() => {
-                    derived.entry(s.to_string()).and_modify(|v| {
-                        if v.is_empty() { *v = mode.clone(); }
-                    }).or_insert_with(|| mode.clone());
+                    // Resolve the run's studio filter (session_guid OR studio_id)
+                    // to its group; no match → nothing to transition.
+                    if let Some(group) = ident_to_group.get(s) {
+                        derived.entry(group.clone()).and_modify(|v| {
+                            if v.is_empty() { *v = mode.clone(); }
+                        }).or_insert_with(|| mode.clone());
+                    }
                 }
                 _ => {
                     for session in studio_doms.keys() {
@@ -915,9 +924,16 @@ fn build_studios(
         if !dom.connected {
             continue;
         }
+        // Group by the canonical plugin studio id — shared across every DOM of
+        // one Studio process, so a manual studio's play children group with its
+        // edit DOM the same as an owned studio's do. Fall back to the launch
+        // session_guid (available at connect before the first state message),
+        // then to the dom id (a lone id-less DOM).
         let key = dom
-            .session_guid
+            .studio_id
             .clone()
+            .filter(|s| !s.is_empty())
+            .or_else(|| dom.session_guid.clone())
             .unwrap_or_else(|| format!("dom:{}", dom.dom_id));
         groups.entry(key).or_default().push(dom);
     }
@@ -938,10 +954,11 @@ fn build_studios(
                 .unwrap_or_default();
             // Representative DOM for place/name/backend: prefer the edit DOM.
             let rep = edit.or_else(|| members.first().copied());
-            let inst = instances.get(&id);
-            // The group key is the launch session_guid unless this is a
-            // session-less (manually-connected) studio keyed "dom:<id>".
-            let session_id = if id.starts_with("dom:") { None } else { Some(id.clone()) };
+            // The launch session_guid (owned studios only) — the DOMs of one
+            // studio share it. Absent for manually-connected studios. Used for
+            // the instance-lifecycle lookup and surfaced as `session_id`.
+            let session_id = members.iter().find_map(|v| v.session_guid.clone());
+            let inst = session_id.as_ref().and_then(|sg| instances.get(sg));
 
             rodeo_proto::StudioState {
                 studio_id: id.clone(),

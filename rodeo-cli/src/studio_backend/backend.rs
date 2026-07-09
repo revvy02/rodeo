@@ -774,6 +774,10 @@ async fn build_state_snapshot(state: &SharedBackendState) -> proto::StateSnapsho
         mode: dom.state.as_ref().map(|s| s.mode.clone()),
         dom_kind: dom.state.as_ref().map(|s| s.dom_kind.clone()),
         session_guid: dom.session_guid.clone(),
+        // Canonical studio id from the plugin (empty until first state msg).
+        studio_id: dom.state.as_ref()
+            .map(|s| s.studio_id.clone())
+            .filter(|s| !s.is_empty()),
         place_id: dom.state.as_ref().map(|s| s.place_id),
         game_name: dom.state.as_ref().map(|s| s.game_name.clone()),
         active_runs: dom.active_count() as u32,

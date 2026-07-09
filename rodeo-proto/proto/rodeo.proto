@@ -127,6 +127,9 @@ message DomSnapshot {
   optional string mode = 3;
   optional string dom_kind = 4;
   optional string session_guid = 5;
+  // Canonical studio identity (plugin-minted; see StudioStateMsg.studio_id).
+  // The grouping key for build_studios.
+  optional string studio_id = 12;
   optional int64 place_id = 6;
   optional string game_name = 7;
   uint32 active_runs = 8;
@@ -561,6 +564,11 @@ message StudioStateMsg {
   // stamp DomConnection.session_guid synchronously. Absent for manually-
   // installed plugins that weren't launched via a rodeo session.
   optional string session_guid = 15;
+  // Canonical studio identity: one value per Studio process, shared across its
+  // DOMs (minted by the edit DOM as a Workspace attribute, inherited by play
+  // children via clone). The master groups DOMs into studios by this and
+  // addresses them by it (--studio-id). Present for owned AND manual studios.
+  string studio_id = 16;
 }
 
 message ClientInfo {
