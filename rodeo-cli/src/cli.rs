@@ -1,6 +1,36 @@
 use crate::util::config;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+
+/// Routing flag enums. Each maps to its lowercase wire string via `as_str`;
+/// `shared::target::RouteSpec` does the actual defaults + validation.
+#[derive(Copy, Clone, Debug, ValueEnum)]
+#[value(rename_all = "lowercase")]
+pub enum ModeArg { Edit, Run, Test, Play }
+
+#[derive(Copy, Clone, Debug, ValueEnum)]
+#[value(rename_all = "lowercase")]
+pub enum DomKindArg { Server, Client }
+
+#[derive(Copy, Clone, Debug, ValueEnum)]
+#[value(rename_all = "lowercase")]
+pub enum ContextArg { Plugin, Server, Client, Elevated }
+
+impl ModeArg {
+    pub fn as_str(self) -> &'static str {
+        match self { Self::Edit => "edit", Self::Run => "run", Self::Test => "test", Self::Play => "play" }
+    }
+}
+impl DomKindArg {
+    pub fn as_str(self) -> &'static str {
+        match self { Self::Server => "server", Self::Client => "client" }
+    }
+}
+impl ContextArg {
+    pub fn as_str(self) -> &'static str {
+        match self { Self::Plugin => "plugin", Self::Server => "server", Self::Client => "client", Self::Elevated => "elevated" }
+    }
+}
 
 const STYLES: Styles = Styles::styled()
     .header(AnsiColor::Yellow.on_default().effects(Effects::BOLD))
@@ -74,13 +104,26 @@ pub enum Commands {
         #[arg(long)]
         show_return: bool,
 
-        /// Target: mode:domKind[:identity] (e.g. edit:plugin, test:server, play:client:plugin)
-        #[arg(long)]
-        target: Option<String>,
+        /// Studio mode to run in (auto-transitions Studio). Defaults from
+        /// --context/--dom-kind (else edit).
+        #[arg(long, value_enum, help_heading = "Targeting")]
+        mode: Option<ModeArg>,
 
-        /// Studio instance to target (id, name, or "active")
-        #[arg(long)]
-        studio: Option<String>,
+        /// Which DOM role receives the script (rarely needed — inferred).
+        #[arg(long = "dom-kind", value_enum, help_heading = "Targeting")]
+        dom_kind: Option<DomKindArg>,
+
+        /// Run context the code executes as (cf. Script.RunContext).
+        #[arg(long, value_enum, help_heading = "Targeting")]
+        context: Option<ContextArg>,
+
+        /// Play-test session size (mode play only): ensure N clients total.
+        #[arg(long, help_heading = "Targeting")]
+        clients: Option<u32>,
+
+        /// Scope routing to one studio by id (from `rodeo state`; unique prefix ok).
+        #[arg(long = "studio-id", help_heading = "Targeting", conflicts_with = "place")]
+        studio_id: Option<String>,
 
         /// Disable warning output
         #[arg(long)]
@@ -238,9 +281,10 @@ pub struct PlaceArgs {
     #[arg(long = "place", num_args = 0..=1, default_missing_value = "", help_heading = "Launch")]
     pub place: Option<String>,
 
-    /// Target a specific DOM directly by ID (from `rodeo state`)
-    #[arg(long, help_heading = "Targeting")]
-    pub dom: Option<String>,
+    /// Pin the run to a specific DOM by id (from `rodeo state`; unique prefix
+    /// ok). Only --context may accompany it — no mode/dom-kind/clients routing.
+    #[arg(long = "dom-id", help_heading = "Targeting")]
+    pub dom_id: Option<String>,
 
     /// Universe ID (resolved from place ID if omitted)
     #[arg(long = "place.universe", value_name = "UNIVERSE_ID", help_heading = "Launch")]

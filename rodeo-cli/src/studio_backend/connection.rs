@@ -8,12 +8,15 @@ use rodeo_proto::{self as proto, ProcessState, StudioStateMsg};
 pub struct RunRequest {
     pub execution_id: String,
     pub script: String,
-    pub target: String,
+    /// Routing spec (sparse, as submitted). Validated via `resolve()` at
+    /// submit time, so downstream `.resolve().unwrap()` is infallible.
+    pub route: crate::shared::target::RouteSpec,
     /// Session filter — matches a DOM's master-minted `session_guid`. Used by
-    /// Dom-scoped callers (TS `Dom.runCode`) to narrow target-based search to a
-    /// specific Studio launch.
+    /// studio-scoped callers (Studio.runCode, --studio-id) to narrow
+    /// route-based matching to a specific Studio launch.
     pub session: Option<String>,
-    /// Direct DOM targeting (bypasses mode/dom matching)
+    /// Direct DOM targeting (bypasses route matching; only `route.context`
+    /// applies)
     pub dom_id: Option<String>,
     pub log_filter: proto::LogFilter,
     pub cache_requires: Option<bool>,
@@ -122,20 +125,21 @@ impl DomConnection {
 
     /// Start a run on this DOM
     pub fn start_run(&mut self, mut run: RunRequest) {
-        let identity = if run.target.is_empty() {
-            "plugin".to_string()
-        } else {
-            crate::shared::target::parse(&run.target)
-                .map(|t| t.identity.as_str().to_string())
-                .unwrap_or_else(|_| "plugin".to_string())
-        };
+        // Pinned runs (dom_id) carry at most a context; routed runs resolve
+        // through the defaults table. Either way the plugin receives only the
+        // run context — mode/dom-kind were consumed when this DOM was picked.
+        let context = run
+            .route
+            .context
+            .or_else(|| run.route.resolve().ok().map(|r| r.context))
+            .unwrap_or(crate::shared::target::RunContext::Plugin);
 
         let run_cmd = proto::ServerMessage {
             msg: Some(proto::server_message::Msg::Run(Box::new(
                 proto::RunCommand {
                     execution_id: run.execution_id.clone(),
                     script: run.script.clone(),
-                    target: identity,
+                    context: context.as_str().to_string(),
                     log_filter: buffa::MessageField::some(run.log_filter.clone()),
                     cache_requires: run.cache_requires,
                     script_args: run.script_args.clone().unwrap_or_default(),
@@ -154,7 +158,7 @@ impl DomConnection {
 
         let msg = serde_json::to_string(&run_cmd).unwrap();
 
-        tracing::info!(id = run.execution_id.as_str(), target = run.target.as_str(), "executing");
+        tracing::info!(id = run.execution_id.as_str(), context = context.as_str(), "executing");
 
         run.state = ProcessState::PROCESS_STATE_RUNNING;
         let _ = self.studio_tx.send(msg);

@@ -274,11 +274,19 @@ message RunClientMessage {
 
 // No id field: the master mints the run id and returns it as the first
 // stream event (ProcessCreated).
+//
+// Routing fields (mode / dom_kind / context / clients) are sparse — they carry
+// exactly what the caller specified; the master applies the defaults table and
+// validates at submit (shared::target::RouteSpec::resolve). A run with dom_id
+// set is pinned: only context may accompany it.
 message SubmitRequest {
   string script = 1;
-  string target = 2;
+  optional string mode = 2;      // edit | run | test | play
   optional string session = 3;
   optional string dom_id = 4;
+  optional string dom_kind = 15; // server | client
+  optional string context = 16;  // plugin | server | client | elevated (cf. Script.RunContext)
+  optional uint32 clients = 17;  // play session size (mode play only)
   optional bool cache_requires = 5;
   repeated string script_args = 6;
   optional string return_file = 7;
@@ -471,10 +479,11 @@ message DomInfo {
 message ProcessInfo {
   string execution_id = 1;
   string state = 2;                  // queued | running | done | error | killed
-  // Requested target (e.g. "edit:elevated"). Empty for --dom-pinned runs that
-  // gave no target (the DOM's native target applies).
-  string target = 3;
-  string context = 4;                // identity: plugin | elevated | server | client
+  // Resolved route. mode/dom_kind are empty for dom_id-pinned runs (no
+  // routing happened); context is always set (plugin default).
+  string mode = 3;                   // edit | run | test | play
+  string context = 4;                // plugin | server | client | elevated
+  string dom_kind = 9;               // edit | server | client
   // Where the run executes — set once dispatched, absent while queued.
   optional string studio_id = 5;
   optional string session_id = 6;
@@ -566,7 +575,10 @@ message WelcomeMsg {
 message RunCommand {
   string execution_id = 1;
   string script = 2;
-  string target = 3;
+  // Run context the code executes as: plugin | server | client | elevated
+  // (empty → plugin). Mode/dom-kind never reach the plugin — the master
+  // resolved those when it picked the DOM this command is sent to.
+  string context = 3;
   reserved 4, 5, 6, 7, 8;    // old flat enable_warn/error/info/output/logs
   optional bool cache_requires = 9;
   repeated string script_args = 10;

@@ -176,10 +176,10 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
             state.backends.lock().await.insert(handle.clone(), Arc::new(backend));
             Ok(json!({ "backendHandle": handle, "info": info }))
         }
-        "client.getStudio" => {
+        "client.getBackend" => {
             let id_or_name = params.get("idOrName").and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow!("idOrName required"))?;
-            let backend = state.client.get_studio(id_or_name).await?;
+            let backend = state.client.get_backend(id_or_name).await?;
             let info = serde_json::json!({ "id": backend.id, "name": backend.name });
             let handle = state.mint_handle("b");
             state.backends.lock().await.insert(handle.clone(), Arc::new(backend));
@@ -189,6 +189,7 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
             let doms = state.client.get_doms().await?;
             Ok(serde_json::to_value(doms.iter().map(dom_snapshot).collect::<Vec<_>>())?)
         }
+        "client.runCode" => client_run_code(state, params).await,
         "client.listProcesses" => {
             let list = state.client.list_processes().await?;
             Ok(serde_json::to_value(list)?)
@@ -209,6 +210,7 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
         "studio.save" => studio_save(state, params).await,
         "studio.close" => studio_close(state, params).await,
         "studio.getDoms" => studio_get_doms(state, params).await,
+        "studio.runCode" => studio_run_code(state, params).await,
         "studio.startMultiplayerTest" => studio_start_multiplayer_test(state, params).await,
 
         // mp.* — in-Studio multiplayer test lifecycle, keyed by an `mpHandle`
@@ -413,19 +415,10 @@ async fn mp_close(state: Arc<State>, params: Value) -> Result<Value> {
 // dom.* adapters
 // ---------------------------------------------------------------------------
 
-async fn dom_run_code(state: Arc<State>, params: Value) -> Result<Value> {
-    let dom_id = params.get("domId").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("domId required"))?
-        .to_string();
-    // Client-provided streamId (mandatory). This eliminates the race where a
-    // server-minted ID could be included in a notification before the
-    // response-with-ID reaches the client. The caller allocates the ID,
-    // registers its callback locally, THEN sends the request — so any
-    // notification that arrives (even immediately) routes correctly.
-    let stream_id = params.get("streamId").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("streamId required (client-allocated)"))?
-        .to_string();
-
+/// Read a RunCodeOpts from JSON-RPC params, including the routing fields
+/// (mode/dom_kind/context/clients). The DOM tier omits the routing fields at
+/// the type level, so they arrive absent → None.
+fn read_run_opts(params: &Value) -> RunCodeOpts {
     // Parse logFilter from params — missing fields default to "enabled" to
     // match the old TS client's behavior (all message types captured unless
     // explicitly disabled). Passing an unset field on the wire causes the
@@ -444,17 +437,17 @@ async fn dom_run_code(state: Arc<State>, params: Value) -> Result<Value> {
             ..Default::default()
         }
     };
-
     // Accept directory paths from the JSON-RPC caller (same-machine) and hand
     // them to rodeo-client, which writes profile/log files directly to disk.
-    // Presence of a dir implies the corresponding feature is on. We do NOT
-    // stream file bytes back over stdio — that path was a ~10× amplification
-    // of on-disk data and a quadratic hazard for Luau's line-buffered reader.
     let profile_dir = params.get("profileDir").and_then(|v| v.as_str()).map(std::path::PathBuf::from);
+    let str_opt = |k: &str| params.get(k).and_then(|v| v.as_str()).map(String::from);
 
-    let opts = RunCodeOpts {
+    RunCodeOpts {
         source: params.get("source").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        target: params.get("target").and_then(|v| v.as_str()).map(String::from),
+        mode: str_opt("mode"),
+        dom_kind: str_opt("domKind"),
+        context: str_opt("context"),
+        clients: params.get("clients").and_then(|v| v.as_u64()).map(|n| n as u32),
         show_return: params.get("showReturn").and_then(|v| v.as_bool()).unwrap_or(false),
         cache_requires: params.get("cacheRequires").and_then(|v| v.as_bool()).unwrap_or(false),
         verbose: params.get("verbose").and_then(|v| v.as_bool()).unwrap_or(false),
@@ -463,18 +456,62 @@ async fn dom_run_code(state: Arc<State>, params: Value) -> Result<Value> {
             .unwrap_or_default(),
         profile: profile_dir.is_some(),
         log_filter: Some(log_filter),
-        instance_path: params.get("instancePath").and_then(|v| v.as_str()).map(String::from),
-        script_path: params.get("scriptPath").and_then(|v| v.as_str()).map(String::from),
-        return_file: params.get("returnFile").and_then(|v| v.as_str()).map(String::from),
-        output_file: params.get("outputFile").and_then(|v| v.as_str()).map(String::from),
+        instance_path: str_opt("instancePath"),
+        script_path: str_opt("scriptPath"),
+        return_file: str_opt("returnFile"),
+        output_file: str_opt("outputFile"),
         profile_dir,
-        // Daemon callers route by domId (the Dom handle pins its own session).
         session: None,
-    };
+    }
+}
 
+async fn dom_run_code(state: Arc<State>, params: Value) -> Result<Value> {
+    let dom_id = params.get("domId").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("domId required"))?
+        .to_string();
+    let stream_id = require_stream_id(&params)?;
+    let opts = read_run_opts(&params);
     let dom = state.client.get_dom(&dom_id).await?;
-    let mut stream = dom.run_code_stream(opts).await?;
+    let stream = dom.run_code_stream(opts).await?;
+    pump_stream(state, stream_id, stream).await
+}
 
+async fn studio_run_code(state: Arc<State>, params: Value) -> Result<Value> {
+    let studio = lookup_studio(&state, &params).await?;
+    let stream_id = require_stream_id(&params)?;
+    let opts = read_run_opts(&params);
+    let stream = {
+        let guard = studio.lock().await;
+        guard.run_code_stream(opts).await?
+    };
+    pump_stream(state, stream_id, stream).await
+}
+
+async fn client_run_code(state: Arc<State>, params: Value) -> Result<Value> {
+    let stream_id = require_stream_id(&params)?;
+    let opts = read_run_opts(&params);
+    let stream = state.client.submit_run_stream(opts).await?;
+    pump_stream(state, stream_id, stream).await
+}
+
+/// Client-provided streamId (mandatory). Eliminates the race where a
+/// server-minted ID could appear in a notification before the response
+/// reaches the client: the caller allocates it and registers its callback
+/// before sending, so any notification routes correctly.
+fn require_stream_id(params: &Value) -> Result<String> {
+    Ok(params.get("streamId").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("streamId required (client-allocated)"))?
+        .to_string())
+}
+
+/// Drive a RunStream, forwarding events to the JSON-RPC caller as
+/// stream.data / stream.done / stream.error notifications. Registers a cancel
+/// channel keyed by streamId. Shared by the dom / studio / client run tiers.
+async fn pump_stream(
+    state: Arc<State>,
+    stream_id: String,
+    mut stream: rodeo_client::run::RunStream,
+) -> Result<Value> {
     let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
     state.streams.lock().await.insert(stream_id.clone(), cancel_tx);
 

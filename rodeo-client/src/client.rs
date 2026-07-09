@@ -107,7 +107,10 @@ impl RodeoClient {
         }
     }
 
-    pub async fn get_studio(&self, id_or_name: &str) -> Result<StudioBackend> {
+    /// Select a studio BACKEND (a machine running a studio backend process)
+    /// by id prefix or exact name — not a studio instance; those are
+    /// addressed by studio_id via the snapshot.
+    pub async fn get_backend(&self, id_or_name: &str) -> Result<StudioBackend> {
         let backends = self.list_backends(Some("studio")).await?;
         backends
             .into_iter()
@@ -201,18 +204,18 @@ impl RodeoClient {
         Ok(())
     }
 
-    /// Submit a run with no DOM handle — server routes by target. Used by the
-    /// CLI orchestration path where the target string (`run:server`, `play:client:2`)
-    /// is the canonical selector and master resolves it to a DOM.
+    /// Submit a run with no DOM handle — the serve-wide tier: the master
+    /// routes by the opts' mode/dom_kind/context fields (within opts.session
+    /// if set) and resolves them to a DOM.
     pub async fn submit_run(&self, opts: crate::run::RunCodeOpts) -> Result<crate::run::RunResult> {
-        crate::run::run_buffered_target(self.transport.clone(), opts).await
+        crate::run::run_buffered_routed(self.transport.clone(), opts).await
     }
 
     /// Streaming variant of `submit_run` — caller drives the returned stream
     /// and decides how to handle Output events (write to stdio, emit as
     /// structured notifications, etc.).
     pub async fn submit_run_stream(&self, opts: crate::run::RunCodeOpts) -> Result<crate::run::RunStream> {
-        crate::run::run_stream_target(self.transport.clone(), opts).await
+        crate::run::run_stream_routed(self.transport.clone(), opts).await
     }
 
     /// Save the default (current) studio — for CLI `rodeo save`.

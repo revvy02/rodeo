@@ -8,11 +8,13 @@ export type LogFilter = {
 	enableLogs: boolean?,
 }
 
-export type RunCodeOpts = {
+-- Common run options (every tier). `context` is the run context the code
+-- executes as (cf. Roblox Script.RunContext).
+export type DomRunCodeOpts = {
 	source: string?,
 	file: string?,
 	sourcemap: string?,
-	target: string?,
+	context: ("plugin" | "server" | "client" | "elevated")?,
 	showReturn: boolean?,
 	cacheRequires: boolean?,
 	verbose: boolean?,
@@ -23,6 +25,14 @@ export type RunCodeOpts = {
 	-- other extension emits JSON-encoded tagged structs.
 	returnFile: string?,
 	logFilter: LogFilter?,
+}
+
+-- Routed tiers (client.runCode / studio.runCode) add routing fields.
+-- `dom.runCode` uses DomRunCodeOpts (pinned — no routing).
+export type RunCodeOpts = DomRunCodeOpts & {
+	mode: ("edit" | "run" | "test" | "play")?,
+	domKind: ("server" | "client")?,
+	clients: number?,
 }
 
 export type RunResult = {

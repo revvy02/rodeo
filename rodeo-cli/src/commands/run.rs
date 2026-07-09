@@ -13,7 +13,11 @@ pub struct RunArgs {
     pub output: Option<String>,
     pub return_file: Option<String>,
     pub show_return: bool,
-    pub target: Option<String>,
+    pub mode: Option<String>,
+    pub dom_kind: Option<String>,
+    pub context: Option<String>,
+    pub clients: Option<u32>,
+    pub studio_id: Option<String>,
     pub no_warn: bool,
     pub no_error: bool,
     pub no_info: bool,
@@ -39,7 +43,8 @@ struct RunConfig {
     output_file: Option<String>,
     return_file: Option<String>,
     show_return: bool,
-    target: Option<String>,
+    /// Sparse routing spec (validated in prepare_execution).
+    route: crate::shared::target::RouteSpec,
     log_filter: proto::LogFilter,
     cache_requires: bool,
     script_args: Vec<String>,
@@ -56,9 +61,38 @@ struct RunConfig {
     detached: bool,
     no_hud: bool,
     // Targeting fields
-    dom: Option<String>,
+    dom_id: Option<String>,
+    studio_id: Option<String>,
     // Profiling
     profile: Option<std::path::PathBuf>,
+}
+
+impl RunConfig {
+    /// The resolved route, or None for an empty (default-everything) spec.
+    fn resolved(&self) -> Result<Option<crate::shared::target::Resolved>> {
+        if self.route.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(self.route.resolve()?))
+        }
+    }
+
+    fn is_play(&self) -> bool {
+        self.resolved()
+            .ok()
+            .flatten()
+            .map(|r| r.mode == crate::shared::target::StudioMode::Play)
+            .unwrap_or(false)
+    }
+}
+
+fn args_route(args: &RunArgs) -> Result<crate::shared::target::RouteSpec> {
+    crate::shared::target::RouteSpec::from_strings(
+        args.mode.as_deref(),
+        args.dom_kind.as_deref(),
+        args.context.as_deref(),
+        args.clients,
+    )
 }
 
 pub async fn main(mut args: RunArgs) -> Result<()> {
@@ -99,14 +133,16 @@ async fn persistent_mode(args: RunArgs) -> Result<()> {
             Some(super::serve::start_full_serve(port).await?)
         };
 
-    if is_play_target(args.target.as_deref()) {
-        let target_str = args.target.as_deref().unwrap_or("play:server");
-        let parsed = crate::shared::target::parse(target_str)?;
+    let route = args_route(&args)?;
+    let resolved = if route.is_empty() { None } else { Some(route.resolve()?) };
+    let is_play = resolved.map(|r| r.mode == crate::shared::target::StudioMode::Play).unwrap_or(false);
 
+    if is_play {
+        let resolved = resolved.expect("is_play implies a resolved route");
         let mut play_handles = launch_play_processes(
             &host,
             port,
-            &parsed,
+            &resolved,
             place_target.as_ref(),
             !args.place.focus,
             &args.fflags,
@@ -213,11 +249,20 @@ fn resolve_script(args: &mut RunArgs) -> Result<ResolvedScript> {
     })
 }
 
-/// Build RunConfig: validate target, build log filter, assemble config.
+/// Build RunConfig: validate the route, build log filter, assemble config.
 fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfig> {
-    // Validate the target string if specified
-    if let Some(ref t) = args.target {
-        crate::shared::target::parse(t)?;
+    let route = args_route(&args)?;
+    // Validate the route now (fast error) and enforce the dom-id pin rule.
+    if !route.is_empty() {
+        route.resolve()?;
+    }
+    if args.place.dom_id.is_some()
+        && (route.mode.is_some() || route.dom_kind.is_some() || route.clients.is_some())
+    {
+        bail!("--dom-id pins the run to one DOM — mode/dom-kind/clients don't apply (only --context does)");
+    }
+    if args.studio_id.is_some() && args.place.dom_id.is_some() {
+        bail!("--studio-id and --dom-id are mutually exclusive (a DOM already identifies its studio)");
     }
 
     let log_filter = process_source::execution::build_log_filter(
@@ -227,7 +272,6 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
     let host = args.server.host.clone();
     let port = args.server.port;
     let place_target = args.place.to_target();
-    let _is_play = is_play_target(args.target.as_deref());
     let should_launch = place_target.is_some();
 
     // Always generate a run_id for correlation
@@ -248,7 +292,7 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
 
     Ok(RunConfig {
         script_content: resolved.script_content,
-        target: args.target,
+        route,
         log_filter,
         cache_requires: args.cache_requires,
         script_args: args.script_args,
@@ -267,7 +311,8 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         fflags,
         detached: args.place.detached,
         no_hud: args.place.no_hud,
-        dom: args.place.dom,
+        dom_id: args.place.dom_id,
+        studio_id: args.studio_id,
         profile,
     })
 }
@@ -278,24 +323,22 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
     let mut _play_handles: Option<PlayHandles> = None;
     let mut launched_studio_id: Option<String> = None;
 
-    if is_play_target(cfg.target.as_deref()) {
+    if cfg.is_play() {
         // Play mode: ensure the session + requested client(s) exist.
         // NOTE: we do NOT gate on cfg.should_launch — `should_launch` is only
-        // true when --place was provided, but `rodeo run --target
-        // play:client:N -s 'code'` against an already-running play server
-        // must still spawn the client.
+        // true when --place was provided, but `rodeo run --mode play
+        // --dom-kind client --clients N -s 'code'` against an already-running
+        // play server must still spawn the client.
         if !RodeoClient::connect(&cfg.host, cfg.port)?.is_healthy().await {
             let handle = super::serve::start_full_serve(cfg.port).await?;
             serve_handle = Some(handle);
         }
 
-        let target_str = cfg.target.as_deref().unwrap_or("play:server");
-        let parsed = crate::shared::target::parse(target_str)?;
-
+        let resolved = cfg.resolved()?.expect("is_play implies a resolved route");
         _play_handles = Some(launch_play_processes(
             &cfg.host,
             cfg.port,
-            &parsed,
+            &resolved,
             cfg.place_target.as_ref(),
             !cfg.focus,
             &cfg.fflags,
@@ -358,14 +401,24 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         }
     }
 
+    // Resolve --dom-id / --studio-id prefixes against live state.
+    let dom_id = match cfg.dom_id.as_deref() {
+        Some(prefix) => Some(resolve_dom_id(&cfg.host, cfg.port, prefix).await?),
+        None => None,
+    };
+    // Session pin priority: an explicit --studio-id, else the studio we just
+    // launched (so `run --place` executes in THIS place).
+    let session = match cfg.studio_id.as_deref() {
+        Some(prefix) => Some(resolve_studio_id(&cfg.host, cfg.port, prefix).await?),
+        None => launched_studio_id.clone(),
+    };
+
     let is_profiling = cfg.profile.is_some();
     let request = RunRequest {
         script: cfg.script_content,
-        target: cfg.target.unwrap_or_default(),
-        dom_id: cfg.dom,
-        // Pin to the studio we launched (if any) so the script runs in the
-        // requested place even when other studios share this serve.
-        session: launched_studio_id.clone(),
+        route: cfg.route,
+        dom_id,
+        session,
         log_filter: cfg.log_filter,
         cache_requires: cfg.cache_requires,
         script_args: cfg.script_args,
@@ -419,9 +472,34 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
 // Play mode helpers
 // ---------------------------------------------------------------------------
 
-/// Check if a target string is a play mode target.
-fn is_play_target(target: Option<&str>) -> bool {
-    target.is_some_and(|t| t.starts_with("play:"))
+/// Resolve a `--dom-id` value (full id or unique prefix) against live state.
+async fn resolve_dom_id(host: &str, port: u16, prefix: &str) -> Result<String> {
+    let state = RodeoClient::connect(host, port)?.get_state().await?;
+    let matches: Vec<String> = state.studios.iter()
+        .flat_map(|s| s.doms.iter().map(|d| d.dom_id.clone()))
+        .filter(|id| id.starts_with(prefix))
+        .collect();
+    resolve_unique(matches, prefix, "DOM")
+}
+
+/// Resolve a `--studio-id` value (full id or unique prefix) against live state.
+async fn resolve_studio_id(host: &str, port: u16, prefix: &str) -> Result<String> {
+    let state = RodeoClient::connect(host, port)?.get_state().await?;
+    let matches: Vec<String> = state.studios.iter()
+        .map(|s| s.studio_id.clone())
+        .filter(|id| id.starts_with(prefix))
+        .collect();
+    resolve_unique(matches, prefix, "studio")
+}
+
+fn resolve_unique(mut matches: Vec<String>, prefix: &str, what: &str) -> Result<String> {
+    matches.sort();
+    matches.dedup();
+    match matches.len() {
+        1 => Ok(matches.into_iter().next().unwrap()),
+        0 => bail!("no connected {what} matches id '{prefix}' (see `rodeo state`)"),
+        _ => bail!("id '{prefix}' is ambiguous — matches {} {what}s; use more characters", matches.len()),
+    }
 }
 
 /// Build a LaunchStudioRequest from CLI args for the LaunchStudio RPC.
@@ -476,7 +554,7 @@ impl PlayHandles {
 async fn launch_play_processes(
     host: &str,
     port: u16,
-    target: &crate::shared::target::Target,
+    route: &crate::shared::target::Resolved,
     place: Option<&crate::studio_backend::PlaceTarget>,
     background: bool,
     fflags: &crate::cli::FflagArgs,
@@ -490,7 +568,7 @@ async fn launch_play_processes(
     let _ = port;
     let client = RodeoClient::connect(host, port)?;
 
-    let want_client = matches!(target.dom_kind, DomKind::Client);
+    let want_client = matches!(route.dom_kind, DomKind::Client);
 
     // Existing play session? (a studio that already has a server DOM)
     let snapshot = client.get_state().await.ok();
@@ -501,12 +579,12 @@ async fn launch_play_processes(
     if let Some(st) = server_studio {
         // A multiplayer test is already running. Grow it to the target client
         // count via AddPlayers on the server DOM:
-        //   play:client:N  => N total clients
-        //   play:client    => append one more than currently connected
-        //   play:server    => leave as-is
+        //   --dom-kind client --clients N  => N total clients
+        //   --dom-kind client (no --clients) => append one more
+        //   --dom-kind server              => leave as-is
         let current = st.doms.iter().filter(|v| v.dom_kind == "client").count() as u32;
         let target_total = if want_client {
-            match target.client_index {
+            match route.clients {
                 Some(n) => n,
                 None => current + 1,
             }
@@ -518,7 +596,8 @@ async fn launch_play_processes(
             tracing::info!(add, current, target_total, "growing play session via AddPlayers");
             client.submit_run(rodeo_client::RunCodeOpts {
                 source: format!("game:GetService(\"StudioTestService\"):AddPlayers({add})\nreturn true"),
-                target: Some("play:server".to_string()),
+                mode: Some("play".to_string()),
+                context: Some("server".to_string()),
                 ..Default::default()
             }).await.context("AddPlayers run failed")?;
         }
@@ -527,8 +606,8 @@ async fn launch_play_processes(
     }
 
     // No play session yet. Initial client count for the fresh test:
-    //   play:client:N => N, play:client => 1, play:server => 0.
-    let initial_clients: u32 = if want_client { target.client_index.unwrap_or(1) } else { 0 };
+    //   client + --clients N => N, client alone => 1, server => 0.
+    let initial_clients: u32 = if want_client { route.clients.unwrap_or(1) } else { 0 };
 
     // We need a place to open the edit Studio that will host the test.
     let Some(place) = place else {
@@ -542,7 +621,7 @@ async fn launch_play_processes(
     let backend = client.get_local_studio().await?;
     let fflag_overrides = fflags.fflag_override.clone();
     let fflag_file = fflags.fflag_file.clone();
-    tracing::info!(dom = ?target.dom_kind, initial_clients, "opening edit Studio for multiplayer test");
+    tracing::info!(dom = route.dom_kind.as_str(), initial_clients, "opening edit Studio for multiplayer test");
     let studio = match place {
         PlaceTarget::File(p) => backend.open_file(OpenFileOpts {
             path: p.clone(),

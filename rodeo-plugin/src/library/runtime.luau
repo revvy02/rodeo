@@ -39,11 +39,11 @@ export type ExecutionCallbacks = {
 	onRpc: (msg: any) -> (),
 }
 
-type ExecutionTarget = "server" | "client" | "plugin"
+type RunContext = "server" | "client" | "plugin" | "elevated"
 
 -- Execute a module in a specific context (server/client/plugin)
 -- ctx contains the runner, module, events, and cleanup function (created by utils.createExecutionContext)
-local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTarget, params: ExecutionParams, callbacks: ExecutionCallbacks)
+local function executeInContext(ctx: utils.ExecutionContext, context: RunContext, params: ExecutionParams, callbacks: ExecutionCallbacks)
 	-- Create RPC handle early so logger can use it
 	local rpc = createRpc(function(msg)
 		ctx.outgoingEvent:Fire(msg)
@@ -60,7 +60,7 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 
 	log.debug(`START`)
 	log.debug(`ctx.module: {ctx.module:GetFullName()}`)
-	log.debug(`target: {target}`)
+	log.debug(`context: {context}`)
 	log.debug(`cacheRequires: {params.cacheRequires or false}`)
 
 	-- Get module path BEFORE traversal (so we can re-resolve after if it gets cloned)
@@ -92,7 +92,7 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 	ctx.runner:SetAttribute("showReturn", params.showReturn or false)
 	ctx.runner:SetAttribute("outputFile", params.outputFile or "")
 	ctx.runner:SetAttribute("logFilter", HttpService:JSONEncode(params.logFilter or {}))
-	ctx.runner:SetAttribute("target", target)
+	ctx.runner:SetAttribute("context", context)
 
 	-- Profiler label injection: stamp each frame with execution_id so dumps can be matched
 	local profileConnection: RBXScriptConnection? = nil
@@ -141,10 +141,10 @@ local function executeInContext(ctx: utils.ExecutionContext, target: ExecutionTa
 	log.debug(`Starting execution...`)
 
 	-- Trigger execution
-	if target == "server" then
+	if context == "server" then
 		-- Parent thin shim Script to SSS to trigger auto-execution
 		ctx.shim.Parent = ServerScriptService
-	elseif target == "client" then
+	elseif context == "client" then
 		task.spawn(function()
 			-- Parent thin shim LocalScript to PlayerScripts to trigger auto-execution
 			ctx.shim.Parent = Players.LocalPlayer.PlayerScripts

@@ -2,6 +2,8 @@
 -- Mirrors the TS client's class hierarchy; dot-notation method surface.
 
 local domMod = require("./dom")
+local run = require("./run")
+local exec = require("./exec")
 
 type Daemon = {
 	call: (method: string, params: any?) -> any,
@@ -90,6 +92,7 @@ export type Studio = {
 	save: () -> SaveResult,
 	close: () -> (),
 	getDoms: () -> { domMod.Dom },
+	runCode: (opts: run.RunCodeOpts) -> run.RunResult,
 	startMultiplayerTest: () -> MultiplayerTestServer,
 }
 
@@ -114,6 +117,12 @@ local function createStudio(
 			table.insert(out, domMod.create(s, daemon))
 		end
 		return out
+	end
+
+	-- Session-scoped run tier: routes by mode/domKind/context among THIS
+	-- studio's DOMs (auto-transitioning its mode).
+	function self.runCode(opts)
+		return exec.runViaDaemon(daemon, "studio.runCode", { studioHandle = handle }, opts)
 	end
 
 	function self.setMode(mode)

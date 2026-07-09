@@ -413,6 +413,27 @@ impl proto::RunService for RodeoServices {
             }
         });
 
+        // Validate the routing spec up front — an invalid route fails the run
+        // immediately (previously a garbage target from a client library
+        // matched nothing and queued forever).
+        let route = crate::shared::target::RouteSpec::from_strings(
+            submit.mode.as_deref(),
+            submit.dom_kind.as_deref(),
+            submit.context.as_deref(),
+            submit.clients,
+        )
+        .and_then(|r| {
+            r.resolve()?;
+            if submit.dom_id.is_some()
+                && (r.mode.is_some() || r.dom_kind.is_some() || r.clients.is_some())
+            {
+                anyhow::bail!(
+                    "dom_id pins the run to one DOM — mode/dom_kind/clients don't apply (context is allowed)"
+                );
+            }
+            Ok(r)
+        });
+
         // Mint the run id and route the run. The Created event goes into
         // event_tx BEFORE route_or_queue: routing can synchronously push
         // events (e.g. drain_dead_sessions killing the run) into client_tx,
@@ -431,10 +452,27 @@ impl proto::RunService for RodeoServices {
                 ..Default::default()
             });
 
+            let route = match route {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::info!(id = execution_id.as_str(), error = %e, "rejected: invalid route");
+                    let _ = event_tx.send(proto::RunEvent {
+                        event: Some(proto::run_event::Event::Disconnect(format!(
+                            "invalid route: {e}"
+                        ))),
+                        ..Default::default()
+                    });
+                    let output_stream =
+                        tokio_stream::wrappers::UnboundedReceiverStream::new(event_rx)
+                            .map(|msg| Ok(msg));
+                    return Ok((Box::pin(output_stream), Context::default()));
+                }
+            };
+
             let run_request = crate::studio_backend::connection::RunRequest {
                 execution_id: execution_id.clone(),
                 script: submit.script,
-                target: submit.target,
+                route,
                 session: submit.session,
                 dom_id: submit.dom_id,
                 log_filter: submit.log_filter.into_option().unwrap_or_default(),

@@ -6,6 +6,8 @@ local task = require("@lune/task")
 local daemonMod = require("./daemon")
 local studioMod = require("./studio")
 local domMod = require("./dom")
+local run = require("./run")
+local exec = require("./exec")
 
 export type BackendInfo = { id: string, kind: string, name: string }
 export type ProcessInfo = { [string]: any }
@@ -53,7 +55,8 @@ export type RodeoClient = {
 	kill: (executionId: string) -> (),
 	listBackends: (kind: string?) -> { BackendInfo },
 	getLocalStudio: () -> studioMod.StudioBackend,
-	getStudio: (idOrName: string) -> studioMod.StudioBackend,
+	getBackend: (idOrName: string) -> studioMod.StudioBackend,
+	runCode: (opts: run.RunCodeOpts) -> run.RunResult,
 	getDoms: () -> { domMod.Dom },
 	getDom: (domId: string) -> domMod.Dom,
 	close: () -> (),
@@ -90,9 +93,15 @@ local function connect(opts: ConnectOpts): RodeoClient
 		return studioMod.createStudioBackend(resp.backendHandle, resp.info, daemon)
 	end
 
-	function self.getStudio(idOrName)
-		local resp = daemon.call("client.getStudio", { idOrName = idOrName })
+	function self.getBackend(idOrName)
+		local resp = daemon.call("client.getBackend", { idOrName = idOrName })
 		return studioMod.createStudioBackend(resp.backendHandle, resp.info, daemon)
+	end
+
+	-- Serve-wide run tier: master routes by mode/domKind/context across all
+	-- connected DOMs.
+	function self.runCode(opts)
+		return exec.runViaDaemon(daemon, "client.runCode", {}, opts)
 	end
 
 	function self.getDoms()

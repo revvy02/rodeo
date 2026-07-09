@@ -1,5 +1,5 @@
 --[[
-    @rodeo run --target edit:plugin
+    @rodeo run --mode edit --context plugin
 
     Enter run mode from the edit VM.
     Creates a server VM but no client VM.

@@ -1,5 +1,5 @@
 --[[
-    @rodeo run --target edit:plugin
+    @rodeo run --mode edit --context plugin
 
     Capture a screenshot from Roblox Studio.
 

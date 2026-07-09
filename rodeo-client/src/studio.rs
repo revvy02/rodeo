@@ -174,6 +174,20 @@ impl Studio {
         self.edit_dom.as_ref().expect("edit_dom must be set after open")
     }
 
+    /// Execute code somewhere in THIS studio — the session-scoped tier. The
+    /// master matches the opts' mode/dom_kind/context among this studio's
+    /// DOMs (auto-transitioning its mode when needed) and picks one.
+    pub async fn run_code(&self, mut opts: crate::run::RunCodeOpts) -> Result<crate::run::RunResult> {
+        opts.session = Some(self.session_guid.clone());
+        crate::run::run_buffered_routed(self.transport.clone(), opts).await
+    }
+
+    /// Streaming variant of [`Self::run_code`].
+    pub async fn run_code_stream(&self, mut opts: crate::run::RunCodeOpts) -> Result<crate::run::RunStream> {
+        opts.session = Some(self.session_guid.clone());
+        crate::run::run_stream_routed(self.transport.clone(), opts).await
+    }
+
     /// This Studio's canonical state from the master's studio-first snapshot
     /// (by `session_guid`), or None if not yet present.
     pub async fn instance_state(&self) -> Result<Option<proto::StudioState>> {

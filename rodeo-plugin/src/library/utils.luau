@@ -29,7 +29,7 @@ local function makeIgnoreSuffixPattern(executionId: string): string
 	return string.gsub(string.gsub(suffix, "%.", "%%."), "%-", "%%-") .. "$"
 end
 
-export type ExecutionTarget = "server" | "client" | "plugin" | "elevated"
+export type RunContext = "server" | "client" | "plugin" | "elevated"
 
 -- i cloned because for some reason runner loses children and .rpc errors, this is an attempt to fully preserve
 -- runner template for what seems to be an edge case from plugin hot reloading
@@ -45,7 +45,7 @@ export type ExecutionContext = {
 	cleanup: () -> (),
 }
 
-local function createExecutionContext(source: string, target: ExecutionTarget, executionId: string, instancePath: string?, scriptPath: string?): ExecutionContext
+local function createExecutionContext(source: string, context: RunContext, executionId: string, instancePath: string?, scriptPath: string?): ExecutionContext
 	-- Determine module name for stack traces
 	-- Priority: instancePath → scriptPath → source
 	local moduleName = source
@@ -161,8 +161,8 @@ local function createExecutionContext(source: string, target: ExecutionTarget, e
 
 	-- Create thin shim Script/LocalScript for server/client (must be parented to trigger execution)
 	local shim: (Script | LocalScript)? = nil
-	if target == "server" or target == "client" then
-		shim = Instance.new(if target == "server" then "Script" else "LocalScript")
+	if context == "server" or context == "client" then
+		shim = Instance.new(if context == "server" then "Script" else "LocalScript")
 		shim.Name = "__rodeo_runner_" .. executionId
 		shim.Source = "require(script.refs.runner.Value)"
 		local shimRefs = Instance.new("Folder")

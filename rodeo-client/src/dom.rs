@@ -53,36 +53,31 @@ impl Dom {
         }
     }
 
-    /// Execute code, buffering output and returning the final RunResult.
-    ///
-    /// If `opts.target` is set and non-empty, this Dom handle becomes a
-    /// *session* anchor (not a DOM selector): the server routes by target
-    /// within this Studio's session. Without this, `editDom.runCode({
-    /// target: "run:server" })` would pin execution to the edit DOM and the
-    /// server's auto-transition machinery (edit → run) never fires.
+    /// Execute code on THIS DOM, buffering output and returning the final
+    /// RunResult. A Dom handle always pins — no routing happens. Only
+    /// `opts.context` applies; routing fields (`mode`/`dom_kind`/`clients`)
+    /// are rejected: session-scoped routing lives on `Studio::run_code`.
     pub async fn run_code(&self, opts: RunCodeOpts) -> anyhow::Result<RunResult> {
-        let (dom_id, session) = self.resolve_routing(&opts);
-        run::run_buffered(self.transport.clone(), dom_id, session, opts).await
+        self.reject_routing_opts(&opts)?;
+        run::run_buffered(self.transport.clone(), &self.dom_id, self.session_guid.clone(), opts)
+            .await
     }
 
     /// Execute code with streaming output events.
     /// Caller drives the returned `RunStream` to receive output chunks / file
     /// chunks / completion events incrementally.
     pub async fn run_code_stream(&self, opts: RunCodeOpts) -> anyhow::Result<RunStream> {
-        let (dom_id, session) = self.resolve_routing(&opts);
-        run::run_stream(self.transport.clone(), dom_id, session, opts).await
+        self.reject_routing_opts(&opts)?;
+        run::run_stream(self.transport.clone(), &self.dom_id, self.session_guid.clone(), opts)
+            .await
     }
 
-    /// Decide whether this call pins to a specific DOM or defers routing to
-    /// the server via `target` (see `run_code` for rationale). Returned
-    /// `dom_id` is `""` in the deferred case so the submit protocol treats
-    /// it as "server-routed".
-    fn resolve_routing(&self, opts: &RunCodeOpts) -> (&str, Option<String>) {
-        let has_target = opts.target.as_deref().map(|t| !t.is_empty()).unwrap_or(false);
-        if has_target {
-            ("", self.session_guid.clone())
-        } else {
-            (&self.dom_id, self.session_guid.clone())
+    fn reject_routing_opts(&self, opts: &RunCodeOpts) -> anyhow::Result<()> {
+        if opts.mode.is_some() || opts.dom_kind.is_some() || opts.clients.is_some() {
+            anyhow::bail!(
+                "mode/dom_kind/clients don't apply to a pinned DOM — use Studio::run_code for session-scoped routing"
+            );
         }
+        Ok(())
     }
 }

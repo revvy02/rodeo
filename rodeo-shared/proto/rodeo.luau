@@ -764,9 +764,12 @@ type _SubmitRequestImpl = {
 
 type _SubmitRequestFields = {
 	script: string,
-	target: string,
+	mode: string?,
 	session: string?,
 	domId: string?,
+	domKind: string?,
+	context: string?,
+	clients: number?,
 	cacheRequires: boolean?,
 	scriptArgs: { string },
 	returnFile: string?,
@@ -781,9 +784,12 @@ type _SubmitRequestFields = {
 
 export type _SubmitRequestPartialFields = {
 	script: string?,
-	target: string?,
+	mode: string?,
 	session: string?,
 	domId: string?,
+	domKind: string?,
+	context: string?,
+	clients: number?,
 	cacheRequires: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
@@ -1475,8 +1481,9 @@ type _ProcessInfoImpl = {
 type _ProcessInfoFields = {
 	executionId: string,
 	state: string,
-	target: string,
+	mode: string,
 	context: string,
+	domKind: string,
 	studioId: string?,
 	sessionId: string?,
 	domId: string?,
@@ -1486,8 +1493,9 @@ type _ProcessInfoFields = {
 export type _ProcessInfoPartialFields = {
 	executionId: string?,
 	state: string?,
-	target: string?,
+	mode: string?,
 	context: string?,
+	domKind: string?,
 	studioId: string?,
 	sessionId: string?,
 	domId: string?,
@@ -1753,7 +1761,7 @@ type _RunCommandImpl = {
 type _RunCommandFields = {
 	executionId: string,
 	script: string,
-	target: string,
+	context: string,
 	cacheRequires: boolean?,
 	scriptArgs: { string },
 	returnFile: string?,
@@ -1769,7 +1777,7 @@ type _RunCommandFields = {
 export type _RunCommandPartialFields = {
 	executionId: string?,
 	script: string?,
-	target: string?,
+	context: string?,
 	cacheRequires: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
@@ -5800,9 +5808,12 @@ do
 	function _SubmitRequestImpl.new(data: _SubmitRequestPartialFields?): SubmitRequest
 		return setmetatable({
 			script = if data == nil or data.script == nil then "" else data.script,
-			target = if data == nil or data.target == nil then "" else data.target,
+			mode = if data == nil or data.mode == nil then nil else data.mode,
 			session = if data == nil or data.session == nil then nil else data.session,
 			domId = if data == nil or data.domId == nil then nil else data.domId,
+			domKind = if data == nil or data.domKind == nil then nil else data.domKind,
+			context = if data == nil or data.context == nil then nil else data.context,
+			clients = if data == nil or data.clients == nil then nil else data.clients,
 			cacheRequires = if data == nil or data.cacheRequires == nil then nil else data.cacheRequires,
 			scriptArgs = if data == nil or data.scriptArgs == nil then {} else data.scriptArgs,
 			returnFile = if data == nil or data.returnFile == nil then nil else data.returnFile,
@@ -5830,9 +5841,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.script)
 		end
 
-		if self.target ~= nil and self.target ~= "" then
+		if self.mode ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.target)
+			output, cursor = proto.writeString(output, cursor, self.mode)
 		end
 
 		if self.session ~= nil then
@@ -5843,6 +5854,21 @@ do
 		if self.domId ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.domId)
+		end
+
+		if self.domKind ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 15, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.domKind)
+		end
+
+		if self.context ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 16, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.context)
+		end
+
+		if self.clients ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 17, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.clients)
 		end
 
 		if self.cacheRequires ~= nil then
@@ -5932,6 +5958,11 @@ do
 					value, cursor = proto.readVarInt(input, cursor)
 					self.profile = value ~= 0
 					continue
+				elseif field == 17 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.clients = value
+					continue
 				end
 
 				local _
@@ -5945,7 +5976,7 @@ do
 				elseif field == 2 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.target = proto.decodeString(value)
+					self.mode = proto.decodeString(value)
 					continue
 				elseif field == 3 then
 					local value
@@ -5987,6 +6018,16 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.logFilter = messages.LogFilter.decode(value)
 					continue
+				elseif field == 15 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.domKind = proto.decodeString(value)
+					continue
+				elseif field == 16 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.context = proto.decodeString(value)
+					continue
 				end
 
 				local length
@@ -6018,8 +6059,8 @@ do
 			output.script = self.script
 		end
 
-		if self.target ~= nil and self.target ~= "" then
-			output.target = self.target
+		if self.mode ~= nil then
+			output.mode = self.mode
 		end
 
 		if self.session ~= nil then
@@ -6028,6 +6069,18 @@ do
 
 		if self.domId ~= nil then
 			output.domId = self.domId
+		end
+
+		if self.domKind ~= nil then
+			output.domKind = self.domKind
+		end
+
+		if self.context ~= nil then
+			output.context = self.context
+		end
+
+		if self.clients ~= nil then
+			output.clients = self.clients
 		end
 
 		if self.cacheRequires ~= nil then
@@ -6084,8 +6137,8 @@ do
 			self.script = input.script
 		end
 
-		if input.target ~= nil then
-			self.target = input.target
+		if input.mode ~= nil then
+			self.mode = input.mode
 		end
 
 		if input.session ~= nil then
@@ -6094,6 +6147,18 @@ do
 
 		if input.domId ~= nil then
 			self.domId = input.domId
+		end
+
+		if input.domKind ~= nil then
+			self.domKind = input.domKind
+		end
+
+		if input.context ~= nil then
+			self.context = input.context
+		end
+
+		if input.clients ~= nil then
+			self.clients = input.clients
 		end
 
 		if input.cacheRequires ~= nil then
@@ -9738,8 +9803,9 @@ do
 		return setmetatable({
 			executionId = if data == nil or data.executionId == nil then "" else data.executionId,
 			state = if data == nil or data.state == nil then "" else data.state,
-			target = if data == nil or data.target == nil then "" else data.target,
+			mode = if data == nil or data.mode == nil then "" else data.mode,
 			context = if data == nil or data.context == nil then "" else data.context,
+			domKind = if data == nil or data.domKind == nil then "" else data.domKind,
 			studioId = if data == nil or data.studioId == nil then nil else data.studioId,
 			sessionId = if data == nil or data.sessionId == nil then nil else data.sessionId,
 			domId = if data == nil or data.domId == nil then nil else data.domId,
@@ -9761,14 +9827,19 @@ do
 			output, cursor = proto.writeString(output, cursor, self.state)
 		end
 
-		if self.target ~= nil and self.target ~= "" then
+		if self.mode ~= nil and self.mode ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.target)
+			output, cursor = proto.writeString(output, cursor, self.mode)
 		end
 
 		if self.context ~= nil and self.context ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.context)
+		end
+
+		if self.domKind ~= nil and self.domKind ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.domKind)
 		end
 
 		if self.studioId ~= nil then
@@ -9823,7 +9894,7 @@ do
 				elseif field == 3 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.target = proto.decodeString(value)
+					self.mode = proto.decodeString(value)
 					continue
 				elseif field == 4 then
 					local value
@@ -9844,6 +9915,11 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.domId = proto.decodeString(value)
+					continue
+				elseif field == 9 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.domKind = proto.decodeString(value)
 					continue
 				end
 
@@ -9885,12 +9961,16 @@ do
 			output.state = self.state
 		end
 
-		if self.target ~= nil and self.target ~= "" then
-			output.target = self.target
+		if self.mode ~= nil and self.mode ~= "" then
+			output.mode = self.mode
 		end
 
 		if self.context ~= nil and self.context ~= "" then
 			output.context = self.context
+		end
+
+		if self.domKind ~= nil and self.domKind ~= "" then
+			output.domKind = self.domKind
 		end
 
 		if self.studioId ~= nil then
@@ -9923,12 +10003,16 @@ do
 			self.state = input.state
 		end
 
-		if input.target ~= nil then
-			self.target = input.target
+		if input.mode ~= nil then
+			self.mode = input.mode
 		end
 
 		if input.context ~= nil then
 			self.context = input.context
+		end
+
+		if input.domKind ~= nil then
+			self.domKind = input.domKind
 		end
 
 		if input.studioId ~= nil then
@@ -11358,7 +11442,7 @@ do
 		return setmetatable({
 			executionId = if data == nil or data.executionId == nil then "" else data.executionId,
 			script = if data == nil or data.script == nil then "" else data.script,
-			target = if data == nil or data.target == nil then "" else data.target,
+			context = if data == nil or data.context == nil then "" else data.context,
 			cacheRequires = if data == nil or data.cacheRequires == nil then nil else data.cacheRequires,
 			scriptArgs = if data == nil or data.scriptArgs == nil then {} else data.scriptArgs,
 			returnFile = if data == nil or data.returnFile == nil then nil else data.returnFile,
@@ -11391,9 +11475,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.script)
 		end
 
-		if self.target ~= nil and self.target ~= "" then
+		if self.context ~= nil and self.context ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.target)
+			output, cursor = proto.writeString(output, cursor, self.context)
 		end
 
 		if self.cacheRequires ~= nil then
@@ -11501,7 +11585,7 @@ do
 				elseif field == 3 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.target = proto.decodeString(value)
+					self.context = proto.decodeString(value)
 					continue
 				elseif field == 10 then
 					local value
@@ -11568,8 +11652,8 @@ do
 			output.script = self.script
 		end
 
-		if self.target ~= nil and self.target ~= "" then
-			output.target = self.target
+		if self.context ~= nil and self.context ~= "" then
+			output.context = self.context
 		end
 
 		if self.cacheRequires ~= nil then
@@ -11630,8 +11714,8 @@ do
 			self.script = input.script
 		end
 
-		if input.target ~= nil then
-			self.target = input.target
+		if input.context ~= nil then
+			self.context = input.context
 		end
 
 		if input.cacheRequires ~= nil then

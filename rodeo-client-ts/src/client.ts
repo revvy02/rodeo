@@ -6,9 +6,100 @@
 //! plumbing + a runCode-to-final-RunResult collector.
 
 import { Daemon } from "./daemon.js";
-import type { LogFilter, RunCodeOpts, RunResult } from "./run.js";
+import type { DomRunCodeOpts, LogFilter, RunCodeOpts, RunResult } from "./run.js";
 
-export type { LogFilter, RunCodeOpts, RunResult };
+export type { DomRunCodeOpts, LogFilter, RunCodeOpts, RunResult };
+
+// ---------------------------------------------------------------------------
+// Shared runCode plumbing (all three tiers: client / studio / dom)
+// ---------------------------------------------------------------------------
+
+/// Process the source, open a stream, and collect the final RunResult. `method`
+/// selects the tier (`client.runCode` / `studio.runCode` / `dom.runCode`);
+/// `target` carries the tier's identifier (`{}` / `{studioHandle}` / `{domId}`).
+async function daemonRunCode(
+  daemon: Daemon,
+  method: string,
+  target: Record<string, unknown>,
+  opts: RunCodeOpts,
+): Promise<RunResult> {
+  // Process source via rodeo __process_source (bundle + shims + ensure_return).
+  const processed = processSource({ source: opts.source, file: opts.file, sourcemap: opts.sourcemap });
+
+  // Local tag for the default profile-dir name only — NOT the run id (the
+  // master mints that; it comes back on the result as `executionId`).
+  const profileTag = crypto.randomUUID();
+  const profileDir = opts.profile !== undefined
+    ? (opts.profile || `.rodeo/.temp/profiles/${profileTag}`)
+    : undefined;
+
+  // Client-allocated streamId: we register the callback BEFORE sending the
+  // request, so notifications can arrive at any time (even before the RPC
+  // response) without being lost. Matches the LSP progress-token pattern.
+  const streamId = crypto.randomUUID();
+
+  let bufferedOutput = "";
+  let resolveRun!: (r: RunResult) => void;
+  let rejectRun!: (e: Error) => void;
+  const runPromise = new Promise<RunResult>((res, rej) => { resolveRun = res; rejectRun = rej; });
+
+  daemon.registerStream(streamId, (m, params) => {
+    if (m === "stream.data") {
+      const kind = params.kind as string;
+      if (kind === "stdout" || kind === "stderr") {
+        bufferedOutput += String(params.chunk ?? "");
+      }
+    } else if (m === "stream.done") {
+      daemon.unregisterStream(streamId);
+      const r = (params.result ?? {}) as {
+        ok?: boolean; output?: string; exitCode?: number;
+        executionId?: string | null; returnValue?: string | null;
+      };
+      let parsedReturn: unknown = undefined;
+      if (typeof r.returnValue === "string" && r.returnValue.length > 0) {
+        try { parsedReturn = JSON.parse(r.returnValue); } catch { parsedReturn = undefined; }
+      }
+      resolveRun({
+        ok: r.ok ?? false,
+        output: (r.output && r.output.length > 0) ? r.output : bufferedOutput,
+        exitCode: r.exitCode ?? 0,
+        executionId: r.executionId ?? undefined,
+        return: parsedReturn,
+      });
+    } else if (m === "stream.error") {
+      daemon.unregisterStream(streamId);
+      rejectRun(new Error(String(params.error ?? "run failed")));
+    }
+  });
+
+  // Routing fields are present only on the routed tiers (RunCodeOpts).
+  const route = opts as RunCodeOpts;
+  try {
+    await daemon.request<{ streamId: string }>(method, {
+      ...target,
+      streamId,
+      source: processed.script,
+      mode: route.mode ?? null,
+      domKind: route.domKind ?? null,
+      context: opts.context ?? null,
+      clients: route.clients ?? null,
+      showReturn: opts.showReturn ?? false,
+      cacheRequires: opts.cacheRequires ?? false,
+      verbose: opts.verbose ?? false,
+      scriptArgs: opts.scriptArgs ?? [],
+      profileDir: profileDir ?? null,
+      returnFile: opts.returnFile ?? null,
+      instancePath: processed.instancePath ?? null,
+      scriptPath: processed.scriptPath ?? null,
+      logFilter: opts.logFilter ?? null,
+    });
+  } catch (e) {
+    daemon.unregisterStream(streamId);
+    throw e;
+  }
+
+  return await runPromise;
+}
 
 // ---------------------------------------------------------------------------
 // Shape of daemon responses
@@ -97,95 +188,9 @@ export class Dom {
     this.daemon = daemon;
   }
 
-  async runCode(opts: RunCodeOpts): Promise<RunResult> {
-    // Process source via rodeo __process_source (preserves old CLI-path
-    // behavior: bundle + shims + ensure_return). The daemon takes the
-    // already-processed script as `source`.
-    const processed = processSource({ source: opts.source, file: opts.file, sourcemap: opts.sourcemap });
-
-    // Local tag for the default profile-dir name only — NOT the run id (the
-    // master mints that; it comes back on the result as `executionId`).
-    const profileTag = crypto.randomUUID();
-    const profileDir = opts.profile !== undefined
-      ? (opts.profile || `.rodeo/.temp/profiles/${profileTag}`)
-      : undefined;
-
-    // Client-allocated streamId: we register the callback BEFORE sending the
-    // request, so notifications can arrive at any time (even before the
-    // RPC response) without being lost. Matches the LSP progress-token pattern.
-    const streamId = crypto.randomUUID();
-
-    let bufferedOutput = "";
-    let resolveRun!: (r: RunResult) => void;
-    let rejectRun!: (e: Error) => void;
-    const runPromise = new Promise<RunResult>((res, rej) => { resolveRun = res; rejectRun = rej; });
-
-    this.daemon.registerStream(streamId, (method, params) => {
-      if (method === "stream.data") {
-        const kind = params.kind as string;
-        // stdout and stderr are merged into the single `output` field of
-        // RunResult — matches the pre-daemon client's behavior. Wrappers that
-        // want them separated can key off `kind` via a custom subscriber.
-        if (kind === "stdout" || kind === "stderr") {
-          bufferedOutput += String(params.chunk ?? "");
-        }
-      } else if (method === "stream.done") {
-        this.daemon.unregisterStream(streamId);
-        const r = (params.result ?? {}) as {
-          ok?: boolean;
-          output?: string;
-          exitCode?: number;
-          executionId?: string | null;
-          returnValue?: string | null;
-        };
-        // The daemon ships the script's return value as a JSON string
-        // (or null when the script didn't return anything). Parse here
-        // so consumers can write `result.return` directly. Parse errors
-        // are swallowed — we never throw at the consumer because the
-        // script returned something non-JSON-encodable.
-        let parsedReturn: unknown = undefined;
-        if (typeof r.returnValue === "string" && r.returnValue.length > 0) {
-          try {
-            parsedReturn = JSON.parse(r.returnValue);
-          } catch {
-            parsedReturn = undefined;
-          }
-        }
-        resolveRun({
-          ok: r.ok ?? false,
-          output: (r.output && r.output.length > 0) ? r.output : bufferedOutput,
-          exitCode: r.exitCode ?? 0,
-          executionId: r.executionId ?? undefined,
-          return: parsedReturn,
-        });
-      } else if (method === "stream.error") {
-        this.daemon.unregisterStream(streamId);
-        rejectRun(new Error(String(params.error ?? "run failed")));
-      }
-    });
-
-    try {
-      await this.daemon.request<{ streamId: string }>("dom.runCode", {
-        domId: this.domId,
-        streamId,
-        source: processed.script,
-        target: opts.target ?? null,
-        showReturn: opts.showReturn ?? false,
-        cacheRequires: opts.cacheRequires ?? false,
-        verbose: opts.verbose ?? false,
-        scriptArgs: opts.scriptArgs ?? [],
-        profileDir: profileDir ?? null,
-        returnFile: opts.returnFile ?? null,
-        instancePath: processed.instancePath ?? null,
-        scriptPath: processed.scriptPath ?? null,
-        logFilter: opts.logFilter ?? null,
-      });
-    } catch (e) {
-      this.daemon.unregisterStream(streamId);
-      throw e;
-    }
-
-    return await runPromise;
+  /** Run on THIS DOM (pinned — no routing). Only `context` applies. */
+  async runCode(opts: DomRunCodeOpts): Promise<RunResult> {
+    return daemonRunCode(this.daemon, "dom.runCode", { domId: this.domId }, opts);
   }
 }
 
@@ -260,9 +265,18 @@ export class RodeoClient {
     return new StudioBackend(resp.backendHandle, resp.info, this.daemon);
   }
 
-  async getStudio(idOrName: string): Promise<StudioBackend> {
-    const resp = await this.daemon.request<{ backendHandle: string; info: { id: string; name: string } }>("client.getStudio", { idOrName });
+  /** Select a studio BACKEND (a machine running a studio backend) by id
+   *  prefix or exact name — not a studio instance. */
+  async getBackend(idOrName: string): Promise<StudioBackend> {
+    const resp = await this.daemon.request<{ backendHandle: string; info: { id: string; name: string } }>("client.getBackend", { idOrName });
     return new StudioBackend(resp.backendHandle, resp.info, this.daemon);
+  }
+
+  /** Serve-wide run tier: the master routes by mode/domKind/context across all
+   *  connected DOMs. Use `Studio.runCode` to scope to one studio, or
+   *  `Dom.runCode` to pin. */
+  async runCode(opts: RunCodeOpts): Promise<RunResult> {
+    return daemonRunCode(this.daemon, "client.runCode", {}, opts);
   }
 
   // DOM discovery
@@ -399,6 +413,12 @@ export class Studio {
     this.sessionGuid = sessionGuid;
     this.backendId = backendId;
     this.daemon = daemon;
+  }
+
+  /** Session-scoped run tier: the master routes by mode/domKind/context among
+   *  THIS studio's DOMs (auto-transitioning its mode). */
+  async runCode(opts: RunCodeOpts): Promise<RunResult> {
+    return daemonRunCode(this.daemon, "studio.runCode", { studioHandle: this.studioHandle }, opts);
   }
 
   async setMode(mode: string): Promise<void> {

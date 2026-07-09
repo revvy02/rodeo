@@ -62,7 +62,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 			local run = serverMsg.msg.value
 			setIsExecuting(true)
 
-			local target = run.target or "plugin"
+			local context = run.context or "plugin"
 			local lf = run.logFilter
 			local logFilter = {
 				enableWarn = lf and lf.enableWarn,
@@ -76,13 +76,13 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 
 			local ctx = utils.createExecutionContext(
 				run.script,
-				target,
+				context,
 				executionId,
 				run.instancePath,
 				run.scriptPath
 			)
 
-			local killFn = runtime.executeInContext(ctx, target, {
+			local killFn = runtime.executeInContext(ctx, context, {
 				executionId = executionId,
 				logFilter = logFilter,
 				cacheRequires = run.cacheRequires,

@@ -1,5 +1,5 @@
 --[[
-    @rodeo run --target edit:plugin
+    @rodeo run --mode edit --context plugin
 
     Enter play test mode from the edit VM.
     Waits for server and client VMs to connect.

@@ -23,10 +23,11 @@ use rodeo_proto as proto;
 /// describe a run.
 pub struct RunRequest {
     pub script: String,
-    pub target: String,
+    /// Sparse routing spec (mode/dom_kind/context/clients).
+    pub route: crate::shared::target::RouteSpec,
     pub dom_id: Option<String>,
-    /// Pin target-routed execution to this studio session (e.g. the Studio
-    /// this run just launched via `--place`).
+    /// Pin route-matched execution to this studio session (e.g. the Studio
+    /// this run just launched via `--place`, or an explicit `--studio-id`).
     pub session: Option<String>,
     pub log_filter: proto::LogFilter,
     pub cache_requires: bool,
@@ -52,7 +53,10 @@ pub async fn run_piped(host: &str, port: u16, mut request: RunRequest) -> Result
     let mut on_created = request.on_created.take();
     let opts = RunCodeOpts {
         source: request.script,
-        target: if request.target.is_empty() { None } else { Some(request.target) },
+        mode: request.route.mode.map(|m| m.as_str().to_string()),
+        dom_kind: request.route.dom_kind.map(|d| d.as_str().to_string()),
+        context: request.route.context.map(|c| c.as_str().to_string()),
+        clients: request.route.clients,
         show_return: request.show_return,
         cache_requires: request.cache_requires,
         verbose: request.verbose,

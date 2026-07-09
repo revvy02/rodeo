@@ -81,15 +81,15 @@ pub async fn main(host: &str, port: u16, json: bool) -> Result<()> {
         return Ok(());
     }
 
-    let mut table = new_table(&["ID", "STATE", "TARGET", "CONTEXT", "DOM", "STUDIO"]);
+    let mut table = new_table(&["ID", "STATE", "MODE", "KIND", "CONTEXT", "DOM", "STUDIO"]);
     for run in &snapshot.processes {
-        let target = if run.target.is_empty() { "-".to_string() } else { run.target.clone() };
-        let context = if run.context.is_empty() { "-".to_string() } else { run.context.clone() };
+        let dash = |s: &str| if s.is_empty() { "-".to_string() } else { s.to_string() };
         table.add_row(vec![
             run.execution_id.clone(),
             output::format_state(&run.state),
-            target,
-            context,
+            dash(&run.mode),
+            dash(&run.dom_kind),
+            dash(&run.context),
             run.dom_id.as_deref().map(short).unwrap_or_else(|| "-".to_string()),
             run.studio_id.as_deref().map(short).unwrap_or_else(|| "-".to_string()),
         ]);

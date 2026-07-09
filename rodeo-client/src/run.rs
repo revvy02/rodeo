@@ -9,12 +9,23 @@ use crate::proto;
 use crate::runtime;
 use crate::transport::Transport;
 
-/// User-facing options for `Dom::run_code`.
+/// User-facing options for `run_code` at every tier (client / studio / dom).
+///
+/// The routing fields (`mode`, `dom_kind`, `clients`) apply to the routed
+/// tiers only — `Dom::run_code` rejects them (a pinned DOM does no routing).
+/// `context` applies everywhere: it's the run context the code executes as
+/// (cf. Roblox `Script.RunContext`), not a routing selector.
 #[derive(Default, Clone)]
 pub struct RunCodeOpts {
     pub source: String,
-    /// Target override (e.g. "run:server"). Falls back to the DOM's native target.
-    pub target: Option<String>,
+    /// Studio mode to converge to: "edit" | "run" | "test" | "play".
+    pub mode: Option<String>,
+    /// Which DOM role receives the script: "server" | "client".
+    pub dom_kind: Option<String>,
+    /// Run context: "plugin" | "server" | "client" | "elevated".
+    pub context: Option<String>,
+    /// Play session size (resolved mode must be "play").
+    pub clients: Option<u32>,
     pub show_return: bool,
     pub cache_requires: bool,
     pub verbose: bool,
@@ -101,7 +112,10 @@ async fn run_inner(
     // first event on the stream (ProcessCreated).
     let submit = proto::SubmitRequest {
         script: opts.source,
-        target: opts.target.unwrap_or_default(),
+        mode: opts.mode,
+        dom_kind: opts.dom_kind,
+        context: opts.context,
+        clients: opts.clients,
         session: session_guid,
         dom_id: if dom_id.is_empty() { None } else { Some(dom_id.to_string()) },
         log_filter: opts.log_filter.map(buffa::MessageField::some).unwrap_or_else(buffa::MessageField::none),
@@ -143,10 +157,11 @@ pub(crate) async fn run_stream(
     Ok(RunStream { rx, _task: task })
 }
 
-/// Target-routed streaming variant — empty `dom_id` tells the server to route
-/// by the opts' `target` field. Used by CLI paths that rely on master-side
-/// routing (e.g. `rodeo run --target play:server`).
-pub(crate) async fn run_stream_target(
+/// Route-matched streaming variant — empty `dom_id` tells the server to route
+/// by the opts' mode/dom_kind/context fields (within `opts.session` if set).
+/// Used by the client/studio tiers and CLI paths that rely on master-side
+/// routing (e.g. `rodeo run --mode play --context server`).
+pub(crate) async fn run_stream_routed(
     transport: Arc<Transport>,
     opts: RunCodeOpts,
 ) -> Result<RunStream> {
@@ -154,11 +169,11 @@ pub(crate) async fn run_stream_target(
     run_stream(transport, "", session, opts).await
 }
 
-pub(crate) async fn run_buffered_target(
+pub(crate) async fn run_buffered_routed(
     transport: Arc<Transport>,
     opts: RunCodeOpts,
 ) -> Result<RunResult> {
-    // dom_id empty → server routes by target (within opts.session if set)
+    // dom_id empty → server routes by mode/dom_kind (within opts.session if set)
     let session = opts.session.clone();
     run_buffered(transport, "", session, opts).await
 }

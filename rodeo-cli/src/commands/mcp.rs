@@ -22,15 +22,16 @@ use rmcp::{ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 const SERVER_INSTRUCTIONS: &str = "\
 rodeo executes Luau code inside Roblox Studio via WebSocket.
 
-DOM Targeting (--target): <mode>:<domKind>[:<identity>]
-- edit:plugin (default) — edit DataModel, ModuleScript
-- run:server — run mode server, Script
-- test:server / test:client — play test server/client
-- play:server / play:client — multi-client test
-- Append :plugin or :elevated to override identity
+Run routing (orthogonal args; all optional, sensible defaults):
+- mode: edit | run | test | play (auto-transitions Studio)
+- context: plugin | server | client | elevated (run context; elevated = command bar)
+- dom_kind: server | client (usually inferred)
+- clients: play session size (mode play)
+Examples: context=client runs a client; context=server a run-mode server;
+context=elevated edit elevated; no args = edit plugin.
 
 Direct targeting:
-- dom: target a specific DOM by ID (from get_state)
+- dom_id: pin to one DOM by id (from get_state); studio_id: scope to one studio
 
 Launch:
 - launch_studio: open a standalone Studio (place = empty/ID/file path), optionally with profiling; stays alive for later run_code calls
@@ -46,15 +47,32 @@ struct LuauTool {
     name: String,
     description: String,
     script: String,
-    target: String,
+    route: crate::shared::target::RouteSpec,
     input_schema: Option<serde_json::Value>,
     annotations: Option<serde_json::Value>,
+}
+
+/// Read a routing spec from `@rodeo run` flag tokens
+/// (`--mode`/`--dom-kind`/`--context`/`--clients`). Unknown/invalid values
+/// yield an empty spec (defaults apply).
+fn route_from_flag_tokens(inline: &str) -> crate::shared::target::RouteSpec {
+    let toks: Vec<&str> = inline.split_whitespace().collect();
+    let val = |flag: &str| {
+        toks.iter().position(|t| *t == flag).and_then(|i| toks.get(i + 1)).copied()
+    };
+    crate::shared::target::RouteSpec::from_strings(
+        val("--mode"),
+        val("--dom-kind"),
+        val("--context"),
+        val("--clients").and_then(|s| s.parse::<u32>().ok()),
+    )
+    .unwrap_or_default()
 }
 
 /// Parse the leading `--[[ ... ]]` header of a Luau tool source.
 ///
 /// Supported directives:
-///   `@rodeo run --target <target>` — inline; sets the DOM target
+///   `@rodeo run --mode <m> --context <c> …` — inline; sets the run route
 ///   `@rodeo schema` — claims subsequent non-`@rodeo` lines as JSON inputSchema
 ///   `@rodeo annotations` — claims subsequent non-`@rodeo` lines as JSON annotations
 ///
@@ -65,21 +83,21 @@ fn parse_luau_header(
     source: &str,
 ) -> (
     String,
-    String,
+    crate::shared::target::RouteSpec,
     Option<serde_json::Value>,
     Option<serde_json::Value>,
 ) {
     let mut description = String::new();
-    let mut target = "edit:plugin".to_string();
+    let mut route = crate::shared::target::RouteSpec::default();
     let mut schema: Option<serde_json::Value> = None;
     let mut annotations: Option<serde_json::Value> = None;
 
     let Some(start) = source.find("--[[") else {
-        return (description, target, schema, annotations);
+        return (description, route, schema, annotations);
     };
     let block_start = start + 4;
     let Some(rel_end) = source[block_start..].find("]]") else {
-        return (description, target, schema, annotations);
+        return (description, route, schema, annotations);
     };
     let block = &source[block_start..block_start + rel_end];
 
@@ -123,14 +141,7 @@ fn parse_luau_header(
 
             match name {
                 "run" => {
-                    if let Some(t) = inline.split("--target").nth(1) {
-                        target = t
-                            .trim()
-                            .split_whitespace()
-                            .next()
-                            .unwrap_or("edit:plugin")
-                            .to_string();
-                    }
+                    route = route_from_flag_tokens(inline);
                     current = Section::Description;
                 }
                 "schema" => {
@@ -165,7 +176,7 @@ fn parse_luau_header(
     }
     flush(&current, &buffer, &mut schema, &mut annotations);
 
-    (description, target, schema, annotations)
+    (description, route, schema, annotations)
 }
 
 fn discover_luau_tools() -> Vec<LuauTool> {
@@ -193,13 +204,13 @@ fn discover_luau_tools() -> Vec<LuauTool> {
             continue;
         };
 
-        let (description, target, input_schema, annotations) = parse_luau_header(&source);
+        let (description, route, input_schema, annotations) = parse_luau_header(&source);
 
         tools.push(LuauTool {
             name,
             description,
             script: source,
-            target,
+            route,
             input_schema,
             annotations,
         });
@@ -277,24 +288,24 @@ fn run_code_input_schema() -> Arc<JsonObject> {
         "type": "object",
         "properties": {
             "code": { "type": "string", "description": "Luau code to execute. Can return a value." },
-            "target": {
+            "mode": {
                 "type": "string",
-                "description": "DOM target. Grammar: <mode>:<domKind>[:plugin|:elevated]. \
-                    Modes: edit, run, test, play. Dom kinds: server, client (implicit for edit). \
-                    Requesting a mode that isn't currently active will transition Studio into it. \
-                    Append :elevated for command-bar identity (privileged Roblox APIs).",
-                "examples": [
-                    "edit:plugin",
-                    "edit:elevated",
-                    "run:server",
-                    "run:server:elevated",
-                    "test:server",
-                    "test:client",
-                    "test:server:elevated",
-                    "play:client"
-                ]
+                "enum": ["edit", "run", "test", "play"],
+                "description": "Studio mode to run in (auto-transitions Studio). Defaults from context/dom_kind, else edit."
             },
-            "dom": { "type": "string", "description": "Direct DOM ID (bypasses target matching)" },
+            "dom_kind": {
+                "type": "string",
+                "enum": ["server", "client"],
+                "description": "Which DOM role receives the script. Usually inferred from context/mode."
+            },
+            "context": {
+                "type": "string",
+                "enum": ["plugin", "server", "client", "elevated"],
+                "description": "Run context (cf. Script.RunContext). elevated = command-bar identity for privileged Roblox APIs."
+            },
+            "clients": { "type": "integer", "description": "Play-test session size (mode play only): ensure N clients total." },
+            "dom_id": { "type": "string", "description": "Pin the run to one DOM by id (from get_state; bypasses routing). Only context may accompany it." },
+            "studio_id": { "type": "string", "description": "Scope routing to one studio by id (from get_state)." },
             "place": { "type": "string", "description": "Launch Studio: empty = new place, number = place ID, path = .rbxl file" },
             "args": { "type": "array", "items": { "type": "string" }, "description": "Script arguments (accessible via require('@rodeo/process').args)" },
             "cache_requires": { "type": "boolean", "description": "Use cached module state" },
@@ -442,12 +453,12 @@ where
 #[tool_router(router = tool_router)]
 impl RodeoServer {
     #[tool(
-        description = "Execute Luau code in a Roblox Studio DOM matched by `target`. \
-            If no live DOM matches the requested target, Studio will transition into \
-            that mode first (e.g. entering play test) before running — this mutates \
-            Studio state and may take several seconds. Append `:elevated` to a target \
-            (e.g. `edit:elevated`) to run at command-bar identity instead of plugin \
-            identity; required for privileged Roblox APIs like `DebuggerManager`. \
+        description = "Execute Luau code in a Roblox Studio DOM, routed by mode / \
+            context / dom_kind (all optional). If no live DOM matches, Studio \
+            transitions into the requested mode first (e.g. entering play test) — \
+            this mutates Studio state and may take several seconds. Use \
+            `context: \"elevated\"` to run at command-bar identity instead of \
+            plugin; required for privileged Roblox APIs like `DebuggerManager`. \
             Use `get_state` to see what DOMs are currently alive.",
         input_schema = run_code_input_schema(),
         output_schema = run_code_output_schema(),
@@ -564,10 +575,10 @@ impl RodeoServer {
             tool = tool.with_annotations(annotations_from_json(ann));
         }
 
-        let target = lt.target.clone();
+        let route = lt.route;
         let script = lt.script.clone();
         self.tool_router.add_route(ToolRoute::new_dyn(tool, move |tcc: ToolCallContext<'_, RodeoServer>| {
-            let target = target.clone();
+            let route = route;
             let script = script.clone();
             Box::pin(async move {
                 let ct = tcc.request_context.ct.clone();
@@ -575,7 +586,7 @@ impl RodeoServer {
                 let args = serde_json::Value::Object(tcc.arguments.unwrap_or_default());
                 Ok(text_or_cancel(
                     &ct,
-                    handle_luau_tool(&svc.host, svc.port, script, target, args),
+                    handle_luau_tool(&svc.host, svc.port, script, route, args),
                 )
                 .await)
             })
@@ -897,8 +908,8 @@ async fn handle_run_code(
     };
 
     let code = args["code"].as_str().unwrap_or("").to_string();
-    let target = args["target"].as_str().unwrap_or("").to_string();
-    let dom_id = args["dom"].as_str().map(String::from);
+    let dom_id = args["dom_id"].as_str().map(String::from);
+    let studio_id = args["studio_id"].as_str().map(String::from);
     let script_args: Vec<String> = args["args"]
         .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
@@ -909,11 +920,16 @@ async fn handle_run_code(
     let profile_dir = args["profile_dir"].as_str().map(std::path::PathBuf::from);
     let profile = args["profile"].as_bool().unwrap_or(false) || profile_dir.is_some();
 
-    if !target.is_empty() {
-        if let Err(e) = crate::shared::target::parse(&target) {
-            return fail(e.to_string());
-        }
-    }
+    // Build + validate the routing spec (fast error to the agent).
+    let route = match crate::shared::target::RouteSpec::from_strings(
+        args["mode"].as_str(),
+        args["dom_kind"].as_str(),
+        args["context"].as_str(),
+        args["clients"].as_u64().map(|n| n as u32),
+    ).and_then(|r| { r.resolve()?; Ok(r) }) {
+        Ok(r) => r,
+        Err(e) => return fail(e.to_string()),
+    };
 
     let output_file = args["output"]
         .as_str()
@@ -944,9 +960,9 @@ async fn handle_run_code(
                     .unwrap_or_else(|_| code.clone())
             }
         },
-        target,
+        route,
         dom_id,
-        session: None,
+        session: studio_id,
         log_filter: proto::LogFilter {
             enable_warn: true,
             enable_error: true,
@@ -1124,7 +1140,7 @@ async fn handle_luau_tool(
     host: &str,
     port: u16,
     script: String,
-    target: String,
+    route: crate::shared::target::RouteSpec,
     args: serde_json::Value,
 ) -> Result<String, String> {
     let return_file = std::env::temp_dir()
@@ -1138,7 +1154,7 @@ async fn handle_luau_tool(
 
     let request = RunRequest {
         script,
-        target,
+        route,
         dom_id: None,
         session: None,
         log_filter: proto::LogFilter {

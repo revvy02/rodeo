@@ -94,7 +94,7 @@ impl BackendState {
     // --- Routing ---
 
     /// Try to find a matching DOM for a run request.
-    /// Priority: --dom (direct ID) > --target (mode/dom matching) > any connected DOM.
+    /// Priority: --dom-id (direct) > route (mode/dom-kind matching) > any connected DOM.
     fn find_match_for_run(&self, run: &RunRequest) -> Option<String> {
         // Direct DOM targeting by ID
         if let Some(ref wanted_dom) = run.dom_id {
@@ -106,10 +106,11 @@ impl BackendState {
             return None; // Specific DOM requested but not found/connected
         }
 
-        let parsed = if !run.target.is_empty() {
-            crate::shared::target::parse(&run.target).ok()
-        } else {
+        // Validated at submit; an empty route matches any connected DOM.
+        let resolved = if run.route.is_empty() {
             None
+        } else {
+            run.route.resolve().ok()
         };
 
         let mut best: Option<(String, usize)> = None;
@@ -120,7 +121,7 @@ impl BackendState {
             }
 
             // Session filter — `run.session` is the master-minted session_guid.
-            // Applies regardless of target: a default-target run pinned to a
+            // Applies regardless of route: a default-route run pinned to a
             // session (e.g. the Studio `run --place` just launched) must never
             // route into another session's DOMs.
             if let Some(ref wanted) = run.session {
@@ -130,29 +131,21 @@ impl BackendState {
                 }
             }
 
-            if let Some(ref t) = parsed {
+            if let Some(ref r) = resolved {
                 // Mode-aware matching using DOM's reported state
                 let dom_mode = match dom.mode() {
                     Some(m) => m,
                     None => continue, // No state yet, skip
                 };
-                let vm_dom = match dom.dom_kind() {
+                let dom_kind = match dom.dom_kind() {
                     Some(d) => d,
                     None => continue,
                 };
 
-                // Check mode matches
-                if t.mode.as_str() != dom_mode {
+                if r.mode.as_str() != dom_mode {
                     continue;
                 }
-
-                // Check dom matches
-                let target_dom = match t.dom_kind {
-                    crate::shared::target::DomKind::Edit => "edit",
-                    crate::shared::target::DomKind::Server => "server",
-                    crate::shared::target::DomKind::Client => "client",
-                };
-                if target_dom != vm_dom {
+                if r.dom_kind.as_str() != dom_kind {
                     continue;
                 }
             }
@@ -278,9 +271,12 @@ pub struct MasterState {
 pub struct ActiveRun {
     pub execution_id: String,
     pub dom_id: String,
-    /// Requested target string (e.g. "edit:elevated"); empty for --dom-pinned
-    /// runs that gave no target. Surfaced in the snapshot's process list.
-    pub target: String,
+    /// Resolved route, surfaced in the snapshot's process list. mode/dom_kind
+    /// are empty for --dom-id-pinned runs (no routing happened); context is
+    /// always set (plugin default).
+    pub mode: String,
+    pub dom_kind: String,
+    pub context: String,
     pub client_tx: mpsc::UnboundedSender<ClientMsg>,
     pub state: ProcessState,
     pub profile: Option<bool>,
@@ -380,10 +376,11 @@ impl MasterState {
             return None;
         }
 
-        let parsed = if !run.target.is_empty() {
-            crate::shared::target::parse(&run.target).ok()
-        } else {
+        // Validated at submit; an empty route matches any connected DOM.
+        let resolved = if run.route.is_empty() {
             None
+        } else {
+            run.route.resolve().ok()
         };
 
         let all_doms = self.all_doms();
@@ -394,8 +391,8 @@ impl MasterState {
                 continue;
             }
 
-            // Session filter applies regardless of target — see the sibling
-            // find_match_for_run: a session-pinned default-target run must not
+            // Session filter applies regardless of route — see the sibling
+            // find_match_for_run: a session-pinned default-route run must not
             // route into another session's DOMs.
             if let Some(ref wanted) = run.session {
                 if dom.session_guid.as_deref() != Some(wanted.as_str()) {
@@ -403,19 +400,14 @@ impl MasterState {
                 }
             }
 
-            if let Some(ref t) = parsed {
+            if let Some(ref r) = resolved {
                 let dom_mode = dom.mode.as_deref().unwrap_or("");
-                let vm_dom = dom.dom_kind.as_deref().unwrap_or("");
+                let dom_kind = dom.dom_kind.as_deref().unwrap_or("");
 
-                if t.mode.as_str() != dom_mode {
+                if r.mode.as_str() != dom_mode {
                     continue;
                 }
-                let target_dom = match t.dom_kind {
-                    crate::shared::target::DomKind::Edit => "edit",
-                    crate::shared::target::DomKind::Server => "server",
-                    crate::shared::target::DomKind::Client => "client",
-                };
-                if target_dom != vm_dom {
+                if r.dom_kind.as_str() != dom_kind {
                     continue;
                 }
             }
@@ -432,15 +424,18 @@ impl MasterState {
 
     /// Build a RunCommand proto from a RunRequest.
     fn build_run_command(run: &RunRequest) -> rodeo_proto::ServerMessage {
+        // Pinned runs carry at most a context; routed runs resolve through the
+        // defaults table. The plugin receives only the run context.
+        let context = run
+            .route
+            .context
+            .or_else(|| run.route.resolve().ok().map(|r| r.context))
+            .unwrap_or(crate::shared::target::RunContext::Plugin);
         rodeo_proto::ServerMessage {
             msg: Some(rodeo_proto::server_message::Msg::Run(Box::new(rodeo_proto::RunCommand {
                 execution_id: run.execution_id.clone(),
                 script: run.script.clone(),
-                target: if run.target.is_empty() { String::new() } else {
-                    crate::shared::target::parse(&run.target).ok()
-                        .map(|t| t.identity.as_str().to_string())
-                        .unwrap_or_default()
-                },
+                context: context.as_str().to_string(),
                 log_filter: buffa::MessageField::some(run.log_filter.clone()),
                 cache_requires: run.cache_requires,
                 script_args: run.script_args.clone().unwrap_or_default(),
@@ -471,26 +466,42 @@ impl MasterState {
             }
             studio
         };
+        // Resolved route for the snapshot: pinned runs did no routing (mode/
+        // dom_kind stay empty; context defaults to plugin), routed runs record
+        // the effective defaults-applied values.
+        let (mode, dom_kind, context) = if run.dom_id.is_some() {
+            let context = run
+                .route
+                .context
+                .unwrap_or(crate::shared::target::RunContext::Plugin);
+            (String::new(), String::new(), context.as_str().to_string())
+        } else {
+            match run.route.resolve() {
+                Ok(r) => (
+                    r.mode.as_str().to_string(),
+                    r.dom_kind.as_str().to_string(),
+                    r.context.as_str().to_string(),
+                ),
+                Err(_) => (String::new(), String::new(), String::new()),
+            }
+        };
         tracing::info!(
             id = run.execution_id.as_str(),
             dom = &dom_id[..8.min(dom_id.len())],
-            target = run.target.as_str(),
+            mode = mode.as_str(),
+            kind = dom_kind.as_str(),
+            context = context.as_str(),
             studio = studio.as_deref().map(|s| &s[..8.min(s.len())]).unwrap_or("-"),
             "dispatch"
         );
         let cmd = Self::build_run_command(&run);
         self.send_to_dom(dom_id, cmd);
-        // An empty target on a non-pinned run took the routing default; record
-        // the effective target. --dom-pinned runs keep it empty (DOM-native).
-        let target = if run.target.is_empty() && run.dom_id.is_none() {
-            "edit:plugin".to_string()
-        } else {
-            run.target.clone()
-        };
         self.active_runs.insert(run.execution_id.clone(), ActiveRun {
             execution_id: run.execution_id.clone(),
             dom_id: dom_id.to_string(),
-            target,
+            mode,
+            dom_kind,
+            context,
             client_tx: run.client_tx,
             state: ProcessState::PROCESS_STATE_RUNNING,
             profile: run.profile,
@@ -613,12 +624,13 @@ impl MasterState {
         let mut ordered: Vec<&RunRequest> = self.pending_runs.iter().collect();
         ordered.sort_by(|a, b| a.created_at.partial_cmp(&b.created_at).unwrap_or(std::cmp::Ordering::Equal));
         for run in ordered {
-            if run.target.is_empty() { continue; }
-            let Ok(t) = crate::shared::target::parse(&run.target) else { continue; };
-            let mode = match t.mode {
+            // Pinned runs and empty routes drive no transitions.
+            if run.dom_id.is_some() || run.route.is_empty() { continue; }
+            let Ok(r) = run.route.resolve() else { continue; };
+            let mode = match r.mode {
                 crate::shared::target::StudioMode::Run
                 | crate::shared::target::StudioMode::Test
-                | crate::shared::target::StudioMode::Play => t.mode.as_str().to_string(),
+                | crate::shared::target::StudioMode::Play => r.mode.as_str().to_string(),
                 _ => continue,
             };
             match run.session.as_deref() {
@@ -852,8 +864,9 @@ impl MasterState {
                         ProcessState::PROCESS_STATE_KILLED => "killed",
                         _ => "queued",
                     }.to_string(),
-                    target: r.target.clone(),
-                    context: identity_for_target(&r.target).to_string(),
+                    mode: r.mode.clone(),
+                    dom_kind: r.dom_kind.clone(),
+                    context: r.context.clone(),
                     studio_id: owner.map(|s| s.studio_id.clone()),
                     session_id: owner.and_then(|s| s.session_id.clone()),
                     dom_id: Some(r.dom_id.clone()),
@@ -862,13 +875,17 @@ impl MasterState {
                 }
             })
             // Queued runs aren't pinned to a DOM yet — only the request is known.
-            .chain(self.pending_runs.iter().map(|r| rodeo_proto::ProcessInfo {
-                execution_id: r.execution_id.clone(),
-                state: "queued".to_string(),
-                target: r.target.clone(),
-                context: identity_for_target(&r.target).to_string(),
-                created_at: r.created_at,
-                ..Default::default()
+            .chain(self.pending_runs.iter().map(|r| {
+                let resolved = r.route.resolve().ok();
+                rodeo_proto::ProcessInfo {
+                    execution_id: r.execution_id.clone(),
+                    state: "queued".to_string(),
+                    mode: resolved.map(|v| v.mode.as_str().to_string()).unwrap_or_default(),
+                    dom_kind: resolved.map(|v| v.dom_kind.as_str().to_string()).unwrap_or_default(),
+                    context: resolved.map(|v| v.context.as_str().to_string()).unwrap_or_default(),
+                    created_at: r.created_at,
+                    ..Default::default()
+                }
             }))
             .collect();
 
@@ -953,17 +970,6 @@ fn build_studios(
         .collect()
 }
 
-/// The identity a run's code executes at, derived from its requested target.
-/// Empty targets take the routing default (edit:plugin → plugin identity).
-fn identity_for_target(target: &str) -> &'static str {
-    if target.is_empty() {
-        return "plugin";
-    }
-    match crate::shared::target::parse(target) {
-        Ok(t) => t.identity.as_str(),
-        Err(_) => "",
-    }
-}
 
 pub type SharedMasterState = Arc<Mutex<MasterState>>;
 
@@ -1072,12 +1078,12 @@ mod tests {
         }
     }
 
-    fn queued_run(target: &str) -> (RunRequest, mpsc::UnboundedReceiver<ClientMsg>) {
+    fn queued_run(route: crate::shared::target::RouteSpec) -> (RunRequest, mpsc::UnboundedReceiver<ClientMsg>) {
         let (client_tx, client_rx) = mpsc::unbounded_channel();
         let run = RunRequest {
             execution_id: "exec-1".to_string(),
             script: String::new(),
-            target: target.to_string(),
+            route,
             session: None,
             dom_id: None,
             log_filter: rodeo_proto::LogFilter::default(),
@@ -1130,7 +1136,7 @@ mod tests {
     #[test]
     fn session_less_edit_dom_is_driven_for_a_session_less_run() {
         let (mut state, mut backend_rx) = state_with_edit_dom("edit-dom", None);
-        let (run, _client_rx) = queued_run("test:server");
+        let (run, _client_rx) = queued_run(crate::shared::target::RouteSpec { mode: Some(crate::shared::target::StudioMode::Test), dom_kind: Some(crate::shared::target::DomKind::Server), context: None, clients: None });
         state.pending_runs.push(run);
 
         state.derive_and_push_targets();
@@ -1149,7 +1155,7 @@ mod tests {
     #[test]
     fn session_bearing_edit_dom_is_driven_by_session() {
         let (mut state, _backend_rx) = state_with_edit_dom("edit-dom", Some("sess-A"));
-        let (run, _client_rx) = queued_run("test:server");
+        let (run, _client_rx) = queued_run(crate::shared::target::RouteSpec { mode: Some(crate::shared::target::StudioMode::Test), dom_kind: Some(crate::shared::target::DomKind::Server), context: None, clients: None });
         state.pending_runs.push(run);
 
         state.derive_and_push_targets();

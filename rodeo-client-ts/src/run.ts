@@ -10,11 +10,24 @@ export type LogFilter = {
   enableLogs?: boolean;
 };
 
-export type RunCodeOpts = {
+/** Routing fields — used by the serve-wide (`client.runCode`) and
+ *  session-scoped (`studio.runCode`) tiers. `dom.runCode` omits them (a
+ *  pinned DOM does no routing); only `context` applies there. */
+export type RouteOpts = {
+  /** Studio mode to converge to (auto-transitions). */
+  mode?: "edit" | "run" | "test" | "play";
+  /** Which DOM role receives the script (usually inferred). */
+  domKind?: "server" | "client";
+  /** Play session size (mode play only): ensure N clients total. */
+  clients?: number;
+};
+
+type CommonRunOpts = {
   source?: string;
   file?: string;
   sourcemap?: string;
-  target?: string;
+  /** Run context the code executes as (cf. Roblox Script.RunContext). */
+  context?: "plugin" | "server" | "client" | "elevated";
   showReturn?: boolean;
   cacheRequires?: boolean;
   verbose?: boolean;
@@ -26,6 +39,12 @@ export type RunCodeOpts = {
   returnFile?: string;
   logFilter?: LogFilter;
 };
+
+/** Options for the routed tiers (`client.runCode` / `studio.runCode`). */
+export type RunCodeOpts = CommonRunOpts & RouteOpts;
+
+/** Options for `dom.runCode` — a pinned DOM, so no routing fields. */
+export type DomRunCodeOpts = CommonRunOpts;
 
 export type RunResult = {
   ok: boolean;

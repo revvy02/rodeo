@@ -1,5 +1,5 @@
 --[[
-    @rodeo run --target test:server
+    @rodeo run --mode test --context server
 
     Exit play/run test mode.
 

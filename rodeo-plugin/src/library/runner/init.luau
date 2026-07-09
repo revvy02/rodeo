@@ -66,10 +66,10 @@ local limits = require(ref("limits"))
 local logConnection, outputFileStream = setupLogging(LogService, apis.fs, apis.stream, apis.io, logFilter, outputFile)
 
 -- Execute user module
-local target = script:GetAttribute("target") or "plugin"
+local context = script:GetAttribute("context") or "plugin"
 
 local success, result = xpcall(function()
-	if target == "elevated" then
+	if context == "elevated" then
 		local TestService = game:GetService("TestService")
 		local RunService = game:GetService("RunService")
 		-- StudioMCP's execute_luau requires the datamodel_type its command bar
