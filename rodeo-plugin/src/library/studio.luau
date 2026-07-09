@@ -65,22 +65,26 @@ end
 local domId = require(RODEO_UNIFIER_MODULE)
 
 -- Canonical studio id: one per Studio *process*, shared across all its DOMs.
--- The edit DOM mints it once as a Workspace attribute; the play server/client
--- DataModels are clones of the edit DataModel (verified: a runtime-set
--- Workspace attribute survives the play-solo clone), so they inherit it. This
--- is the stable studio identity — independent of the launch `session_guid`
--- (only owned/launched studios have one) and of StudioMCP's flaky id. Minted
--- only in edit; other DOMs read the inherited value.
+-- The edit DOM ALWAYS mints a fresh id as a Workspace attribute — a persisted
+-- attribute in the place file identifies a dead process (or another live one,
+-- if the file is open twice), so it must never be trusted in edit. The play
+-- server/client DataModels are clones of the edit DataModel (verified: a
+-- runtime-set Workspace attribute survives the play-solo clone), so they
+-- inherit and reuse it. This is the stable studio identity — independent of
+-- the launch `session_guid` (only owned/launched studios have one) and of
+-- StudioMCP's flaky id.
 local RODEO_STUDIO_ID_ATTR = "rodeoStudioId"
 local studioId: string = ""
 do
 	local ws = game:GetService("Workspace")
-	local existing = ws:GetAttribute(RODEO_STUDIO_ID_ATTR)
-	if type(existing) == "string" and existing ~= "" then
-		studioId = existing
-	elseif RunService:IsEdit() then
+	if RunService:IsEdit() then
 		studioId = game:GetService("HttpService"):GenerateGUID(false)
 		ws:SetAttribute(RODEO_STUDIO_ID_ATTR, studioId)
+	else
+		local existing = ws:GetAttribute(RODEO_STUDIO_ID_ATTR)
+		if type(existing) == "string" and existing ~= "" then
+			studioId = existing
+		end
 	end
 end
 
