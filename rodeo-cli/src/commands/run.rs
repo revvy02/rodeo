@@ -327,7 +327,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         // Play mode: ensure the session + requested client(s) exist.
         // NOTE: we do NOT gate on cfg.should_launch — `should_launch` is only
         // true when --place was provided, but `rodeo run --mode play
-        // --dom-kind client --clients N -s 'code'` against an already-running
+        // --dom client --clients N -s 'code'` against an already-running
         // play server must still spawn the client.
         if !RodeoClient::connect(&cfg.host, cfg.port)?.is_healthy().await {
             let handle = super::serve::start_full_serve(cfg.port).await?;
@@ -579,9 +579,9 @@ async fn launch_play_processes(
     if let Some(st) = server_studio {
         // A multiplayer test is already running. Grow it to the target client
         // count via AddPlayers on the server DOM:
-        //   --dom-kind client --clients N  => N total clients
-        //   --dom-kind client (no --clients) => append one more
-        //   --dom-kind server              => leave as-is
+        //   --dom client --clients N  => N total clients
+        //   --dom client (no --clients) => append one more
+        //   --dom server              => leave as-is
         let current = st.doms.iter().filter(|v| v.dom_kind == "client").count() as u32;
         let target_total = if want_client {
             match route.clients {

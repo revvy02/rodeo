@@ -210,7 +210,7 @@ export function makeCliRunFn(
     if (opts.showReturn) args.push("--show-return");
     if (opts.cacheRequires) args.push("--cache-requires");
     if (opts.mode !== undefined) args.push("--mode", opts.mode);
-    if (opts.domKind !== undefined) args.push("--dom-kind", opts.domKind);
+    if (opts.domKind !== undefined) args.push("--dom", opts.domKind);
     if (opts.context !== undefined) args.push("--context", opts.context);
     if (opts.clients !== undefined) args.push("--clients", String(opts.clients));
 

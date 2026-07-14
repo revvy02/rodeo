@@ -41,7 +41,7 @@ describe("--profile with play mode (CLI)", () => {
 
     const result = runRodeo([
       "run", "--port", String(PORT),
-      "--mode", "play", "--dom-kind", "client", "--clients", "1",
+      "--mode", "play", "--dom", "client", "--clients", "1",
       "--profile", clientProfileDir,
       "--source", PROFILE_SCRIPT,
     ]);

@@ -25,7 +25,7 @@ rodeo executes Luau code inside Roblox Studio via WebSocket.
 Run routing (orthogonal args; all optional, sensible defaults):
 - mode: edit | run | test | play (auto-transitions Studio)
 - context: plugin | server | client | elevated (run context; elevated = command bar)
-- dom_kind: server | client (usually inferred)
+- dom: edit | server | client (usually inferred; `edit` targets the edit DOM even while a session runs)
 - clients: play session size (mode play)
 Examples: context=client runs a client; context=server a run-mode server;
 context=elevated edit elevated; no args = edit plugin.
@@ -53,7 +53,7 @@ struct LuauTool {
 }
 
 /// Read a routing spec from `@rodeo run` flag tokens
-/// (`--mode`/`--dom-kind`/`--context`/`--clients`). Unknown/invalid values
+/// (`--mode`/`--dom`/`--context`/`--clients`). Unknown/invalid values
 /// yield an empty spec (defaults apply).
 fn route_from_flag_tokens(inline: &str) -> crate::shared::target::RouteSpec {
     let toks: Vec<&str> = inline.split_whitespace().collect();
@@ -62,7 +62,7 @@ fn route_from_flag_tokens(inline: &str) -> crate::shared::target::RouteSpec {
     };
     crate::shared::target::RouteSpec::from_strings(
         val("--mode"),
-        val("--dom-kind"),
+        val("--dom"),
         val("--context"),
         val("--clients").and_then(|s| s.parse::<u32>().ok()),
     )
@@ -291,12 +291,12 @@ fn run_code_input_schema() -> Arc<JsonObject> {
             "mode": {
                 "type": "string",
                 "enum": ["edit", "run", "test", "play"],
-                "description": "Studio mode to run in (auto-transitions Studio). Defaults from context/dom_kind, else edit."
+                "description": "Studio mode to run in (auto-transitions Studio). Defaults from context/dom, else edit."
             },
-            "dom_kind": {
+            "dom": {
                 "type": "string",
-                "enum": ["server", "client"],
-                "description": "Which DOM role receives the script. Usually inferred from context/mode."
+                "enum": ["edit", "server", "client"],
+                "description": "Which DOM receives the script. Usually inferred from context/mode. `edit` targets the edit DOM even while a test/play session runs."
             },
             "context": {
                 "type": "string",
@@ -454,7 +454,7 @@ where
 impl RodeoServer {
     #[tool(
         description = "Execute Luau code in a Roblox Studio DOM, routed by mode / \
-            context / dom_kind (all optional). If no live DOM matches, Studio \
+            context / dom (all optional). If no live DOM matches, Studio \
             transitions into the requested mode first (e.g. entering play test) — \
             this mutates Studio state and may take several seconds. Use \
             `context: \"elevated\"` to run at command-bar identity instead of \
@@ -923,7 +923,7 @@ async fn handle_run_code(
     // Build + validate the routing spec (fast error to the agent).
     let route = match crate::shared::target::RouteSpec::from_strings(
         args["mode"].as_str(),
-        args["dom_kind"].as_str(),
+        args["dom"].as_str(),
         args["context"].as_str(),
         args["clients"].as_u64().map(|n| n as u32),
     ).and_then(|r| { r.resolve()?; Ok(r) }) {

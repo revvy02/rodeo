@@ -85,13 +85,15 @@ impl DomKind {
         }
     }
 
-    /// Parse a user-supplied dom kind. `edit` is intentionally not accepted:
-    /// the edit DOM is addressed by `mode: edit`, never selected as a kind.
+    /// Parse a user-supplied dom kind. `edit` is accepted: the edit DataModel
+    /// exists in every studio mode (it's the source the run/test/play DOMs are
+    /// cloned from), so it's addressable as a kind in any mode.
     pub fn parse(s: &str) -> Result<Self> {
         match s {
+            "edit" => Ok(Self::Edit),
             "server" => Ok(Self::Server),
             "client" => Ok(Self::Client),
-            _ => bail!("unknown dom kind '{s}' — expected server or client"),
+            _ => bail!("unknown dom '{s}' — expected edit, server, or client"),
         }
     }
 }
@@ -147,9 +149,10 @@ impl RouteSpec {
     /// Apply the defaults table, then validate the combination.
     ///
     /// Defaults:
-    /// - `mode` omitted: from `dom_kind` (server→run, client→test) if given,
-    ///   else from `context` (client→test, server→run, plugin/elevated→edit),
-    ///   else edit.
+    /// - `mode` omitted: from `dom_kind` (edit→edit, server→run, client→test)
+    ///   if given, else from `context` (client→test, server→run,
+    ///   plugin/elevated→edit), else edit. Pass `--mode` explicitly to address
+    ///   the edit DOM while a session runs (e.g. `--mode test --dom edit`).
     /// - `dom_kind` omitted: from `context` (server→server, client→client);
     ///   for plugin/elevated (or none) by mode: edit→edit, run/test/play→server.
     /// - `context` omitted: the native context of the resolved dom kind
@@ -184,22 +187,20 @@ impl RouteSpec {
             K::Client => C::Client,
         });
 
-        // Validity: which (mode, dom_kind) pairs exist, and which contexts a
-        // dom kind can host.
+        // Validity: which DOMs exist in each mode. The edit DataModel is present
+        // in every mode (the run/test/play DOMs are clones of it), so `edit` is
+        // always addressable — including to run in the edit DOM while a test or
+        // play session is live in the sibling DOMs.
         match (mode, dom_kind) {
             (M::Edit, K::Edit) => {}
             (M::Edit, k) => bail!(
-                "mode edit has no {} DOM — drop --dom-kind or pick run/test/play",
+                "mode edit has only an edit DOM — drop --dom or pick run/test/play for a {} DOM",
                 k.as_str()
             ),
-            (M::Run, K::Server) => {}
-            (M::Run, k) => bail!("mode run has no {} DOM (edit + server only)", k.as_str()),
-            (M::Test, K::Server | K::Client) => {}
-            (M::Play, K::Server | K::Client) => {}
-            (m, K::Edit) => bail!(
-                "the edit DOM is not addressable in mode {} — use mode edit",
-                m.as_str()
-            ),
+            (M::Run, K::Edit | K::Server) => {}
+            (M::Run, K::Client) => bail!("mode run has no client DOM (edit + server only)"),
+            (M::Test, _) => {}
+            (M::Play, _) => {}
         }
 
         let ok_context = match dom_kind {
@@ -258,6 +259,12 @@ mod tests {
             // dom kind alone implies mode + native context
             (spec(None, Some(K::Server), None, None), (M::Run, K::Server, C::Server)),
             (spec(None, Some(K::Client), None, None), (M::Test, K::Client, C::Client)),
+            (spec(None, Some(K::Edit), None, None), (M::Edit, K::Edit, C::Plugin)),
+            // edit DOM addressable while a session runs (edit exists in every mode)
+            (spec(Some(M::Run), Some(K::Edit), None, None), (M::Run, K::Edit, C::Plugin)),
+            (spec(Some(M::Test), Some(K::Edit), None, None), (M::Test, K::Edit, C::Plugin)),
+            (spec(Some(M::Play), Some(K::Edit), None, None), (M::Play, K::Edit, C::Plugin)),
+            (spec(Some(M::Test), Some(K::Edit), Some(C::Elevated), None), (M::Test, K::Edit, C::Elevated)),
             // mode alone → primary DOM + native context
             (spec(Some(M::Run), None, None, None), (M::Run, K::Server, C::Server)),
             (spec(Some(M::Test), None, None, None), (M::Test, K::Server, C::Server)),
@@ -294,6 +301,9 @@ mod tests {
             // context/dom-kind mismatches
             spec(None, Some(K::Server), Some(C::Client), None),
             spec(None, Some(K::Client), Some(C::Server), None),
+            // edit DOM hosts only plugin/elevated — not server/client contexts
+            spec(Some(M::Test), Some(K::Edit), Some(C::Server), None),
+            spec(Some(M::Test), Some(K::Edit), Some(C::Client), None),
             // clients outside play
             spec(Some(M::Test), Some(K::Client), None, Some(2)),
             spec(None, None, None, Some(1)),
@@ -312,9 +322,14 @@ mod tests {
         );
         // empty strings are None
         assert!(RouteSpec::from_strings(Some(""), None, Some(""), None).unwrap().is_empty());
+        // edit is now an accepted dom kind
+        assert_eq!(
+            RouteSpec::from_strings(None, Some("edit"), None, None).unwrap(),
+            spec(None, Some(K::Edit), None, None)
+        );
         // unknown words error
         assert!(RouteSpec::from_strings(Some("editt"), None, None, None).is_err());
-        assert!(RouteSpec::from_strings(None, Some("edit"), None, None).is_err());
+        assert!(RouteSpec::from_strings(None, Some("edom"), None, None).is_err());
         assert!(RouteSpec::from_strings(None, None, Some("identity"), None).is_err());
     }
 }

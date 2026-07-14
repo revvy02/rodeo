@@ -31,7 +31,7 @@ export type DomRunCodeOpts = {
 -- `dom.runCode` uses DomRunCodeOpts (pinned — no routing).
 export type RunCodeOpts = DomRunCodeOpts & {
 	mode: ("edit" | "run" | "test" | "play")?,
-	domKind: ("server" | "client")?,
+	domKind: ("edit" | "server" | "client")?,
 	clients: number?,
 }
 

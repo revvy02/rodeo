@@ -16,8 +16,9 @@ export type LogFilter = {
 export type RouteOpts = {
   /** Studio mode to converge to (auto-transitions). */
   mode?: "edit" | "run" | "test" | "play";
-  /** Which DOM role receives the script (usually inferred). */
-  domKind?: "server" | "client";
+  /** Which DOM receives the script (usually inferred). `edit` targets the edit
+   *  DOM even while a test/play session runs. */
+  domKind?: "edit" | "server" | "client";
   /** Play session size (mode play only): ensure N clients total. */
   clients?: number;
 };

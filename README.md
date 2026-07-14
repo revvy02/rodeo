@@ -67,7 +67,7 @@ possible.
 
 - `--mode edit|run|test|play` — the Studio mode
 - `--context plugin|server|client|elevated` — the run context (cf. Roblox `Script.RunContext`)
-- `--dom-kind server|client` — which DataModel (usually inferred from context/mode)
+- `--dom edit|server|client` — which DataModel (usually inferred from context/mode; `edit` targets the edit DOM even while a session runs)
 
 | Flags | Runs as |
 |-------|---------|
@@ -76,9 +76,10 @@ possible.
 | `--context server` | server Script in run mode |
 | `--mode test --context server` | server Script in a play test |
 | `--context client` | LocalScript in a play test |
+| `--mode test --dom edit` | ModuleScript in the edit DOM while a play test runs |
 | `--mode play --context server` | server Script in a multiplayer test |
-| `--mode play --dom-kind client` | LocalScript on a client in a multiplayer test |
-| `--mode play --dom-kind client --clients <n>` | multiplayer test sized to `n` clients |
+| `--mode play --dom client` | LocalScript on a client in a multiplayer test |
+| `--mode play --dom client --clients <n>` | multiplayer test sized to `n` clients |
 
 `--context` composes with `--dom-id <id>` to run at a chosen context on one
 exact DOM (e.g. `--dom-id <id> --context elevated`). `--dom-id` / `--studio-id`

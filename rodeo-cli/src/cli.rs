@@ -10,7 +10,7 @@ pub enum ModeArg { Edit, Run, Test, Play }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
 #[value(rename_all = "lowercase")]
-pub enum DomKindArg { Server, Client }
+pub enum DomKindArg { Edit, Server, Client }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
 #[value(rename_all = "lowercase")]
@@ -23,7 +23,7 @@ impl ModeArg {
 }
 impl DomKindArg {
     pub fn as_str(self) -> &'static str {
-        match self { Self::Server => "server", Self::Client => "client" }
+        match self { Self::Edit => "edit", Self::Server => "server", Self::Client => "client" }
     }
 }
 impl ContextArg {
@@ -105,12 +105,13 @@ pub enum Commands {
         show_return: bool,
 
         /// Studio mode to run in (auto-transitions Studio). Defaults from
-        /// --context/--dom-kind (else edit).
+        /// --context/--dom (else edit).
         #[arg(long, value_enum, help_heading = "Targeting")]
         mode: Option<ModeArg>,
 
-        /// Which DOM role receives the script (rarely needed — inferred).
-        #[arg(long = "dom-kind", value_enum, help_heading = "Targeting")]
+        /// Which DOM receives the script: edit, server, or client (usually
+        /// inferred). `edit` targets the edit DOM even while a session runs.
+        #[arg(long = "dom", value_name = "DOM", value_enum, help_heading = "Targeting")]
         dom_kind: Option<DomKindArg>,
 
         /// Run context the code executes as (cf. Script.RunContext).
@@ -282,7 +283,7 @@ pub struct PlaceArgs {
     pub place: Option<String>,
 
     /// Pin the run to a specific DOM by id (from `rodeo state`; unique prefix
-    /// ok). Only --context may accompany it — no mode/dom-kind/clients routing.
+    /// ok). Only --context may accompany it — no mode/dom/clients routing.
     #[arg(long = "dom-id", help_heading = "Targeting")]
     pub dom_id: Option<String>,
 

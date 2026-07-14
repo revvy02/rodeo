@@ -75,7 +75,7 @@ impl Dom {
     fn reject_routing_opts(&self, opts: &RunCodeOpts) -> anyhow::Result<()> {
         if opts.mode.is_some() || opts.dom_kind.is_some() || opts.clients.is_some() {
             anyhow::bail!(
-                "mode/dom_kind/clients don't apply to a pinned DOM — use Studio::run_code for session-scoped routing"
+                "mode/dom/clients don't apply to a pinned DOM — use Studio::run_code for session-scoped routing"
             );
         }
         Ok(())

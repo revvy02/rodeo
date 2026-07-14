@@ -63,13 +63,13 @@ Run a script in Studio
 * `--output <OUTPUT>` — Path to file for execution output (prints/logs)
 * `--return <RETURN_FILE>` — Path to file for return value JSON
 * `--show-return` — Print return value to stdout
-* `--mode <MODE>` — Studio mode to run in (auto-transitions Studio). Defaults from --context/--dom-kind (else edit)
+* `--mode <MODE>` — Studio mode to run in (auto-transitions Studio). Defaults from --context/--dom (else edit)
 
   Possible values: `edit`, `run`, `test`, `play`
 
-* `--dom-kind <DOM_KIND>` — Which DOM role receives the script (rarely needed — inferred)
+* `--dom <DOM>` — Which DOM receives the script: edit, server, or client (usually inferred). `edit` targets the edit DOM even while a session runs
 
-  Possible values: `server`, `client`
+  Possible values: `edit`, `server`, `client`
 
 * `--context <CONTEXT>` — Run context the code executes as (cf. Script.RunContext)
 
@@ -91,7 +91,7 @@ Run a script in Studio
 
   Default value: `44872`
 * `--place <PLACE>` — Launch Studio: empty (no value), place ID (number), or file path (.rbxl/.rbxlx)
-* `--dom-id <DOM_ID>` — Pin the run to a specific DOM by id (from `rodeo state`; unique prefix ok). Only --context may accompany it — no mode/dom-kind/clients routing
+* `--dom-id <DOM_ID>` — Pin the run to a specific DOM by id (from `rodeo state`; unique prefix ok). Only --context may accompany it — no mode/dom/clients routing
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
 * `--focus` — Bring Studio to the foreground on launch (default: background)
 * `--detached` — Keep Studio/Player running after rodeo exits

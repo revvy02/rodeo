@@ -112,6 +112,15 @@ describe("state (CLI)", () => {
       "--show-return", "--source", "return tostring(DebuggerManager())",
     ]);
     // Elevated needs StudioMCP; assert it at least didn't reject at parse time.
-    expect(result.stdout + result.stderr).not.toContain("mode/dom-kind/clients don't apply");
+    expect(result.stdout + result.stderr).not.toContain("mode/dom/clients don't apply");
+  });
+
+  it("--dom edit routes to the edit DOM", () => {
+    const result = runRodeo([
+      "run", "--port", String(PORT), "--dom", "edit",
+      "--show-return", "--source", "return game:GetService('RunService'):IsEdit()",
+    ]);
+    expect(result.ok).toBe(true);
+    expect(result.stdout + result.stderr).toContain("true");
   });
 });

@@ -131,21 +131,23 @@ impl BackendState {
             }
 
             if let Some(ref r) = resolved {
-                // Mode-aware matching using DOM's reported state
-                let dom_mode = match dom.mode() {
-                    Some(m) => m,
-                    None => continue, // No state yet, skip
-                };
                 let dom_kind = match dom.dom_kind() {
                     Some(d) => d,
                     None => continue,
                 };
-
-                if r.mode.as_str() != dom_mode {
-                    continue;
-                }
                 if r.dom_kind.as_str() != dom_kind {
                     continue;
+                }
+                // The edit DOM exists in every studio mode and always reports
+                // mode="edit" (it's the non-running source DataModel), so match
+                // it by kind alone — converging the studio to r.mode is driven
+                // separately by derive_and_push_targets. Server/client DOMs
+                // report the studio's live mode, so match that too.
+                if r.dom_kind != crate::shared::target::DomKind::Edit {
+                    match dom.mode() {
+                        Some(m) if m == r.mode.as_str() => {}
+                        _ => continue,
+                    }
                 }
             }
 
@@ -402,14 +404,17 @@ impl MasterState {
             }
 
             if let Some(ref r) = resolved {
-                let dom_mode = dom.mode.as_deref().unwrap_or("");
                 let dom_kind = dom.dom_kind.as_deref().unwrap_or("");
-
-                if r.mode.as_str() != dom_mode {
-                    continue;
-                }
                 if r.dom_kind.as_str() != dom_kind {
                     continue;
+                }
+                // Edit DOM: match by kind alone — it exists in every mode and
+                // always reports mode="edit"; studio convergence is separate.
+                if r.dom_kind != crate::shared::target::DomKind::Edit {
+                    let dom_mode = dom.mode.as_deref().unwrap_or("");
+                    if r.mode.as_str() != dom_mode {
+                        continue;
+                    }
                 }
             }
 
