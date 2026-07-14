@@ -63,7 +63,7 @@ Run a script in Studio
 * `--output <OUTPUT>` — Path to file for execution output (prints/logs)
 * `--return <RETURN_FILE>` — Path to file for return value JSON
 * `--show-return` — Print return value to stdout
-* `--mode <MODE>` — Studio mode to run in (auto-transitions Studio). Defaults from --context/--dom (else edit)
+* `--mode <MODE>` — Studio mode to run in (auto-transitions Studio). Defaults to edit; never inferred from --context/--dom, so a server/client run must pass --mode explicitly (e.g. --mode run --context server)
 
   Possible values: `edit`, `run`, `test`, `play`
 
@@ -71,7 +71,7 @@ Run a script in Studio
 
   Possible values: `edit`, `server`, `client`
 
-* `--context <CONTEXT>` — Run context the code executes as (cf. Script.RunContext)
+* `--context <CONTEXT>` — Identity level the code executes at: plugin, server (server-runtime identity), client (client-runtime identity), or elevated (command bar). Each context is its own Luau VM on the DOM
 
   Possible values: `plugin`, `server`, `client`, `elevated`
 

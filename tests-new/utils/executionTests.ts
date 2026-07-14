@@ -477,6 +477,7 @@ export function targetIdentity(run: RunFn): void {
 
   it("run:server can access ServerStorage", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       source: "return game:GetService('ServerStorage') ~= nil",
     });
@@ -486,6 +487,7 @@ export function targetIdentity(run: RunFn): void {
 
   it("test:client can access LocalPlayer", async () => {
     const result = await run({
+      mode: "test",
       context: "client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
     });
@@ -495,6 +497,7 @@ export function targetIdentity(run: RunFn): void {
 
   it("run:server cannot access LocalPlayer", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       source: "return game:GetService('Players').LocalPlayer == nil",
     });
@@ -508,6 +511,7 @@ export function targetIdentity(run: RunFn): void {
 export function cacheRequires(run: RunFn): void {
   it("run:server sees mutated global state with cache-requires", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       cacheRequires: true,
       source: "return require(game.ReplicatedStorage.globalState).value",
@@ -518,6 +522,7 @@ export function cacheRequires(run: RunFn): void {
 
   it("test:client sees mutated global state with cache-requires", async () => {
     const result = await run({
+      mode: "test",
       context: "client",
       cacheRequires: true,
       source: "return require(game.ReplicatedStorage.globalState).value",
@@ -579,7 +584,7 @@ export function execFiltering(run: RunFn): void {
   // Run mode tests
 
   it("run:server targets server DOM in run mode", async () => {
-    const result = await run({ context: "server", source: SOURCE_DOM });
+    const result = await run({ mode: "run", context: "server", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.running).toBe(true);
@@ -588,6 +593,7 @@ export function execFiltering(run: RunFn): void {
 
   it("run:server runs as Script (can access ServerStorage)", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       source: "return game:GetService('ServerStorage') ~= nil",
     });
@@ -624,7 +630,7 @@ export function execFiltering(run: RunFn): void {
   });
 
   it("test:client targets client DOM in play mode", async () => {
-    const result = await run({ context: "client", source: SOURCE_DOM });
+    const result = await run({ mode: "test", context: "client", source: SOURCE_DOM });
     expect(result.ok).toBe(true);
     const r = result.return as Record<string, boolean>;
     expect(r.client).toBe(true);
@@ -633,6 +639,7 @@ export function execFiltering(run: RunFn): void {
 
   it("test:client runs as LocalScript (can access LocalPlayer)", async () => {
     const result = await run({
+      mode: "test",
       context: "client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
     });
@@ -655,6 +662,7 @@ export function execFiltering(run: RunFn): void {
 export function uncachedRequireTraversal(run: RunFn): void {
   const exec = (source: string) =>
     run({
+      mode: "run",
       context: "server",
       source,
       verbose: true,
@@ -718,6 +726,7 @@ export function uncachedRequireTraversal(run: RunFn): void {
 export function cachedRequireTraversal(run: RunFn): void {
   const exec = (source: string) =>
     run({
+      mode: "run",
       context: "server",
       source,
       verbose: true,
@@ -750,13 +759,14 @@ export function cachedRequireTraversal(run: RunFn): void {
 }
 
 // ── autoTransition (6 tests) ─────────────────────────────────────────────
-// Verifies that passing `context: "server" | "test:client" | ...` to runCode
-// triggers the expected mode transition. Order of cases matters — they traverse
+// Verifies that passing `--mode` drives the expected studio transition (context
+// never transitions on its own). Order of cases matters — they traverse
 // edit→run→test→run with specific expectations at each hop.
 
 export function autoTransition(run: RunFn): void {
   it("edit → run:server auto-enters run mode", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       source: "return game:GetService('RunService'):IsRunning() and game.Players.LocalPlayer == nil",
     });
@@ -766,6 +776,7 @@ export function autoTransition(run: RunFn): void {
 
   it("run → test:client auto-transitions to play mode", async () => {
     const result = await run({
+      mode: "test",
       context: "client",
       source: "return game:GetService('Players').LocalPlayer ~= nil",
     });
@@ -775,6 +786,7 @@ export function autoTransition(run: RunFn): void {
 
   it("test → run:server auto-transitions back to run mode", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       source: "return game:GetService('RunService'):IsRunning() and game:GetService('ServerStorage') ~= nil",
     });
@@ -784,6 +796,7 @@ export function autoTransition(run: RunFn): void {
 
   it("no transition when already in correct mode", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       source: "return game:GetService('RunService'):IsRunning()",
     });
@@ -802,6 +815,7 @@ export function autoTransition(run: RunFn): void {
 
   it("test → run:server auto-transitions to run mode", async () => {
     const result = await run({
+      mode: "run",
       context: "server",
       source: "return game:GetService('RunService'):IsRunning() and #game:GetService('Players'):GetPlayers() == 0 and 'PASS' or 'FAIL'",
     });

@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bulkmoveto_hack --context server
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/bulkmoveto_hack --mode run --context server
 
 -- Benchmark: workspace:BulkMoveTo() via raw method call (xpcall hack) with N anchored parts
 

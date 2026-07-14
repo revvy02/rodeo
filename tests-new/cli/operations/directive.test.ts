@@ -75,16 +75,18 @@ describe("directives (CLI)", () => {
   // CLI overrides directive on conflict. Splice injects directive tokens
   // *before* user CLI args, so clap's last-arg-wins resolves to the CLI
   // value for scalar fields. Observable via RunService:IsRunning() —
-  // true in run mode, false in edit mode.
-  it("CLI --context overrides directive --context", () => {
+  // true in run mode, false in edit mode. (--mode is the transition flag;
+  // context no longer implies mode, so this exercises the override on the
+  // flag that actually changes studio state.)
+  it("CLI --mode overrides directive --mode", () => {
     const script = writeScript(
-      `-- @rodeo run --context plugin --show-return`,
+      `-- @rodeo run --mode edit --show-return`,
       `return game:GetService("RunService"):IsRunning()`,
     );
     try {
       const r = runRodeo([
         "run", "--port", String(PORT), script,
-        "--context", "server",
+        "--mode", "run", "--context", "server",
       ]);
       expect(r.ok).toBe(true);
       expect(r.stdout + r.stderr).toContain("true");

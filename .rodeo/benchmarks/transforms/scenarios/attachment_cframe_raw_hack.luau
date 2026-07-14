@@ -1,4 +1,4 @@
---@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/attachment_cframe_hack --context server
+--@rodeo run --place --focus --profile .rodeo/benchmarks/transforms/results/profiles/attachment_cframe_hack --mode run --context server
 
 -- Benchmark: Attachment.CFrame via raw property setter (xpcall hack) with N attachments
 

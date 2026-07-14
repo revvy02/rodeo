@@ -32,7 +32,7 @@ That's it. No flags needed at the call site; the script's directive runs it unde
 - The directive must be on a single line; it can sit anywhere in the file but is conventionally the first line.
 
 ```luau
--- @rodeo run --place ./game.rbxl --context client -- --user frank --rooms 4
+-- @rodeo run --place ./game.rbxl --mode test --context client -- --user frank --rooms 4
 
 local process = require("@rodeo/process")
 print(process.args)  --> { "--user", "frank", "--rooms", "4" }
@@ -43,8 +43,8 @@ print(process.args)  --> { "--user", "frank", "--rooms", "4" }
 User-supplied flags at the CLI call site override directive flags:
 
 ```bash
-rodeo run my-script.luau --context server
-# script ran with --context server, NOT the elevated context from its directive.
+rodeo run my-script.luau --mode run --context server
+# script ran with --mode run --context server, NOT the context from its directive.
 ```
 
 This lets the directive set sensible defaults while leaving room for one-off overrides.

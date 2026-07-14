@@ -2,11 +2,13 @@
 //!
 //! A run is routed by up to four orthogonal, individually-optional fields
 //! (`RouteSpec`): the studio `mode` to converge to, the `dom_kind` (which
-//! DataModel role receives the script), the `context` the code executes as
-//! (cf. Roblox's own `Script.RunContext` — our set is its Server/Client/Plugin
-//! plus `elevated`), and the play-session `clients` size. `resolve()` applies
-//! the defaults table and validates the combination; the master calls it at
-//! submit time, the CLI/MCP call it early for fast errors.
+//! DataModel the run lands on — the communication boundary: same-DOM contexts
+//! share instances, cross-DOM needs remotes), the `context` (the *identity
+//! level* the code runs at, each an independent Luau VM on the DOM — cf.
+//! Roblox's `Script.RunContext` Server/Client/Plugin, plus `elevated` for the
+//! command bar; NOT a script class), and the play-session `clients` size.
+//! `resolve()` applies the defaults table and validates the combination; the
+//! master calls it at submit time, the CLI/MCP call it early for fast errors.
 
 use anyhow::{bail, Result};
 
@@ -148,11 +150,16 @@ impl RouteSpec {
 
     /// Apply the defaults table, then validate the combination.
     ///
+    /// `mode` is the sole driver of studio transitions and is NEVER inferred
+    /// from `context`/`dom_kind` — it defaults to `edit` when omitted. So a
+    /// server/client run must pass `--mode` explicitly (e.g. `--mode run
+    /// --context server`); `--context server` alone resolves to `(edit,
+    /// server)` and fails validation rather than silently transitioning the
+    /// studio. This keeps the mutating action (mode change) explicit and the
+    /// outcome independent of the studio's current state.
+    ///
     /// Defaults:
-    /// - `mode` omitted: from `dom_kind` (edit→edit, server→run, client→test)
-    ///   if given, else from `context` (client→test, server→run,
-    ///   plugin/elevated→edit), else edit. Pass `--mode` explicitly to address
-    ///   the edit DOM while a session runs (e.g. `--mode test --dom edit`).
+    /// - `mode` omitted: `edit`.
     /// - `dom_kind` omitted: from `context` (server→server, client→client);
     ///   for plugin/elevated (or none) by mode: edit→edit, run/test/play→server.
     /// - `context` omitted: the native context of the resolved dom kind
@@ -162,14 +169,7 @@ impl RouteSpec {
         use RunContext as C;
         use StudioMode as M;
 
-        let mode = self.mode.unwrap_or(match (self.dom_kind, self.context) {
-            (Some(K::Server), _) => M::Run,
-            (Some(K::Client), _) => M::Test,
-            (Some(K::Edit), _) => M::Edit,
-            (None, Some(C::Client)) => M::Test,
-            (None, Some(C::Server)) => M::Run,
-            (None, _) => M::Edit,
-        });
+        let mode = self.mode.unwrap_or(M::Edit);
 
         let dom_kind = self.dom_kind.unwrap_or(match self.context {
             Some(C::Server) => K::Server,
@@ -194,7 +194,7 @@ impl RouteSpec {
         match (mode, dom_kind) {
             (M::Edit, K::Edit) => {}
             (M::Edit, k) => bail!(
-                "mode edit has only an edit DOM — drop --dom or pick run/test/play for a {} DOM",
+                "a {} DOM needs --mode run/test/play — mode defaults to edit, which has only an edit DOM",
                 k.as_str()
             ),
             (M::Run, K::Edit | K::Server) => {}
@@ -251,14 +251,11 @@ mod tests {
         let cases: &[(RouteSpec, (M, K, C))] = &[
             // bare run = edit plugin
             (spec(None, None, None, None), (M::Edit, K::Edit, C::Plugin)),
-            // context alone implies mode + dom kind
-            (spec(None, None, Some(C::Client), None), (M::Test, K::Client, C::Client)),
-            (spec(None, None, Some(C::Server), None), (M::Run, K::Server, C::Server)),
+            // mode is never inferred from context: without --mode, mode is edit,
+            // so only edit-hosted contexts (plugin/elevated) resolve here.
+            // (server/client without --mode are invalid — see invalid_combos.)
             (spec(None, None, Some(C::Elevated), None), (M::Edit, K::Edit, C::Elevated)),
             (spec(None, None, Some(C::Plugin), None), (M::Edit, K::Edit, C::Plugin)),
-            // dom kind alone implies mode + native context
-            (spec(None, Some(K::Server), None, None), (M::Run, K::Server, C::Server)),
-            (spec(None, Some(K::Client), None, None), (M::Test, K::Client, C::Client)),
             (spec(None, Some(K::Edit), None, None), (M::Edit, K::Edit, C::Plugin)),
             // edit DOM addressable while a session runs (edit exists in every mode)
             (spec(Some(M::Run), Some(K::Edit), None, None), (M::Run, K::Edit, C::Plugin)),
@@ -295,6 +292,12 @@ mod tests {
             spec(Some(M::Edit), Some(K::Client), None, None),
             spec(Some(M::Edit), None, Some(C::Client), None),
             spec(Some(M::Edit), None, Some(C::Server), None),
+            // no --mode → mode defaults to edit, so a server/client context or
+            // dom kind is invalid (must pass --mode run/test/play explicitly)
+            spec(None, None, Some(C::Server), None),
+            spec(None, None, Some(C::Client), None),
+            spec(None, Some(K::Server), None, None),
+            spec(None, Some(K::Client), None, None),
             // run mode has no client DOM
             spec(Some(M::Run), Some(K::Client), None, None),
             spec(Some(M::Run), None, Some(C::Client), None),

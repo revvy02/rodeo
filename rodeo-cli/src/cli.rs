@@ -104,8 +104,9 @@ pub enum Commands {
         #[arg(long)]
         show_return: bool,
 
-        /// Studio mode to run in (auto-transitions Studio). Defaults from
-        /// --context/--dom (else edit).
+        /// Studio mode to run in (auto-transitions Studio). Defaults to edit;
+        /// never inferred from --context/--dom, so a server/client run must pass
+        /// --mode explicitly (e.g. --mode run --context server).
         #[arg(long, value_enum, help_heading = "Targeting")]
         mode: Option<ModeArg>,
 
@@ -114,7 +115,9 @@ pub enum Commands {
         #[arg(long = "dom", value_name = "DOM", value_enum, help_heading = "Targeting")]
         dom_kind: Option<DomKindArg>,
 
-        /// Run context the code executes as (cf. Script.RunContext).
+        /// Identity level the code executes at: plugin, server (server-runtime
+        /// identity), client (client-runtime identity), or elevated (command
+        /// bar). Each context is its own Luau VM on the DOM.
         #[arg(long, value_enum, help_heading = "Targeting")]
         context: Option<ContextArg>,
 

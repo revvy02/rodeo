@@ -22,13 +22,12 @@ use rmcp::{ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 const SERVER_INSTRUCTIONS: &str = "\
 rodeo executes Luau code inside Roblox Studio via WebSocket.
 
-Run routing (orthogonal args; all optional, sensible defaults):
-- mode: edit | run | test | play (auto-transitions Studio)
-- context: plugin | server | client | elevated (run context; elevated = command bar)
-- dom: edit | server | client (usually inferred; `edit` targets the edit DOM even while a session runs)
+Run routing (orthogonal args):
+- mode: edit | run | test | play — the sole driver of studio transitions; defaults to edit and is NEVER inferred from context/dom. A server/client run must set mode (e.g. mode=run context=server, mode=test context=client).
+- context: the identity level the code runs at — plugin | server (server-runtime identity) | client (client-runtime identity) | elevated (command bar). Each context is an independent Luau VM on the DOM.
+- dom: edit | server | client — which DataModel to run on (usually inferred; `edit` targets the edit DOM even while a session runs). The DOM is the communication boundary: contexts on the same DOM share instances (BindableEvents), different DOMs talk via RemoteEvents.
 - clients: play session size (mode play)
-Examples: context=client runs a client; context=server a run-mode server;
-context=elevated edit elevated; no args = edit plugin.
+Examples: no args = edit plugin; mode=run context=server = server identity in run mode; mode=test context=client = client identity in a play test; context=elevated = command-bar identity in edit.
 
 Direct targeting:
 - dom_id: pin to one DOM by id (from get_state); studio_id: scope to one studio
@@ -291,7 +290,7 @@ fn run_code_input_schema() -> Arc<JsonObject> {
             "mode": {
                 "type": "string",
                 "enum": ["edit", "run", "test", "play"],
-                "description": "Studio mode to run in (auto-transitions Studio). Defaults from context/dom, else edit."
+                "description": "Studio mode to run in (auto-transitions Studio). Defaults to edit; never inferred from context/dom, so a server/client run must set mode explicitly (e.g. mode=run context=server)."
             },
             "dom": {
                 "type": "string",
@@ -301,7 +300,7 @@ fn run_code_input_schema() -> Arc<JsonObject> {
             "context": {
                 "type": "string",
                 "enum": ["plugin", "server", "client", "elevated"],
-                "description": "Run context (cf. Script.RunContext). elevated = command-bar identity for privileged Roblox APIs."
+                "description": "Identity level the code runs at (its own Luau VM on the DOM): plugin, server (server-runtime identity), client (client-runtime identity), or elevated (command-bar identity, for privileged Roblox APIs like DebuggerManager). NOT a script class — a ModuleScript runs at whatever context requires it."
             },
             "clients": { "type": "integer", "description": "Play-test session size (mode play only): ensure N clients total." },
             "dom_id": { "type": "string", "description": "Pin the run to one DOM by id (from get_state; bypasses routing). Only context may accompany it." },

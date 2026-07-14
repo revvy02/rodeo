@@ -123,4 +123,15 @@ describe("state (CLI)", () => {
     expect(result.ok).toBe(true);
     expect(result.stdout + result.stderr).toContain("true");
   });
+
+  it("--context server without --mode is rejected (mode never inferred)", () => {
+    // mode defaults to edit; (edit, server) has no server DOM, so this fails at
+    // validation rather than silently transitioning the studio to run mode.
+    const result = runRodeo([
+      "run", "--port", String(PORT), "--context", "server",
+      "--source", "return 1",
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.stdout + result.stderr).toContain("edit");
+  });
 });

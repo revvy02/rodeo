@@ -32,7 +32,7 @@ pub async fn main(host: &str, port: u16, json: bool) -> Result<()> {
     if snapshot.studios.is_empty() {
         println!("  (none connected)");
     } else {
-        let mut table = new_table(&["STUDIO", "MODE", "PLACE", "STATUS"]);
+        let mut table = new_table(&["ID", "MODE", "PLACE", "STATUS"]);
         for st in &snapshot.studios {
             let place = if st.place_id != 0 {
                 format!("{} ({})", st.place_name, st.place_id)
@@ -55,7 +55,7 @@ pub async fn main(host: &str, port: u16, json: bool) -> Result<()> {
     if !has_doms {
         println!("  (none)");
     } else {
-        let mut table = new_table(&["DOM", "KIND", "STUDIO", "USER"]);
+        let mut table = new_table(&["ID", "KIND", "STUDIO", "USER"]);
         for st in &snapshot.studios {
             for d in &st.doms {
                 let user = match (&d.user_name, d.user_id) {
