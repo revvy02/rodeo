@@ -29,12 +29,12 @@ $ rodeo run --place ./game.rbxl --focus script.luau
 
 ### Keep the place open
 
-`--detached` leaves the Studio open after the run.
+`--detach` leaves the Studio open after the run.
 
 ```bash
 $ rodeo serve                 # terminal 1
 
-$ rodeo run --place 1234567890 --detached --source "print('studio is up')"
+$ rodeo run --place 1234567890 --detach --source "print('studio is up')"
 studio is up
 
 $ rodeo run --show-return --source "return game.PlaceId"

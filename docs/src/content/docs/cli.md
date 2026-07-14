@@ -94,7 +94,7 @@ Run a script in Studio
 * `--dom-id <DOM_ID>` — Pin the run to a specific DOM by id (from `rodeo state`; unique prefix ok). Only --context may accompany it — no mode/dom/clients routing
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
 * `--focus` — Bring Studio to the foreground on launch (default: background)
-* `--detached` — Keep Studio/Player running after rodeo exits
+* `--detach` — Keep Studio/Player running after rodeo exits
 * `--no-hud` — Strip Studio UI panels (Explorer/Properties/Toolbox/Output/etc.) for a minimal launch. Applies only to the Studio rodeo launches; restored on exit
 * `--profile <PROFILE>` — Enable microprofiler auto-capture and collect dumps (optional: output directory)
 * `--save <SAVE>` — Save Studio place on exit, optionally to a specific path

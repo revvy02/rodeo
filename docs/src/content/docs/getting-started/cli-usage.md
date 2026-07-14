@@ -42,15 +42,15 @@ rodeo run --place 12345 --source 'return game.PlaceId'
 rodeo run --place ./my-place.rbxl script.luau
 ```
 
-Studio launches in the background and the script runs against it. By default rodeo closes the Studio it launched once the run finishes; pass `--detached` to keep it running.
+Studio launches in the background and the script runs against it. By default rodeo closes the Studio it launched once the run finishes; pass `--detach` to keep it running.
 
 ## Launch a detached Studio
 
-Pass `--detached` to spawn a Studio that isn't tied to the `rodeo run` process. Instead of closing the Studio when the script finishes, rodeo leaves it running:
+Pass `--detach` to spawn a Studio that isn't tied to the `rodeo run` process. Instead of closing the Studio when the script finishes, rodeo leaves it running:
 
 ```bash
 # Launch a Studio and leave it up after the command exits
-rodeo run --place 12345 --detached --source 'print("studio is up")'
+rodeo run --place 12345 --detach --source 'print("studio is up")'
 ```
 
 The command returns, but the Studio stays open and connected to the server, so later `rodeo run` commands can target it without relaunching:

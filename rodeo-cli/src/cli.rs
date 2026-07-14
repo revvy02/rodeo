@@ -296,7 +296,7 @@ pub struct PlaceArgs {
     pub focus: bool,
 
     /// Keep Studio/Player running after rodeo exits
-    #[arg(long = "detached", help_heading = "Launch")]
+    #[arg(long = "detach", help_heading = "Launch")]
     pub detached: bool,
 
     /// Strip Studio UI panels (Explorer/Properties/Toolbox/Output/etc.) for a

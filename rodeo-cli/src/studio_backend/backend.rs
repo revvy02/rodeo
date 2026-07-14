@@ -724,7 +724,7 @@ async fn handle_master_msg(
             };
             if let Some(studio) = studio_to_cleanup {
                 tracing::info!(session_guid = session_guid.as_str(), "closing Studio");
-                // Run full cleanup (save if --save, skip kill if --detached) off the async
+                // Run full cleanup (save if --save, skip kill if --detach) off the async
                 // runtime — save() can block up to 30s waiting for file mtime change.
                 let ls = state.clone();
                 tokio::spawn(async move {

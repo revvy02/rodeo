@@ -3,10 +3,10 @@ import { runRodeo, processMatches, killMatching } from "../helpers.js";
 
 const PORT = 46202;
 
-describe("--detached flag (CLI)", () => {
-  it("run --place --detached keeps Studio alive", async () => {
+describe("--detach flag (CLI)", () => {
+  it("run --place --detach keeps Studio alive", async () => {
     const result = runRodeo([
-      "run", "--place", "--detached",
+      "run", "--place", "--detach",
       "--port", String(PORT),
       "--source", "return nil",
     ]);

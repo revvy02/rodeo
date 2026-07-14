@@ -444,7 +444,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
             }
         };
         // Graceful shutdown: close studio (triggers save if --save was used).
-        // Skip when --detached — caller explicitly asked Studio to survive.
+        // Skip when --detach — caller explicitly asked Studio to survive.
         if let Some(ref sid) = launched_studio_id {
             if !cfg.detached {
                 let _ = RodeoClient::connect(&cfg.host, cfg.port)?.close_studio_raw(sid).await;
@@ -455,7 +455,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
     } else {
         let r = cli_run::run_piped(&cfg.host, cfg.port, request).await;
         // Same one-shot hygiene when we launched a studio on someone else's
-        // serve: close it after the run (unless --detached).
+        // serve: close it after the run (unless --detach).
         if let Some(ref sid) = launched_studio_id {
             if !cfg.detached {
                 let _ = RodeoClient::connect(&cfg.host, cfg.port)?.close_studio_raw(sid).await;
