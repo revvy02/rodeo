@@ -16,7 +16,8 @@
 /build
 /rodeo-plugin/build/
 /bin/
-/.claude/
+/.claude/*
+!/.claude/skills/
 /.plans
 /.vscode
 /.scratch/
