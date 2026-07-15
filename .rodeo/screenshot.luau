@@ -1,6 +1,4 @@
---[[
-    Capture a screenshot from Roblox Studio
-]]
+-- Capture a screenshot from Roblox Studio (only works for mac os atm)
 
 local argparse = require("@pkg/argparse")
 
@@ -12,7 +10,7 @@ local stream = require("@rodeo/stream")
 local CaptureService = game:GetService("CaptureService")
 local RunService = game:GetService("RunService")
 
-local args = process.args
+-- Parse args via argparse
 local parser = argparse("screenshot", "Capture a screenshot from Roblox Studio")
 parser:option("--cframe"):description("Camera CFrame expression (Luau)")
 parser:option("--fov"):description("Field of view"):convert(tonumber)
@@ -20,7 +18,7 @@ parser:option("--settle"):description("Settle time in seconds"):convert(tonumber
 parser:option("--focus"):description("Focus CFrame expression (Luau)")
 parser:option("--skew"):description("Per-frame CFrame skew expression (Luau)")
 parser:option("-o --output"):description("Output file path")
-local opts = parser:parse(args)
+local opts = parser:parse(process.args)
 
 local cframe: CFrame? = if opts.cframe then (loadstring("return " .. opts.cframe) :: any)() else nil
 local fov: number? = opts.fov
@@ -85,7 +83,7 @@ local bestDelta = math.huge
 for _, entry in entries do
 	if entry.name:sub(1, 4) == "wob-" then
 		local meta = fs.stat(captureDir .. "/" .. entry.name)
-		local delta = math.abs((meta.modified or 0) - timestamp)
+		local delta = math.abs(meta.modifiedMillis - timestamp)
 		if delta < bestDelta then
 			bestDelta = delta
 			bestFile = entry.name
