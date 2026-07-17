@@ -9,6 +9,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StudioTestService = game:GetService("StudioTestService")
 
 -- Static (never change for this VM's lifetime)
 local isServer = RunService:IsServer()
@@ -100,6 +101,9 @@ local inputs = {
 	serverMcpStudioId = nil :: string?,
 	clientDomIds = {} :: { [string]: Player },
 	clientMcpStudioIds = {} :: { [string]: Player },
+	-- Session kind ("test" | "play") reported by a client via CanLeaveTest and
+	-- propagated to the server, which can't call CanLeaveTest itself.
+	sessionKind = nil :: ("test" | "play")?,
 	-- Players
 	players = {} :: { [Player]: boolean },
 }
@@ -148,18 +152,14 @@ local function computeState(): State
 	local clientMcpStudioId = if isClient then inputs.bindableMcpStudioId else next(inputs.clientMcpStudioIds)
 	local serverMcpStudioId = inputs.serverMcpStudioId or clientMcpStudioId or inputs.bindableMcpStudioId
 
-	-- Defaults to "play" when MCP studio IDs haven't been resolved via reconciliation.
-	-- StudioMCP currently can't execute Luau in StartServer/StartClient windows,
-	-- so play mode processes never get MCP studio IDs — defaulting to "play" is correct.
-	-- For single-process test mode, MCP reconciliation sets matching MCP IDs
-	-- and mode corrects from "play" to "test". When StudioMCP adds support for
-	-- play DataModels, reconciliation will set different IDs and mode resolves
-	-- to "play" through the explicit check instead of the default.
-	local mode: "edit" | "run" | "test" | "play" = if isEdit
-		then "edit"
-		elseif isRunMode then "run"
-		elseif serverMcpStudioId and clientMcpStudioId and serverMcpStudioId == clientMcpStudioId then "test"
-		else "play"
+	-- test vs play (running, non-run-mode) comes from `inputs.sessionKind`, set
+	-- from StudioTestService:CanLeaveTest() — the client computes it once running
+	-- and both stores it locally and propagates it to the server (which can't
+	-- call CanLeaveTest itself). Defaults to "play" until set — a DOM with no
+	-- verdict yet can't be a solo test.
+	local sessionKind: "test" | "play" = inputs.sessionKind or "play"
+
+	local mode: "edit" | "run" | "test" | "play" = if isEdit then "edit" elseif isRunMode then "run" else sessionKind
 
 	local clientDomIds = nil
 	if isServer then
@@ -270,6 +270,9 @@ if isServer then
 		elseif action == "studio_id_from_client" then
 			-- "id" is the client's mcp_studio_id (from reconciliation)
 			inputs.clientMcpStudioIds[id] = player
+		elseif action == "session_kind" then
+			-- "id" is "test" | "play" — the client's CanLeaveTest verdict
+			inputs.sessionKind = id
 		end
 	end)
 
@@ -297,6 +300,13 @@ if isClient then
 		end
 	end)
 	RODEO_UNIFIER_REMOTE:FireServer("register_client_dom_id", domId)
+
+	local ok, canLeave = pcall(function()
+		return StudioTestService:CanLeaveTest()
+	end)
+	local kind = if ok and not canLeave then "test" else "play"
+	inputs.sessionKind = kind
+	RODEO_UNIFIER_REMOTE:FireServer("session_kind", kind)
 end
 
 RODEO_UNIFIER_BINDABLE.Event:Connect(function(id)
