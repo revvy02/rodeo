@@ -1,12 +1,13 @@
 --[[
 	Rodeo Plugin Entry Point
 
-	Bootstraps the React UI. All connection and execution logic
-	lives in React hooks (useWebSocket, useExecution).
-	AppProvider is the single source of truth for all state.
+	Bootstraps the React UI. All connection and execution logic lives in
+	AppProvider, which auto-connects on load (no manual host/port/autoConnect —
+	the port comes from the launch's rodeoPort attribute, else the default).
 
-	The app is always mounted (for WebSocket to work in "once" mode).
-	The settings panel (widget/toolbar) is only created when SETTINGS_PANEL_ENABLED.
+	The app is always mounted (the widget is the mount point) so the WebSocket
+	runs; the panel itself just shows connection status, active runs, and a
+	verbose toggle.
 ]]
 
 local App = require(script.app.widget)
@@ -53,19 +54,11 @@ end)
 -- Create React root and render (always, for WebSocket to work)
 local root = ReactRoblox.createRoot(widget)
 
--- Priority: persisted plugin setting > constant default
-local persistedAutoConnect = plugin:GetSetting("autoConnect")
-local resolvedAutoConnect = if persistedAutoConnect ~= nil then persistedAutoConnect else constants.DEFAULT_AUTO_CONNECT
-
-local resolvedSettings = {
-	host = constants.DEFAULT_HOST,
-	port = constants.DEFAULT_PORT,
-	autoConnect = resolvedAutoConnect,
-}
-
 root:render(e(App, {
 	plugin = plugin,
-	initialSettings = resolvedSettings,
+	initialSettings = {
+		port = constants.DEFAULT_PORT,
+	},
 }))
 
 -- Cleanup on plugin unload

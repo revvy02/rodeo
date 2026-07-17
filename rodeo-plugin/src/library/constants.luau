@@ -12,7 +12,6 @@ return {
 	-- by the RunScript bootstrap) and supplies its session via `rodeoSession`.
 	DEFAULT_HOST = "localhost",
 	DEFAULT_PORT = 44873,
-	DEFAULT_AUTO_CONNECT = true,
 	VERBOSE = false,
 
 	-- Bit positions for context bitset

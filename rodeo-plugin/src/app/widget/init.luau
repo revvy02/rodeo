@@ -1,14 +1,12 @@
 local React = require("@pkg/react")
 
 local AppContext = require(script.Parent.context.AppContext)
-local Button = require(script.Button)
 local Checkbox = require(script.Checkbox)
 local Container = require(script.Container)
 local Label = require(script.Label)
 local RodeoLabel = require(script.RodeoLabel)
 local Row = require(script.Row)
 local StatusIndicator = require(script.StatusIndicator)
-local TextInput = require(script.TextInput)
 local constants = require(script.Parent.Parent.library.constants)
 
 local AppProvider = AppContext.AppProvider
@@ -21,9 +19,7 @@ local e = React.createElement
 export type Props = {
 	plugin: Plugin,
 	initialSettings: {
-		host: string?,
 		port: number,
-		autoConnect: boolean,
 	},
 }
 
@@ -38,8 +34,6 @@ local PROCESS_STATE_COLORS = {
 -- Inner component that can use context
 local function AppContent()
 	local context = useAppContext()
-	local showSettings = context.settingsPanelEnabled
-	local isConnected = context.connected
 
 	-- Build process list entries
 	local processChildren = {}
@@ -83,73 +77,8 @@ local function AppContent()
 			Children = e(React.Fragment, nil, processChildren),
 		}) or nil,
 
-		-- Port row (only when settings panel enabled)
-		PortRow = showSettings and e(Row, {
-			height = 30,
-			layoutOrder = 3,
-		}, {
-			Container = e("Frame", {
-				BackgroundColor3 = COLORS.inputBackground,
-				BackgroundTransparency = 0,
-				BorderSizePixel = 0,
-				Size = UDim2.fromScale(1, 1),
-			}, {
-				Layout = e("UIListLayout", {
-					FillDirection = Enum.FillDirection.Horizontal,
-					HorizontalFlex = Enum.UIFlexAlignment.SpaceBetween,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					Padding = UDim.new(0, 8),
-				}),
-				Padding = e("UIPadding", {
-					PaddingLeft = UDim.new(0, 8),
-					PaddingRight = UDim.new(0, 8),
-				}),
-				Corner = e("UICorner", {
-					CornerRadius = UDim.new(0, 4),
-				}),
-				Stroke = e("UIStroke", {
-					Color = COLORS.stroke,
-					Thickness = 1,
-				}),
-				HostInput = e(TextInput, {
-					value = context.settings.host,
-					placeholder = context.settings.defaultHost,
-					textColor = COLORS.text,
-					placeholderColor = COLORS.textDim,
-					textXAlignment = Enum.TextXAlignment.Left,
-					onValueChange = context.setHost,
-				}),
-				PortInput = e(TextInput, {
-					value = context.settings.port,
-					placeholder = context.settings.defaultPort,
-					textColor = COLORS.text,
-					placeholderColor = COLORS.textDim,
-					textXAlignment = Enum.TextXAlignment.Right,
-					onValueChange = context.setPort,
-				}),
-			}),
-		}) or nil,
-
-		-- Auto Connect row (only when settings panel enabled)
-		AutoConnectRow = showSettings and e(Row, {
-			height = 30,
-			layoutOrder = 4,
-		}, {
-			Label = e(Label, {
-				text = "> Auto Connect",
-				textColor = COLORS.accent,
-			}),
-			Checkbox = e(Checkbox, {
-				checked = context.settings.autoConnect,
-				strokeColor = COLORS.stroke,
-				onToggle = function()
-					context.setAutoConnect(not context.settings.autoConnect)
-				end,
-			}),
-		}) or nil,
-
-		-- Verbose row (only when settings panel enabled)
-		VerboseRow = showSettings and e(Row, {
+		-- Verbose toggle (the only remaining control; connection is automatic)
+		VerboseRow = e(Row, {
 			height = 30,
 			layoutOrder = 5,
 		}, {
@@ -164,19 +93,7 @@ local function AppContent()
 					context.setVerbose(not context.settings.verbose)
 				end,
 			}),
-		}) or nil,
-
-		-- Button (only when settings panel enabled)
-		-- When connected: red text/stroke (disconnect action)
-		-- When disconnected: green text/stroke (connect action)
-		Button = showSettings and e(Button, {
-			text = if isConnected then "DISCONNECT" else "CONNECT",
-			color = if isConnected then COLORS.error else COLORS.success,
-			strokeColor = if isConnected then COLORS.error else COLORS.success,
-			size = UDim2.fromOffset(140, 50),
-			layoutOrder = 6,
-			onClick = if isConnected then context.disconnect else context.connect,
-		}) or nil,
+		}),
 
 		-- Rodeo label (always shown)
 		RodeoLabel = e(RodeoLabel),

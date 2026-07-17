@@ -25,11 +25,6 @@ local AppContext = React.createContext(nil)
 
 -- Types
 export type Settings = {
-	host: string,
-	port: string,
-	defaultHost: string,
-	defaultPort: string,
-	autoConnect: boolean,
 	verbose: boolean,
 }
 
@@ -50,26 +45,14 @@ export type AppContextValue = {
 	-- Settings
 	settings: Settings,
 
-	-- UI visibility
-	settingsPanelEnabled: boolean,
-
 	-- Setters
-	setHost: (host: string) -> (),
-	setPort: (port: string) -> (),
-	setAutoConnect: (autoConnect: boolean) -> (),
 	setVerbose: (verbose: boolean) -> (),
-
-	-- Actions
-	connect: () -> (),
-	disconnect: () -> (),
 }
 
 export type AppProviderProps = {
 	plugin: Plugin,
 	initialSettings: {
-		host: string?,
 		port: number,
-		autoConnect: boolean,
 	},
 	children: any,
 }
@@ -108,14 +91,10 @@ end
 
 -- Provider component
 local function AppProvider(props: AppProviderProps)
-	-- Default values (used as placeholders and fallbacks)
-	local defaultHost = props.initialSettings.host or constants.DEFAULT_HOST
+	-- Connection defaults (host is fixed; port falls back to the launch attribute).
+	local defaultHost = constants.DEFAULT_HOST
 	local defaultPort = tostring(props.initialSettings.port or constants.DEFAULT_PORT)
 
-	-- Current override values (empty means use default)
-	local currentHost, setCurrentHost = React.useState("")
-	local currentPort, setCurrentPort = React.useState("")
-	local autoConnect, setAutoConnect = React.useState(props.initialSettings.autoConnect)
 	local verbose, setVerbose = React.useState(constants.VERBOSE)
 
 	-- WebSocket state
@@ -246,50 +225,17 @@ local function AppProvider(props: AppProviderProps)
 		return cleanup
 	end, { client, verbose })
 
-	-- Port change handler with validation
-	local function handlePortChange(newPort: string)
-		local portNum = tonumber(newPort)
-		if newPort == "" or (portNum and portNum > 0 and portNum < 65536) then
-			setCurrentPort(newPort)
-		end
-	end
-
-	-- Host change handler
-	local function handleHostChange(newHost: string)
-		setCurrentHost(newHost)
-	end
-
-	-- Auto-connect toggle handler (persists across plugin reloads)
-	local function handleAutoConnectToggle(newAutoConnect: boolean)
-		setAutoConnect(newAutoConnect)
-		props.plugin:SetSetting("autoConnect", newAutoConnect)
-	end
-
 	-- Verbose toggle handler
 	local function handleVerboseToggle(newVerbose: boolean)
 		setVerbose(newVerbose)
 	end
 
-	-- Connect handler uses current host:port (falls back to the launch's
-	-- rodeoPort attribute, then the default, if no manual override).
-	local function handleConnect()
-		local connectHost = if currentHost == "" then defaultHost else currentHost
-		local bootstrapPort = game:GetService("Workspace"):GetAttribute("rodeoPort")
-		local portNum = tonumber(currentPort) or bootstrapPort or tonumber(defaultPort)
-		setWsUrl(`ws://{connectHost}:{portNum}`)
-	end
-
-	-- Disconnect handler
-	local function handleDisconnect()
-		setAutoConnect(false)
-		props.plugin:SetSetting("autoConnect", false)
-		setWsUrl(nil)
-	end
-
-	-- Auto-reconnect when enabled and disconnected (retries every 1s)
+	-- Auto-connect: always on, retries every 1s while disconnected. No manual
+	-- host/port — the host is the default and the port comes from the launch's
+	-- `rodeoPort` attribute (falling back to the default).
 	React.useEffect(function()
-		-- Skip if: autoConnect is off, already connected, or already have a wsUrl (connection in progress)
-		if not autoConnect or connected or wsUrl then
+		-- Skip if already connected or a connection is in progress.
+		if connected or wsUrl then
 			return
 		end
 
@@ -298,10 +244,9 @@ local function AppProvider(props: AppProviderProps)
 			if not shouldReconnect then
 				return
 			end
-			local connectHost = if currentHost == "" then defaultHost else currentHost
 			local bootstrapPort = game:GetService("Workspace"):GetAttribute("rodeoPort")
-			local portNum = tonumber(currentPort) or bootstrapPort or tonumber(defaultPort)
-			setWsUrl(`ws://{connectHost}:{portNum}`)
+			local portNum = bootstrapPort or tonumber(defaultPort)
+			setWsUrl(`ws://{defaultHost}:{portNum}`)
 		end
 
 		-- Only the edit DOM races the RunScript bootstrap that stamps the launch
@@ -320,7 +265,7 @@ local function AppProvider(props: AppProviderProps)
 		return function()
 			shouldReconnect = false
 		end
-	end, { autoConnect, connected, wsUrl, currentHost, currentPort, defaultHost, defaultPort })
+	end, { connected, wsUrl, defaultHost, defaultPort })
 
 	-- Build context value (memoized)
 	local contextValue = React.useMemo(function()
@@ -336,46 +281,21 @@ local function AppProvider(props: AppProviderProps)
 			-- Active processes
 			activeProcesses = activeProcesses,
 
-			-- Settings
+			-- Settings (verbose only; connection is automatic)
 			settings = {
-				host = currentHost,
-				port = currentPort,
-				defaultHost = defaultHost,
-				defaultPort = defaultPort,
-				autoConnect = autoConnect,
 				verbose = verbose,
 			},
 
-			-- UI visibility
-			settingsPanelEnabled = true,
-
 			-- Setters
-			setHost = handleHostChange,
-			setPort = handlePortChange,
-			setAutoConnect = handleAutoConnectToggle,
 			setVerbose = handleVerboseToggle,
-
-			-- Actions
-			connect = handleConnect,
-			disconnect = handleDisconnect,
 		}
 	end, {
 		connected,
 		isExecuting,
 		status,
 		activeProcesses,
-		currentHost,
-		currentPort,
-		defaultHost,
-		defaultPort,
-		autoConnect,
 		verbose,
-		handleHostChange,
-		handlePortChange,
-		handleAutoConnectToggle,
 		handleVerboseToggle,
-		handleConnect,
-		handleDisconnect,
 	})
 
 	return e(AppContext.Provider, {
