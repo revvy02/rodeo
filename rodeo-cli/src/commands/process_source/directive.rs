@@ -2,9 +2,14 @@ use regex::Regex;
 use std::path::Path;
 
 /// Resolve a script name to a file path.
-/// Simple names (no path separator, no extension) are resolved to .rodeo/{name}.luau
+///
+/// An extensionless name resolves to `.rodeo/{name}.luau` when that file exists
+/// — and `name` may include subdirectories (e.g. `benchmarks/foo` →
+/// `.rodeo/benchmarks/foo.luau`), not just a shallow name. A name with an
+/// extension (or a `./` / `../` prefix) is treated as a literal path and left
+/// as-is. If the `.rodeo` file doesn't exist, the arg is returned unchanged.
 pub fn resolve_script_path(script_arg: &str) -> String {
-    if script_arg.contains('/') || script_arg.contains('\\') || script_arg.contains('.') {
+    if script_arg.contains('.') {
         return script_arg.to_string();
     }
 
