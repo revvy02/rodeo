@@ -110,8 +110,15 @@ pub async fn run_master(port: u16, master_id: String) -> Result<()> {
 pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) -> Result<()> {
     ensure_mcp_enabled();
 
-    // The rodeo plugin is a single static install (`rodeo.rbxm`); launches no
-    // longer drop per-launch plugin files, so there's nothing to sweep or lock.
+    // Ensure the static `rodeo.rbxm` plugin is installed and current before we
+    // accept connections — so every serve (not just a launch) keeps the plugin
+    // in lockstep with this CLI, and a manually-opened Studio finds it. The
+    // write is byte-idempotent: it's a no-op unless missing or a different
+    // version, so repeated serve starts don't churn or trigger a plugin reload.
+    if let Err(e) = crate::studio_backend::launch::install_static_plugin() {
+        tracing::warn!("failed to install rodeo plugin: {e}");
+    }
+
     // Two backends on the same port are already prevented by the socket bind.
 
     let state = Arc::new(Mutex::new(BackendState::new()));

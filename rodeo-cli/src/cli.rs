@@ -196,9 +196,6 @@ pub enum Commands {
         server: ServerArgs,
     },
 
-    /// Build and install the rodeo plugin
-    Plugin,
-
     /// Generate type definitions and configure .luaurc
     Setup,
 

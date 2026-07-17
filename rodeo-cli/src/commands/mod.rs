@@ -1,6 +1,5 @@
 pub mod kill;
 pub mod mcp;
-pub mod plugin;
 pub mod process_source;
 pub mod state;
 pub mod run;

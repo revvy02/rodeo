@@ -110,8 +110,9 @@ impl Studio {
         let session_guid = opts.session_guid.clone();
         let sg_short = &session_guid[..8.min(session_guid.len())];
 
-        tracing::info!(session_guid = sg_short, "spawn: ensuring static plugin installed");
-        install_static_plugin()?;
+        // The plugin is installed once at studio-backend startup (see
+        // `commands::serve::run_studio_backend`), not per launch — a launch
+        // always goes through a running backend that already ensured it.
 
         // Generate the RunScript bootstrap. It stamps `rodeoSession`/`rodeoPort`
         // onto the Workspace once Studio is up, so the static plugin routes to
@@ -211,7 +212,7 @@ impl Drop for Studio {
 /// sets — so this writes the same `rodeo.rbxm` the manual `rodeo plugin` command
 /// does. One shared static plugin per machine: never deleted on cleanup, and
 /// overwriting keeps the installed plugin in lockstep with the running CLI.
-fn install_static_plugin() -> Result<()> {
+pub(crate) fn install_static_plugin() -> Result<()> {
     let studio = roblox_install::RobloxStudio::locate()
         .context("failed to locate Roblox Studio install")?;
     let plugins_dir = studio.plugins_path();

@@ -16,7 +16,6 @@ Command-line interface for Roblox Studio
 * `state` — Show the canonical rodeo state: studios, their DOMs, and runs
 * `kill` — Kill a running process
 * `save` — Save the Studio place
-* `plugin` — Build and install the rodeo plugin
 * `setup` — Generate type definitions and configure .luaurc
 * `mcp` — Start MCP server for AI agent integration
 
@@ -156,14 +155,6 @@ Save the Studio place
 * `--port <PORT>` — Port number of running server
 
   Default value: `44872`
-
-
-
-## `rodeo plugin`
-
-Build and install the rodeo plugin
-
-**Usage:** `rodeo plugin`
 
 
 
