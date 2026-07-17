@@ -317,18 +317,29 @@ pub struct PlaceArgs {
 }
 
 impl PlaceArgs {
-    /// Convert to PlaceTarget. Returns None if no launch requested.
-    pub fn to_target(&self) -> Option<crate::studio_backend::PlaceTarget> {
-        let val = self.place.as_deref()?;
+    /// Convert to PlaceTarget. Returns Ok(None) if no launch requested.
+    ///
+    /// A file path is resolved to an absolute path against the run client's cwd
+    /// — the serve that opens the place may run in a different directory, so a
+    /// relative path would otherwise be resolved against the serve's cwd (wrong
+    /// file, or a fresh place). Canonicalize also fails fast if the file is
+    /// missing rather than silently launching an empty place.
+    pub fn to_target(&self) -> anyhow::Result<Option<crate::studio_backend::PlaceTarget>> {
+        use crate::studio_backend::PlaceTarget;
+        let Some(val) = self.place.as_deref() else {
+            return Ok(None);
+        };
         if val.is_empty() {
-            Some(crate::studio_backend::PlaceTarget::Empty)
+            Ok(Some(PlaceTarget::Empty))
         } else if let Ok(pid) = val.parse::<u64>() {
-            Some(crate::studio_backend::PlaceTarget::PlaceId {
+            Ok(Some(PlaceTarget::PlaceId {
                 place_id: pid,
                 universe_id: self.place_universe,
-            })
+            }))
         } else {
-            Some(crate::studio_backend::PlaceTarget::File(val.to_string()))
+            let abs = std::fs::canonicalize(val)
+                .map_err(|e| anyhow::anyhow!("place file '{val}' not found: {e}"))?;
+            Ok(Some(PlaceTarget::File(abs.to_string_lossy().into_owned())))
         }
     }
 }

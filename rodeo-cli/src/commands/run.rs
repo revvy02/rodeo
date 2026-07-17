@@ -97,7 +97,7 @@ fn args_route(args: &RunArgs) -> Result<crate::shared::target::RouteSpec> {
 
 pub async fn main(mut args: RunArgs) -> Result<()> {
     let has_script = args.script.is_some() || args.source.is_some();
-    let has_place = args.place.to_target().is_some();
+    let has_place = args.place.to_target()?.is_some();
 
     if has_place && !has_script {
         return persistent_mode(args).await;
@@ -122,7 +122,7 @@ pub async fn main(mut args: RunArgs) -> Result<()> {
 async fn persistent_mode(args: RunArgs) -> Result<()> {
     let port = args.server.port;
     let host = args.server.host.clone();
-    let place_target = args.place.to_target();
+    let place_target = args.place.to_target()?;
 
     // Ensure a serve exists on `port`: reuse a healthy one (None — not ours to
     // tear down), otherwise start and own it (Some — we hold it open below).
@@ -271,7 +271,7 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
 
     let host = args.server.host.clone();
     let port = args.server.port;
-    let place_target = args.place.to_target();
+    let place_target = args.place.to_target()?;
     let should_launch = place_target.is_some();
 
     // Always generate a run_id for correlation
