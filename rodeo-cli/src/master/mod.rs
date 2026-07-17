@@ -1158,7 +1158,7 @@ mod tests {
     #[test]
     fn session_less_edit_dom_is_driven_for_a_session_less_run() {
         let (mut state, mut backend_rx) = state_with_edit_dom("edit-dom", None);
-        let (run, _client_rx) = queued_run(crate::shared::target::RouteSpec { mode: Some(crate::shared::target::StudioMode::Test), dom_kind: Some(crate::shared::target::DomKind::Server), context: None, clients: None });
+        let (run, _client_rx) = queued_run(crate::shared::target::RouteSpec { mode: Some(crate::shared::target::StudioMode::Test), dom_kind: Some(crate::shared::target::DomKind::Server), context: None });
         state.pending_runs.push(run);
 
         state.derive_and_push_targets();
@@ -1177,7 +1177,7 @@ mod tests {
     #[test]
     fn session_bearing_edit_dom_is_driven_by_session() {
         let (mut state, _backend_rx) = state_with_edit_dom("edit-dom", Some("sess-A"));
-        let (run, _client_rx) = queued_run(crate::shared::target::RouteSpec { mode: Some(crate::shared::target::StudioMode::Test), dom_kind: Some(crate::shared::target::DomKind::Server), context: None, clients: None });
+        let (run, _client_rx) = queued_run(crate::shared::target::RouteSpec { mode: Some(crate::shared::target::StudioMode::Test), dom_kind: Some(crate::shared::target::DomKind::Server), context: None });
         state.pending_runs.push(run);
 
         state.derive_and_push_targets();

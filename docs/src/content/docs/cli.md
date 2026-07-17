@@ -75,7 +75,6 @@ Run a script in Studio
 
   Possible values: `plugin`, `server`, `client`, `elevated`
 
-* `--clients <CLIENTS>` — Play-test session size (mode play only): ensure N clients total
 * `--studio-id <STUDIO_ID>` — Scope routing to one studio by id (from `rodeo state`; unique prefix ok)
 * `--no-warn` — Disable warning output
 * `--no-error` — Disable error output
@@ -91,7 +90,7 @@ Run a script in Studio
 
   Default value: `44872`
 * `--place <PLACE>` — Launch Studio: empty (no value), place ID (number), or file path (.rbxl/.rbxlx)
-* `--dom-id <DOM_ID>` — Pin the run to a specific DOM by id (from `rodeo state`; unique prefix ok). Only --context may accompany it — no mode/dom/clients routing
+* `--dom-id <DOM_ID>` — Pin the run to a specific DOM by id (from `rodeo state`; unique prefix ok). Only --context may accompany it — no mode/dom routing
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
 * `--focus` — Bring Studio to the foreground on launch (default: background)
 * `--detach` — Keep Studio/Player running after rodeo exits

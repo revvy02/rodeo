@@ -121,10 +121,6 @@ pub enum Commands {
         #[arg(long, value_enum, help_heading = "Targeting")]
         context: Option<ContextArg>,
 
-        /// Play-test session size (mode play only): ensure N clients total.
-        #[arg(long, help_heading = "Targeting")]
-        clients: Option<u32>,
-
         /// Scope routing to one studio by id (from `rodeo state`; unique prefix ok).
         #[arg(long = "studio-id", help_heading = "Targeting", conflicts_with = "place")]
         studio_id: Option<String>,
@@ -286,7 +282,7 @@ pub struct PlaceArgs {
     pub place: Option<String>,
 
     /// Pin the run to a specific DOM by id (from `rodeo state`; unique prefix
-    /// ok). Only --context may accompany it — no mode/dom/clients routing.
+    /// ok). Only --context may accompany it — no mode/dom routing.
     #[arg(long = "dom-id", help_heading = "Targeting")]
     pub dom_id: Option<String>,
 

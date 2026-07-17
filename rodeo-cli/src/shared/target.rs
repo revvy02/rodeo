@@ -1,12 +1,12 @@
 //! Run routing: mode / dom-kind / run-context resolution.
 //!
-//! A run is routed by up to four orthogonal, individually-optional fields
+//! A run is routed by three orthogonal, individually-optional fields
 //! (`RouteSpec`): the studio `mode` to converge to, the `dom_kind` (which
 //! DataModel the run lands on — the communication boundary: same-DOM contexts
-//! share instances, cross-DOM needs remotes), the `context` (the *identity
+//! share instances, cross-DOM needs remotes), and the `context` (the *identity
 //! level* the code runs at, each an independent Luau VM on the DOM — cf.
 //! Roblox's `Script.RunContext` Server/Client/Plugin, plus `elevated` for the
-//! command bar; NOT a script class), and the play-session `clients` size.
+//! command bar; NOT a script class).
 //! `resolve()` applies the defaults table and validates the combination; the
 //! master calls it at submit time, the CLI/MCP call it early for fast errors.
 
@@ -108,9 +108,6 @@ pub struct RouteSpec {
     pub mode: Option<StudioMode>,
     pub dom_kind: Option<DomKind>,
     pub context: Option<RunContext>,
-    /// Play session size: ensure the session has this many clients total.
-    /// Only valid when the resolved mode is `play`.
-    pub clients: Option<u32>,
 }
 
 /// A fully-resolved, validated route.
@@ -119,7 +116,6 @@ pub struct Resolved {
     pub mode: StudioMode,
     pub dom_kind: DomKind,
     pub context: RunContext,
-    pub clients: Option<u32>,
 }
 
 impl RouteSpec {
@@ -128,7 +124,6 @@ impl RouteSpec {
         mode: Option<&str>,
         dom_kind: Option<&str>,
         context: Option<&str>,
-        clients: Option<u32>,
     ) -> Result<Self> {
         fn some(s: Option<&str>) -> Option<&str> {
             s.filter(|v| !v.is_empty())
@@ -137,7 +132,6 @@ impl RouteSpec {
             mode: some(mode).map(StudioMode::parse).transpose()?,
             dom_kind: some(dom_kind).map(DomKind::parse).transpose()?,
             context: some(context).map(RunContext::parse).transpose()?,
-            clients,
         })
     }
 
@@ -145,7 +139,6 @@ impl RouteSpec {
         self.mode.is_none()
             && self.dom_kind.is_none()
             && self.context.is_none()
-            && self.clients.is_none()
     }
 
     /// Apply the defaults table, then validate the combination.
@@ -216,15 +209,10 @@ impl RouteSpec {
             );
         }
 
-        if self.clients.is_some() && mode != M::Play {
-            bail!("--clients only applies to mode play (multiplayer session sizing)");
-        }
-
         Ok(Resolved {
             mode,
             dom_kind,
             context,
-            clients: self.clients,
         })
     }
 }
@@ -240,9 +228,8 @@ mod tests {
         mode: Option<M>,
         dom_kind: Option<K>,
         context: Option<C>,
-        clients: Option<u32>,
     ) -> RouteSpec {
-        RouteSpec { mode, dom_kind, context, clients }
+        RouteSpec { mode, dom_kind, context }
     }
 
     #[test]
@@ -250,33 +237,32 @@ mod tests {
         // (input spec, expected resolved (mode, dom_kind, context))
         let cases: &[(RouteSpec, (M, K, C))] = &[
             // bare run = edit plugin
-            (spec(None, None, None, None), (M::Edit, K::Edit, C::Plugin)),
+            (spec(None, None, None), (M::Edit, K::Edit, C::Plugin)),
             // mode is never inferred from context: without --mode, mode is edit,
             // so only edit-hosted contexts (plugin/elevated) resolve here.
             // (server/client without --mode are invalid — see invalid_combos.)
-            (spec(None, None, Some(C::Elevated), None), (M::Edit, K::Edit, C::Elevated)),
-            (spec(None, None, Some(C::Plugin), None), (M::Edit, K::Edit, C::Plugin)),
-            (spec(None, Some(K::Edit), None, None), (M::Edit, K::Edit, C::Plugin)),
+            (spec(None, None, Some(C::Elevated)), (M::Edit, K::Edit, C::Elevated)),
+            (spec(None, None, Some(C::Plugin)), (M::Edit, K::Edit, C::Plugin)),
+            (spec(None, Some(K::Edit), None), (M::Edit, K::Edit, C::Plugin)),
             // edit DOM addressable while a session runs (edit exists in every mode)
-            (spec(Some(M::Run), Some(K::Edit), None, None), (M::Run, K::Edit, C::Plugin)),
-            (spec(Some(M::Test), Some(K::Edit), None, None), (M::Test, K::Edit, C::Plugin)),
-            (spec(Some(M::Play), Some(K::Edit), None, None), (M::Play, K::Edit, C::Plugin)),
-            (spec(Some(M::Test), Some(K::Edit), Some(C::Elevated), None), (M::Test, K::Edit, C::Elevated)),
+            (spec(Some(M::Run), Some(K::Edit), None), (M::Run, K::Edit, C::Plugin)),
+            (spec(Some(M::Test), Some(K::Edit), None), (M::Test, K::Edit, C::Plugin)),
+            (spec(Some(M::Play), Some(K::Edit), None), (M::Play, K::Edit, C::Plugin)),
+            (spec(Some(M::Test), Some(K::Edit), Some(C::Elevated)), (M::Test, K::Edit, C::Elevated)),
             // mode alone → primary DOM + native context
-            (spec(Some(M::Run), None, None, None), (M::Run, K::Server, C::Server)),
-            (spec(Some(M::Test), None, None, None), (M::Test, K::Server, C::Server)),
-            (spec(Some(M::Play), None, None, None), (M::Play, K::Server, C::Server)),
-            (spec(Some(M::Edit), None, None, None), (M::Edit, K::Edit, C::Plugin)),
+            (spec(Some(M::Run), None, None), (M::Run, K::Server, C::Server)),
+            (spec(Some(M::Test), None, None), (M::Test, K::Server, C::Server)),
+            (spec(Some(M::Play), None, None), (M::Play, K::Server, C::Server)),
+            (spec(Some(M::Edit), None, None), (M::Edit, K::Edit, C::Plugin)),
             // the old three-segment targets
-            (spec(Some(M::Run), None, Some(C::Plugin), None), (M::Run, K::Server, C::Plugin)),
-            (spec(Some(M::Test), Some(K::Client), Some(C::Plugin), None), (M::Test, K::Client, C::Plugin)),
-            (spec(Some(M::Test), None, Some(C::Elevated), None), (M::Test, K::Server, C::Elevated)),
-            (spec(Some(M::Test), Some(K::Client), Some(C::Elevated), None), (M::Test, K::Client, C::Elevated)),
+            (spec(Some(M::Run), None, Some(C::Plugin)), (M::Run, K::Server, C::Plugin)),
+            (spec(Some(M::Test), Some(K::Client), Some(C::Plugin)), (M::Test, K::Client, C::Plugin)),
+            (spec(Some(M::Test), None, Some(C::Elevated)), (M::Test, K::Server, C::Elevated)),
+            (spec(Some(M::Test), Some(K::Client), Some(C::Elevated)), (M::Test, K::Client, C::Elevated)),
             // mode + context implying dom kind
-            (spec(Some(M::Test), None, Some(C::Client), None), (M::Test, K::Client, C::Client)),
-            (spec(Some(M::Play), None, Some(C::Client), None), (M::Play, K::Client, C::Client)),
-            // play sizing
-            (spec(Some(M::Play), Some(K::Client), Some(C::Client), Some(2)), (M::Play, K::Client, C::Client)),
+            (spec(Some(M::Test), None, Some(C::Client)), (M::Test, K::Client, C::Client)),
+            (spec(Some(M::Play), None, Some(C::Client)), (M::Play, K::Client, C::Client)),
+            (spec(Some(M::Play), Some(K::Client), Some(C::Client)), (M::Play, K::Client, C::Client)),
         ];
         for (input, (mode, dom_kind, context)) in cases {
             let r = input.resolve().unwrap_or_else(|e| panic!("{input:?}: {e}"));
@@ -288,28 +274,25 @@ mod tests {
     fn invalid_combos() {
         let cases: &[RouteSpec] = &[
             // edit mode has no server/client DOM
-            spec(Some(M::Edit), Some(K::Server), None, None),
-            spec(Some(M::Edit), Some(K::Client), None, None),
-            spec(Some(M::Edit), None, Some(C::Client), None),
-            spec(Some(M::Edit), None, Some(C::Server), None),
+            spec(Some(M::Edit), Some(K::Server), None),
+            spec(Some(M::Edit), Some(K::Client), None),
+            spec(Some(M::Edit), None, Some(C::Client)),
+            spec(Some(M::Edit), None, Some(C::Server)),
             // no --mode → mode defaults to edit, so a server/client context or
             // dom kind is invalid (must pass --mode run/test/play explicitly)
-            spec(None, None, Some(C::Server), None),
-            spec(None, None, Some(C::Client), None),
-            spec(None, Some(K::Server), None, None),
-            spec(None, Some(K::Client), None, None),
+            spec(None, None, Some(C::Server)),
+            spec(None, None, Some(C::Client)),
+            spec(None, Some(K::Server), None),
+            spec(None, Some(K::Client), None),
             // run mode has no client DOM
-            spec(Some(M::Run), Some(K::Client), None, None),
-            spec(Some(M::Run), None, Some(C::Client), None),
+            spec(Some(M::Run), Some(K::Client), None),
+            spec(Some(M::Run), None, Some(C::Client)),
             // context/dom-kind mismatches
-            spec(None, Some(K::Server), Some(C::Client), None),
-            spec(None, Some(K::Client), Some(C::Server), None),
+            spec(None, Some(K::Server), Some(C::Client)),
+            spec(None, Some(K::Client), Some(C::Server)),
             // edit DOM hosts only plugin/elevated — not server/client contexts
-            spec(Some(M::Test), Some(K::Edit), Some(C::Server), None),
-            spec(Some(M::Test), Some(K::Edit), Some(C::Client), None),
-            // clients outside play
-            spec(Some(M::Test), Some(K::Client), None, Some(2)),
-            spec(None, None, None, Some(1)),
+            spec(Some(M::Test), Some(K::Edit), Some(C::Server)),
+            spec(Some(M::Test), Some(K::Edit), Some(C::Client)),
         ];
         for input in cases {
             assert!(input.resolve().is_err(), "{input:?} should be invalid");
@@ -318,21 +301,21 @@ mod tests {
 
     #[test]
     fn from_strings_roundtrip() {
-        let s = RouteSpec::from_strings(Some("play"), Some("client"), Some("plugin"), Some(3)).unwrap();
+        let s = RouteSpec::from_strings(Some("play"), Some("client"), Some("plugin")).unwrap();
         assert_eq!(
             s,
-            spec(Some(M::Play), Some(K::Client), Some(C::Plugin), Some(3))
+            spec(Some(M::Play), Some(K::Client), Some(C::Plugin))
         );
         // empty strings are None
-        assert!(RouteSpec::from_strings(Some(""), None, Some(""), None).unwrap().is_empty());
+        assert!(RouteSpec::from_strings(Some(""), None, Some("")).unwrap().is_empty());
         // edit is now an accepted dom kind
         assert_eq!(
-            RouteSpec::from_strings(None, Some("edit"), None, None).unwrap(),
-            spec(None, Some(K::Edit), None, None)
+            RouteSpec::from_strings(None, Some("edit"), None).unwrap(),
+            spec(None, Some(K::Edit), None)
         );
         // unknown words error
-        assert!(RouteSpec::from_strings(Some("editt"), None, None, None).is_err());
-        assert!(RouteSpec::from_strings(None, Some("edom"), None, None).is_err());
-        assert!(RouteSpec::from_strings(None, None, Some("identity"), None).is_err());
+        assert!(RouteSpec::from_strings(Some("editt"), None, None).is_err());
+        assert!(RouteSpec::from_strings(None, Some("edom"), None).is_err());
+        assert!(RouteSpec::from_strings(None, None, Some("identity")).is_err());
     }
 }

@@ -16,7 +16,6 @@ pub struct RunArgs {
     pub mode: Option<String>,
     pub dom_kind: Option<String>,
     pub context: Option<String>,
-    pub clients: Option<u32>,
     pub studio_id: Option<String>,
     pub no_warn: bool,
     pub no_error: bool,
@@ -91,7 +90,6 @@ fn args_route(args: &RunArgs) -> Result<crate::shared::target::RouteSpec> {
         args.mode.as_deref(),
         args.dom_kind.as_deref(),
         args.context.as_deref(),
-        args.clients,
     )
 }
 
@@ -257,9 +255,9 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         route.resolve()?;
     }
     if args.place.dom_id.is_some()
-        && (route.mode.is_some() || route.dom_kind.is_some() || route.clients.is_some())
+        && (route.mode.is_some() || route.dom_kind.is_some())
     {
-        bail!("--dom-id pins the run to one DOM — mode/dom-kind/clients don't apply (only --context does)");
+        bail!("--dom-id pins the run to one DOM — mode/dom don't apply (only --context does)");
     }
     if args.studio_id.is_some() && args.place.dom_id.is_some() {
         bail!("--studio-id and --dom-id are mutually exclusive (a DOM already identifies its studio)");
@@ -577,20 +575,11 @@ async fn launch_play_processes(
     });
 
     if let Some(st) = server_studio {
-        // A multiplayer test is already running. Grow it to the target client
-        // count via AddPlayers on the server DOM:
-        //   --dom client --clients N  => N total clients
-        //   --dom client (no --clients) => append one more
-        //   --dom server              => leave as-is
+        // A multiplayer test is already running:
+        //   --dom client  => append one more client (via AddPlayers on the server)
+        //   --dom server  => leave the session as-is
         let current = st.doms.iter().filter(|v| v.dom_kind == "client").count() as u32;
-        let target_total = if want_client {
-            match route.clients {
-                Some(n) => n,
-                None => current + 1,
-            }
-        } else {
-            current
-        };
+        let target_total = if want_client { current + 1 } else { current };
         if target_total > current {
             let add = target_total - current;
             tracing::info!(add, current, target_total, "growing play session via AddPlayers");
@@ -605,9 +594,9 @@ async fn launch_play_processes(
         return Ok(PlayHandles);
     }
 
-    // No play session yet. Initial client count for the fresh test:
-    //   client + --clients N => N, client alone => 1, server => 0.
-    let initial_clients: u32 = if want_client { route.clients.unwrap_or(1) } else { 0 };
+    // No play session yet. Fresh test starts with one client (client dom) or
+    // none (server dom); more clients are added one at a time via later runs.
+    let initial_clients: u32 = if want_client { 1 } else { 0 };
 
     // We need a place to open the edit Studio that will host the test.
     let Some(place) = place else {

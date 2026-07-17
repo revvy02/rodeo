@@ -212,7 +212,6 @@ export function makeCliRunFn(
     if (opts.mode !== undefined) args.push("--mode", opts.mode);
     if (opts.domKind !== undefined) args.push("--dom", opts.domKind);
     if (opts.context !== undefined) args.push("--context", opts.context);
-    if (opts.clients !== undefined) args.push("--clients", String(opts.clients));
 
     // CLI subprocesses don't see the wire-level ExecutionDone, so to give
     // tests a `result.return` to assert against we shadow it via the same

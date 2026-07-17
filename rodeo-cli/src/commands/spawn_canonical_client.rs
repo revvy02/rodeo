@@ -416,7 +416,7 @@ async fn mp_close(state: Arc<State>, params: Value) -> Result<Value> {
 // ---------------------------------------------------------------------------
 
 /// Read a RunCodeOpts from JSON-RPC params, including the routing fields
-/// (mode/dom_kind/context/clients). The DOM tier omits the routing fields at
+/// (mode/dom_kind/context). The DOM tier omits the routing fields at
 /// the type level, so they arrive absent → None.
 fn read_run_opts(params: &Value) -> RunCodeOpts {
     // Parse logFilter from params — missing fields default to "enabled" to
@@ -447,7 +447,6 @@ fn read_run_opts(params: &Value) -> RunCodeOpts {
         mode: str_opt("mode"),
         dom_kind: str_opt("domKind"),
         context: str_opt("context"),
-        clients: params.get("clients").and_then(|v| v.as_u64()).map(|n| n as u32),
         show_return: params.get("showReturn").and_then(|v| v.as_bool()).unwrap_or(false),
         cache_requires: params.get("cacheRequires").and_then(|v| v.as_bool()).unwrap_or(false),
         verbose: params.get("verbose").and_then(|v| v.as_bool()).unwrap_or(false),

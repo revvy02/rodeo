@@ -79,7 +79,6 @@ it when possible.
 | `--mode test --dom edit` | edit DOM, plugin identity, while a play test runs |
 | `--mode play --context server` | multiplayer test, server DOM, server identity |
 | `--mode play --dom client` | multiplayer test, client DOM, client identity |
-| `--mode play --dom client --clients <n>` | multiplayer test sized to `n` clients |
 
 A server/client run needs `--mode` — `--context server` alone resolves to edit mode (which has no server DOM) and errors, rather than silently transitioning the studio.
 

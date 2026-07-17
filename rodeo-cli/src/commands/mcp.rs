@@ -26,7 +26,6 @@ Run routing (orthogonal args):
 - mode: edit | run | test | play — the sole driver of studio transitions; defaults to edit and is NEVER inferred from context/dom. A server/client run must set mode (e.g. mode=run context=server, mode=test context=client).
 - context: the identity level the code runs at — plugin | server (server-runtime identity) | client (client-runtime identity) | elevated (command bar). Each context is an independent Luau VM on the DOM.
 - dom: edit | server | client — which DataModel to run on (usually inferred; `edit` targets the edit DOM even while a session runs). The DOM is the communication boundary: contexts on the same DOM share instances (BindableEvents), different DOMs talk via RemoteEvents.
-- clients: play session size (mode play)
 Examples: no args = edit plugin; mode=run context=server = server identity in run mode; mode=test context=client = client identity in a play test; context=elevated = command-bar identity in edit.
 
 Direct targeting:
@@ -52,7 +51,7 @@ struct LuauTool {
 }
 
 /// Read a routing spec from `@rodeo run` flag tokens
-/// (`--mode`/`--dom`/`--context`/`--clients`). Unknown/invalid values
+/// (`--mode`/`--dom`/`--context`). Unknown/invalid values
 /// yield an empty spec (defaults apply).
 fn route_from_flag_tokens(inline: &str) -> crate::shared::target::RouteSpec {
     let toks: Vec<&str> = inline.split_whitespace().collect();
@@ -63,7 +62,6 @@ fn route_from_flag_tokens(inline: &str) -> crate::shared::target::RouteSpec {
         val("--mode"),
         val("--dom"),
         val("--context"),
-        val("--clients").and_then(|s| s.parse::<u32>().ok()),
     )
     .unwrap_or_default()
 }
@@ -302,7 +300,6 @@ fn run_code_input_schema() -> Arc<JsonObject> {
                 "enum": ["plugin", "server", "client", "elevated"],
                 "description": "Identity level the code runs at (its own Luau VM on the DOM): plugin, server (server-runtime identity), client (client-runtime identity), or elevated (command-bar identity, for privileged Roblox APIs like DebuggerManager). NOT a script class — a ModuleScript runs at whatever context requires it."
             },
-            "clients": { "type": "integer", "description": "Play-test session size (mode play only): ensure N clients total." },
             "dom_id": { "type": "string", "description": "Pin the run to one DOM by id (from get_state; bypasses routing). Only context may accompany it." },
             "studio_id": { "type": "string", "description": "Scope routing to one studio by id (from get_state)." },
             "place": { "type": "string", "description": "Launch Studio: empty = new place, number = place ID, path = .rbxl file" },
@@ -924,7 +921,6 @@ async fn handle_run_code(
         args["mode"].as_str(),
         args["dom"].as_str(),
         args["context"].as_str(),
-        args["clients"].as_u64().map(|n| n as u32),
     ).and_then(|r| { r.resolve()?; Ok(r) }) {
         Ok(r) => r,
         Err(e) => return fail(e.to_string()),

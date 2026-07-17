@@ -35,7 +35,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client:1 — spawns client with LocalPlayer", async () => {
       const result = await run({
-        mode: "play", domKind: "client", clients: 1,
+        mode: "play", domKind: "client",
         source: "return game:GetService('Players').LocalPlayer ~= nil",
       });
       expect(result.ok).toBe(true);
@@ -159,7 +159,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client:1 — spawns client with LocalPlayer", async () => {
       const result = await run({
-        mode: "play", domKind: "client", clients: 1,
+        mode: "play", domKind: "client",
         source: "return game:GetService('Players').LocalPlayer ~= nil",
       });
       expect(result.ok).toBe(true);
@@ -168,7 +168,7 @@ describe("isolated play mode (CLI)", () => {
 
     it("play:client:1 — game.PlaceId matches the published placeId", async () => {
       const result = await run({
-        mode: "play", domKind: "client", clients: 1,
+        mode: "play", domKind: "client",
         source: "return game.PlaceId",
       });
       expect(result.ok).toBe(true);

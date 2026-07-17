@@ -19,8 +19,6 @@ export type RouteOpts = {
   /** Which DOM receives the script (usually inferred). `edit` targets the edit
    *  DOM even while a test/play session runs. */
   domKind?: "edit" | "server" | "client";
-  /** Play session size (mode play only): ensure N clients total. */
-  clients?: number;
 };
 
 type CommonRunOpts = {

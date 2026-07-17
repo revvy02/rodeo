@@ -40,7 +40,6 @@ Run a script in Studio.
 - `--mode edit|run|test|play` — Studio mode (auto-transitions; the only flag that does). Defaults to edit; never inferred from --context/--dom, so a server/client run must pass --mode
 - `--context plugin|server|client|elevated` — the identity level to run at (its own Luau VM on the DOM): plugin, server-runtime identity, client-runtime identity, or command bar. Not a script class
 - `--dom edit|server|client` — which DOM (usually inferred); `edit` targets the edit DOM even while a test/play session runs
-- `--clients <n>` — play-test session size (mode play): ensure N clients total
 - `--studio-id <id>` — scope routing to one studio (id from `rodeo state`; unique prefix ok)
 - `--dom-id <id>` — pin the run to one DOM (id from `rodeo state`; unique prefix ok). Only `--context` may accompany it
 - `--show-return` — print return value to stdout (any size; streamed in chunks)
@@ -146,8 +145,7 @@ Read each row as (studio mode, which DOM, at which identity):
 | `--mode test --dom client --context plugin` | play test, client DOM, plugin identity |
 | `--dom edit` | edit DOM, plugin identity — even while a test/play session runs (session preserved) |
 | `--mode play --context server` | multiplayer test, server DOM, server identity |
-| `--mode play --dom client` | multiplayer test, +1 client, client DOM, client identity |
-| `--mode play --dom client --clients <n>` | multiplayer test sized to `n` clients (spawned up front at session start; growing an existing session crashes on Studio 0.726–0.729 — see Gotchas) |
+| `--mode play --dom client` | multiplayer test, client DOM, client identity (starts one client; appends one more against a running session) |
 
 Any combination that isn't a valid (mode, dom, context) triple errors at
 submit — including a server/client `--context`/`--dom` with no `--mode` (mode
@@ -259,7 +257,7 @@ rodeo run script.luau -- arg1 arg2
 
 # Multiplayer test: create the session with its client(s) up front, then run on the server.
 # (Client-first matters on Studio 0.726–0.729: growing a running session crashes — see Gotchas.)
-rodeo run --place --mode play --dom client --clients 1 --show-return --source "return game.Players.LocalPlayer.UserId"
+rodeo run --place --mode play --dom client --show-return --source "return game.Players.LocalPlayer.UserId"
 rodeo run --mode play --context server --source "print(#game.Players:GetPlayers())"
 
 # Profiling
@@ -278,7 +276,7 @@ rodeo run myscript                   # runs .rodeo/myscript.luau
 - `--mode run|test|play` when the studio isn't already in that mode → auto-transitions (may take a few seconds)
 - `--context elevated` requires Studio's AI assistant / StudioMCP to be available — rodeo bridges to elevated identity through it
 - **`test`/`play` modes (and `--context elevated`) can hang ~60s and time out if the Studio never connected to StudioMCP** — the Assistant plugin only opens its MCP socket when the Assistant panel is opened, and `mcp-server.enabled=true` alone doesn't guarantee it (github.com/revvy02/rodeo issue #4). Symptom: `rodeo state` shows the studio stuck in `play` mode with the run `queued`. Recovery: open the AI Assistant panel in that Studio — the run dispatches within seconds
-- **Never grow a running play session on Studio 0.726–0.729** — `StudioTestService:AddPlayers` SIGSEGVs the play-server process ~0.6s in (engine bug, reproduced with zero rodeo code). Size the session up front with `--clients <n>` when it's created; appending (`--mode play --dom client` against an existing session, or a `--clients` value above the current count) crashes it. `EndTest` also silently no-ops on 0.729. This is why the isolatedPlay/playProfiling test suites have known failures on these versions
+- **Never grow a running play session on Studio 0.726–0.729** — `StudioTestService:AddPlayers` SIGSEGVs the play-server process ~0.6s in (engine bug, reproduced with zero rodeo code). A fresh `--mode play` test spawns its one client up front via `ExecuteMultiplayerTestAsync` (fine); appending another (`--mode play --dom client` against an already-running session, which calls `AddPlayers`) crashes it. `EndTest` also silently no-ops on 0.729. This is why the isolatedPlay/playProfiling suites can have known failures on these versions
 - `rodeo setup` must be run once per project for `@rodeo/*` imports
 - Return values >2MiB without a `--return` file fail the run by design — pass a file path for big payloads
 - `--place` always opens its own fresh place, even when another place is already open on the serve — runs never silently land in a resident place

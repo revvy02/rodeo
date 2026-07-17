@@ -32,7 +32,6 @@ export type DomRunCodeOpts = {
 export type RunCodeOpts = DomRunCodeOpts & {
 	mode: ("edit" | "run" | "test" | "play")?,
 	domKind: ("edit" | "server" | "client")?,
-	clients: number?,
 }
 
 export type RunResult = {

@@ -112,7 +112,6 @@ local function runViaDaemon(
 		mode = opts.mode,
 		domKind = opts.domKind,
 		context = opts.context,
-		clients = opts.clients,
 		showReturn = opts.showReturn == true,
 		cacheRequires = opts.cacheRequires == true,
 		verbose = opts.verbose == true,

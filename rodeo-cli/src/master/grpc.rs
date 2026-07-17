@@ -420,15 +420,14 @@ impl proto::RunService for RodeoServices {
             submit.mode.as_deref(),
             submit.dom_kind.as_deref(),
             submit.context.as_deref(),
-            submit.clients,
         )
         .and_then(|r| {
             r.resolve()?;
             if submit.dom_id.is_some()
-                && (r.mode.is_some() || r.dom_kind.is_some() || r.clients.is_some())
+                && (r.mode.is_some() || r.dom_kind.is_some())
             {
                 anyhow::bail!(
-                    "dom_id pins the run to one DOM — mode/dom_kind/clients don't apply (context is allowed)"
+                    "dom_id pins the run to one DOM — mode/dom_kind don't apply (context is allowed)"
                 );
             }
             Ok(r)

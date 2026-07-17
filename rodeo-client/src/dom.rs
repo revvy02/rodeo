@@ -55,7 +55,7 @@ impl Dom {
 
     /// Execute code on THIS DOM, buffering output and returning the final
     /// RunResult. A Dom handle always pins — no routing happens. Only
-    /// `opts.context` applies; routing fields (`mode`/`dom_kind`/`clients`)
+    /// `opts.context` applies; routing fields (`mode`/`dom_kind`)
     /// are rejected: session-scoped routing lives on `Studio::run_code`.
     pub async fn run_code(&self, opts: RunCodeOpts) -> anyhow::Result<RunResult> {
         self.reject_routing_opts(&opts)?;
@@ -73,9 +73,9 @@ impl Dom {
     }
 
     fn reject_routing_opts(&self, opts: &RunCodeOpts) -> anyhow::Result<()> {
-        if opts.mode.is_some() || opts.dom_kind.is_some() || opts.clients.is_some() {
+        if opts.mode.is_some() || opts.dom_kind.is_some() {
             anyhow::bail!(
-                "mode/dom/clients don't apply to a pinned DOM — use Studio::run_code for session-scoped routing"
+                "mode/dom don't apply to a pinned DOM — use Studio::run_code for session-scoped routing"
             );
         }
         Ok(())

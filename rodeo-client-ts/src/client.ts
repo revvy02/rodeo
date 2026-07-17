@@ -82,7 +82,6 @@ async function daemonRunCode(
       mode: route.mode ?? null,
       domKind: route.domKind ?? null,
       context: opts.context ?? null,
-      clients: route.clients ?? null,
       showReturn: opts.showReturn ?? false,
       cacheRequires: opts.cacheRequires ?? false,
       verbose: opts.verbose ?? false,

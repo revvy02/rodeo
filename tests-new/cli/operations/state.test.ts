@@ -112,7 +112,7 @@ describe("state (CLI)", () => {
       "--show-return", "--source", "return tostring(DebuggerManager())",
     ]);
     // Elevated needs StudioMCP; assert it at least didn't reject at parse time.
-    expect(result.stdout + result.stderr).not.toContain("mode/dom/clients don't apply");
+    expect(result.stdout + result.stderr).not.toContain("mode/dom don't apply");
   });
 
   it("--dom edit routes to the edit DOM", () => {

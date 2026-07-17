@@ -11,10 +11,10 @@ use crate::transport::Transport;
 
 /// User-facing options for `run_code` at every tier (client / studio / dom).
 ///
-/// The routing fields (`mode`, `dom_kind`, `clients`) apply to the routed
-/// tiers only — `Dom::run_code` rejects them (a pinned DOM does no routing).
-/// `context` applies everywhere: it's the run context the code executes as
-/// (cf. Roblox `Script.RunContext`), not a routing selector.
+/// The routing fields (`mode`, `dom_kind`) apply to the routed tiers only —
+/// `Dom::run_code` rejects them (a pinned DOM does no routing). `context`
+/// applies everywhere: it's the run context the code executes as (cf. Roblox
+/// `Script.RunContext`), not a routing selector.
 #[derive(Default, Clone)]
 pub struct RunCodeOpts {
     pub source: String,
@@ -24,8 +24,6 @@ pub struct RunCodeOpts {
     pub dom_kind: Option<String>,
     /// Run context: "plugin" | "server" | "client" | "elevated".
     pub context: Option<String>,
-    /// Play session size (resolved mode must be "play").
-    pub clients: Option<u32>,
     pub show_return: bool,
     pub cache_requires: bool,
     pub verbose: bool,
@@ -115,7 +113,6 @@ async fn run_inner(
         mode: opts.mode,
         dom_kind: opts.dom_kind,
         context: opts.context,
-        clients: opts.clients,
         session: session_guid,
         dom_id: if dom_id.is_empty() { None } else { Some(dom_id.to_string()) },
         log_filter: opts.log_filter.map(buffa::MessageField::some).unwrap_or_else(buffa::MessageField::none),

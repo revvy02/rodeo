@@ -771,7 +771,6 @@ type _SubmitRequestFields = {
 	domId: string?,
 	domKind: string?,
 	context: string?,
-	clients: number?,
 	cacheRequires: boolean?,
 	scriptArgs: { string },
 	returnFile: string?,
@@ -791,7 +790,6 @@ export type _SubmitRequestPartialFields = {
 	domId: string?,
 	domKind: string?,
 	context: string?,
-	clients: number?,
 	cacheRequires: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
@@ -5836,7 +5834,6 @@ do
 			domId = if data == nil or data.domId == nil then nil else data.domId,
 			domKind = if data == nil or data.domKind == nil then nil else data.domKind,
 			context = if data == nil or data.context == nil then nil else data.context,
-			clients = if data == nil or data.clients == nil then nil else data.clients,
 			cacheRequires = if data == nil or data.cacheRequires == nil then nil else data.cacheRequires,
 			scriptArgs = if data == nil or data.scriptArgs == nil then {} else data.scriptArgs,
 			returnFile = if data == nil or data.returnFile == nil then nil else data.returnFile,
@@ -5887,11 +5884,6 @@ do
 		if self.context ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 16, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.context)
-		end
-
-		if self.clients ~= nil then
-			output, cursor = proto.writeTag(output, cursor, 17, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, self.clients)
 		end
 
 		if self.cacheRequires ~= nil then
@@ -5980,11 +5972,6 @@ do
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
 					self.profile = value ~= 0
-					continue
-				elseif field == 17 then
-					local value
-					value, cursor = proto.readVarIntU32(input, cursor)
-					self.clients = value
 					continue
 				end
 
@@ -6102,10 +6089,6 @@ do
 			output.context = self.context
 		end
 
-		if self.clients ~= nil then
-			output.clients = self.clients
-		end
-
 		if self.cacheRequires ~= nil then
 			output.cacheRequires = self.cacheRequires
 		end
@@ -6178,10 +6161,6 @@ do
 
 		if input.context ~= nil then
 			self.context = input.context
-		end
-
-		if input.clients ~= nil then
-			self.clients = input.clients
 		end
 
 		if input.cacheRequires ~= nil then
