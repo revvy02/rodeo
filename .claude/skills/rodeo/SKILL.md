@@ -19,7 +19,7 @@ rodeo state                             # canonical state: studios, DOMs, runs
 rodeo kill <id>                         # kill a run by its id (from rodeo state)
 ```
 
-`rodeo run --place` is sufficient to spawn a studio with an empty place. The studio process is attached to that run process, and will terminate if that run process gets terminated. You can do `rodeo run --place --detached` to ensure that studio instance persists even if that run process is ended.
+`rodeo run --place` is sufficient to spawn a studio with an empty place. The studio process is attached to that run process, and will terminate if that run process gets terminated. You can do `rodeo run --place --detach` to ensure that studio instance persists even if that run process is ended.
 
 ## Commands
 
@@ -35,7 +35,7 @@ Start a persistent server. Does NOT launch Studio — use `run --place` for that
 
 Run a script in Studio.
 
-- `<script>` — path to script, or `-` for stdin. Simple names (no path separator, no extension) resolve to `.rodeo/<name>.luau` when that file exists
+- `<script>` — path to script, or `-` for stdin. Any name without a `.` resolves to `.rodeo/<name>.luau` when that file exists — nested paths included (`rodeo run tests/smoke` → `.rodeo/tests/smoke.luau`)
 - `-s` / `--source <code>` — execute inline source code
 - `--mode edit|run|test|play` — Studio mode (auto-transitions; the only flag that does). Defaults to edit; never inferred from --context/--dom, so a server/client run must pass --mode
 - `--context plugin|server|client|elevated` — the identity level to run at (its own Luau VM on the DOM): plugin, server-runtime identity, client-runtime identity, or command bar. Not a script class

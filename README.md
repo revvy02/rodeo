@@ -60,14 +60,9 @@ hello, frank
 ```
 
 ### Run code on any DOM, at any identity, in any Studio mode
-
-Three orthogonal flags pick where and how the script runs — all optional, with
-sensible defaults. If Studio isn't in the requested mode, rodeo auto-transitions
-it when possible.
-
-- `--mode edit|run|test|play` — the Studio mode. The only flag that transitions the studio; defaults to `edit` and is never inferred from `--context`/`--dom`
-- `--dom edit|server|client` — which DataModel to run on (usually inferred from context). The DOM is the communication boundary — code on one DOM shares instances (BindableEvents); across DOMs it's RemoteEvents. `--dom edit` targets the edit DOM even while a session runs
-- `--context plugin|server|client|elevated` — the **identity level** to run at (its own Luau VM on the DOM), not a script class: `plugin`, `server`-runtime identity, `client`-runtime identity, or `elevated` (command bar). A ModuleScript runs at whatever context requires it
+- `--mode edit|run|test|play`
+- `--dom edit|server|client`
+- `--context plugin|server|client|elevated`
 
 | Flags | Runs (mode, DOM, identity) |
 |-------|----------------------------|
