@@ -293,19 +293,29 @@ local function AppProvider(props: AppProviderProps)
 			return
 		end
 
-		-- Delay before attempting reconnect. The 1s wait also guarantees a
-		-- rodeo launch's RunScript bootstrap has already stamped `rodeoPort`
-		-- (worst-case it lands ~200ms after the plugin mounts), so a plain read
-		-- here picks up the launch's port with no ordering dance.
 		local shouldReconnect = true
-		task.delay(1, function()
-			if shouldReconnect then
-				local connectHost = if currentHost == "" then defaultHost else currentHost
-				local bootstrapPort = game:GetService("Workspace"):GetAttribute("rodeoPort")
-				local portNum = tonumber(currentPort) or bootstrapPort or tonumber(defaultPort)
-				setWsUrl(`ws://{connectHost}:{portNum}`)
+		local function doConnect()
+			if not shouldReconnect then
+				return
 			end
-		end)
+			local connectHost = if currentHost == "" then defaultHost else currentHost
+			local bootstrapPort = game:GetService("Workspace"):GetAttribute("rodeoPort")
+			local portNum = tonumber(currentPort) or bootstrapPort or tonumber(defaultPort)
+			setWsUrl(`ws://{connectHost}:{portNum}`)
+		end
+
+		-- Only the edit DOM races the RunScript bootstrap that stamps the launch
+		-- attributes — `rodeoSession` (which launch/run this studio belongs to,
+		-- sent on the WS handshake) and `rodeoPort` (the backend to dial) — worst
+		-- case ~200ms after the plugin mounts, so wait there before reading them.
+		-- Server/client DOMs are clones of the edit DataModel and inherit both, so
+		-- they connect immediately — one plugin connects per DOM, and this is on
+		-- each DOM's launch→connect critical path.
+		if RunService:IsEdit() then
+			task.delay(1, doConnect)
+		else
+			doConnect()
+		end
 
 		return function()
 			shouldReconnect = false
