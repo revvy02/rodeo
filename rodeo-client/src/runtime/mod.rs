@@ -105,6 +105,10 @@ pub struct RpcState {
     pub stream_handlers: HashMap<String, StreamHandler>,
     pub child_processes: HashMap<String, Child>,
     pub exit_code: i32,
+    /// Set when the script called process.exit — the run ends via a
+    /// client-initiated kill and the final result maps to `exit_code`
+    /// (which may legitimately be 0).
+    pub exit_requested: bool,
     pub next_pid: u32,
     /// Where `stream.write("stdout" | "stderr", ...)` bytes go.
     pub captured_output_tx: CapturedOutputSender,
@@ -116,6 +120,7 @@ impl RpcState {
             stream_handlers: HashMap::new(),
             child_processes: HashMap::new(),
             exit_code: 0,
+            exit_requested: false,
             next_pid: 0,
             captured_output_tx,
         };

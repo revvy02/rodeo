@@ -40,17 +40,9 @@ return function(rpc, scriptArgs, hostInfo: runtime.ProcessGetInfoResponse)
 		return hostInfo.execpath
 	end
 
-	-- Terminates the run. The code travels via _G (require() replaces error
-	-- messages with "Requested module experienced an error...", so a sentinel
-	-- string would never reach the runner's xpcall); the error is only the
-	-- unwind mechanism. Suspending here instead would leave the run alive
-	-- forever. Keep names in sync with rodeo-plugin runner/init.luau and the
-	-- log suppressor in rodeo-shared/logging.luau.
 	function process.exit(code: number)
 		rpc.notify("process_exit", runtime.ProcessExitRequest.new({ code = code }))
-		_G.__rodeo_exit_requested = _G.__rodeo_exit_requested or {}
-		_G.__rodeo_exit_requested[_G.__rodeo_eid] = code or 0
-		error("__RODEO_PROCESS_EXIT__" .. tostring(code or 0), 0)
+		coroutine.yield()
 	end
 
 	function process.run(argsOrHandle, options: any?)

@@ -136,19 +136,6 @@ end
 -- unchunkable hop whose downstream transports cap at a few MB). File and
 -- stdout writes are size-unbounded: stream.write chunks large payloads.
 
--- process.exit(code) unwinds as an error after recording its code in _G
--- (see rodeo-shared/process.luau — require() masks error strings, so the
--- code can't ride the error message). Translate into a completed run:
--- success iff code 0.
-local exitRequested = _G.__rodeo_exit_requested and _G.__rodeo_exit_requested[executionId]
-if not success and exitRequested ~= nil then
-	success = exitRequested == 0
-	result = if success then nil else `process exited with code {exitRequested}`
-end
-if _G.__rodeo_exit_requested then
-	_G.__rodeo_exit_requested[executionId] = nil
-end
-
 local returnValueJson: string? = nil
 local capError: string? = nil
 if success and result ~= nil then

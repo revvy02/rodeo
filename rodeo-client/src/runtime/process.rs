@@ -41,7 +41,9 @@ pub fn process_get_info(_req: &rt::ProcessGetInfoRequest) -> Result<rt::ProcessG
 }
 
 pub async fn process_exit(state: SharedRpcState, req: &rt::ProcessExitRequest) -> Result<rt::Ok, String> {
-    state.lock().await.exit_code = req.code;
+    let mut guard = state.lock().await;
+    guard.exit_code = req.code;
+    guard.exit_requested = true;
     Ok(rt::Ok::default())
 }
 

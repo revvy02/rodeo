@@ -269,18 +269,42 @@ async fn message_loop(
                                     let call_boxed = call.clone();
                                     let handle = tokio::spawn(async move {
                                         let _ = observer.send(RunStreamEvent::RpcCall { call: Box::new(*call_boxed) });
+                                        // process.exit: the script suspends plugin-side after this
+                                        // notify — ending the run is the client's job. Reuse the
+                                        // kill path (the master forwards it to the DOM); the final
+                                        // Killed/Done maps to the recorded exit code below.
+                                        let is_exit = matches!(
+                                            &call.req,
+                                            Some(rodeo_proto::runtime_types::client_rpc_call::Req::ProcessExit(_))
+                                        );
+                                        let eid = call.execution_id.clone();
                                         let response = runtime::dispatch_client(state, &call).await;
                                         let _ = tx.send(proto::RunClientMessage {
                                             msg: Some(proto::run_client_message::Msg::RpcResponse(Box::new(response))),
                                             ..Default::default()
                                         });
+                                        if is_exit {
+                                            let _ = tx.send(proto::RunClientMessage {
+                                                msg: Some(proto::run_client_message::Msg::Kill(Box::new(proto::KillCommand {
+                                                    execution_id: eid,
+                                                    ..Default::default()
+                                                }))),
+                                                ..Default::default()
+                                            });
+                                        }
                                     });
                                     rpc_tasks.push(handle);
                                 }
                                 proto::run_event::Event::ExecutionDone(done) => {
                                     if !done.success { exit_code = 1; ok = false; }
-                                    let rpc_exit = rpc_state.lock().await.exit_code;
-                                    if rpc_exit != 0 { exit_code = rpc_exit; ok = false; }
+                                    let (rpc_exit, exit_requested) = {
+                                        let st = rpc_state.lock().await;
+                                        (st.exit_code, st.exit_requested)
+                                    };
+                                    if exit_requested {
+                                        exit_code = rpc_exit;
+                                        ok = rpc_exit == 0;
+                                    } else if rpc_exit != 0 { exit_code = rpc_exit; ok = false; }
                                     return_value = done.return_value.clone();
                                     for task in rpc_tasks.drain(..) { let _ = task.await; }
                                     // After every in-flight stream.write RPC has
@@ -298,8 +322,19 @@ async fn message_loop(
                                     // the pre-refactor run_loop semantics; otherwise
                                     // `await runCode()` rejects and tests that await a
                                     // deliberate kill blow up).
-                                    exit_code = 1;
-                                    ok = false;
+                                    // Exception: a kill the client itself initiated for
+                                    // process.exit resolves to the script's requested code.
+                                    let (rpc_exit, exit_requested) = {
+                                        let st = rpc_state.lock().await;
+                                        (st.exit_code, st.exit_requested)
+                                    };
+                                    if exit_requested {
+                                        exit_code = rpc_exit;
+                                        ok = rpc_exit == 0;
+                                    } else {
+                                        exit_code = 1;
+                                        ok = false;
+                                    }
                                     for task in rpc_tasks.drain(..) { let _ = task.await; }
                                     while let Ok((kind, bytes)) = capture_rx.try_recv() {
                                         forward_captured(kind, bytes);
