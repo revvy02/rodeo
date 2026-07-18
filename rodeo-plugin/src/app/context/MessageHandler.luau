@@ -165,23 +165,29 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 			local proc = activeProcesses[kill.executionId]
 			if proc and proc.kill then
 				proc.kill()
-				local killedMsg = rodeoProto.PluginMessage.new({
-					msg = { type = "killed", value = rodeoProto.ExecutionKilled.new({
-						executionId = kill.executionId,
-					}) },
-				})
-				client:Send(HttpService:JSONEncode(killedMsg:jsonEncode()))
-				activeProcesses[kill.executionId] = nil
-				processEntries[kill.executionId] = nil
-				setActiveProcesses(table.clone(processEntries))
-				local hasActive = false
-				for _ in pairs(activeProcesses) do
-					hasActive = true
-					break
-				end
-				if not hasActive then
-					setIsExecuting(false)
-				end
+			else
+				-- Unknown execution (already completed, or lost to a plugin
+				-- reload). Still ack below: kill is idempotent, and a silent
+				-- drop leaves the master's run entry alive forever — rodeo
+				-- kill would report success while the run stays in state.
+				warn(`rodeo: kill for unknown execution {kill.executionId} — acking anyway`)
+			end
+			local killedMsg = rodeoProto.PluginMessage.new({
+				msg = { type = "killed", value = rodeoProto.ExecutionKilled.new({
+					executionId = kill.executionId,
+				}) },
+			})
+			client:Send(HttpService:JSONEncode(killedMsg:jsonEncode()))
+			activeProcesses[kill.executionId] = nil
+			processEntries[kill.executionId] = nil
+			setActiveProcesses(table.clone(processEntries))
+			local hasActive = false
+			for _ in pairs(activeProcesses) do
+				hasActive = true
+				break
+			end
+			if not hasActive then
+				setIsExecuting(false)
 			end
 		elseif serverMsg.msg and serverMsg.msg.type == "rpcResponse" then
 			local rpcResp = serverMsg.msg.value  -- ClientRpcResponse

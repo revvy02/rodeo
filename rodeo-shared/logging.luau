@@ -20,7 +20,25 @@ return function(LogService, fs, stream, io, logFilter, outputFile)
 	-- Output file stream (via rodeo fs/stream APIs)
 	local outputFileHandle = if outputFile ~= "" then fs.open(outputFile, "w") else nil
 
+	-- The engine always logs module-load errors, so process.exit's sentinel
+	-- unwind (see rodeo-shared/process.luau) would spam every exiting run:
+	-- drop the sentinel message and the stack-trace block that follows it
+	-- (the run is completing — there is nothing after it worth keeping).
+	local suppressingExitStack = false
 	local logConnection = LogService.MessageOut:Connect(function(body, messageType)
+		if string.find(body, "__RODEO_PROCESS_EXIT__", 1, true) then
+			suppressingExitStack = true
+			return
+		end
+		if suppressingExitStack then
+			if body == "Stack Begin"
+				or body == "Stack End"
+				or string.match(body, "^Script '") ~= nil
+			then
+				return
+			end
+			suppressingExitStack = false
+		end
 		if not LOG_FILTER[messageType] then
 			return
 		end
