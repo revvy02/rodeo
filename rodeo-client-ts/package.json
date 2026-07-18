@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "devDependencies": {
     "@bufbuild/buf": "latest",
-    "@bufbuild/protoc-gen-es": "2",
+    "@bufbuild/protoc-gen-es": "^2.12.1",
     "@types/bun": "latest",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   },
   "exports": "./src/index.ts",
   "scripts": {
@@ -13,8 +13,8 @@
   },
   "type": "module",
   "dependencies": {
-    "@bufbuild/protobuf": "2",
-    "@connectrpc/connect": "2",
-    "@connectrpc/connect-node": "2"
+    "@bufbuild/protobuf": "^2.12.1",
+    "@connectrpc/connect": "^2.1.2",
+    "@connectrpc/connect-node": "^2.1.2"
   }
 }
