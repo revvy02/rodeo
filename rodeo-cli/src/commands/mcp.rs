@@ -362,7 +362,7 @@ fn launch_studio_input_schema() -> Arc<JsonObject> {
             "profile": { "type": "boolean", "description": "Enable microprofiler auto-capture on the launched Studio, so later run_code calls with profile_dir collect dumps" },
             "detached": { "type": "boolean", "description": "Keep Studio running even if the rodeo server stops (default: false, tied to the server's lifetime). Studio persists across run_code calls either way" },
             "focus": { "type": "boolean", "description": "Bring Studio to the foreground (default: launch in the background)" },
-            "no_hud": { "type": "boolean", "description": "Hide the rodeo HUD overlay" }
+            "show_widgets": { "type": "string", "description": "Allow-list of Studio dock widgets to keep visible; everything else (panels, ribbon, command bar) is hidden. 'none' hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID)" }
         }
     }))
 }
@@ -398,7 +398,7 @@ struct LaunchStudioArgs {
     #[serde(default)]
     focus: bool,
     #[serde(default)]
-    no_hud: bool,
+    show_widgets: Option<String>,
 }
 
 // --- Server state ---
@@ -1085,7 +1085,7 @@ async fn handle_launch_studio(host: &str, port: u16, args: LaunchStudioArgs) -> 
         None,
         crate::cli::FflagArgs::default(),
         args.detached,
-        args.no_hud,
+        args.show_widgets.clone(),
         args.profile,
         host,
         port,

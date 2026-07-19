@@ -682,7 +682,7 @@ type _LaunchStudioCommandFields = {
 	savePath: string?,
 	fflagFile: string?,
 	sessionGuid: string,
-	noHud: boolean,
+	showWidgets: string,
 	profile: boolean,
 }
 
@@ -695,7 +695,7 @@ export type _LaunchStudioCommandPartialFields = {
 	savePath: string?,
 	fflagFile: string?,
 	sessionGuid: string?,
-	noHud: boolean?,
+	showWidgets: string?,
 	profile: boolean?,
 }
 
@@ -974,7 +974,7 @@ type _LaunchStudioRequestFields = {
 	detached: boolean,
 	savePath: string?,
 	fflagFile: string?,
-	noHud: boolean,
+	showWidgets: string,
 	profile: boolean,
 }
 
@@ -987,7 +987,7 @@ export type _LaunchStudioRequestPartialFields = {
 	detached: boolean?,
 	savePath: string?,
 	fflagFile: string?,
-	noHud: boolean?,
+	showWidgets: string?,
 	profile: boolean?,
 }
 
@@ -5284,7 +5284,7 @@ do
 			savePath = if data == nil or data.savePath == nil then nil else data.savePath,
 			fflagFile = if data == nil or data.fflagFile == nil then nil else data.fflagFile,
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
-			noHud = if data == nil or data.noHud == nil then false else data.noHud,
+			showWidgets = if data == nil or data.showWidgets == nil then "" else data.showWidgets,
 			profile = if data == nil or data.profile == nil then false else data.profile,
 		}, _LaunchStudioCommandImpl :: _LaunchStudioCommandImpl)
 	end
@@ -5335,9 +5335,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
 		end
 
-		if self.noHud then
-			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.noHud then 1 else 0)
+		if self.showWidgets ~= nil and self.showWidgets ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.showWidgets)
 		end
 
 		if self.profile then
@@ -5374,11 +5374,6 @@ do
 					value, cursor = proto.readVarInt(input, cursor)
 					self.detached = value ~= 0
 					continue
-				elseif field == 10 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.noHud = value ~= 0
-					continue
 				elseif field == 11 then
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
@@ -5413,6 +5408,11 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.sessionGuid = proto.decodeString(value)
+					continue
+				elseif field == 10 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.showWidgets = proto.decodeString(value)
 					continue
 				end
 
@@ -5477,8 +5477,8 @@ do
 			output.sessionGuid = self.sessionGuid
 		end
 
-		if self.noHud then
-			output.noHud = self.noHud
+		if self.showWidgets ~= nil and self.showWidgets ~= "" then
+			output.showWidgets = self.showWidgets
 		end
 
 		if self.profile then
@@ -5528,8 +5528,8 @@ do
 			self.sessionGuid = input.sessionGuid
 		end
 
-		if input.noHud ~= nil then
-			self.noHud = input.noHud
+		if input.showWidgets ~= nil then
+			self.showWidgets = input.showWidgets
 		end
 
 		if input.profile ~= nil then
@@ -6972,7 +6972,7 @@ do
 			detached = if data == nil or data.detached == nil then false else data.detached,
 			savePath = if data == nil or data.savePath == nil then nil else data.savePath,
 			fflagFile = if data == nil or data.fflagFile == nil then nil else data.fflagFile,
-			noHud = if data == nil or data.noHud == nil then false else data.noHud,
+			showWidgets = if data == nil or data.showWidgets == nil then "" else data.showWidgets,
 			profile = if data == nil or data.profile == nil then false else data.profile,
 		}, _LaunchStudioRequestImpl :: _LaunchStudioRequestImpl)
 	end
@@ -7023,9 +7023,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.fflagFile)
 		end
 
-		if self.noHud then
-			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.noHud then 1 else 0)
+		if self.showWidgets ~= nil and self.showWidgets ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.showWidgets)
 		end
 
 		if self.profile then
@@ -7062,11 +7062,6 @@ do
 					value, cursor = proto.readVarInt(input, cursor)
 					self.detached = value ~= 0
 					continue
-				elseif field == 10 then
-					local value
-					value, cursor = proto.readVarInt(input, cursor)
-					self.noHud = value ~= 0
-					continue
 				elseif field == 11 then
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
@@ -7101,6 +7096,11 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.fflagFile = proto.decodeString(value)
+					continue
+				elseif field == 10 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.showWidgets = proto.decodeString(value)
 					continue
 				end
 
@@ -7165,8 +7165,8 @@ do
 			output.fflagFile = self.fflagFile
 		end
 
-		if self.noHud then
-			output.noHud = self.noHud
+		if self.showWidgets ~= nil and self.showWidgets ~= "" then
+			output.showWidgets = self.showWidgets
 		end
 
 		if self.profile then
@@ -7216,8 +7216,8 @@ do
 			self.fflagFile = input.fflagFile
 		end
 
-		if input.noHud ~= nil then
-			self.noHud = input.noHud
+		if input.showWidgets ~= nil then
+			self.showWidgets = input.showWidgets
 		end
 
 		if input.profile ~= nil then

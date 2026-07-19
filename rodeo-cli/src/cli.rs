@@ -295,10 +295,12 @@ pub struct PlaceArgs {
     #[arg(long = "detach", help_heading = "Launch")]
     pub detached: bool,
 
-    /// Strip Studio UI panels (Explorer/Properties/Toolbox/Output/etc.) for a
-    /// minimal launch. Applies only to the Studio rodeo launches; restored on exit.
-    #[arg(long = "no-hud", help_heading = "Launch")]
-    pub no_hud: bool,
+    /// Allow-list of Studio dock widgets to keep visible; everything else
+    /// (panels, ribbon, command bar) is hidden. `none` hides all; a comma list
+    /// keeps those (aliases: output, explorer, properties, editor, toolbox,
+    /// assistant, ribbon, commandbar; or a raw panel ID). Restored on exit.
+    #[arg(long = "show-widgets", value_name = "WIDGETS", help_heading = "Launch")]
+    pub show_widgets: Option<String>,
 
     /// Enable microprofiler auto-capture and collect dumps (optional: output directory)
     #[arg(long = "profile", num_args = 0..=1, default_missing_value = "", help_heading = "Profiling")]

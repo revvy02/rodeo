@@ -634,7 +634,7 @@ impl proto::MasterService for RodeoServices {
                 fflags: req.fflags.iter().map(|s| s.to_string()).collect(),
                 background: req.background,
                 detached: req.detached,
-                no_hud: req.no_hud,
+                show_widgets: req.show_widgets.to_string(),
                 profile: req.profile,
                 save_path: req.save_path.map(|s| s.to_string()),
                 fflag_file: req.fflag_file.map(|s| s.to_string()),

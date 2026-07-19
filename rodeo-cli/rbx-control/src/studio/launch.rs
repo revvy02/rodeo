@@ -58,9 +58,11 @@ pub struct StudioOptions {
     pub fflags: FflagConfig,
     /// If true, skip killing Studio on cleanup (Studio survives this process's exit).
     pub detached: bool,
-    /// Strip non-essential Studio UI (Explorer/Properties/Toolbox/etc.) by
-    /// patching the dock-layout plist before launch. Restored on cleanup.
-    pub no_hud: bool,
+    /// `--show-widgets` allow-list spec: which dock widgets to keep visible by
+    /// patching the dock-layout plist before launch (everything else hidden).
+    /// `None` = normal Studio (no patch); `Some("none")` = hide everything;
+    /// `Some("output,...")` = keep those. Restored on cleanup.
+    pub show_widgets: Option<String>,
     /// If set, launch via `-task RunScript -runScriptFile <path>` so Studio runs
     /// this Luau (command-bar identity) right after the place loads. File/PlaceId
     /// targets are passed as `-localPlaceFile`/`-placeId` alongside it. Used by
@@ -92,7 +94,7 @@ pub struct Studio {
     place_path: Option<PathBuf>,
     save_mode: SaveMode,
     fflag_handle: Option<FflagHandle>,
-    /// Dock-layout plist patch (`--no-hud`). Restored alongside fflags.
+    /// Dock-layout plist patch (`--show-widgets`). Restored alongside fflags.
     layout_handle: Option<filepatch::Handle>,
     /// Saved-once flag — cleanup() may be called by both explicit code and Drop.
     saved: AtomicBool,
@@ -118,12 +120,13 @@ impl Studio {
             None
         };
 
-        tracing::info!(no_hud = opts.no_hud, "Studio::spawn invoked");
+        tracing::info!(show_widgets = ?opts.show_widgets, "Studio::spawn invoked");
 
         // Apply dock-layout plist patch before launching (Studio reads it at startup).
-        let layout_handle = if opts.no_hud {
-            let h = layout::apply_no_hud().context("failed to apply --no-hud layout patch")?;
-            tracing::info!(applied = h.is_some(), "no-hud: apply_no_hud returned");
+        let layout_handle = if let Some(spec) = opts.show_widgets.as_deref() {
+            let h = layout::apply_show_widgets(spec)
+                .context("failed to apply --show-widgets layout patch")?;
+            tracing::info!(applied = h.is_some(), "show-widgets: apply returned");
             h
         } else {
             None
@@ -524,7 +527,7 @@ impl Studio {
             handle.restore();
         }
 
-        // Restore Studio dock-layout plist patch (--no-hud).
+        // Restore Studio dock-layout plist patch (--show-widgets).
         if let Some(ref handle) = self.layout_handle {
             handle.restore();
         }

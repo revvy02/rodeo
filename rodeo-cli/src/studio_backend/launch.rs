@@ -77,8 +77,9 @@ pub struct StudioOptions {
     pub save: SaveMode,
     pub fflags: FflagConfig,
     pub detached: bool,
-    /// Strip Studio dock UI panels for a minimal launch (restored on cleanup).
-    pub no_hud: bool,
+    /// `--show-widgets` allow-list spec (`None` = normal Studio; `Some("none")`
+    /// = hide all; `Some("output,...")` = keep those). Restored on cleanup.
+    pub show_widgets: Option<String>,
     /// Master-minted session identity. Stamped as the `rodeoSession` Workspace
     /// attribute by the RunScript bootstrap; the plugin sends it on the WS
     /// handshake so master correlates the connecting DOM to this launch.
@@ -149,7 +150,7 @@ impl Studio {
                 save: opts.save,
                 fflags: opts.fflags,
                 detached: opts.detached,
-                no_hud: opts.no_hud,
+                show_widgets: opts.show_widgets.clone(),
                 run_script_file: Some(bootstrap),
             },
         )?;

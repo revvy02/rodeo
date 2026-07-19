@@ -478,7 +478,7 @@ async fn handle_master_msg(
                     save: crate::studio_backend::parse_save_mode(cmd.save_path),
                     fflags,
                     detached: cmd.detached,
-                    no_hud: cmd.no_hud,
+                    show_widgets: if cmd.show_widgets.is_empty() { None } else { Some(cmd.show_widgets.clone()) },
                     session_guid: session_guid.clone(),
                 };
                 // Transition pending → launching

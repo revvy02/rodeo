@@ -247,7 +247,7 @@ message LaunchStudioCommand {
   optional string fflag_file = 7;      // path to JSON fflag file
   string session_guid = 8;             // master-assigned session identity
   reserved 9;                          // old `logs_dir` — removed Studio FLog-capture feature
-  bool no_hud = 10;                    // strip dock UI panels via plist patch (restored on exit)
+  string show_widgets = 10;            // allow-list of dock widgets to keep ("none" = hide all); "" = normal Studio. Restored on exit.
   bool profile = 11;                   // enable microprofiler auto-capture (backend injects fflags)
 }
 
@@ -348,7 +348,7 @@ message LaunchStudioRequest {
   optional string save_path = 7;
   optional string fflag_file = 8;
   reserved 9;                   // old `logs_dir` — removed Studio FLog-capture feature
-  bool no_hud = 10;             // strip Studio dock UI panels; restored on exit
+  string show_widgets = 10;     // allow-list of dock widgets to keep ("none" = hide all); "" = normal. Restored on exit.
   bool profile = 11;            // enable microprofiler auto-capture (backend injects fflags)
 }
 

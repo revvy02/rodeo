@@ -93,7 +93,7 @@ Run a script in Studio
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
 * `--focus` — Bring Studio to the foreground on launch (default: background)
 * `--detach` — Keep Studio/Player running after rodeo exits
-* `--no-hud` — Strip Studio UI panels (Explorer/Properties/Toolbox/Output/etc.) for a minimal launch. Applies only to the Studio rodeo launches; restored on exit
+* `--show-widgets <WIDGETS>` — Allow-list of Studio dock widgets to keep visible; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
 * `--profile <PROFILE>` — Enable microprofiler auto-capture and collect dumps (optional: output directory)
 * `--save <SAVE>` — Save Studio place on exit, optionally to a specific path
 * `--fflag.override <KEY=VALUE>` — Set FFlag override (Key=Value, repeatable)

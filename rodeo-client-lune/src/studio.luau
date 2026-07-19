@@ -206,7 +206,7 @@ export type OpenOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	noHud: boolean?,
+	showWidgets: string?,
 }
 
 export type OpenPlaceOpts = {
@@ -214,14 +214,14 @@ export type OpenPlaceOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	noHud: boolean?,
+	showWidgets: string?,
 }
 
 export type OpenFileOpts = {
 	fflags: { string }?,
 	background: boolean?,
 	profile: boolean?,
-	noHud: boolean?,
+	showWidgets: string?,
 }
 
 export type StudioBackend = {
@@ -261,7 +261,7 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			fflags = opts.fflags or {},
 			background = opts.background == true,
 			profile = opts.profile == true,
-			noHud = opts.noHud == true,
+			showWidgets = opts.showWidgets,
 			detached = opts.detached == true,
 		})
 	end
@@ -273,7 +273,7 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			fflags = opts.fflags or {},
 			background = opts.background == true,
 			profile = opts.profile == true,
-			noHud = opts.noHud == true,
+			showWidgets = opts.showWidgets,
 			detached = opts.detached == true,
 		})
 	end
@@ -286,7 +286,7 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			fflags = opts.fflags or {},
 			background = opts.background == true,
 			profile = opts.profile == true,
-			noHud = opts.noHud == true,
+			showWidgets = opts.showWidgets,
 			detached = opts.detached == true,
 		})
 	end

@@ -263,7 +263,7 @@ fn parse_open_opts(params: &Value) -> rodeo_client::studio::OpenOpts {
         save: params.get("save").and_then(|v| v.as_str()).map(String::from),
         detached: params.get("detached").and_then(|v| v.as_bool()).unwrap_or(false),
         fflag_file: params.get("fflagFile").and_then(|v| v.as_str()).map(String::from),
-        no_hud: params.get("noHud").and_then(|v| v.as_bool()).unwrap_or(false),
+        show_widgets: params.get("showWidgets").and_then(|v| v.as_str()).map(String::from),
     }
 }
 
@@ -289,7 +289,7 @@ async fn studio_open_place(state: Arc<State>, params: Value) -> Result<Value> {
         save: opts.save,
         detached: opts.detached,
         fflag_file: opts.fflag_file,
-        no_hud: opts.no_hud,
+        show_widgets: opts.show_widgets,
     }).await?;
     let session_guid = studio.session_guid.clone();
     let edit_dom_id = studio.edit_dom().dom_id.clone();
@@ -311,7 +311,7 @@ async fn studio_open_file(state: Arc<State>, params: Value) -> Result<Value> {
         save: opts.save,
         detached: opts.detached,
         fflag_file: opts.fflag_file,
-        no_hud: opts.no_hud,
+        show_widgets: opts.show_widgets,
     }).await?;
     let session_guid = studio.session_guid.clone();
     let edit_dom_id = studio.edit_dom().dom_id.clone();

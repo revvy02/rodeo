@@ -302,7 +302,10 @@ export type OpenPlaceOpts = {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
-  noHud?: boolean;
+  /** Allow-list of Studio dock widgets to keep visible ("none" = hide all;
+   *  comma list keeps those). Everything unlisted (panels, ribbon, command
+   *  bar) is hidden. Omit for a normal Studio. */
+  showWidgets?: string;
   /** Studio process survives `studio.close()` and rodeo serve exit. Caller
    *  owns the OS lifecycle from there — the Studio is no longer in rodeo's
    *  managed set after close. */
@@ -313,7 +316,10 @@ export type OpenFileOpts = {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
-  noHud?: boolean;
+  /** Allow-list of Studio dock widgets to keep visible ("none" = hide all;
+   *  comma list keeps those). Everything unlisted (panels, ribbon, command
+   *  bar) is hidden. Omit for a normal Studio. */
+  showWidgets?: string;
   detached?: boolean;
 };
 
@@ -321,7 +327,10 @@ export type OpenOpts = {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
-  noHud?: boolean;
+  /** Allow-list of Studio dock widgets to keep visible ("none" = hide all;
+   *  comma list keeps those). Everything unlisted (panels, ribbon, command
+   *  bar) is hidden. Omit for a normal Studio. */
+  showWidgets?: string;
   detached?: boolean;
 };
 
@@ -344,7 +353,7 @@ export class StudioBackend {
       fflags: opts.fflags ?? [],
       background: opts.background ?? false,
       profile: opts.profile ?? false,
-      noHud: opts.noHud ?? false,
+      showWidgets: opts.showWidgets,
       detached: opts.detached ?? false,
     });
   }
@@ -356,7 +365,7 @@ export class StudioBackend {
       fflags: opts.fflags ?? [],
       background: opts.background ?? false,
       profile: opts.profile ?? false,
-      noHud: opts.noHud ?? false,
+      showWidgets: opts.showWidgets,
       detached: opts.detached ?? false,
     });
   }
@@ -368,7 +377,7 @@ export class StudioBackend {
       fflags: opts.fflags ?? [],
       background: opts.background ?? false,
       profile: opts.profile ?? false,
-      noHud: opts.noHud ?? false,
+      showWidgets: opts.showWidgets,
       detached: opts.detached ?? false,
     });
   }

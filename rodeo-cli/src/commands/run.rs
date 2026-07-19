@@ -58,7 +58,7 @@ struct RunConfig {
     save: Option<String>,
     fflags: FflagArgs,
     detached: bool,
-    no_hud: bool,
+    show_widgets: Option<String>,
     // Targeting fields
     dom_id: Option<String>,
     studio_id: Option<String>,
@@ -144,7 +144,7 @@ async fn persistent_mode(args: RunArgs) -> Result<()> {
             place_target.as_ref(),
             !args.place.focus,
             &args.fflags,
-            args.place.no_hud,
+            args.place.show_widgets.clone(),
             args.place.profile.is_some(),
         ).await?;
 
@@ -154,7 +154,7 @@ async fn persistent_mode(args: RunArgs) -> Result<()> {
             play_handles.cleanup();
         }
     } else if let Some(target) = place_target {
-        let req = build_launch_request(&target, !args.place.focus, args.place.save, args.fflags, args.place.detached, args.place.no_hud, args.place.profile.is_some(), &host, port).await?;
+        let req = build_launch_request(&target, !args.place.focus, args.place.save, args.fflags, args.place.detached, args.place.show_widgets.clone(), args.place.profile.is_some(), &host, port).await?;
         let rc = RodeoClient::connect(&host, port)?;
         if let Some(mut handle) = owned {
             // We own the serve: race the launch against ctrl-c, then hold it open.
@@ -308,7 +308,7 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         save: args.place.save,
         fflags,
         detached: args.place.detached,
-        no_hud: args.place.no_hud,
+        show_widgets: args.place.show_widgets,
         dom_id: args.place.dom_id,
         studio_id: args.studio_id,
         profile,
@@ -340,7 +340,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
             cfg.place_target.as_ref(),
             !cfg.focus,
             &cfg.fflags,
-            cfg.no_hud,
+            cfg.show_widgets.clone(),
             cfg.profile.is_some(),
         )
         .await?);
@@ -357,7 +357,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         }
 
         if let Some(ref target) = cfg.place_target {
-            let req = build_launch_request(target, !cfg.focus, cfg.save.clone(), cfg.fflags.clone(), cfg.detached, cfg.no_hud, cfg.profile.is_some(), &cfg.host, cfg.port).await?;
+            let req = build_launch_request(target, !cfg.focus, cfg.save.clone(), cfg.fflags.clone(), cfg.detached, cfg.show_widgets.clone(), cfg.profile.is_some(), &cfg.host, cfg.port).await?;
             // Race launch against shutdown (ctrl-c / SIGTERM)
             if let Some(ref mut handle) = serve_handle {
                 let rc = RodeoClient::connect(&cfg.host, cfg.port)?;
@@ -507,7 +507,7 @@ pub(crate) async fn build_launch_request(
     save: Option<String>,
     fflags: crate::cli::FflagArgs,
     detached: bool,
-    no_hud: bool,
+    show_widgets: Option<String>,
     profile: bool,
     host: &str,
     port: u16,
@@ -530,7 +530,7 @@ pub(crate) async fn build_launch_request(
         fflags: fflags.fflag_override,
         background,
         detached,
-        no_hud,
+        show_widgets: show_widgets.unwrap_or_default(),
         profile,
         save_path: save,
         fflag_file: fflags.fflag_file,
@@ -556,7 +556,7 @@ async fn launch_play_processes(
     place: Option<&crate::studio_backend::PlaceTarget>,
     background: bool,
     fflags: &crate::cli::FflagArgs,
-    no_hud: bool,
+    show_widgets: Option<String>,
     profile: bool,
 ) -> Result<PlayHandles> {
     use crate::shared::target::DomKind;
@@ -615,16 +615,16 @@ async fn launch_play_processes(
         PlaceTarget::File(p) => backend.open_file(OpenFileOpts {
             path: p.clone(),
             fflags: fflag_overrides, background, profile,
-            save: None, detached: false, fflag_file, no_hud,
+            save: None, detached: false, fflag_file, show_widgets: show_widgets.clone(),
         }).await?,
         PlaceTarget::PlaceId { place_id, .. } => backend.open_place(OpenPlaceOpts {
             place_id: *place_id,
             fflags: fflag_overrides, background, profile,
-            save: None, detached: false, fflag_file, no_hud,
+            save: None, detached: false, fflag_file, show_widgets: show_widgets.clone(),
         }).await?,
         PlaceTarget::Empty => backend.open(OpenOpts {
             fflags: fflag_overrides, background, profile,
-            save: None, detached: false, fflag_file, no_hud,
+            save: None, detached: false, fflag_file, show_widgets: show_widgets.clone(),
         }).await?,
         PlaceTarget::Content(_) => bail!("Content place target is not supported for play launch"),
     };

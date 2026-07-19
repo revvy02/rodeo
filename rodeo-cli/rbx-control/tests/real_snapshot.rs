@@ -10,7 +10,9 @@ fn transform_real_snapshot_hides_more_panels() {
         return;
     }
     let orig = std::fs::read(orig_path).unwrap();
-    let stripped = rbx_control::studio::layout::transform(&orig).expect("transform");
+    // Empty keep-set = hide everything (the old `--no-hud` behavior).
+    let keep = rbx_control::studio::layout::KeepSpec::parse("none");
+    let stripped = rbx_control::studio::layout::transform(&orig, &keep).expect("transform");
 
     let orig_val = plist::Value::from_reader(std::io::Cursor::new(&orig)).unwrap();
     let out_val = plist::Value::from_reader(std::io::Cursor::new(&stripped)).unwrap();

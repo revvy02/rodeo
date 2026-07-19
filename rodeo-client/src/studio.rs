@@ -24,7 +24,9 @@ pub struct OpenOpts {
     pub save: Option<String>,
     pub detached: bool,
     pub fflag_file: Option<String>,
-    pub no_hud: bool,
+    /// `--show-widgets` allow-list spec (`None` = normal; `Some("none")` = hide
+    /// all; `Some("output,...")` = keep those).
+    pub show_widgets: Option<String>,
 }
 
 /// Options for `StudioBackend::open_place` — open by place ID.
@@ -37,7 +39,9 @@ pub struct OpenPlaceOpts {
     pub save: Option<String>,
     pub detached: bool,
     pub fflag_file: Option<String>,
-    pub no_hud: bool,
+    /// `--show-widgets` allow-list spec (`None` = normal; `Some("none")` = hide
+    /// all; `Some("output,...")` = keep those).
+    pub show_widgets: Option<String>,
 }
 
 /// Options for `StudioBackend::open_file` — open by file path.
@@ -50,7 +54,9 @@ pub struct OpenFileOpts {
     pub save: Option<String>,
     pub detached: bool,
     pub fflag_file: Option<String>,
-    pub no_hud: bool,
+    /// `--show-widgets` allow-list spec (`None` = normal; `Some("none")` = hide
+    /// all; `Some("output,...")` = keep those).
+    pub show_widgets: Option<String>,
 }
 
 #[derive(Clone)]
@@ -74,7 +80,7 @@ impl StudioBackend {
             profile: opts.profile,
             save_path: opts.save,
             fflag_file: opts.fflag_file,
-            no_hud: opts.no_hud,
+            show_widgets: opts.show_widgets.unwrap_or_default(),
             ..Default::default()
         }).await
     }
@@ -89,7 +95,7 @@ impl StudioBackend {
             profile: opts.profile,
             save_path: opts.save,
             fflag_file: opts.fflag_file,
-            no_hud: opts.no_hud,
+            show_widgets: opts.show_widgets.unwrap_or_default(),
             ..Default::default()
         }).await
     }
@@ -104,7 +110,7 @@ impl StudioBackend {
             profile: opts.profile,
             save_path: opts.save,
             fflag_file: opts.fflag_file,
-            no_hud: opts.no_hud,
+            show_widgets: opts.show_widgets.unwrap_or_default(),
             ..Default::default()
         }).await
     }

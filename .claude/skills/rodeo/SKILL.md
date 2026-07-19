@@ -50,7 +50,7 @@ Run a script in Studio.
 - `--place.universe <id>` — universe ID (auto-resolved from place ID if omitted)
 - `--detach` — keep Studio running after rodeo exits
 - `--focus` — bring Studio to foreground on launch (default: background)
-- `--no-hud` — strip Studio UI panels (Explorer/Properties/Toolbox/etc.) for a minimal launch; restored on exit
+- `--show-widgets <spec>` — allow-list of Studio dock widgets to keep; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
 - `--save [path]` — save Studio place on exit, optionally to a specific path
 - `--profile [dir]` — enable microprofiler auto-capture and collect dumps (optional output directory)
 - `--sourcemap <path>` — path to sourcemap.json for instance resolution
