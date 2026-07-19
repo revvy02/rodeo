@@ -203,9 +203,9 @@ pub fn transform(orig: &[u8], keep: &KeepSpec) -> Result<Vec<u8>> {
     }
 
     // Collapse the top ribbon (File / Home / Model / Test menu bar) unless kept.
-    if !keep.keep_ribbon {
-        dict.insert(RIBBON_MINIMIZED_KEY.to_string(), plist::Value::Boolean(true));
-    }
+    // Forced both ways so the allow-list is authoritative regardless of the
+    // user's saved ribbon state: listed `ribbon` -> shown, unlisted -> minimized.
+    dict.insert(RIBBON_MINIMIZED_KEY.to_string(), plist::Value::Boolean(!keep.keep_ribbon));
 
     // Hide the command bar (unless kept) by flipping its visibility byte inside
     // the QMainWindow::saveState blob — for both ribbon-UI variants.
