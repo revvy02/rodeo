@@ -23,6 +23,13 @@
 //! Crash recovery is free: stale locks from dead processes get adopted by the
 //! next caller, who will restore them when their own handle drops.
 //!
+//! That adoption only fires when someone re-patches the *same* path, though. If
+//! nothing re-patches it, a leaked patch persists indefinitely (e.g. a killed
+//! `--profile` run leaves Studio's autocapture FFlag enabled forever). For that
+//! case, lock files embed the owner's **pid** (`<base>.lock.<pid>.<uuid>`) and
+//! [`sweep_stale`] reverts any lock whose owner is no longer alive — call it on
+//! startup to self-heal leaks without needing a fresh patch.
+//!
 //! # What this crate does *not* do
 //!
 //! - It does not understand file formats. JSON merges, plist key replacement,
@@ -91,11 +98,22 @@ impl Drop for Handle {
     }
 }
 
-/// Build the lock filename `<basename>.lock.<uuid>` next to `path`.
-fn lock_path_for(path: &Path, uuid: &str) -> PathBuf {
+/// Build the lock filename `<basename>.lock.<pid>.<uuid>` next to `path`. The
+/// pid identifies the owning process so [`sweep_stale`] can tell a live patch
+/// from a leaked one.
+fn lock_path_for(path: &Path, pid: u32, uuid: &str) -> PathBuf {
     let dir = path.parent().unwrap_or_else(|| Path::new("."));
     let base = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    dir.join(format!("{base}{LOCK_INFIX}{uuid}"))
+    dir.join(format!("{base}{LOCK_INFIX}{pid}.{uuid}"))
+}
+
+/// Parse the owner pid out of a lock filename `<base>.lock.<pid>.<uuid>`.
+/// Returns `None` for an old (pre-pid) lock, which callers treat as stale.
+fn pid_from_lock(lock_path: &Path, base: &str) -> Option<u32> {
+    let name = lock_path.file_name()?.to_str()?;
+    let rest = name.strip_prefix(&format!("{base}{LOCK_INFIX}"))?;
+    // pid is the segment before the first '.' (uuid has no dots).
+    rest.split('.').next()?.parse::<u32>().ok()
 }
 
 /// Find any existing `<basename>.lock.*` file in the same directory as `path`.
@@ -103,19 +121,76 @@ fn lock_path_for(path: &Path, uuid: &str) -> PathBuf {
 /// Used to detect a prior patch (either an active one from another process or
 /// a stale one from a crashed process) so we can claim it via rename.
 fn find_existing_lock(path: &Path) -> Option<PathBuf> {
+    find_locks(path).into_iter().next().map(|(p, _)| p)
+}
+
+/// List every `<basename>.lock.*` file for `path` with its embedded owner pid
+/// (`None` if the lock predates pid-tagging).
+pub fn find_locks(path: &Path) -> Vec<(PathBuf, Option<u32>)> {
     let dir = path.parent().unwrap_or_else(|| Path::new("."));
-    let base = path.file_name().and_then(|n| n.to_str())?;
+    let Some(base) = path.file_name().and_then(|n| n.to_str()) else {
+        return Vec::new();
+    };
     let prefix = format!("{base}{LOCK_INFIX}");
-    for entry in std::fs::read_dir(dir).ok()?.flatten() {
-        if entry
-            .file_name()
-            .to_str()
-            .map_or(false, |n| n.starts_with(&prefix))
-        {
-            return Some(entry.path());
+    let mut out = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for entry in rd.flatten() {
+            if entry
+                .file_name()
+                .to_str()
+                .map_or(false, |n| n.starts_with(&prefix))
+            {
+                let p = entry.path();
+                let pid = pid_from_lock(&p, base);
+                out.push((p, pid));
+            }
         }
     }
-    None
+    out
+}
+
+/// Revert a leaked patch directly from its lock file, without a [`Handle`].
+/// Mirrors [`Handle::restore`]: an empty (sentinel) lock means the original
+/// didn't exist, so the patched target is deleted; otherwise the lock is
+/// renamed back over the target. No-op if the lock is already gone.
+fn restore_from_lock(lock_path: &Path, target: &Path) -> Result<()> {
+    if !lock_path.exists() {
+        return Ok(());
+    }
+    let is_sentinel = std::fs::metadata(lock_path).map(|m| m.len() == 0).unwrap_or(false);
+    let _ = std::fs::remove_file(target);
+    if is_sentinel {
+        let _ = std::fs::remove_file(lock_path);
+    } else {
+        std::fs::rename(lock_path, target).with_context(|| {
+            format!(
+                "restore {} from {}",
+                target.display(),
+                lock_path.display()
+            )
+        })?;
+    }
+    debug!(target = %target.display(), "filepatch: swept stale lock");
+    Ok(())
+}
+
+/// Revert any **stale** patch on `path` — one whose owning process is no longer
+/// alive per `is_alive(pid)`. Locks with a live owner (an active patch from a
+/// concurrent process) are left untouched. A lock with no parseable pid
+/// (pre-pid-tagging) is treated as stale. Returns the number of locks reverted.
+///
+/// Call on startup to self-heal a leaked patch left by a crashed/hard-killed
+/// run, without needing to re-patch the file.
+pub fn sweep_stale<F: Fn(u32) -> bool>(path: &Path, is_alive: F) -> Result<usize> {
+    let mut reverted = 0;
+    for (lock_path, pid) in find_locks(path) {
+        let stale = pid.map_or(true, |p| !is_alive(p));
+        if stale {
+            restore_from_lock(&lock_path, path)?;
+            reverted += 1;
+        }
+    }
+    Ok(reverted)
 }
 
 /// Apply a patch.
@@ -130,7 +205,7 @@ where
     F: FnOnce(Option<&[u8]>) -> Result<Vec<u8>>,
 {
     let owner_uuid = uuid::Uuid::new_v4().to_string();
-    let lock_path = lock_path_for(path, &owner_uuid);
+    let lock_path = lock_path_for(path, std::process::id(), &owner_uuid);
 
     // Determine the starting state: is there an existing lock to claim, an
     // existing target file to move aside, or nothing?
@@ -283,6 +358,34 @@ mod tests {
         // Dropping h2 restores the original.
         drop(h2);
         assert_eq!(std::fs::read(&target).unwrap(), b"orig");
+    }
+
+    #[test]
+    fn sweep_reverts_stale_but_keeps_live() {
+        let td = TempDir::new();
+
+        // Leaked patch where the original existed: sweep with a dead owner
+        // renames the lock back over the target.
+        let a = td.path().join("a.txt");
+        write(&a, b"orig");
+        std::mem::forget(apply(&a, |_| Ok(b"leaked".to_vec())).unwrap());
+        assert_eq!(std::fs::read(&a).unwrap(), b"leaked");
+        assert_eq!(sweep_stale(&a, |_| false).unwrap(), 1); // owner "dead"
+        assert_eq!(std::fs::read(&a).unwrap(), b"orig");
+
+        // Leaked patch where NO original existed: sweep deletes the target.
+        let b = td.path().join("b.txt");
+        std::mem::forget(apply(&b, |_| Ok(b"leaked".to_vec())).unwrap());
+        assert!(b.exists());
+        assert_eq!(sweep_stale(&b, |_| false).unwrap(), 1);
+        assert!(!b.exists());
+
+        // A live owner is left untouched.
+        let c = td.path().join("c.txt");
+        write(&c, b"orig");
+        std::mem::forget(apply(&c, |_| Ok(b"active".to_vec())).unwrap());
+        assert_eq!(sweep_stale(&c, |_| true).unwrap(), 0); // owner "alive"
+        assert_eq!(std::fs::read(&c).unwrap(), b"active");
     }
 
     #[test]

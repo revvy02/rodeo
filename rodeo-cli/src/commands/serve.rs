@@ -110,6 +110,20 @@ pub async fn run_master(port: u16, master_id: String) -> Result<()> {
 pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) -> Result<()> {
     ensure_mcp_enabled();
 
+    // Self-heal leaked filepatch patches from crashed/hard-killed runs before
+    // accepting connections. A `--profile` run that didn't restore leaves
+    // Studio's microprofiler-autocapture FFlag enabled *globally* — every
+    // subsequent Studio (rodeo or manual) then captures dumps and fills the
+    // disk; a killed `--show-widgets` run leaves a stripped dock layout. Each
+    // sweep reverts only locks whose owner process is dead, so a concurrent
+    // active patch is left untouched.
+    if let Err(e) = rbx_control::fflags::sweep_stale_leak(rbx_control::fflags::FflagTarget::Studio) {
+        tracing::warn!("fflag stale-lock sweep failed: {e}");
+    }
+    if let Err(e) = rbx_control::studio::layout::sweep_stale_leak() {
+        tracing::warn!("layout stale-lock sweep failed: {e}");
+    }
+
     // Ensure the static `rodeo.rbxm` plugin is installed and current before we
     // accept connections — so every serve (not just a launch) keeps the plugin
     // in lockstep with this CLI, and a manually-opened Studio finds it. The

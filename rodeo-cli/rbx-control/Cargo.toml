@@ -55,3 +55,10 @@ libc = "0.2"
 
 # UUID generation (fflag lock owner IDs)
 uuid = { version = "1", features = ["v4"] }
+
+# Windows pid-liveness for stale-lock sweep (OpenProcess)
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+] }

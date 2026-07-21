@@ -160,6 +160,22 @@ fn plist_path() -> Result<PathBuf> {
         .join("com.roblox.RobloxStudio.plist"))
 }
 
+/// Revert a **stale** dock-layout plist patch — one left behind by a
+/// `--show-widgets` run that was killed before its restore ran. Only reverts a
+/// lock whose owner process is dead; an active patch is left alone. Returns the
+/// number reverted. Safe to call on every startup.
+pub fn sweep_stale_leak() -> Result<usize> {
+    let path = plist_path()?;
+    let n = filepatch::sweep_stale(&path, crate::pid_alive)?;
+    if n > 0 {
+        tracing::warn!(
+            "swept {n} stale layout lock(s) — reverted a leaked patch at {}",
+            path.display()
+        );
+    }
+    Ok(n)
+}
+
 /// Apply the UI strip for a `--show-widgets` spec, returning a handle that
 /// restores the plist on drop. Everything not named in `spec` is hidden;
 /// `spec = "none"` hides everything.

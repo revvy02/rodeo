@@ -23,6 +23,25 @@ pub struct FflagConfig {
     pub file: Option<String>,
 }
 
+/// Revert a **stale** ClientAppSettings.json patch for the given target — one
+/// left behind by a `--profile` (or any fflag) run that was killed before its
+/// restore ran. Without this, a leaked patch (e.g. the microprofiler
+/// autocapture FFlag) stays enabled for *every* future Studio launch and
+/// silently fills the disk with capture dumps. Only reverts locks whose owner
+/// process is dead; an active patch from a concurrent run is left alone.
+/// Returns the number reverted. Safe to call on every startup.
+pub fn sweep_stale_leak(target: FflagTarget) -> Result<usize> {
+    let settings_path = client_settings_dir(&target)?.join(SETTINGS_FILE);
+    let n = filepatch::sweep_stale(&settings_path, crate::pid_alive)?;
+    if n > 0 {
+        tracing::warn!(
+            "swept {n} stale fflag lock(s) — reverted a leaked patch at {}",
+            settings_path.display()
+        );
+    }
+    Ok(n)
+}
+
 /// Resolve the ClientSettings directory for the given target.
 fn client_settings_dir(target: &FflagTarget) -> Result<PathBuf> {
     match target {
