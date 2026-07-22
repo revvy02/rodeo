@@ -199,12 +199,6 @@ pub enum Commands {
     /// Generate type definitions and configure .luaurc
     Setup,
 
-    /// Start MCP server for AI agent integration
-    Mcp {
-        #[command(flatten)]
-        server: ServerArgs,
-    },
-
 
     /// Internal: master server process
     #[command(name = "__master", hide = true)]

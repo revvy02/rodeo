@@ -274,7 +274,6 @@ pub async fn run() {
         Commands::Kill { id, server } => commands::kill::main(&id, &server.host, server.port).await,
         Commands::Save { out, server } => commands::save::main(&server.host, server.port, out).await,
         Commands::Setup => commands::setup::main(),
-        Commands::Mcp { server } => commands::mcp::main(&server.host, server.port).await,
         Commands::InternalMaster { port, ppid } => {
             if let Some(ppid) = ppid { parent_exit::on_parent_exit(ppid); }
             let master_id = master_bootstrap_id.unwrap_or_default();

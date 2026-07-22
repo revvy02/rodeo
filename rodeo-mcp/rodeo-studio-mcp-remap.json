@@ -1,7 +1,0 @@
-{
-  "execute_luau": { "exclude": true },
-  "start_stop_play": { "exclude": true },
-  "list_roblox_studios": { "exclude": true },
-  "get_studio_state": { "exclude": true },
-  "set_active_studio": { "exclude": true }
-}

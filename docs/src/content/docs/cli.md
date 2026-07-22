@@ -17,7 +17,6 @@ Command-line interface for Roblox Studio
 * `kill` — Kill a running process
 * `save` — Save the Studio place
 * `setup` — Generate type definitions and configure .luaurc
-* `mcp` — Start MCP server for AI agent integration
 
 ###### **Options:**
 
@@ -163,23 +162,6 @@ Save the Studio place
 Generate type definitions and configure .luaurc
 
 **Usage:** `rodeo setup`
-
-
-
-## `rodeo mcp`
-
-Start MCP server for AI agent integration
-
-**Usage:** `rodeo mcp [OPTIONS]`
-
-###### **Options:**
-
-* `--host <HOST>` — Host of running server
-
-  Default value: `localhost`
-* `--port <PORT>` — Port number of running server
-
-  Default value: `44872`
 
 
 

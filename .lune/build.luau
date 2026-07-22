@@ -1,7 +1,6 @@
 -- Build script for rodeo
 -- 1. Builds the Roblox Studio plugin (.rbxm)
--- 2. Bundles MCP scripts (inlines @pkg deps via darklua)
--- 3. Builds the Rust CLI binary via cargo
+-- 2. Builds the Rust CLI binary via cargo
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -35,12 +34,6 @@ local function main()
 
 	ensureDir("build")
 
-	-- Clean root-level per-run artifacts (preserve cargo cache for
-	-- incremental builds; subproject builds clean their own output)
-	if fs.isDir("build/mcp") then
-		fs.removeDir("build/mcp")
-	end
-
 	-- Generate proto bindings (each language owned by its consumer subproject)
 	exec("lune", { "run", "rodeo-shared/build" })
 	exec("lune", { "run", "rodeo-client-ts/build" })
@@ -49,23 +42,7 @@ local function main()
 	-- rodeo-plugin/build/plugin.rbxm)
 	exec("lune", { "run", "rodeo-plugin/build" })
 
-	-- Step 3: Bundle MCP scripts (inline @pkg deps, leave @rodeo for runtime)
-	print("Bundling MCP scripts...")
-	ensureDir("build/mcp")
-
-	for _, entry in fs.readDir("rodeo-mcp") do
-		if string.sub(entry, -5) == ".luau" then
-			exec("darklua", {
-				"process",
-				"rodeo-mcp/" .. entry,
-				"build/mcp/" .. entry,
-				"--config",
-				"rodeo-mcp/.darklua.json",
-			})
-		end
-	end
-
-	-- Step 4: Build Rust CLI binary
+	-- Build Rust CLI binary
 	-- Resolve cargo path: mise may provide it, otherwise fall back to ~/.cargo/bin
 	local cargoPath = "cargo"
 	local home = process.env.HOME or ""
