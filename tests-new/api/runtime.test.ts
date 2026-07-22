@@ -8,6 +8,7 @@ import {
   ensureReturn,
   execFiltering,
   inlineSource,
+  largeSource,
   outputFlags,
   targetIdentity,
   uncachedRequireTraversal,
@@ -48,6 +49,7 @@ describe("rodeo runtime", () => {
   });
 
   describe("inline source", () => inlineSource(run));
+  describe("large source", () => largeSource(run));
   describe("ensure return", () => ensureReturn(run));
 
   describe("error handling", () => {

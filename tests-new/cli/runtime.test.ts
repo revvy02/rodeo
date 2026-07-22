@@ -10,6 +10,7 @@ import {
   errorHandling,
   execFiltering,
   inlineSource,
+  largeSource,
   outputFlags,
   targetIdentity,
   uncachedRequireTraversal,
@@ -28,6 +29,7 @@ describe("rodeo runtime (CLI)", () => {
   afterAll(cli.close);
 
   describe("inline source", () => inlineSource(cli.runFn));
+  describe("large source", () => largeSource(cli.runFn));
   describe("ensure return", () => ensureReturn(cli.runFn));
   describe("error handling", () => errorHandling(cli.runFn));
   describe("output flags", () => outputFlags(cli.runFn));

@@ -42,6 +42,23 @@ export function inlineSource(run: RunFn): void {
   });
 }
 
+// ── largeSource ──────────────────────────────────────────────────────────
+
+export function largeSource(run: RunFn): void {
+  it("executes source larger than the Source property assignment limit", async () => {
+    const path = mkTmp(".luau");
+    const payload = "x".repeat(225_000);
+    try {
+      writeFileSync(path, `local payload = [[${payload}]]\nreturn #payload`);
+      const result = await run({ file: path });
+      expect(result.ok).toBe(true);
+      expect(result.return).toBe(payload.length);
+    } finally {
+      rmIfExists(path);
+    }
+  });
+}
+
 // ── ensureReturn (4 tests) ───────────────────────────────────────────────
 
 export function ensureReturn(run: RunFn): void {

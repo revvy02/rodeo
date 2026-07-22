@@ -1,6 +1,18 @@
 -- Shared utilities for rodeo plugins
 
+local ScriptEditorService = game:GetService("ScriptEditorService")
+
 local constants = require(script.Parent.constants)
+
+-- LuaSourceContainer.Source rejects strings at 200,000 bytes, even though
+-- Studio's script editor and compiler support substantially larger sources.
+-- UpdateSourceAsync writes through the editor API and avoids that property
+-- assignment limit. Its callback may be retried, so keep it side-effect free.
+local function updateSource(scriptInstance: LuaSourceContainer, source: string)
+	ScriptEditorService:UpdateSourceAsync(scriptInstance, function()
+		return source
+	end)
+end
 
 local function resolveInstancePath(path: string): Instance?
 	local resolver = Instance.new("ModuleScript")
@@ -73,12 +85,12 @@ local function createExecutionContext(source: string, context: RunContext, execu
 		else
 			module = Instance.new("ModuleScript")
 			module.Name = moduleName
-			module.Source = source
+			updateSource(module, source)
 		end
 	else
 		module = Instance.new("ModuleScript")
 		module.Name = moduleName
-		module.Source = source
+		updateSource(module, source)
 	end
 
 	-- Create nil-parented runner module from template
