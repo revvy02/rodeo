@@ -141,3 +141,9 @@ return {
 ## Companion tools
 
 - **[rbx-microprofiler](https://github.com/revvy02/rbx-microprofiler)** — view + diff Roblox microprofiler dumps captured via `rodeo run --profile`.
+
+## Agentic workflows
+
+rodeo is a CLI first tool. Coding agents are trained heavily on the terminal, e.g. spawning processes, piping stdio, running several at once, and rodeo is a Roblox Luau runtime built to be driven that way. `rodeo run` behaves like any other language runtime: it reads stdin, streams stdout as the script runs, takes arguments, returns a value, and exits with a status code. An agent can start many runs at once, keep long-lived ones in the background, and compose them with ordinary shell tooling.
+
+This is the direction Anthropic points to in [Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp): calling tools one at a time — each a round trip that loads definitions up front and passes every intermediate result back through the model's context — doesn't scale, while having the model write and execute code instead is faster and dramatically cheaper (they measure up to ~98% less context overhead). A tool call blocks the agent loop until it returns; a process the agent launches keeps running concurrently and streams as it goes. `rodeo` is that process: the complete Studio runtime, in every execution context, behind a single command.
