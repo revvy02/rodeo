@@ -212,6 +212,10 @@ message MasterMessage {
 
 message CloseStudioCommand {
   string session_guid = 1;
+  // Caller already performed a verified SavePlace for this session — skip the
+  // close-time backstop save (one-shot, unverifiable) instead of firing a
+  // second save against an already-clean document.
+  optional bool skip_save = 2;
 }
 
 message RunCompleted {
@@ -392,6 +396,8 @@ message SetStudioModeResponse {
 
 message CloseStudioRequest {
   string session_guid = 1;
+  // See CloseStudioCommand.skip_save.
+  optional bool skip_save = 2;
 }
 
 message CloseStudioEvent {

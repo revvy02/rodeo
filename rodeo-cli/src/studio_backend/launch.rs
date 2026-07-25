@@ -187,6 +187,7 @@ impl Studio {
     }
     pub fn place_path(&self) -> Option<&Path> { self.inner.place_path() }
     pub fn save(&self) -> Result<()> { self.inner.save() }
+    pub fn mark_saved(&self) { self.inner.mark_saved() }
     pub fn warm_save_menu_once(&self) -> bool { self.inner.warm_save_menu_once() }
     pub fn kill(&self) { self.inner.kill() }
 

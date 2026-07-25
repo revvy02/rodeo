@@ -477,6 +477,14 @@ impl Studio {
     /// what happens when the `Studio` handle is dropped (without an explicit
     /// cleanup call). Calling this function is interpreted as the caller
     /// taking down the process.
+    /// Mark the place as already saved so `cleanup()` skips its close-time
+    /// backstop save. Callers set this after a *verified* save (mtime
+    /// confirmed) — the backstop is one-shot and unverifiable, and re-firing
+    /// it against an already-clean document just burns the mtime wait.
+    pub fn mark_saved(&self) {
+        self.saved.store(true, Ordering::Relaxed);
+    }
+
     pub fn cleanup(&self) {
         if self.cleaned.swap(true, Ordering::Relaxed) {
             return;

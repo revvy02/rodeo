@@ -45,7 +45,7 @@ pub async fn main(id: &str, host: &str, port: u16) -> Result<()> {
                     short(&studio.studio_id)
                 );
             };
-            client.close_studio_raw(&session_guid).await?;
+            client.close_studio_raw(&session_guid, false).await?;
             tracing::info!("Closed Studio {}", short(&studio.studio_id));
         }
         (runs, studios) => {

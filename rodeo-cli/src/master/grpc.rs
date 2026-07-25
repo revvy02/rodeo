@@ -729,6 +729,7 @@ impl proto::MasterService for RodeoServices {
         let _ = b.tx.send(proto::MasterMessage {
             msg: Some(proto::master_message::Msg::CloseStudio(Box::new(proto::CloseStudioCommand {
                 session_guid: session_guid.clone(),
+                skip_save: req.skip_save,
                 ..Default::default()
             }))),
             ..Default::default()

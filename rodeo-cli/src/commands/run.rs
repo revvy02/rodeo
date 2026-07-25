@@ -431,6 +431,7 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
         profile_dir: cfg.profile.clone(),
     };
 
+    let save_requested = cfg.save.is_some();
     let result = if let Some(mut handle) = serve_handle {
         // Race the run against serve shutdown (Ctrl+C)
         let r = tokio::select! {
@@ -441,28 +442,63 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
                 return Ok(rodeo_client::RunResult { exit_code: 130, ..Default::default() });
             }
         };
-        // Graceful shutdown: close studio (triggers save if --save was used).
-        // Skip when --detach — caller explicitly asked Studio to survive.
         if let Some(ref sid) = launched_studio_id {
-            if !cfg.detached {
-                let _ = RodeoClient::connect(&cfg.host, cfg.port)?.close_studio_raw(sid).await;
-            }
+            finish_launched_studio(&cfg.host, cfg.port, sid, save_requested, cfg.detached, &r).await?;
         }
         drop(handle);
         r?
     } else {
         let r = cli_run::run_piped(&cfg.host, cfg.port, request).await;
         // Same one-shot hygiene when we launched a studio on someone else's
-        // serve: close it after the run (unless --detach).
+        // serve: save + close after the run (close skipped for --detach).
         if let Some(ref sid) = launched_studio_id {
-            if !cfg.detached {
-                let _ = RodeoClient::connect(&cfg.host, cfg.port)?.close_studio_raw(sid).await;
-            }
+            finish_launched_studio(&cfg.host, cfg.port, sid, save_requested, cfg.detached, &r).await?;
         }
         r?
     };
 
     Ok(result)
+}
+
+/// Post-run save + close for a Studio this run launched.
+///
+/// `--save` goes through the same mtime-verified SavePlace path as
+/// `rodeo save`, *before* the CLI reports success — the close-time cleanup
+/// save is one-shot and can only log its failure, which made a missed save
+/// look like exit 0 (issue #7). A verified save arms `skip_save` on the close
+/// so the backstop doesn't re-fire against the already-clean document.
+///
+/// Error precedence: when the run itself failed, a save failure is logged but
+/// the run's own error stands; when the run succeeded, a save failure IS the
+/// command's failure. `--detach` saves without closing.
+async fn finish_launched_studio(
+    host: &str,
+    port: u16,
+    session_guid: &str,
+    save_requested: bool,
+    detached: bool,
+    run_result: &anyhow::Result<rodeo_client::RunResult>,
+) -> Result<()> {
+    let run_failed = run_result.as_ref().map(|r| r.exit_code != 0).unwrap_or(true);
+    let mut saved = false;
+    if save_requested {
+        match RodeoClient::connect(host, port)?.save_place(Some(session_guid.to_string())).await {
+            Ok(_) => saved = true,
+            Err(e) if run_failed => {
+                tracing::warn!("--save failed after run failure: {e}");
+            }
+            Err(e) => {
+                if !detached {
+                    let _ = RodeoClient::connect(host, port)?.close_studio_raw(session_guid, false).await;
+                }
+                return Err(e);
+            }
+        }
+    }
+    if !detached {
+        let _ = RodeoClient::connect(host, port)?.close_studio_raw(session_guid, saved).await;
+    }
+    Ok(())
 }
 
 

@@ -188,11 +188,17 @@ impl RodeoClient {
         bail!("launch studio stream ended without ready event")
     }
 
-    /// Close Studio, blocking until Closed event.
-    pub async fn close_studio_raw(&self, session_guid: &str) -> Result<()> {
+    /// Close Studio, blocking until Closed event. `skip_save: true` tells the
+    /// backend the caller already performed a verified SavePlace for this
+    /// session, so the close-time backstop save is skipped.
+    pub async fn close_studio_raw(&self, session_guid: &str, skip_save: bool) -> Result<()> {
         let mut stream = self.transport
             .master()
-            .close_studio(proto::CloseStudioRequest { session_guid: session_guid.to_string(), ..Default::default() })
+            .close_studio(proto::CloseStudioRequest {
+                session_guid: session_guid.to_string(),
+                skip_save: skip_save.then_some(true),
+                ..Default::default()
+            })
             .await
             .map_err(|e| anyhow!("failed to close studio: {e}"))?;
         while let Ok(Some(view)) = stream.message().await {

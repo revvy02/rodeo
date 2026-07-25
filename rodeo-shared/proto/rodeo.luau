@@ -566,10 +566,12 @@ type _CloseStudioCommandImpl = {
 
 type _CloseStudioCommandFields = {
 	sessionGuid: string,
+	skipSave: boolean?,
 }
 
 export type _CloseStudioCommandPartialFields = {
 	sessionGuid: string?,
+	skipSave: boolean?,
 }
 
 export type CloseStudioCommand = typeof(setmetatable({} :: _CloseStudioCommandFields, {} :: _CloseStudioCommandImpl))
@@ -1156,10 +1158,12 @@ type _CloseStudioRequestImpl = {
 
 type _CloseStudioRequestFields = {
 	sessionGuid: string,
+	skipSave: boolean?,
 }
 
 export type _CloseStudioRequestPartialFields = {
 	sessionGuid: string?,
+	skipSave: boolean?,
 }
 
 export type CloseStudioRequest = typeof(setmetatable({} :: _CloseStudioRequestFields, {} :: _CloseStudioRequestImpl))
@@ -4762,6 +4766,7 @@ do
 	function _CloseStudioCommandImpl.new(data: _CloseStudioCommandPartialFields?): CloseStudioCommand
 		return setmetatable({
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
+			skipSave = if data == nil or data.skipSave == nil then nil else data.skipSave,
 		}, _CloseStudioCommandImpl :: _CloseStudioCommandImpl)
 	end
 
@@ -4772,6 +4777,11 @@ do
 		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
+		end
+
+		if self.skipSave ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.skipSave then 1 else 0)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -4788,7 +4798,12 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				-- No fields
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.skipSave = value ~= 0
+					continue
+				end
 
 				local _
 				_, cursor = proto.readVarInt(input, cursor)
@@ -4829,6 +4844,10 @@ do
 			output.sessionGuid = self.sessionGuid
 		end
 
+		if self.skipSave ~= nil then
+			output.skipSave = self.skipSave
+		end
+
 		return output
 	end
 
@@ -4837,6 +4856,10 @@ do
 
 		if input.sessionGuid ~= nil then
 			self.sessionGuid = input.sessionGuid
+		end
+
+		if input.skipSave ~= nil then
+			self.skipSave = input.skipSave
 		end
 
 		return self
@@ -8007,6 +8030,7 @@ do
 	function _CloseStudioRequestImpl.new(data: _CloseStudioRequestPartialFields?): CloseStudioRequest
 		return setmetatable({
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
+			skipSave = if data == nil or data.skipSave == nil then nil else data.skipSave,
 		}, _CloseStudioRequestImpl :: _CloseStudioRequestImpl)
 	end
 
@@ -8017,6 +8041,11 @@ do
 		if self.sessionGuid ~= nil and self.sessionGuid ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.sessionGuid)
+		end
+
+		if self.skipSave ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.skipSave then 1 else 0)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -8033,7 +8062,12 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				-- No fields
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.skipSave = value ~= 0
+					continue
+				end
 
 				local _
 				_, cursor = proto.readVarInt(input, cursor)
@@ -8074,6 +8108,10 @@ do
 			output.sessionGuid = self.sessionGuid
 		end
 
+		if self.skipSave ~= nil then
+			output.skipSave = self.skipSave
+		end
+
 		return output
 	end
 
@@ -8082,6 +8120,10 @@ do
 
 		if input.sessionGuid ~= nil then
 			self.sessionGuid = input.sessionGuid
+		end
+
+		if input.skipSave ~= nil then
+			self.skipSave = input.skipSave
 		end
 
 		return self

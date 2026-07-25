@@ -743,6 +743,7 @@ async fn handle_master_msg(
         }
         proto::master_message::Msg::CloseStudio(cmd) => {
             let session_guid = cmd.session_guid.clone();
+            let skip_save = cmd.skip_save == Some(true);
             let studio_to_cleanup = {
                 let mut guard = state.lock().await;
                 let trigger = guard.snapshot_trigger.clone();
@@ -794,6 +795,9 @@ async fn handle_master_msg(
                 let ls = state.clone();
                 tokio::spawn(async move {
                     tokio::task::spawn_blocking(move || {
+                        if skip_save {
+                            studio.mark_saved();
+                        }
                         studio.cleanup();
                         studio.kill();
                     }).await.ok();
