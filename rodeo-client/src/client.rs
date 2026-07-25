@@ -218,11 +218,12 @@ impl RodeoClient {
         crate::run::run_stream_routed(self.transport.clone(), opts).await
     }
 
-    /// Save the default (current) studio — for CLI `rodeo save`.
-    pub async fn save_default(&self) -> Result<proto::SavePlaceResponse> {
+    /// Save a studio's place. `session_guid: None` falls back to the only
+    /// connected Studio (errors server-side when 0 or ≥2 are connected).
+    pub async fn save_place(&self, session_guid: Option<String>) -> Result<proto::SavePlaceResponse> {
         let resp = self.transport
             .master()
-            .save_place(proto::SavePlaceRequest::default())
+            .save_place(proto::SavePlaceRequest { session_guid, ..Default::default() })
             .await
             .map_err(|e| anyhow!("save failed: {e}"))?
             .into_owned();
@@ -230,6 +231,11 @@ impl RodeoClient {
             bail!("save failed: {}", resp.error.as_deref().unwrap_or(""));
         }
         Ok(resp)
+    }
+
+    /// Save the default (current) studio — for CLI `rodeo save`.
+    pub async fn save_default(&self) -> Result<proto::SavePlaceResponse> {
+        self.save_place(None).await
     }
 }
 

@@ -189,7 +189,12 @@ pub enum Commands {
 
     /// Save the Studio place
     Save {
-        /// Copy saved file to this output path
+        /// Studio ID to save (from `rodeo state`; prefixes accepted).
+        /// Defaults to the only connected Studio.
+        id: Option<String>,
+
+        /// Copy saved file to this output path (overrides the default of
+        /// copying back to the launch's SOURCE_PATH)
         #[arg(long)]
         out: Option<String>,
 
