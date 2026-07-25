@@ -218,11 +218,41 @@ pub async fn dispatch_client(
         None => Some(Res::Error("missing req".to_string())),
     };
 
-    rt::ClientRpcResponse {
+    guard_relay_size(rt::ClientRpcResponse {
         id: call.id.clone(),
         execution_id: call.execution_id.clone(),
         res,
         ..Default::default()
+    })
+}
+
+/// Covers connect framing and the outer stream-message wrapper around a
+/// guarded response, so a payload sized exactly at the cap still fits.
+const RELAY_GUARD_MARGIN: usize = 4096;
+
+/// Refuse to send any RPC response that would exceed the connectrpc envelope
+/// cap. The receive side can't skip an oversized message — it drops the whole
+/// stream, which tears down the run (transport death, no diagnostic). Rejecting
+/// at the sender turns that into a run-scoped error the script sees at the
+/// call site. Handlers that can return payloads that grow with user data must
+/// chunk (see stream.luau's READ/WRITE_CHUNK); this guard is the backstop for
+/// paths that don't yet.
+fn guard_relay_size(mut response: rt::ClientRpcResponse) -> rt::ClientRpcResponse {
+    use buffa::Message;
+    let size = response.compute_size() as usize;
+    if size + RELAY_GUARD_MARGIN <= rodeo_proto::MAX_RPC_MESSAGE_SIZE {
+        return response;
     }
+    tracing::warn!(
+        id = response.id.as_str(),
+        size,
+        limit = rodeo_proto::MAX_RPC_MESSAGE_SIZE,
+        "rpc response exceeds the relay envelope cap; erroring the call instead of killing the run stream"
+    );
+    response.res = Some(rt::client_rpc_response::Res::Error(format!(
+        "rpc response ({size} bytes) exceeds the relay envelope limit ({} bytes); read or return the data in smaller chunks",
+        rodeo_proto::MAX_RPC_MESSAGE_SIZE,
+    )));
+    response
 }
 

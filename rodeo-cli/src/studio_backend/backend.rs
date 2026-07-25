@@ -9,7 +9,7 @@ use rodeo_proto as proto;
 use crate::master::SharedBackendState;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::info;
+use tracing::{info, warn};
 
 /// Connect to master via connectrpc gRPC and register as a studio backend.
 /// Returns (client, backend_id, master_id, bidi_stream) for the Control RPC.
@@ -149,6 +149,7 @@ pub async fn run_master_loop(
             msg = outgoing_rx.recv() => {
                 match msg {
                     Some(m) => {
+                        if !guard_relay_size(&m, &loop_state).await { continue; }
                         if bidi.send(m).await.is_err() { break; }
                     }
                     None => break,
@@ -171,6 +172,65 @@ pub async fn run_master_loop(
 
     { let mut guard = state.lock().await; guard.relay_tx = None; }
     info!("master connection closed");
+}
+
+/// Covers connect framing and the DomPluginMessage wrapper around a relayed
+/// message, so a payload sized exactly at the cap still fits.
+const RELAY_GUARD_MARGIN: usize = 4096;
+
+/// Refuse to relay any single BackendMessage that would exceed the master's
+/// connectrpc envelope cap. The receive side can't skip an oversized message —
+/// it drops the whole control stream, killing every Studio and run on this
+/// backend (issue #7's failure mode). Rejecting at the sender scopes the
+/// failure to the one message: a plugin RPC gets an error response back (the
+/// run's rpc.call raises, actionable); anything else is dropped with a
+/// warning. Returns whether the message may be sent.
+async fn guard_relay_size(m: &proto::BackendMessage, state: &SharedBackendState) -> bool {
+    use buffa::Message;
+    let size = m.compute_size() as usize;
+    if size + RELAY_GUARD_MARGIN <= rodeo_proto::MAX_RPC_MESSAGE_SIZE {
+        return true;
+    }
+
+    if let Some(proto::backend_message::Msg::DomPluginMessage(ref dpm)) = m.msg {
+        if let Some(proto::plugin_message::Msg::Rpc(ref call)) =
+            dpm.message.as_option().and_then(|pm| pm.msg.as_ref())
+        {
+            warn!(
+                rpc_id = call.id.as_str(),
+                execution_id = call.execution_id.as_str(),
+                size,
+                limit = rodeo_proto::MAX_RPC_MESSAGE_SIZE,
+                "refusing to relay oversized rpc; erroring the call instead of killing the control stream"
+            );
+            let guard = state.lock().await;
+            if let Some(dom) = guard.doms.get(&dpm.dom_id) {
+                let server_msg = proto::ServerMessage {
+                    msg: Some(proto::server_message::Msg::RpcResponse(Box::new(
+                        rodeo_proto::runtime_types::ClientRpcResponse {
+                            id: call.id.clone(),
+                            execution_id: call.execution_id.clone(),
+                            res: Some(rodeo_proto::runtime_types::client_rpc_response::Res::Error(format!(
+                                "rpc message ({size} bytes) exceeds the relay envelope limit ({} bytes); send the data in smaller chunks",
+                                rodeo_proto::MAX_RPC_MESSAGE_SIZE,
+                            ))),
+                            ..Default::default()
+                        },
+                    ))),
+                    ..Default::default()
+                };
+                let _ = dom.studio_tx.send(serde_json::to_string(&server_msg).unwrap_or_default());
+            }
+            return false;
+        }
+    }
+
+    warn!(
+        size,
+        limit = rodeo_proto::MAX_RPC_MESSAGE_SIZE,
+        "dropping oversized backend message instead of killing the control stream"
+    );
+    false
 }
 
 /// Mark a launching session as failed. Drives the lifecycle transition
