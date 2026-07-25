@@ -177,9 +177,10 @@ pub enum Commands {
         server: ServerArgs,
     },
 
-    /// Kill a running process
+    /// Kill a run or close a Studio by id
     Kill {
-        /// Run ID to kill (from `rodeo state`)
+        /// Run ID or Studio ID (from `rodeo state`; prefixes accepted).
+        /// Killing a Studio fails its active runs as disconnected.
         id: String,
 
         #[command(flatten)]

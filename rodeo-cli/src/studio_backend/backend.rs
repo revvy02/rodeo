@@ -785,11 +785,18 @@ async fn handle_master_msg(
             };
             if let Some(studio) = studio_to_cleanup {
                 tracing::info!(session_guid = session_guid.as_str(), "closing Studio");
-                // Run full cleanup (save if --save, skip kill if --detach) off the async
-                // runtime — save() can block up to 30s waiting for file mtime change.
+                // Run full cleanup off the async runtime — save() can block up
+                // to 30s waiting for file mtime change. cleanup() skips the
+                // kill for --detach studios (detach = survive serve exit), but
+                // an explicit CloseStudio means the user wants the process
+                // gone regardless, so kill unconditionally after (no-op when
+                // cleanup already killed).
                 let ls = state.clone();
                 tokio::spawn(async move {
-                    tokio::task::spawn_blocking(move || studio.cleanup()).await.ok();
+                    tokio::task::spawn_blocking(move || {
+                        studio.cleanup();
+                        studio.kill();
+                    }).await.ok();
                     let mut guard = ls.lock().await;
                     guard.studio_instances.remove(&session_guid);
                     if let Some(ref notify) = guard.snapshot_trigger {
