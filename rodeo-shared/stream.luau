@@ -54,13 +54,14 @@ return function(rpc)
 	-- (repeat/until so an empty write still makes one call, matching the
 	-- unchunked behavior.)
 	--
-	-- The binding limit is connectrpc's 4,194,304-byte per-envelope cap on
-	-- the backend→master and master→client hops (measured wrapper overhead
-	-- ~170 bytes, plus the file-handle path length). 4,000,000 leaves ~190KB
-	-- of headroom; a full 4MiB chunk is over the cap BY CONSTRUCTION and
-	-- deterministically drops the whole backend. The WS hop (16MB frames)
-	-- never binds, even with worst-case ~2x JSON escaping inflation.
-	local WRITE_CHUNK = 4_000_000
+	-- With the Rust hops raised to 16MiB envelopes (MAX_RPC_MESSAGE_SIZE in
+	-- rodeo-proto), the binding limit is now the plugin↔backend WS hop's
+	-- 16MB (16,777,216-byte) frames under worst-case ~2x JSON escaping
+	-- inflation: 8,000,000 * 2 = 16,000,000 leaves ~777KB of headroom for
+	-- the RPC wrapper (~170 bytes measured) and the handle path. An
+	-- oversized chunk is over a cap BY CONSTRUCTION and deterministically
+	-- kills the transport, so the margin errs conservative.
+	local WRITE_CHUNK = 8_000_000
 
 	function stream.write(handle, data)
 		local s = tostring(data)
@@ -90,13 +91,14 @@ return function(rpc)
 		until offset > len
 	end
 
-	-- Same envelope cap as stream.write, but bytes fields ride the WS/JSON hop
-	-- base64-encoded (4/3 inflation), so the raw chunk must be sized so
-	-- chunk * 4/3 stays under the cap: 3,000,000 * 4/3 = 4,000,000, keeping
-	-- the same ~190KB headroom as WRITE_CHUNK. No boundary concerns — base64
-	-- splits cleanly anywhere, unlike UTF-8 (chunks are separate base64
-	-- payloads, not slices of one encoding).
-	local WRITE_CHUNK_BYTES = 3_000_000
+	-- Same WS frame limit as WRITE_CHUNK, but bytes fields ride the WS/JSON
+	-- hop base64-encoded — exactly 4/3 inflation, and base64 output is pure
+	-- ASCII so no further JSON escaping applies: 12,000,000 * 4/3 =
+	-- 16,000,000, the same ~777KB headroom. The raw chunk is far under the
+	-- Rust hops' 16MiB envelopes. No boundary concerns — base64 splits
+	-- cleanly anywhere, unlike UTF-8 (chunks are separate base64 payloads,
+	-- not slices of one encoding).
+	local WRITE_CHUNK_BYTES = 12_000_000
 
 	function stream.writeBytes(handle, data: buffer)
 		local len = buffer.len(data)
@@ -124,7 +126,7 @@ return function(rpc)
 	-- chunks sized like WRITE_CHUNK_BYTES and reassemble. eof=true on the
 	-- response that exhausts the source (a short chunk), so a source of any
 	-- size under the cap still costs a single round trip.
-	local READ_CHUNK_BYTES = 3_000_000
+	local READ_CHUNK_BYTES = 12_000_000
 
 	function stream.readBytes(handle): buffer
 		local chunks: { buffer } = {}

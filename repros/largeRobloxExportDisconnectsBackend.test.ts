@@ -6,9 +6,10 @@
 // This fixture creates its payload inside a blank Studio so it does not depend
 // on a particular place or checked-in binary asset. The StringValues contain
 // deterministic pseudo-random printable ASCII, which prevents Roblox's binary
-// serializer from shrinking the model below the backend relay limit. Keeping
-// this near 8 MiB also avoids the separate `table overflow` failure in Rodeo's
-// current whole-buffer base64 encoder.
+// serializer from shrinking the model below the backend relay limit. The
+// large model is sized to exceed the relay's per-envelope cap (16 MiB since
+// the cap bump; originally 4 MiB) so the test keeps guarding the transport
+// boundary — an unchunked export of this model fails BY CONSTRUCTION.
 //
 // Observed with Rodeo v1.2.0-rc.8:
 //   rodeo: run disconnected: backend disconnected while the run was active
@@ -49,7 +50,7 @@ test("large roblox.export does not disconnect the Studio backend", async () => {
 local roblox = require("@rodeo/roblox")
 
 local CONTROL_COUNT = 1500
-local VALUE_COUNT = 4000
+local VALUE_COUNT = 10500
 local BYTES_PER_VALUE = 2048
 local WORDS_PER_VALUE = BYTES_PER_VALUE / 4
 local root = Instance.new("Folder")
@@ -85,12 +86,13 @@ local function appendValues(targetCount)
 	end
 end
 
--- Control: the same export path succeeds below the 4 MiB relay limit.
+-- Control: the same export path succeeds well below the relay limit.
 appendValues(CONTROL_COUNT)
 roblox.export("${CONTROL_OUTPUT}", { root })
 print("control export completed")
 
--- Repro: extending the same model to ~8 MiB disconnects the backend.
+-- Repro: extending the same model past the per-envelope cap (~21 MiB
+-- vs 16 MiB) disconnects the backend unless the transfer is chunked.
 appendValues(VALUE_COUNT)
 print(string.format(
 	"exporting %d instances with %.1f MiB of pseudo-random string data",

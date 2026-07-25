@@ -9,7 +9,10 @@
 // StringValues contain deterministic pseudo-random printable ASCII, which
 // prevents Roblox's binary serializer from shrinking the model below the
 // relay limit. The control import (~3.1 MiB) proves the import path works
-// below the 4 MiB boundary; the ~7.9 MiB import exercises the failure.
+// below the relay boundary; the large import is sized to exceed the
+// per-envelope cap (16 MiB since the cap bump; originally 4 MiB) so the
+// test keeps guarding the transport boundary — an unchunked read of this
+// file fails BY CONSTRUCTION.
 //
 // Observed with rodeo v1.2.0-rc.8 (+ chunked export): the run client's
 // oversized StreamReadBytesResponse kills its own run stream — the master
@@ -52,7 +55,7 @@ test("large roblox.import does not kill the run transport", async () => {
 local roblox = require("@rodeo/roblox")
 
 local CONTROL_COUNT = 1500
-local VALUE_COUNT = 4000
+local VALUE_COUNT = 10500
 local BYTES_PER_VALUE = 2048
 local WORDS_PER_VALUE = BYTES_PER_VALUE / 4
 local root = Instance.new("Folder")
