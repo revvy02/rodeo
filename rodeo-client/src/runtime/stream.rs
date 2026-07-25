@@ -204,12 +204,31 @@ pub async fn stream_write(state: SharedRpcState, req: &rt::StreamWriteRequest) -
     Ok(rt::Ok::default())
 }
 
+// `size` caps one response so callers can pull a large file in chunks that fit
+// the transport (an uncapped read of a big file overflows the connectrpc
+// envelope and kills the run stream). `eof` is true when the source is
+// exhausted: a read shorter than `size` (read_to_end past a `take` only stops
+// early at EOF), or any uncapped read.
 pub async fn stream_read_bytes(state: SharedRpcState, req: &rt::StreamReadBytesRequest) -> Result<rt::StreamReadBytesResponse, String> {
+    let size = req.size.map(|s| s as u64);
+    let response = move |data: Vec<u8>| {
+        let eof = match size {
+            Some(s) => (data.len() as u64) < s,
+            None => true,
+        };
+        rt::StreamReadBytesResponse { data, eof, ..Default::default() }
+    };
+
     if req.handle == "stdin" {
-        return tokio::task::spawn_blocking(|| {
+        return tokio::task::spawn_blocking(move || {
             let mut buf = Vec::new();
-            std::io::stdin().lock().read_to_end(&mut buf).map_err(|e| format!("stdin read: {e}"))?;
-            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+            let stdin = std::io::stdin();
+            match size {
+                Some(s) => stdin.lock().take(s).read_to_end(&mut buf),
+                None => stdin.lock().read_to_end(&mut buf),
+            }
+            .map_err(|e| format!("stdin read: {e}"))?;
+            Ok(response(buf))
         })
         .await
         .map_err(|e| format!("task error: {e}"))?;
@@ -226,20 +245,32 @@ pub async fn stream_read_bytes(state: SharedRpcState, req: &rt::StreamReadBytesR
             use tokio::io::AsyncReadExt;
             let reader = stdout.as_mut().ok_or("stdout not available")?;
             let mut buf = Vec::new();
-            reader.read_to_end(&mut buf).await.map_err(|e| format!("read error: {e}"))?;
-            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+            match size {
+                Some(s) => reader.take(s).read_to_end(&mut buf).await,
+                None => reader.read_to_end(&mut buf).await,
+            }
+            .map_err(|e| format!("read error: {e}"))?;
+            Ok(response(buf))
         }
         StreamHandler::ProcessStderr { stderr } => {
             use tokio::io::AsyncReadExt;
             let reader = stderr.as_mut().ok_or("stderr not available")?;
             let mut buf = Vec::new();
-            reader.read_to_end(&mut buf).await.map_err(|e| format!("read error: {e}"))?;
-            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+            match size {
+                Some(s) => reader.take(s).read_to_end(&mut buf).await,
+                None => reader.read_to_end(&mut buf).await,
+            }
+            .map_err(|e| format!("read error: {e}"))?;
+            Ok(response(buf))
         }
         StreamHandler::FileReader { reader } => {
             let mut buf = Vec::new();
-            reader.read_to_end(&mut buf).map_err(|e| format!("read error: {e}"))?;
-            Ok(rt::StreamReadBytesResponse { data: buf, ..Default::default() })
+            match size {
+                Some(s) => reader.take(s).read_to_end(&mut buf),
+                None => reader.read_to_end(&mut buf),
+            }
+            .map_err(|e| format!("read error: {e}"))?;
+            Ok(response(buf))
         }
         _ => Err(format!("handle not readable: {}", req.handle)),
     }
@@ -293,6 +324,25 @@ pub async fn stream_close(state: SharedRpcState, req: &rt::StreamCloseRequest) -
         }
     }
     Ok(rt::Ok::default())
+}
+
+/// Remove and return a FileWriter's accumulated (path, buffer) so a consumer
+/// can post-process the bytes instead of flushing them verbatim (used by
+/// `roblox_export` finalize in place of `stream_close`). This is the only
+/// sanctioned way for another module to end a stream handle — keeps
+/// `stream_handlers` encapsulated here. A handle of any other kind is left
+/// untouched.
+pub async fn take_file_writer(state: &SharedRpcState, handle: &str) -> Result<(String, Vec<u8>), String> {
+    let mut guard = state.lock().await;
+    match guard.stream_handlers.get(handle) {
+        Some(StreamHandler::FileWriter { .. }) => {}
+        Some(_) => return Err(format!("handle is not an open file writer: {handle}")),
+        None => return Err(format!("no open file handle: {handle}")),
+    }
+    match guard.stream_handlers.remove(handle) {
+        Some(StreamHandler::FileWriter { path, buffer }) => Ok((path, buffer)),
+        _ => unreachable!("checked above while holding the lock"),
+    }
 }
 
 // --- helpers ---

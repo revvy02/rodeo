@@ -14,8 +14,12 @@ return function(rpc, fs, stream)
 
 	function roblox.export(path: string, instances: { Instance })
 		local buf = SerializationService:SerializeInstancesAsync(instances)
+		local h = fs.open(path, "w")
+		stream.writeBytes(h, buf)
+		-- Finalize in place of stream.close: consumes the handle, converts to
+		-- XML when the extension is .rbxmx/.rbxlx, writes atomically.
 		local runtime = _G.__rodeo_runtime_proto
-		rpc.call("roblox_export", runtime.RobloxExportRequest.new({ path = path, data = buf }))
+		rpc.call("roblox_export", runtime.RobloxExportRequest.new({ handle = h.__handle }))
 	end
 
 	return roblox

@@ -90,18 +90,63 @@ return function(rpc)
 		until offset > len
 	end
 
-	function stream.readBytes(handle): buffer
-		local r: runtime.StreamReadBytesResponse = rpc.call("stream_read_bytes", runtime.StreamReadBytesRequest.new({
-			handle = handle.__handle,
-		}))
-		return r.data
-	end
+	-- Same envelope cap as stream.write, but bytes fields ride the WS/JSON hop
+	-- base64-encoded (4/3 inflation), so the raw chunk must be sized so
+	-- chunk * 4/3 stays under the cap: 3,000,000 * 4/3 = 4,000,000, keeping
+	-- the same ~190KB headroom as WRITE_CHUNK. No boundary concerns — base64
+	-- splits cleanly anywhere, unlike UTF-8 (chunks are separate base64
+	-- payloads, not slices of one encoding).
+	local WRITE_CHUNK_BYTES = 3_000_000
 
 	function stream.writeBytes(handle, data: buffer)
-		rpc.call("stream_write_bytes", runtime.StreamWriteBytesRequest.new({
-			handle = handle.__handle,
-			data = data,
-		}))
+		local len = buffer.len(data)
+		if len <= WRITE_CHUNK_BYTES then
+			rpc.call("stream_write_bytes", runtime.StreamWriteBytesRequest.new({
+				handle = handle.__handle,
+				data = data,
+			}))
+			return
+		end
+		local offset = 0
+		while offset < len do
+			local n = math.min(WRITE_CHUNK_BYTES, len - offset)
+			local chunk = buffer.create(n)
+			buffer.copy(chunk, 0, data, offset, n)
+			rpc.call("stream_write_bytes", runtime.StreamWriteBytesRequest.new({
+				handle = handle.__handle,
+				data = chunk,
+			}))
+			offset += n
+		end
+	end
+
+	-- Reads ride the same capped hops in the response direction, so pull in
+	-- chunks sized like WRITE_CHUNK_BYTES and reassemble. eof=true on the
+	-- response that exhausts the source (a short chunk), so a source of any
+	-- size under the cap still costs a single round trip.
+	local READ_CHUNK_BYTES = 3_000_000
+
+	function stream.readBytes(handle): buffer
+		local chunks: { buffer } = {}
+		local total = 0
+		repeat
+			local r: runtime.StreamReadBytesResponse = rpc.call("stream_read_bytes", runtime.StreamReadBytesRequest.new({
+				handle = handle.__handle,
+				size = READ_CHUNK_BYTES,
+			}))
+			table.insert(chunks, r.data)
+			total += buffer.len(r.data)
+		until r.eof
+		if #chunks == 1 then
+			return chunks[1]
+		end
+		local out = buffer.create(total)
+		local offset = 0
+		for _, chunk in chunks do
+			buffer.copy(out, offset, chunk)
+			offset += buffer.len(chunk)
+		end
+		return out
 	end
 
 	function stream.close(handle)

@@ -56,10 +56,12 @@ message StreamWriteRequest {
 
 message StreamReadBytesRequest {
   string handle = 1;
+  optional uint32 size = 2;  // max bytes to read; absent = read to EOF in one response
 }
 
 message StreamReadBytesResponse {
   bytes data = 1;
+  bool eof = 2;
 }
 
 message StreamWriteBytesRequest {
@@ -75,9 +77,14 @@ message StreamCloseRequest {
 // roblox: model/place serialization
 // ---------------------------------------------------------------------------
 
+// Finalize a model export. The plugin streams the serialized model into an
+// open FileWriter via chunked stream_write_bytes (one RobloxExportRequest
+// carrying the whole model would exceed the 4MiB connectrpc envelope cap and
+// drop the backend), then sends this to consume the handle: the host converts
+// to XML when the destination extension is .rbxmx/.rbxlx and writes the file
+// atomically. Sent *instead of* stream_close.
 message RobloxExportRequest {
-  string path = 1;
-  bytes data = 2;  // binary bytes from SerializeInstancesAsync
+  string handle = 1;
 }
 
 // ---------------------------------------------------------------------------

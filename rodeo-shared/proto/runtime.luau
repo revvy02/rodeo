@@ -302,10 +302,12 @@ type _StreamReadBytesRequestImpl = {
 
 type _StreamReadBytesRequestFields = {
 	handle: string,
+	size: number?,
 }
 
 export type _StreamReadBytesRequestPartialFields = {
 	handle: string?,
+	size: number?,
 }
 
 export type StreamReadBytesRequest = typeof(setmetatable(
@@ -326,10 +328,12 @@ type _StreamReadBytesResponseImpl = {
 
 type _StreamReadBytesResponseFields = {
 	data: buffer,
+	eof: boolean,
 }
 
 export type _StreamReadBytesResponsePartialFields = {
 	data: buffer?,
+	eof: boolean?,
 }
 
 export type StreamReadBytesResponse = typeof(setmetatable(
@@ -396,13 +400,11 @@ type _RobloxExportRequestImpl = {
 }
 
 type _RobloxExportRequestFields = {
-	path: string,
-	data: buffer,
+	handle: string,
 }
 
 export type _RobloxExportRequestPartialFields = {
-	path: string?,
-	data: buffer?,
+	handle: string?,
 }
 
 export type RobloxExportRequest = typeof(setmetatable({} :: _RobloxExportRequestFields, {} :: _RobloxExportRequestImpl))
@@ -2272,6 +2274,7 @@ do
 	function _StreamReadBytesRequestImpl.new(data: _StreamReadBytesRequestPartialFields?): StreamReadBytesRequest
 		return setmetatable({
 			handle = if data == nil or data.handle == nil then "" else data.handle,
+			size = if data == nil or data.size == nil then nil else data.size,
 		}, _StreamReadBytesRequestImpl :: _StreamReadBytesRequestImpl)
 	end
 
@@ -2282,6 +2285,11 @@ do
 		if self.handle ~= nil and self.handle ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		if self.size ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.size)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -2298,7 +2306,12 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				-- No fields
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.size = value
+					continue
+				end
 
 				local _
 				_, cursor = proto.readVarInt(input, cursor)
@@ -2339,6 +2352,10 @@ do
 			output.handle = self.handle
 		end
 
+		if self.size ~= nil then
+			output.size = self.size
+		end
+
 		return output
 	end
 
@@ -2347,6 +2364,10 @@ do
 
 		if input.handle ~= nil then
 			self.handle = input.handle
+		end
+
+		if input.size ~= nil then
+			self.size = input.size
 		end
 
 		return self
@@ -2369,6 +2390,7 @@ do
 	function _StreamReadBytesResponseImpl.new(data: _StreamReadBytesResponsePartialFields?): StreamReadBytesResponse
 		return setmetatable({
 			data = if data == nil or data.data == nil then buffer.create(0) else data.data,
+			eof = if data == nil or data.eof == nil then false else data.eof,
 		}, _StreamReadBytesResponseImpl :: _StreamReadBytesResponseImpl)
 	end
 
@@ -2379,6 +2401,11 @@ do
 		if self.data ~= nil and buffer.len(self.data) > 0 then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeBuffer(output, cursor, self.data, buffer.len(self.data))
+		end
+
+		if self.eof then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.eof then 1 else 0)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -2395,7 +2422,12 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				-- No fields
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.eof = value ~= 0
+					continue
+				end
 
 				local _
 				_, cursor = proto.readVarInt(input, cursor)
@@ -2436,6 +2468,10 @@ do
 			output.data = proto.json.serializeBuffer(self.data)
 		end
 
+		if self.eof then
+			output.eof = self.eof
+		end
+
 		return output
 	end
 
@@ -2444,6 +2480,10 @@ do
 
 		if input.data ~= nil then
 			self.data = proto.json.deserializeBuffer(input.data)
+		end
+
+		if input.eof ~= nil then
+			self.eof = input.eof
 		end
 
 		return self
@@ -2678,8 +2718,7 @@ do
 
 	function _RobloxExportRequestImpl.new(data: _RobloxExportRequestPartialFields?): RobloxExportRequest
 		return setmetatable({
-			path = if data == nil or data.path == nil then "" else data.path,
-			data = if data == nil or data.data == nil then buffer.create(0) else data.data,
+			handle = if data == nil or data.handle == nil then "" else data.handle,
 		}, _RobloxExportRequestImpl :: _RobloxExportRequestImpl)
 	end
 
@@ -2687,14 +2726,9 @@ do
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.path ~= nil and self.path ~= "" then
+		if self.handle ~= nil and self.handle ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.path)
-		end
-
-		if self.data ~= nil and buffer.len(self.data) > 0 then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeBuffer(output, cursor, self.data, buffer.len(self.data))
+			output, cursor = proto.writeString(output, cursor, self.handle)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -2719,12 +2753,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.path = proto.decodeString(value)
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.data = value
+					self.handle = proto.decodeString(value)
 					continue
 				end
 
@@ -2753,12 +2782,8 @@ do
 	function _RobloxExportRequestImpl.jsonEncode(self: RobloxExportRequest): any
 		local output = {}
 
-		if self.path ~= nil and self.path ~= "" then
-			output.path = self.path
-		end
-
-		if self.data ~= nil and buffer.len(self.data) > 0 then
-			output.data = proto.json.serializeBuffer(self.data)
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
 		end
 
 		return output
@@ -2767,12 +2792,8 @@ do
 	function _RobloxExportRequestImpl.jsonDecode(input: { [string]: any }): RobloxExportRequest
 		local self = _RobloxExportRequestImpl.new()
 
-		if input.path ~= nil then
-			self.path = input.path
-		end
-
-		if input.data ~= nil then
-			self.data = proto.json.deserializeBuffer(input.data)
+		if input.handle ~= nil then
+			self.handle = input.handle
 		end
 
 		return self

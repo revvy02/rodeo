@@ -213,7 +213,7 @@ pub async fn dispatch_client(
         Some(Req::McpCall(_)) => Some(Res::Error("mcp.call must be dispatched server-side".to_string())),
 
         // roblox
-        Some(Req::RobloxExport(r)) => sync_arm("roblox.export", id, || roblox::roblox_export(r), Res::RobloxExport),
+        Some(Req::RobloxExport(r)) => async_arm("roblox.export", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
 
         None => Some(Res::Error("missing req".to_string())),
     };
