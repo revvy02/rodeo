@@ -29,7 +29,8 @@ pub async fn connect_to_master(
     info!(url = url.as_str(), "connecting to master via connectrpc");
 
     let http = connectrpc::client::HttpClient::plaintext();
-    let config = connectrpc::client::ClientConfig::new(url.parse().context("invalid master URL")?);
+    let config = connectrpc::client::ClientConfig::new(url.parse().context("invalid master URL")?)
+        .default_max_message_size(rodeo_proto::MAX_RPC_MESSAGE_SIZE);
     let client = proto::BackendServiceClient::new(http, config);
 
     let hostname = hostname::get()

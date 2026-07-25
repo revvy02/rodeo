@@ -99,7 +99,12 @@ pub async fn run_master(port: u16, master_id: String) -> Result<()> {
 
     tracing::info!("Master serving on port {port}");
 
-    if let Err(e) = connectrpc::Server::new(router).serve(addr).await {
+    let service = connectrpc::ConnectRpcService::new(router).with_limits(
+        connectrpc::Limits::default()
+            .max_message_size(rodeo_proto::MAX_RPC_MESSAGE_SIZE)
+            .max_request_body_size(rodeo_proto::MAX_RPC_MESSAGE_SIZE),
+    );
+    if let Err(e) = connectrpc::Server::from_service(service).serve(addr).await {
         tracing::error!("master server error: {e}");
     }
 

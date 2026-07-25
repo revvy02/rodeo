@@ -21,7 +21,8 @@ impl Transport {
             .parse()
             .context("invalid server URL")?;
         let http = connectrpc::client::HttpClient::plaintext();
-        let config = connectrpc::client::ClientConfig::new(url);
+        let config = connectrpc::client::ClientConfig::new(url)
+            .default_max_message_size(rodeo_proto::MAX_RPC_MESSAGE_SIZE);
         Ok(Self { host, port, http, config })
     }
 
