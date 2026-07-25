@@ -976,6 +976,8 @@ fn build_studios(
                     .unwrap_or_else(|| "connected".to_string()),
                 studio_mode,
                 edit_dom_id: edit.map(|v| v.dom_id.clone()),
+                source_path: inst.and_then(|i| i.source_path.clone()),
+                working_path: inst.and_then(|i| i.working_path.clone()),
                 doms: members
                     .iter()
                     .map(|v| rodeo_proto::StudioDom {

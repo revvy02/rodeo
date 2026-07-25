@@ -101,6 +101,13 @@ pub struct Studio {
     session_guid: String,
     /// Inner generic Studio. Drop runs save + kill + fflag restore.
     inner: rbx_control::studio::launch::Studio,
+    /// The place file the caller asked to open, absolutized. None for
+    /// place-id and blank-place launches. Surfaced in `rodeo state`.
+    source_path: Option<String>,
+    /// The file Studio actually has open (temp copy for NoSave, the source
+    /// itself for SaveInPlace, the output path for SaveToPath), absolutized.
+    /// None for place-id launches. Surfaced in `rodeo state`.
+    working_path: Option<String>,
 }
 
 impl Studio {
@@ -126,6 +133,8 @@ impl Studio {
         // output copy for SaveToPath; synthesize a minimal place for Empty so
         // RunScript has a file to open). For PlaceId targets, skip prep — Studio
         // downloads the file from Roblox.
+        let mut source_path: Option<String> = None;
+        let mut working_path: Option<String> = None;
         let prepared_target = match &target {
             PlaceTarget::PlaceId { .. } => target.clone(),
             PlaceTarget::Content(_) => {
@@ -138,6 +147,8 @@ impl Studio {
                 };
                 tracing::info!(session_guid = sg_short, "spawn: preparing place file");
                 let place_path = prepare_place(place_str, &opts.save)?;
+                source_path = place_str.map(|p| absolutize(Path::new(p)));
+                working_path = Some(absolutize(&place_path));
                 PlaceTarget::File(place_path.to_string_lossy().to_string())
             }
         };
@@ -159,8 +170,13 @@ impl Studio {
         Ok(Studio {
             session_guid,
             inner,
+            source_path,
+            working_path,
         })
     }
+
+    pub fn source_path(&self) -> Option<&str> { self.source_path.as_deref() }
+    pub fn working_path(&self) -> Option<&str> { self.working_path.as_deref() }
 
     // -- Delegates to inner --
 
@@ -245,6 +261,20 @@ fn write_bootstrap_script(session_guid: &str, port: u16) -> Result<PathBuf> {
     );
     std::fs::write(&path, source).context("failed to write bootstrap script")?;
     Ok(path)
+}
+
+/// Absolutize a path against the backend's CWD for display in `rodeo state`.
+/// `current_dir().join` rather than `canonicalize` — same reason as the
+/// bootstrap path: canonicalize adds the Windows `\\?\` verbatim prefix.
+fn absolutize(p: &Path) -> String {
+    if p.is_absolute() {
+        return p.to_string_lossy().to_string();
+    }
+    std::env::current_dir()
+        .map(|cwd| cwd.join(p))
+        .unwrap_or_else(|_| p.to_path_buf())
+        .to_string_lossy()
+        .to_string()
 }
 
 /// Prepare a place file for Studio based on SaveMode. The place contents are

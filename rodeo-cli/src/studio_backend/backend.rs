@@ -861,6 +861,8 @@ async fn build_state_snapshot(state: &SharedBackendState) -> proto::StateSnapsho
         session_guid: inst.session_guid.clone(),
         status: inst.status.clone(),
         error: inst.error.clone(),
+        source_path: inst.studio.as_ref().and_then(|s| s.source_path().map(str::to_string)),
+        working_path: inst.studio.as_ref().and_then(|s| s.working_path().map(str::to_string)),
         ..Default::default()
     }).collect();
     proto::StateSnapshot { doms, studios, studio_instances, ..Default::default() }

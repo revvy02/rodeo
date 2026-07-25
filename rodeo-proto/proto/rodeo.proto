@@ -119,6 +119,12 @@ message StudioInstanceState {
   string session_guid = 1;
   string status = 2;              // "launching" | "running" | "closing"
   optional string error = 3;
+  // Local-file launches only: the place file the user asked to open, and the
+  // file Studio actually has open (temp copy for NoSave, the source itself for
+  // SaveInPlace, the output path for SaveToPath). Absent for place-id/cloud
+  // launches and manually-opened Studios.
+  optional string source_path = 4;
+  optional string working_path = 5;
 }
 
 message DomSnapshot {
@@ -156,6 +162,11 @@ message StudioState {
   // The root edit DOM's id. Absent if no edit DOM is connected.
   optional string edit_dom_id = 8;
   repeated StudioDom doms = 9;
+  // Local-file launches only (see StudioInstanceState): requested source file
+  // and the file Studio actually has open. Absent for place-id launches and
+  // manually-opened Studios.
+  optional string source_path = 10;
+  optional string working_path = 11;
 }
 
 message StudioDom {

@@ -9,6 +9,19 @@ fn short(id: &str) -> String {
     id[..8.min(id.len())].to_string()
 }
 
+/// Render a path for the table: relative to the CLI's CWD when it's inside it
+/// (keeps the common `.rodeo/.temp/...` case short), absolute otherwise,
+/// "-" when absent (manually-opened Studios have no launch record).
+fn display_path(p: Option<&str>) -> String {
+    let Some(p) = p else { return "-".to_string() };
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Ok(rel) = std::path::Path::new(p).strip_prefix(&cwd) {
+            return rel.to_string_lossy().to_string();
+        }
+    }
+    p.to_string()
+}
+
 fn new_table(headers: &[&str]) -> Table {
     let mut table = Table::new();
     table
@@ -16,6 +29,16 @@ fn new_table(headers: &[&str]) -> Table {
         .set_content_arrangement(ContentArrangement::Dynamic);
     table.set_header(headers.iter().map(|h| style(*h).bold().to_string()).collect::<Vec<_>>());
     table
+}
+
+/// Print a section table; an empty section keeps its header row visible with a
+/// single all-"-" placeholder row instead of collapsing to "(none)".
+fn print_section(title: &str, columns: usize, table: &mut Table) {
+    println!("{}", style(title).bold());
+    if table.row_iter().next().is_none() {
+        table.add_row(vec!["-".to_string(); columns]);
+    }
+    println!("{table}");
 }
 
 pub async fn main(host: &str, port: u16, json: bool) -> Result<()> {
@@ -27,60 +50,56 @@ pub async fn main(host: &str, port: u16, json: bool) -> Result<()> {
     }
 
     // Normalized, flat tables joined by the short studio id: studio-level
-    // facts once in STUDIOS, one row per DOM in DOMS referencing its studio.
-    println!("{}", style("STUDIOS").bold());
-    if snapshot.studios.is_empty() {
-        println!("  (none connected)");
-    } else {
-        let mut table = new_table(&["ID", "MODE", "PLACE", "STATUS"]);
-        for st in &snapshot.studios {
-            let place = if st.place_id != 0 {
-                format!("{} ({})", st.place_name, st.place_id)
-            } else {
-                st.place_name.clone()
+    // facts once in the studio sections, one row per DOM in DOMS referencing
+    // its studio. Local-file and live-place studios split into their own
+    // sections — path columns only apply to the former, the place-id column
+    // only to the latter.
+    let (local, live): (Vec<_>, Vec<_>) = snapshot.studios.iter().partition(|st| st.place_id == 0);
+
+    let mut table = new_table(&["ID", "MODE", "SOURCE_PATH", "WORKING_PATH", "STATUS"]);
+    for st in &local {
+        table.add_row(vec![
+            short(&st.studio_id),
+            st.studio_mode.clone(),
+            display_path(st.source_path.as_deref()),
+            display_path(st.working_path.as_deref()),
+            st.status.clone(),
+        ]);
+    }
+    print_section("LOCAL", 5, &mut table);
+
+    println!();
+    let mut table = new_table(&["ID", "MODE", "PLACE", "STATUS"]);
+    for st in &live {
+        table.add_row(vec![
+            short(&st.studio_id),
+            st.studio_mode.clone(),
+            format!("{} ({})", st.place_name, st.place_id),
+            st.status.clone(),
+        ]);
+    }
+    print_section("UPLOADED", 4, &mut table);
+
+    println!();
+    let mut table = new_table(&["ID", "KIND", "STUDIO", "USER"]);
+    for st in &snapshot.studios {
+        for d in &st.doms {
+            let user = match (&d.user_name, d.user_id) {
+                (Some(name), Some(id)) => format!("{name} ({id})"),
+                (Some(name), None) => name.clone(),
+                _ => "-".to_string(),
             };
             table.add_row(vec![
+                short(&d.dom_id),
+                d.dom_kind.clone(),
                 short(&st.studio_id),
-                st.studio_mode.clone(),
-                place,
-                st.status.clone(),
+                user,
             ]);
         }
-        println!("{table}");
     }
+    print_section("DOMS", 4, &mut table);
 
     println!();
-    println!("{}", style("DOMS").bold());
-    let has_doms = snapshot.studios.iter().any(|s| !s.doms.is_empty());
-    if !has_doms {
-        println!("  (none)");
-    } else {
-        let mut table = new_table(&["ID", "KIND", "STUDIO", "USER"]);
-        for st in &snapshot.studios {
-            for d in &st.doms {
-                let user = match (&d.user_name, d.user_id) {
-                    (Some(name), Some(id)) => format!("{name} ({id})"),
-                    (Some(name), None) => name.clone(),
-                    _ => "-".to_string(),
-                };
-                table.add_row(vec![
-                    short(&d.dom_id),
-                    d.dom_kind.clone(),
-                    short(&st.studio_id),
-                    user,
-                ]);
-            }
-        }
-        println!("{table}");
-    }
-
-    println!();
-    println!("{}", style("RUNS").bold());
-    if snapshot.processes.is_empty() {
-        println!("  (none)");
-        return Ok(());
-    }
-
     let mut table = new_table(&["ID", "STATE", "MODE", "KIND", "CONTEXT", "DOM", "STUDIO"]);
     for run in &snapshot.processes {
         let dash = |s: &str| if s.is_empty() { "-".to_string() } else { s.to_string() };
@@ -94,7 +113,7 @@ pub async fn main(host: &str, port: u16, json: bool) -> Result<()> {
             run.studio_id.as_deref().map(short).unwrap_or_else(|| "-".to_string()),
         ]);
     }
-    println!("{table}");
+    print_section("RUNS", 7, &mut table);
 
     Ok(())
 }

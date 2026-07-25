@@ -341,12 +341,16 @@ type _StudioInstanceStateFields = {
 	sessionGuid: string,
 	status: string,
 	error: string?,
+	sourcePath: string?,
+	workingPath: string?,
 }
 
 export type _StudioInstanceStatePartialFields = {
 	sessionGuid: string?,
 	status: string?,
 	error: string?,
+	sourcePath: string?,
+	workingPath: string?,
 }
 
 export type StudioInstanceState = typeof(setmetatable({} :: _StudioInstanceStateFields, {} :: _StudioInstanceStateImpl))
@@ -415,6 +419,8 @@ type _StudioStateFields = {
 	studioMode: string,
 	editDomId: string?,
 	doms: { StudioDom },
+	sourcePath: string?,
+	workingPath: string?,
 }
 
 export type _StudioStatePartialFields = {
@@ -427,6 +433,8 @@ export type _StudioStatePartialFields = {
 	studioMode: string?,
 	editDomId: string?,
 	doms: { StudioDom | _StudioDomPartialFields }?,
+	sourcePath: string?,
+	workingPath: string?,
 }
 
 export type StudioState = typeof(setmetatable({} :: _StudioStateFields, {} :: _StudioStateImpl))
@@ -3302,6 +3310,8 @@ do
 			sessionGuid = if data == nil or data.sessionGuid == nil then "" else data.sessionGuid,
 			status = if data == nil or data.status == nil then "" else data.status,
 			error = if data == nil or data.error == nil then nil else data.error,
+			sourcePath = if data == nil or data.sourcePath == nil then nil else data.sourcePath,
+			workingPath = if data == nil or data.workingPath == nil then nil else data.workingPath,
 		}, _StudioInstanceStateImpl :: _StudioInstanceStateImpl)
 	end
 
@@ -3322,6 +3332,16 @@ do
 		if self.error ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.error)
+		end
+
+		if self.sourcePath ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.sourcePath)
+		end
+
+		if self.workingPath ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.workingPath)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -3357,6 +3377,16 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.error = proto.decodeString(value)
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.sourcePath = proto.decodeString(value)
+					continue
+				elseif field == 5 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.workingPath = proto.decodeString(value)
 					continue
 				end
 
@@ -3397,6 +3427,14 @@ do
 			output.error = self.error
 		end
 
+		if self.sourcePath ~= nil then
+			output.sourcePath = self.sourcePath
+		end
+
+		if self.workingPath ~= nil then
+			output.workingPath = self.workingPath
+		end
+
 		return output
 	end
 
@@ -3413,6 +3451,14 @@ do
 
 		if input.error ~= nil then
 			self.error = input.error
+		end
+
+		if input.sourcePath ~= nil then
+			self.sourcePath = input.sourcePath
+		end
+
+		if input.workingPath ~= nil then
+			self.workingPath = input.workingPath
 		end
 
 		return self
@@ -3761,6 +3807,8 @@ do
 				end
 				return out
 			end)(),
+			sourcePath = if data == nil or data.sourcePath == nil then nil else data.sourcePath,
+			workingPath = if data == nil or data.workingPath == nil then nil else data.workingPath,
 		}, _StudioStateImpl :: _StudioStateImpl)
 	end
 
@@ -3814,6 +3862,16 @@ do
 				output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
+		end
+
+		if self.sourcePath ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 10, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.sourcePath)
+		end
+
+		if self.workingPath ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 11, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.workingPath)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -3879,6 +3937,16 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					table.insert(self.doms, messages.StudioDom.decode(value))
+					continue
+				elseif field == 10 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.sourcePath = proto.decodeString(value)
+					continue
+				elseif field == 11 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.workingPath = proto.decodeString(value)
 					continue
 				end
 
@@ -3947,6 +4015,14 @@ do
 			output.doms = newOutput
 		end
 
+		if self.sourcePath ~= nil then
+			output.sourcePath = self.sourcePath
+		end
+
+		if self.workingPath ~= nil then
+			output.workingPath = self.workingPath
+		end
+
 		return output
 	end
 
@@ -3992,6 +4068,14 @@ do
 			end
 
 			self.doms = newOutput
+		end
+
+		if input.sourcePath ~= nil then
+			self.sourcePath = input.sourcePath
+		end
+
+		if input.workingPath ~= nil then
+			self.workingPath = input.workingPath
 		end
 
 		return self
