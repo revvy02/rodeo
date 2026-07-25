@@ -16,7 +16,8 @@ rodeo run myscript                      # shorthand for .rodeo/myscript.luau
 rodeo run - < script.luau               # stdin
 rodeo serve                             # optional: persistent server (no Studio launch)
 rodeo state                             # canonical state: studios, DOMs, runs
-rodeo kill <id>                         # kill a run by its id (from rodeo state)
+rodeo kill <id>                         # kill a run OR close a studio by id (from rodeo state)
+rodeo save <studio-id>                  # save a studio's place back to its source file
 ```
 
 `rodeo run --place` is sufficient to spawn a studio with an empty place. The studio process is attached to that run process, and will terminate if that run process gets terminated. You can do `rodeo run --place --detach` to ensure that studio instance persists even if that run process is ended.
@@ -51,7 +52,7 @@ Run a script in Studio.
 - `--detach` — keep Studio running after rodeo exits
 - `--focus` — bring Studio to foreground on launch (default: background)
 - `--show-widgets <spec>` — allow-list of Studio dock widgets to keep; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
-- `--save [path]` — save Studio place on exit, optionally to a specific path
+- `--save [path]` — save the place after the run through the verified save path (retried until the file's mtime changes; a missed save is a nonzero exit, never silent). Bare `--save` opens the source file directly and saves into it; `--save <path>` saves to that path. With `--detach`, saves at run end and leaves Studio open
 - `--profile [dir]` — enable microprofiler auto-capture and collect dumps (optional output directory)
 - `--sourcemap <path>` — path to sourcemap.json for instance resolution
 - `--host <host>` / `--port <port>` — server address (default: localhost:44872)
@@ -61,16 +62,21 @@ Run a script in Studio.
 - `--ppid <pid>` — exit when this process dies
 - `-- arg1 arg2` — script arguments (access via `require("@rodeo/process").args`)
 
-### `rodeo state` / `rodeo kill <id>`
+### `rodeo state` / `rodeo kill <id>` / `rodeo save [id]`
 
-`rodeo state` prints the canonical state as three flat tables joined by the
-short (8-char) studio id — STUDIOS (studio-level facts), DOMS (one row per
-DOM, linked to its studio, with the player for client DOMs), and RUNS (each
-run joined to the DOM/studio it executes on, with its resolved route and
-context):
+`rodeo state` prints the canonical state as flat tables joined by the short
+(8-char) studio id. Studios are split by origin — LOCAL (file launches, with
+the source file the launch asked for and the working file Studio actually has
+open) and UPLOADED (place-id launches) — followed by DOMS (one row per DOM,
+with the player for client DOMs) and RUNS (each run joined to the DOM/studio
+it executes on). Empty sections keep their header with a `-` placeholder row:
 
 ```
-STUDIOS
+LOCAL
+ ID        MODE  SOURCE_PATH      WORKING_PATH                    STATUS
+ 68298c7b  edit  ./MyGame.rbxl    .rodeo/.temp/rodeo-<uuid>.rbxl  connected
+
+UPLOADED
  ID        MODE  PLACE           STATUS
  9aec44bb  test  Place1 (12345)  connected
 
@@ -85,9 +91,21 @@ RUNS
  b0ec4d9a103b  running  test  client  client   b8f11a11  9aec44bb
 ```
 
-Address a studio by its `studioId` (via `--studio-id`) and a run by its run id
-(passed to `kill`). Both change each time you start them, so read the current
-ids from `rodeo state` rather than storing them.
+`--json` emits the full snapshot (including `sourcePath`/`workingPath`).
+
+`rodeo kill <id>` takes a run id or a studio id (unique prefixes ok) and
+resolves which kind it names: a run match kills the run, a studio match closes
+that Studio (detached ones included; its active runs fail as disconnected).
+Ids change each launch, so read them from `rodeo state` rather than storing
+them.
+
+`rodeo save [studio-id] [--out <path>]` saves a studio's place. Targets the
+only connected Studio when the id is omitted; errors listing candidates when
+several are connected. The save is verified (retried until the working file's
+mtime changes), then committed: to `--out` when given, otherwise back to the
+launch's SOURCE_PATH — so the default persists the live place into the file
+you opened. Blank-place studios with no `--out` just save their working file.
+Manually-opened Studios can't be saved this way (no rodeo session).
 
 ## Directives
 
@@ -224,10 +242,10 @@ io.read()  -- read line from stdin
 ### `@rodeo/stream` — stream operations
 
 ```lua
-stream.read(handle) -> string?
-stream.write(handle, data)        -- chunked automatically; any size is safe
-stream.readBytes(handle) -> buffer
-stream.writeBytes(handle, data: buffer)
+stream.read(handle) -> string?        -- text; one-shot (~16MiB cap on files — use readBytes for big files)
+stream.write(handle, data)            -- chunked automatically; any size is safe
+stream.readBytes(handle) -> buffer    -- chunked automatically; any size is safe
+stream.writeBytes(handle, data: buffer) -- chunked automatically; any size is safe
 stream.close(handle)
 ```
 
@@ -235,8 +253,11 @@ stream.close(handle)
 
 ```lua
 roblox.import(path) -> { Instance }   -- load .rbxm/.rbxmx as Instances
-roblox.export(path, { instances })        -- write Instances to .rbxm/.rbxmx
+roblox.export(path, { instances })    -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
 ```
+
+Both stream through the transport in chunks and write atomically —
+arbitrarily large models are fine. XML output is picked by extension.
 
 ## Common patterns
 
@@ -269,6 +290,11 @@ rodeo run --no-print script.luau     # suppress print() only
 
 # .rodeo/ shorthand
 rodeo run myscript                   # runs .rodeo/myscript.luau
+
+# Work against a local place, then persist it
+rodeo run --place MyGame.rbxl --detach --source "..."  # edits land in a temp copy
+rodeo save <studio-id>                                 # commit the copy back to MyGame.rbxl
+rodeo kill <studio-id>                                 # close the Studio
 ```
 
 ## Gotchas
@@ -280,4 +306,6 @@ rodeo run myscript                   # runs .rodeo/myscript.luau
 - `rodeo setup` must be run once per project for `@rodeo/*` imports
 - Return values >2MiB without a `--return` file fail the run by design — pass a file path for big payloads
 - `--place` always opens its own fresh place, even when another place is already open on the serve — runs never silently land in a resident place
+- **`--place file.rbxl` without `--save` opens a temp COPY** (the WORKING_PATH in `rodeo state`) — in-Studio edits and manual Cmd+S land in the copy, which is deleted when the Studio closes. Persist with `rodeo save <studio-id>` (commits back to SOURCE_PATH) before closing, or launch with `--save` to open the source directly
+- `stream.read` on a file handle is a one-shot read (~16MiB transport cap) — an oversized read fails that call with a size error (the run survives); use `fs.open` + `stream.readBytes` for big files, which chunks any size
 - A killed/disconnected run exits 2 with `rodeo: run disconnected: <reason>` on stderr; an explicit `rodeo kill` exits 1
