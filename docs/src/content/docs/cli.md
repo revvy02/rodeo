@@ -14,7 +14,7 @@ Command-line interface for Roblox Studio
 * `serve` — Start persistent server (no Studio launch — use `run --place` for that)
 * `run` — Run a script in Studio
 * `state` — Show the canonical rodeo state: studios, their DOMs, and runs
-* `kill` — Kill a running process
+* `kill` — Kill a run or close a Studio by id
 * `save` — Save the Studio place
 * `setup` — Generate type definitions and configure .luaurc
 
@@ -120,13 +120,13 @@ Show the canonical rodeo state: studios, their DOMs, and runs
 
 ## `rodeo kill`
 
-Kill a running process
+Kill a run or close a Studio by id
 
 **Usage:** `rodeo kill [OPTIONS] <ID>`
 
 ###### **Arguments:**
 
-* `<ID>` — Run ID to kill (from `rodeo state`)
+* `<ID>` — Run ID or Studio ID (from `rodeo state`; prefixes accepted). Killing a Studio fails its active runs as disconnected
 
 ###### **Options:**
 
@@ -143,11 +143,15 @@ Kill a running process
 
 Save the Studio place
 
-**Usage:** `rodeo save [OPTIONS]`
+**Usage:** `rodeo save [OPTIONS] [ID]`
+
+###### **Arguments:**
+
+* `<ID>` — Studio ID to save (from `rodeo state`; prefixes accepted). Defaults to the only connected Studio
 
 ###### **Options:**
 
-* `--out <OUT>` — Copy saved file to this output path
+* `--out <OUT>` — Copy saved file to this output path (overrides the default of copying back to the launch's SOURCE_PATH)
 * `--host <HOST>` — Host of running server
 
   Default value: `localhost`
