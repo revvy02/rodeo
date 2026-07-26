@@ -120,6 +120,8 @@ print(process.args)  --> { "--user", "frank" }
 
 Then just `rodeo run my-script.luau` — no flags at the call site. Everything after `--` becomes `process.args`.
 
+The directive is the base configuration; the CLI overrides it per layer: a flag passed on the CLI replaces the directive's copy of that flag (repeatable flags like `--fflag.override` accumulate instead), and a CLI `--` tail replaces the directive's script args wholesale.
+
 ## DOM Targeting: --mode / --context / --dom
 
 Three orthogonal flags, all optional with sensible defaults. `--mode` picks the
