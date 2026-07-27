@@ -44,12 +44,16 @@ local hostInfo = rpc.call("process_get_info", runtime.ProcessGetInfoRequest.new(
 local processApi = require(ref("process"))(rpc, scriptArgs, hostInfo)
 local streamApi = require(ref("stream"))(rpc)
 local fsApi = require(ref("fs"))(rpc)
+-- Required before `apis` so roblox.bake can close over them (the return-value
+-- handling below uses the same pair directly for its JSON form).
+local normalize = require(ref("normalize"))
+local serializeToLuau = require(ref("serialize"))
 local apis = {
 	fs = fsApi,
 	io = require(ref("io"))(rpc),
 	process = processApi,
 	stream = streamApi,
-	roblox = require(ref("roblox"))(rpc, fsApi, streamApi),
+	roblox = require(ref("roblox"))(rpc, fsApi, streamApi, normalize, serializeToLuau),
 }
 
 -- Publish to _G so require("@rodeo/fs") etc. can find them
@@ -57,8 +61,6 @@ _G.__rodeo_procs = _G.__rodeo_procs or {}
 _G.__rodeo_procs[executionId] = apis
 _G.__rodeo_eid = executionId
 
-local normalize = require(ref("normalize"))
-local serializeToLuau = require(ref("serialize"))
 local setupLogging = require(ref("logging"))
 local limits = require(ref("limits"))
 
@@ -139,21 +141,26 @@ end
 local returnValueJson: string? = nil
 local capError: string? = nil
 if success and result ~= nil then
-	local normalized = normalize(result)
 	local isLuauReturnFile = returnFile ~= "" and string.match(returnFile, "%.luau?$") ~= nil
 
 	-- The JSON form backs the wire field, --show-return, and non-.luau return
-	-- files; .luau return files serialize to Luau source instead, so the
-	-- (potentially huge) encode is skipped when nothing consumes it.
+	-- files; .luau return files go through roblox.bake instead, so the
+	-- (potentially huge) normalize + encode is skipped when nothing consumes it.
 	local json: string? = nil
 	if not isLuauReturnFile or showReturn then
-		json = HttpService:JSONEncode(normalized)
+		json = HttpService:JSONEncode(normalize(result))
 	end
 
 	if returnFile ~= "" then
-		local f = apis.fs.open(returnFile, "w")
-		apis.stream.write(f, if isLuauReturnFile then serializeToLuau(normalized) else json :: string)
-		apis.stream.close(f)
+		if isLuauReturnFile then
+			-- Same normalize → serialize → write path as the public API; one
+			-- implementation so the flag and roblox.bake can't drift.
+			apis.roblox.bake(returnFile, result)
+		else
+			local f = apis.fs.open(returnFile, "w")
+			apis.stream.write(f, json :: string)
+			apis.stream.close(f)
+		end
 	end
 
 	if showReturn then

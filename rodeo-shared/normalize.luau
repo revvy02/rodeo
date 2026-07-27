@@ -26,6 +26,14 @@ local TYPE_CONVERTERS = {
 	Rect = function(v)
 		return { type = "Rect", value = { v.Min.X, v.Min.Y, v.Max.X, v.Max.Y } }
 	end,
+	-- `tostring` already yields the fully-qualified path
+	-- ("Enum.Material.Plastic"), which is both the JSON representation and
+	-- valid Luau source. Tagging it (rather than leaving the bare string the
+	-- catch-all produced) is what lets serialize emit it unquoted so a baked
+	-- file round-trips as an EnumItem instead of a lookalike string.
+	EnumItem = function(v)
+		return { type = "EnumItem", value = tostring(v) }
+	end,
 }
 
 local function normalize(value)

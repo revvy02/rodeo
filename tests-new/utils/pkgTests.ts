@@ -3,7 +3,7 @@
 // some DOM. No case names or script sources are modified from the lute version.
 
 import { it, expect } from "bun:test";
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import type { RunCodeOpts, RunResult } from "../../rodeo-client-ts/src/run.js";
 
 export type RunFn = (opts: RunCodeOpts) => Promise<RunResult>;
@@ -443,7 +443,7 @@ export function process(run: RunFn): void {
   });
 }
 
-// ── roblox (3 tests, plugin-only) ─────────────────────────────────────────
+// ── roblox (9 tests, plugin-only) ─────────────────────────────────────────
 
 export function roblox(run: RunFn): void {
   it("roblox: import can parent instances to workspace", async () => {
@@ -511,6 +511,101 @@ export function roblox(run: RunFn): void {
         roblox.import("./nonexistent-file-12345.rbxm")`,
     });
     expect(result.ok).toBe(false);
+  });
+
+  // bake writes host-side, so the assertions read the emitted file directly
+  // rather than round-tripping it through the return value. Absolute paths
+  // keep the script's fs cwd and the test process in agreement.
+  it("roblox: bake emits Roblox types as constructors", async () => {
+    const out = "/tmp/rodeo-test-bake-types.luau";
+    rmrf(out);
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        roblox.bake("${out}", {
+          v = Vector3.new(1, 2, 3),
+          c = Color3.new(1, 0, 0),
+          u = UDim2.new(0, 4, 1, 8),
+          n = 5,
+          s = "hi",
+          b = true,
+        })
+        return true`,
+    });
+    expect(result.ok).toBe(true);
+    const src = readFileSync(out, "utf8");
+    expect(src).toContain("vector.create(1, 2, 3)");
+    expect(src).toContain("Color3.new(1, 0, 0)");
+    expect(src).toContain("UDim2.new(0, 4, 1, 8)");
+    expect(src).toContain('["n"] = 5,');
+    expect(src).toContain('["s"] = "hi",');
+    expect(src).toContain('["b"] = true,');
+    rmrf(out);
+  });
+
+  // The enum must be emitted UNQUOTED — a quoted "Enum.Material.Plastic" is a
+  // lookalike string that silently fails to round-trip as an EnumItem.
+  it("roblox: bake emits enums unquoted", async () => {
+    const out = "/tmp/rodeo-test-bake-enum.luau";
+    rmrf(out);
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        roblox.bake("${out}", { mat = Enum.Material.Plastic })
+        return true`,
+    });
+    expect(result.ok).toBe(true);
+    const src = readFileSync(out, "utf8");
+    expect(src).toContain('["mat"] = Enum.Material.Plastic,');
+    expect(src).not.toContain('"Enum.Material.Plastic"');
+    rmrf(out);
+  });
+
+  it("roblox: bake writes non-table values", async () => {
+    const cases: Array<[string, string, string]> = [
+      ["number", "42", "return 42\n"],
+      ["string", '"hello"', 'return "hello"\n'],
+      ["boolean", "true", "return true\n"],
+      ["vector", "Vector3.new(1, 2, 3)", "return vector.create(1, 2, 3)\n"],
+    ];
+    for (const [label, literal, expected] of cases) {
+      const out = `/tmp/rodeo-test-bake-scalar-${label}.luau`;
+      rmrf(out);
+      const result = await run({
+        source: `local roblox = require("@rodeo/roblox")
+          roblox.bake("${out}", ${literal})
+          return true`,
+      });
+      expect(result.ok, `bake(${literal}) failed`).toBe(true);
+      expect(readFileSync(out, "utf8"), `bake(${literal})`).toBe(expected);
+      rmrf(out);
+    }
+  });
+
+  it("roblox: bake creates parent directories", async () => {
+    const dir = "/tmp/rodeo-test-bake-nested";
+    rmrf(dir);
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        roblox.bake("${dir}/deeper/data.luau", { ok = true })
+        return true`,
+    });
+    expect(result.ok).toBe(true);
+    expect(readFileSync(`${dir}/deeper/data.luau`, "utf8")).toContain('["ok"] = true,');
+    rmrf(dir);
+  });
+
+  it("roblox: bake stringifies instances", async () => {
+    const out = "/tmp/rodeo-test-bake-instance.luau";
+    rmrf(out);
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        local folder = Instance.new("Folder")
+        folder.Name = "BakeMe"
+        roblox.bake("${out}", { inst = folder })
+        return true`,
+    });
+    expect(result.ok).toBe(true);
+    expect(readFileSync(out, "utf8")).toContain('["inst"] = "BakeMe",');
+    rmrf(out);
   });
 
   it("roblox: import returns instances from rbxmx", async () => {

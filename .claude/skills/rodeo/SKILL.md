@@ -251,13 +251,19 @@ stream.writeBytes(handle, data: buffer) -- chunked automatically; any size is sa
 stream.close(handle)
 ```
 
-### `@rodeo/roblox` — model import/export
+### `@rodeo/roblox` — models, data files, screenshots
 
 ```lua
 roblox.import(path) -> { Instance }      -- load .rbxm/.rbxmx as Instances
 roblox.export(path, { instances })       -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
+roblox.bake(path, value)                 -- write a table/value as a Luau module
 roblox.capture(output?, options?) -> string  -- screenshot Studio, returns absolute path
 ```
+
+`bake` emits `return <value>` with Roblox types as constructors (vectors,
+CFrames, colors, enums), so the file requires straight back into Studio — the
+same path `--return <file>.luau` uses. Instances and functions become their
+`tostring`. Parent directories are created as needed.
 
 Import/export stream through the transport in chunks and write atomically —
 arbitrarily large models are fine. XML output is picked by extension.

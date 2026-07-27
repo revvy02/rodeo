@@ -73,8 +73,18 @@ local TYPE_EMITTERS = {
 	Rect = function(v)
 		return "Rect.new(" .. table.concat(v, ", ") .. ")"
 	end,
+	-- Already a fully-qualified path; emit it unquoted so it round-trips as an
+	-- EnumItem rather than a string that merely looks like one.
+	EnumItem = function(v)
+		return v
+	end,
 }
 
+-- Forward declaration (mutually recursive with `walk`); annotated so the
+-- analyzer knows the concatenations below operate on strings.
+local emitValue: (value: any, depth: number) -> string
+
+-- One table entry: indent + optional key prefix + value + trailing comma.
 local function walk(key, value, depth)
 	local lua = getIndent(depth)
 	if key ~= nil then
@@ -88,56 +98,46 @@ local function walk(key, value, depth)
 			lua = lua .. '["' .. escapeString(tostring(key)) .. '"] = '
 		end
 	end
+	return lua .. emitValue(value, depth) .. ",\n"
+end
+
+-- The value expression alone — no indent, no key, no trailing comma. Shared
+-- by table entries and the top-level value, so a scalar or a tagged Roblox
+-- type at the root emits `return 42` / `return vector.create(...)` instead of
+-- being dropped from an empty table literal.
+function emitValue(value, depth)
 	local valueType = typeof(value)
 	if valueType == "string" then
-		lua = lua .. '"' .. escapeString(value) .. '"'
-	elseif valueType == "number" then
-		lua = lua .. tostring(value)
-	elseif valueType == "boolean" then
-		lua = lua .. tostring(value)
+		return '"' .. escapeString(value) .. '"'
+	elseif valueType == "number" or valueType == "boolean" then
+		return tostring(value)
 	elseif value == nil then
-		lua = lua .. "nil"
+		return "nil"
 	elseif valueType == "table" then
-		-- Check for tagged Roblox type struct
+		-- Tagged Roblox type struct?
 		local taggedType = value.type
-		local emitter = taggedType and TYPE_EMITTERS[taggedType]
+		local emitter = if type(taggedType) == "string" then TYPE_EMITTERS[taggedType] else nil
 		if emitter then
-			lua = lua .. emitter(value.value)
-		else
-			lua = lua .. "{\n"
-			if isArray(value) then
-				for _, v in ipairs(value) do
-					lua = lua .. walk(nil, v, depth + 1)
-				end
-			else
-				local keys = getSortedKeys(value)
-				for _, k in ipairs(keys) do
-					lua = lua .. walk(k, value[k], depth + 1)
-				end
-			end
-			lua = lua .. getIndent(depth) .. "}"
+			return emitter(value.value)
 		end
+		local lua = "{\n"
+		if isArray(value) then
+			for _, v in ipairs(value) do
+				lua = lua .. walk(nil, v, depth + 1)
+			end
+		else
+			for _, k in ipairs(getSortedKeys(value)) do
+				lua = lua .. walk(k, value[k], depth + 1)
+			end
+		end
+		return lua .. getIndent(depth) .. "}"
 	end
-	lua = lua .. ",\n"
-	return lua
+	-- Unreachable: normalize() stringifies every other type first.
+	return "nil"
 end
 
 local function serializeToLuau(value)
-	local lua = "return {\n"
-	if typeof(value) == "table" then
-		if isArray(value) then
-			for _, v in ipairs(value) do
-				lua = lua .. walk(nil, v, 1)
-			end
-		else
-			local keys = getSortedKeys(value)
-			for _, k in ipairs(keys) do
-				lua = lua .. walk(k, value[k], 1)
-			end
-		end
-	end
-	lua = lua .. "}\n"
-	return lua
+	return "return " .. emitValue(value, 0) .. "\n"
 end
 
 return serializeToLuau

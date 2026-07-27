@@ -27,6 +27,16 @@ function roblox.export(path: string, instances: { Instance })
 	(singleton :: any).roblox.export(path, instances)
 end
 
+--- Writes `value` to `path` as a Luau module (`return <value>`), so the data
+--- can be required straight back into Studio. Roblox types round-trip through
+--- their constructors (vectors, CFrames, colors, enums, …); values with no
+--- source representation (Instances, functions) become their `tostring`.
+--- Parent directories are created as needed. This is the same path
+--- `--return <file>.luau` uses.
+function roblox.bake(path: string, value: any)
+	(singleton :: any).roblox.bake(path, value)
+end
+
 --- Captures a Studio screenshot and copies it to a stable path, returning
 --- that absolute path. `output` ending in `.png` is the exact file path; any
 --- other value is a directory the auto-named `.png` lands in; omitted

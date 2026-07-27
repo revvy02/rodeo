@@ -14,6 +14,7 @@ These APIs are not finalized and may change in backwards incompatible ways.
 | Entry | Description |
 | :--- | :--- |
 | [CaptureOptions](#captureoptions) | Camera options for `capture`. All fields optional. |
+| [bake](#robloxbake) | Writes `value` to `path` as a Luau module (`return <value>`), so the data |
 | [capture](#robloxcapture) | Captures a Studio screenshot and copies it to a stable path, returning |
 | [export](#robloxexport) | Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`. |
 | [import](#robloximport) | Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances. |
@@ -46,6 +47,26 @@ type CaptureOptions = {
 ---
 
 ## Functions and Properties
+
+### roblox.bake
+
+Writes `value` to `path` as a Luau module (`return <value>`), so the data
+
+can be required straight back into Studio. Roblox types round-trip through
+
+their constructors (vectors, CFrames, colors, enums, …); values with no
+
+source representation (Instances, functions) become their `tostring`.
+
+Parent directories are created as needed. This is the same path
+
+`--return <file>.luau` uses.
+
+```luau
+(path: string, value: any) -> ()
+```
+
+---
 
 ### roblox.capture
 
