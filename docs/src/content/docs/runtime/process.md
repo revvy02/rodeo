@@ -25,6 +25,7 @@ These APIs are not finalized and may change in backwards incompatible ways.
 | [exit](#processexit) | Exits the current execution with the given code. |
 | [homedir](#processhomedir) | Returns the user's home directory. |
 | [kill](#processkill) | Terminates a process started with `create`. |
+| [platform](#processplatform) | Returns the run client's OS: `"macos"`, `"windows"`, or `"linux"`. |
 | [run](#processrun) | Runs `args` (or an existing handle), blocking until completion. Returns |
 | [system](#processsystem) | Like `run`, but takes a single shell-style command string. |
 
@@ -176,6 +177,16 @@ Terminates a process started with `create`.
 
 ```luau
 (handle: ProcessHandle) -> ()
+```
+
+---
+
+### process.platform
+
+Returns the run client's OS: `"macos"`, `"windows"`, or `"linux"`.
+
+```luau
+() -> string
 ```
 
 ---

@@ -40,6 +40,10 @@ return function(rpc, scriptArgs, hostInfo: runtime.ProcessGetInfoResponse)
 		return hostInfo.execpath
 	end
 
+	function process.platform(): string
+		return hostInfo.platform or ""
+	end
+
 	function process.exit(code: number)
 		rpc.notify("process_exit", runtime.ProcessExitRequest.new({ code = code }))
 		coroutine.yield()

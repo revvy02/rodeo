@@ -254,12 +254,20 @@ stream.close(handle)
 ### `@rodeo/roblox` — model import/export
 
 ```lua
-roblox.import(path) -> { Instance }   -- load .rbxm/.rbxmx as Instances
-roblox.export(path, { instances })    -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
+roblox.import(path) -> { Instance }      -- load .rbxm/.rbxmx as Instances
+roblox.export(path, { instances })       -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
+roblox.capture(output?, options?) -> string  -- screenshot Studio, returns absolute path
 ```
 
-Both stream through the transport in chunks and write atomically —
+Import/export stream through the transport in chunks and write atomically —
 arbitrarily large models are fine. XML output is picked by extension.
+
+`capture`'s `output` is an exact file path when it ends in `.png`, otherwise a
+directory for the auto-named file (default `.rodeo-screenshots/`). `options`
+(all optional): `cframe` (scripted camera for the shot, restored after),
+`fov`, `focus`, `settle` (seconds to wait before capturing). Needs a viewport
+— plugin context, or client context in a running session (server context
+errors). macOS only.
 
 ## Common patterns
 

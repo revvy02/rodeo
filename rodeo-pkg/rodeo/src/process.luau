@@ -60,6 +60,11 @@ function process.execpath(): string
 	return (singleton :: any).process.execpath()
 end
 
+--- Returns the run client's OS: `"macos"`, `"windows"`, or `"linux"`.
+function process.platform(): string
+	return (singleton :: any).process.platform()
+end
+
 --- Exits the current execution with the given code.
 function process.exit(code: number)
 	(singleton :: any).process.exit(code)
