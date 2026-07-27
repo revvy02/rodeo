@@ -1,5 +1,5 @@
 name = "rvy/plugin"
-version = "1.2.0-rc.10"
+version = "1.2.0-rc.11"
 private = true
 
 [engines]
