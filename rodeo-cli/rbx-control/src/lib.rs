@@ -13,6 +13,8 @@
 //! compose these pieces into their own orchestration.
 
 pub mod fflags;
+#[cfg(windows)]
+pub mod job;
 pub mod paths;
 pub mod place;
 pub mod player;

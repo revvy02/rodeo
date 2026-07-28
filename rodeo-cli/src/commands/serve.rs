@@ -12,7 +12,7 @@ use process_wrap::tokio::{CommandWrap, ChildWrapper};
 #[cfg(unix)]
 use process_wrap::tokio::ProcessGroup;
 #[cfg(windows)]
-use process_wrap::tokio::JobObject;
+use rbx_control::job::KillOnCloseJob;
 
 /// Which role(s) this serve instance runs.
 pub enum ServeMode {
@@ -234,6 +234,13 @@ pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) 
 pub struct ServeHandle {
     pub shutdown_rx: tokio::sync::mpsc::Receiver<()>,
     children: Vec<Box<dyn ChildWrapper>>,
+    /// Windows: one kill-on-close job per child. Held (not read) so the job
+    /// handles live exactly as long as this handle — dropping them, or this
+    /// process dying however abruptly, tears down each child's tree except
+    /// breakaway (`--detach`) Studios.
+    #[cfg(windows)]
+    #[allow(dead_code)]
+    jobs: Vec<KillOnCloseJob>,
 }
 
 impl ServeHandle {
@@ -272,7 +279,12 @@ impl Drop for ServeHandle {
     }
 }
 
-fn spawn_in_group(exe: &std::path::Path, args: &[&str]) -> Result<Box<dyn ChildWrapper>> {
+#[cfg(windows)]
+type SpawnedChild = (Box<dyn ChildWrapper>, KillOnCloseJob);
+#[cfg(not(windows))]
+type SpawnedChild = Box<dyn ChildWrapper>;
+
+fn spawn_in_group(exe: &std::path::Path, args: &[&str]) -> Result<SpawnedChild> {
     let mut wrap = CommandWrap::with_new(exe, |cmd| {
         cmd.args(args)
             .stdin(Stdio::null())
@@ -281,13 +293,22 @@ fn spawn_in_group(exe: &std::path::Path, args: &[&str]) -> Result<Box<dyn ChildW
     // Put each child in its own kill group so termination cascades to
     // grandchildren (e.g. Studio): a Unix process group, or a Windows job
     // object (which kills the whole tree when the job handle is closed).
+    // The job is ours, not process-wrap's: its JobObject never sets
+    // BREAKAWAY_OK, which would trap `--detach` Studios in the job and kill
+    // them at serve exit before any detach logic could matter.
     #[cfg(unix)]
     wrap.wrap(ProcessGroup::leader());
-    #[cfg(windows)]
-    wrap.wrap(JobObject);
     let child = wrap
         .spawn()
         .context("failed to spawn child process")?;
+    #[cfg(windows)]
+    {
+        let job = KillOnCloseJob::new().context("failed to create child job object")?;
+        let pid = child.id().context("spawned child has no pid")?;
+        job.assign_pid(pid).context("failed to assign child to job object")?;
+        Ok((child, job))
+    }
+    #[cfg(not(windows))]
     Ok(child)
 }
 
@@ -297,9 +318,18 @@ fn spawn_in_group(exe: &std::path::Path, args: &[&str]) -> Result<Box<dyn ChildW
 pub async fn start_full_serve(port: u16) -> Result<ServeHandle> {
     let exe = std::env::current_exe().context("cannot find own binary")?;
     let mut children: Vec<Box<dyn ChildWrapper>> = Vec::new();
+    #[cfg(windows)]
+    let mut jobs: Vec<KillOnCloseJob> = Vec::new();
     let ppid = std::process::id().to_string();
 
     // Spawn master
+    #[cfg(windows)]
+    {
+        let (child, job) = spawn_in_group(&exe, &["__master", "--port", &port.to_string(), "--ppid", &ppid])?;
+        children.push(child);
+        jobs.push(job);
+    }
+    #[cfg(not(windows))]
     children.push(spawn_in_group(&exe, &["__master", "--port", &port.to_string(), "--ppid", &ppid])?);
 
     // Wait for master to be healthy
@@ -312,6 +342,13 @@ pub async fn start_full_serve(port: u16) -> Result<ServeHandle> {
     let studio_port = port + 1;
     let studio_port_str = studio_port.to_string();
     let port_str = port.to_string();
+    #[cfg(windows)]
+    {
+        let (child, job) = spawn_in_group(&exe, &["__studio-backend", "--port", &studio_port_str, "--master-host", "localhost", "--master-port", &port_str, "--ppid", &ppid])?;
+        children.push(child);
+        jobs.push(job);
+    }
+    #[cfg(not(windows))]
     children.push(spawn_in_group(&exe, &["__studio-backend", "--port", &studio_port_str, "--master-host", "localhost", "--master-port", &port_str, "--ppid", &ppid])?);
 
     // Wait for the studio backend to register
@@ -343,7 +380,12 @@ pub async fn start_full_serve(port: u16) -> Result<ServeHandle> {
         let _ = shutdown_tx.try_send(());
     });
 
-    Ok(ServeHandle { shutdown_rx, children })
+    Ok(ServeHandle {
+        shutdown_rx,
+        children,
+        #[cfg(windows)]
+        jobs,
+    })
 }
 
 // ---------------------------------------------------------------------------
