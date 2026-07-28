@@ -22,7 +22,8 @@ describe("state (CLI)", () => {
     const result = runRodeo(["state", "--port", String(PORT)]);
     expect(result.ok).toBe(true);
     const out = result.stdout + result.stderr;
-    expect(out).toContain("STUDIOS");
+    expect(out).toContain("LOCAL");
+    expect(out).toContain("DOMS");
     expect(out).toContain("edit");
   });
 

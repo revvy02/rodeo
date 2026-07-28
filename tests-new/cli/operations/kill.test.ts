@@ -28,7 +28,7 @@ describe("kill (CLI)", () => {
 
     const killResult = runRodeo(["kill", id!, "--port", String(PORT)]);
     expect(killResult.ok).toBe(true);
-    expect(killResult.stderr).toContain(`Killed ${id}`);
+    expect(killResult.stderr).toContain(`Killed run ${id}`);
 
     // The spawner should exit non-zero when its run is killed.
     const exitCode = await Promise.race([
@@ -42,6 +42,6 @@ describe("kill (CLI)", () => {
   it("kill nonexistent process returns error", () => {
     const result = runRodeo(["kill", "nonexistent", "--port", String(PORT)]);
     expect(result.ok).toBe(false);
-    expect(result.stderr).toContain("not found");
+    expect(result.stderr).toContain("no run or Studio with id");
   });
 });
