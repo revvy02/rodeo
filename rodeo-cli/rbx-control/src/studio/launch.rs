@@ -724,3 +724,51 @@ pub fn studio_content_path() -> Option<String> {
         .map(|s| s.content_path().to_string_lossy().to_string())
 }
 
+
+/// Self-heal Roblox Studio discovery when the registry pointer is stale.
+///
+/// `roblox_install`'s Windows lookup trusts `HKCU\…\RobloxStudio\ContentFolder`,
+/// which Studio's auto-update leaves pointing at the *deleted* previous version
+/// dir — so `locate()` resolves a `RobloxStudioBeta.exe` that no longer exists
+/// and every launch fails in milliseconds. The crate exposes no public way to
+/// force its Versions/ scan except the documented `ROBLOX_STUDIO_PATH` escape
+/// hatch: point it at the Roblox root and it finds the latest installed version
+/// itself.
+///
+/// Call once at process start, before spawning threads. No-op when the user
+/// already set `ROBLOX_STUDIO_PATH` or when the registry pointer is valid, so
+/// the happy path and explicit overrides are untouched. Child processes inherit
+/// the variable, so a single call at the top-level entry covers the whole tree.
+pub fn ensure_studio_env() {
+    // Respect an explicit override — the user (or a test harness) knows best.
+    if std::env::var_os("ROBLOX_STUDIO_PATH").is_some() {
+        return;
+    }
+    // Happy path: the registry pointer already resolves to a real executable.
+    if let Ok(studio) = roblox_install::RobloxStudio::locate() {
+        if studio.application_path().is_file() {
+            return;
+        }
+    }
+    // Stale/missing pointer: fall back to the Roblox root so the crate scans
+    // Versions/ for a live install. Windows-only — this failure mode is specific
+    // to the Windows ContentFolder registry heuristic.
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(root) =
+            std::env::var_os("LOCALAPPDATA").map(|p| PathBuf::from(p).join("Roblox"))
+        {
+            if root.join("Versions").is_dir() {
+                // Runs before tracing is initialized (main → here → tokio →
+                // subscriber), so tracing::warn! would be dropped; use stderr.
+                eprintln!(
+                    "rodeo: RobloxStudio registry pointer is stale (deleted version dir, \
+                     likely after a Studio auto-update); scanning {}\\Versions for a live \
+                     install",
+                    root.display()
+                );
+                std::env::set_var("ROBLOX_STUDIO_PATH", root);
+            }
+        }
+    }
+}

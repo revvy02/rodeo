@@ -7,6 +7,11 @@ fn main() {
         launch_control::run_main_with_args(std::env::args().skip(2));
     }
 
+    // Self-heal Studio discovery before any threads exist (env::set_var is only
+    // sound single-threaded). Repairs the stale-ContentFolder launch failure so
+    // no external ROBLOX_STUDIO_PATH is needed; inherited by all child processes.
+    rbx_control::studio::launch::ensure_studio_env();
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
