@@ -26,9 +26,21 @@ type CaptureOptions = {
 local function capture(output: string?, options: CaptureOptions?): string
 	local resolved: CaptureOptions = options or {}
 
+	-- The engine writes captures into a per-user directory it never reports to
+	-- Luau; the location is the platform-specific Roblox app-data root. Paths
+	-- are normalized to forward slashes (Rust std accepts them on Windows).
 	local platform = process.platform()
-	if platform ~= "macos" then
-		error(`roblox.capture is not yet supported on platform '{platform}' (macOS only: the engine capture directory is not mapped elsewhere)`, 2)
+	local homedir = (process.homedir():gsub("\\", "/"))
+	local captureDirectory
+	if platform == "macos" then
+		captureDirectory = homedir .. "/Library/Roblox/tmp-capture-storage"
+	elseif platform == "windows" then
+		captureDirectory = homedir .. "/AppData/Local/Roblox/tmp-capture-storage"
+	else
+		error(`roblox.capture is not yet supported on platform '{platform}' (the engine capture directory is not mapped there)`, 2)
+	end
+	if output then
+		output = output:gsub("\\", "/")
 	end
 
 	local camera = workspace.CurrentCamera
@@ -76,8 +88,6 @@ local function capture(output: string?, options: CaptureOptions?): string
 
 		task.wait(resolved.settle or 0)
 
-		local captureDirectory = process.homedir() .. "/Library/Roblox/tmp-capture-storage"
-
 		local before: { [string]: boolean } = {}
 		if fs.exists(captureDirectory) then
 			for _, entry in fs.listdir(captureDirectory) do
@@ -92,6 +102,9 @@ local function capture(output: string?, options: CaptureOptions?): string
 		local callbackDeadline = os.clock() + 10
 		while not contentId do
 			if os.clock() > callbackDeadline then
+				if platform == "windows" then
+					error("roblox.capture: CaptureScreenshot callback never fired within 10s. A minimized Studio never renders its viewport on Windows, and background launches are minimized; launch with focus (focus = true / no background) or restore the Studio window and retry.")
+				end
 				error("roblox.capture: CaptureScreenshot callback never fired within 10s")
 			end
 			task.wait()
@@ -127,8 +140,8 @@ local function capture(output: string?, options: CaptureOptions?): string
 			end
 			outputPath = directory .. "/" .. newFile .. ".png"
 		end
-		if outputPath:sub(1, 1) ~= "/" then
-			local cwd = process.cwd()
+		if outputPath:sub(1, 1) ~= "/" and not outputPath:match("^%a:") then
+			local cwd = (process.cwd():gsub("\\", "/"))
 			if cwd:sub(-1) == "/" then
 				cwd = cwd:sub(1, -2)
 			end
