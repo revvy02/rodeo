@@ -22,6 +22,26 @@ rodeo save <studio-id>                  # save a studio's place back to its sour
 
 `rodeo run --place` is sufficient to spawn a studio with an empty place. The studio process is attached to that run process, and will terminate if that run process gets terminated. You can do `rodeo run --place --detach` to ensure that studio instance persists even if that run process is ended.
 
+## Use your own studio
+
+Launch a studio for your own work rather than routing to one that is already
+connected. A run with no `--place`, `--studio-id`, or `--dom-id` matches **any**
+connected DOM, so running `rodeo state`, seeing a studio, and using it is the
+easy mistake — that studio is usually someone's working session with unsaved
+edits and a particular place open. Your script mutates its DOM, `--save` writes
+to their file, and `rodeo kill <studio-id>` closes it out from under them.
+
+Use a studio you did not launch only when:
+
+- you opened it earlier and know what is in it,
+- the task is explicitly about that session ("the place I have open"), or
+- you were told which studio to use.
+
+Otherwise start your own with `rodeo run --place` (add `--detach` to keep it
+alive across several runs, then `rodeo kill <studio-id>` when finished), and
+pin follow-up runs to it with `--studio-id` so they cannot drift onto another
+studio.
+
 ## Commands
 
 ### `rodeo serve`
