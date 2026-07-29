@@ -287,7 +287,23 @@ message RunClientMessage {
     SubmitRequest submit = 1;
     rodeo.runtime.ClientRpcResponse rpc_response = 3;
     KillCommand kill = 4;
+    ScriptChunk script_chunk = 5;
   }
+}
+
+// One piece of a script too large for a single envelope. The carrying message
+// (SubmitRequest client→master, RunCommand master→plugin) holds the first
+// piece plus `script_continues = true`; ScriptChunk messages follow in order
+// on the same stream, the last one flagged. The receiver concatenates before
+// acting. Chunks are sized so every hop clears its cap (connectrpc envelopes
+// and the plugin WS frame limit under worst-case JSON escaping).
+message ScriptChunk {
+  // Empty on the client→master hop — the run id isn't minted until the
+  // master accepts the submit. Set on the master→plugin hop so the plugin
+  // can key reassembly alongside its per-execution demux.
+  string execution_id = 1;
+  string data = 2;
+  bool is_last = 3;
 }
 
 // No id field: the master mints the run id and returns it as the first
@@ -314,6 +330,9 @@ message SubmitRequest {
   optional string script_path = 12;
   optional bool profile = 13;
   LogFilter log_filter = 14;
+  // `script` holds only the first piece; ScriptChunk messages follow on the
+  // same stream (see ScriptChunk).
+  optional bool script_continues = 17;
 }
 
 // ---------------------------------------------------------------------------
@@ -547,6 +566,7 @@ message ServerMessage {
     rodeo.runtime.ClientRpcResponse rpc_response = 3;
     KillCommand kill = 4;
     SetTargetModeMsg set_target_mode = 5;
+    ScriptChunk script_chunk = 6;
   }
 }
 
@@ -615,6 +635,9 @@ message RunCommand {
   optional bool profile = 18;
   LogFilter log_filter = 19;
   reserved 20;  // old `logs` — removed Studio FLog-capture feature
+  // `script` holds only the first piece; ServerMessage.script_chunk messages
+  // follow on the same stream (see ScriptChunk).
+  optional bool script_continues = 21;
 }
 
 message KillCommand {

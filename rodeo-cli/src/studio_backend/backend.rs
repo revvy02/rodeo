@@ -337,6 +337,7 @@ async fn handle_master_msg(
                 Some(proto::server_message::Msg::Kill(_)) => "kill",
                 Some(proto::server_message::Msg::RpcResponse(_)) => "rpc_response",
                 Some(proto::server_message::Msg::SetTargetMode(_)) => "set_target_mode",
+                Some(proto::server_message::Msg::ScriptChunk(_)) => "script_chunk",
                 None => "empty",
             };
             let dom_short = &dom_id[..8.min(dom_id.len())];

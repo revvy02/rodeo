@@ -1,22 +1,16 @@
-// Repro (issue #9): a file entrypoint whose transitive bundle exceeds the
-// run-submission payload limit exits 2 with EMPTY stdout/stderr — no rodeo
-// diagnostic, nothing in Studio, --verbose adds nothing.
+// Repro (issue #9): a file entrypoint whose transitive bundle exceeded the
+// run-submission payload limit used to exit 2 with EMPTY stdout/stderr — the
+// single-message submission blew the master's receive cap, the stream
+// dropped, and the client swallowed the transport error twice over.
 //
-// The bundled source rides the client->master RunStream as a single message;
-// an oversized one blows the master's receive cap, which drops the stream on
-// receipt. Client-side, the stream loop's `_ => break` arm swallows the
-// transport error (no Disconnect event exists — the transport itself died),
-// and run_piped fabricates an exit-2 RunResult with empty output. The
-// sender-side relay guards don't apply: they cover runtime rpc responses,
-// not the initial submission.
-//
-// The fixture generates a ~20MB module tree on the fly (pseudo-random string
-// literals so nothing compresses or dedups) plus a control entrypoint whose
-// bundle is small, proving the pipeline itself works.
-//
-// Expected behavior: the oversized run fails BEFORE dispatch with a message
-// naming the bundle size and the applicable limit (or, minimally, any
-// transport failure is reported on stderr) — never a bare silent exit 2.
+// Scripts over SCRIPT_CHUNK_SIZE are now split across ScriptChunk messages on
+// every hop (client->master reassembled at the master; master->plugin
+// reassembled in the plugin, each chunk its own WS frame), so an oversized
+// bundle RUNS. The fixture generates a ~24MB module tree on the fly
+// (pseudo-random string literals so nothing compresses or dedups) plus a
+// small-bundle control; both must execute and print. The client also emits a
+// large-bundle advisory on stderr — data that size belongs in baked files,
+// not compiled source.
 import { test, expect, afterAll } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
@@ -104,7 +98,7 @@ async function runRodeo(args: string[], timeoutMs: number) {
   return { ...result, stdout, stderr };
 }
 
-test("oversized bundle fails with a diagnostic, not a silent exit 2", async () => {
+test("oversized bundle chunks through and runs", async () => {
   cleanup();
   // 24 x 1MB modules ≈ 24MB of bundled source — over the 16MiB envelope.
   writeFixtures(24, 1_000_000);
@@ -130,19 +124,16 @@ test("oversized bundle fails with a diagnostic, not a silent exit 2", async () =
   expect(control.code, `${control.stdout}\n${control.stderr}`).toBe(0);
   expect(control.stdout).toContain("control loaded");
 
-  // Oversized bundle against the same live serve/Studio.
+  // Oversized bundle against the same live serve/Studio: chunked submission
+  // means it executes end-to-end.
   const big = await runRodeo(
     ["run", `${FIXTURE_DIR}/entry.luau`, "--port", String(PORT)],
-    120_000,
+    180_000,
   );
 
   expect(big.exited, "oversized run hung").toBe(true);
-  // It must fail...
-  expect(big.code).not.toBe(0);
-  // ...but never silently: stderr names the size problem.
-  expect(
-    big.stderr.length,
-    `exit ${big.code} with empty stderr — the silent failure from issue #9`,
-  ).toBeGreaterThan(0);
-  expect(big.stderr).toMatch(/limit|size|large|exceeds/i);
-}, 330_000);
+  expect(big.code, `${big.stdout}\n${big.stderr}`).toBe(0);
+  expect(big.stdout).toContain("fixtures loaded 24");
+  // The advisory still steers toward baking data instead of bundling it.
+  expect(big.stderr).toMatch(/large bundle/i);
+}, 400_000);

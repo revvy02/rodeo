@@ -38,6 +38,116 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 	-- UI-facing process entries
 	local processEntries: { [string]: ProcessEntry } = {}
 
+	-- Runs whose script arrived flagged `scriptContinues`: the RunCommand
+	-- carried only the first piece, ScriptChunk messages carry the rest in
+	-- order. Keyed by executionId; executed once the last chunk lands.
+	local pendingRuns: { [string]: { run: any, parts: { string } } } = {}
+
+	-- Start a run whose full script is assembled. Everything after script
+	-- transport is unchanged from the pre-chunking single-message path.
+	local function executeRun(run)
+		setIsExecuting(true)
+
+		local context = run.context or "plugin"
+		local lf = run.logFilter
+		local logFilter = {
+			enableWarn = lf and lf.enableWarn,
+			enableError = lf and lf.enableError,
+			enableInfo = lf and lf.enableInfo,
+			enableOutput = lf and lf.enableOutput,
+			enableLogs = lf and lf.enableLogs,
+		}
+		local scriptArgs = run.scriptArgs or {}
+		local executionId = run.executionId
+
+		local ctx = utils.createExecutionContext(
+			run.script,
+			context,
+			executionId,
+			run.instancePath,
+			run.scriptPath
+		)
+
+		local killFn = runtime.executeInContext(ctx, context, {
+			executionId = executionId,
+			logFilter = logFilter,
+			cacheRequires = run.cacheRequires,
+			verbose = run.verbose or verbose,
+			scriptArgs = scriptArgs,
+			returnFile = run.returnFile,
+			showReturn = run.showReturn,
+			outputFile = run.outputFile,
+			profile = run.profile,
+		}, {
+			onComplete = function(result)
+				local msg = rodeoProto.PluginMessage.new({
+					msg = { type = "done", value = rodeoProto.ExecutionDone.new({
+						executionId = executionId,
+						success = result and result.success or false,
+						error = result and result.error,
+						returnValue = result and result.returnValue,
+					}) },
+				})
+				client:Send(HttpService:JSONEncode(msg:jsonEncode()))
+				activeProcesses[executionId] = nil
+				processEntries[executionId] = nil
+				setActiveProcesses(table.clone(processEntries))
+				-- Update executing state: still executing if any processes remain
+				local hasActive = false
+				for _ in pairs(activeProcesses) do
+					hasActive = true
+					break
+				end
+				if not hasActive then
+					setIsExecuting(false)
+				end
+			end,
+			onRpc = function(msg)
+				-- msg.callJson is canonical ClientRpcCall JSON minus executionId.
+				-- Stamp executionId, decode to typed, wrap, encode to wire.
+				--
+				-- This runs on the outgoing-event thread, NOT the thread blocked
+				-- in rpc.call's event:Wait(). If encoding/sending throws here
+				-- (e.g. JSONEncode rejects a string field carrying non-UTF-8
+				-- bytes — the wire is a UTF-8-locked WebSocket text frame), the
+				-- error would otherwise be swallowed and the caller would hang
+				-- forever. Catch it and deliver an error response for this id so
+				-- rpc.call's event:Wait() returns and errors at the call site.
+				msg.callJson.executionId = executionId
+				local ok, err = pcall(function()
+					local typedCall = runtimeProto.ClientRpcCall.jsonDecode(msg.callJson)
+					local rpcMsg = rodeoProto.PluginMessage.new({
+						msg = { type = "rpc", value = typedCall },
+					})
+					client:Send(HttpService:JSONEncode(rpcMsg:jsonEncode()))
+				end)
+				if not ok then
+					-- Defer the error response. onRpc runs synchronously inside
+					-- rpc.call's send() (BindableEvent:Fire is synchronous), so a
+					-- direct Fire here would land before rpc.call reaches
+					-- event:Wait() and be missed, hanging the caller forever.
+					-- task.defer resumes after the caller is parked on Wait().
+					local errValue = tostring(err)
+					local id = msg.callJson.id
+					task.defer(function()
+						ctx.incomingEvent:Fire({
+							type = "rpc:response",
+							id = id,
+							res = { type = "error", value = errValue },
+						})
+					end)
+				end
+			end,
+		})
+
+		activeProcesses[executionId] = { ctx = ctx, kill = killFn }
+		processEntries[executionId] = {
+			name = run.scriptPath or "inline",
+			state = "running",
+		}
+		setActiveProcesses(table.clone(processEntries))
+	end
+
 	local connection = client.MessageReceived:Connect(function(message: string)
 		local success, decoded = pcall(function()
 			return HttpService:JSONDecode(message)
@@ -60,108 +170,32 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 			end
 		elseif serverMsg.msg and serverMsg.msg.type == "run" then
 			local run = serverMsg.msg.value
-			setIsExecuting(true)
-
-			local context = run.context or "plugin"
-			local lf = run.logFilter
-			local logFilter = {
-				enableWarn = lf and lf.enableWarn,
-				enableError = lf and lf.enableError,
-				enableInfo = lf and lf.enableInfo,
-				enableOutput = lf and lf.enableOutput,
-				enableLogs = lf and lf.enableLogs,
-			}
-			local scriptArgs = run.scriptArgs or {}
-			local executionId = run.executionId
-
-			local ctx = utils.createExecutionContext(
-				run.script,
-				context,
-				executionId,
-				run.instancePath,
-				run.scriptPath
-			)
-
-			local killFn = runtime.executeInContext(ctx, context, {
-				executionId = executionId,
-				logFilter = logFilter,
-				cacheRequires = run.cacheRequires,
-				verbose = run.verbose or verbose,
-				scriptArgs = scriptArgs,
-				returnFile = run.returnFile,
-				showReturn = run.showReturn,
-				outputFile = run.outputFile,
-				profile = run.profile,
-			}, {
-				onComplete = function(result)
-					local msg = rodeoProto.PluginMessage.new({
-						msg = { type = "done", value = rodeoProto.ExecutionDone.new({
-							executionId = executionId,
-							success = result and result.success or false,
-							error = result and result.error,
-							returnValue = result and result.returnValue,
-						}) },
-					})
-					client:Send(HttpService:JSONEncode(msg:jsonEncode()))
-					activeProcesses[executionId] = nil
-					processEntries[executionId] = nil
-					setActiveProcesses(table.clone(processEntries))
-					-- Update executing state: still executing if any processes remain
-					local hasActive = false
-					for _ in pairs(activeProcesses) do
-						hasActive = true
-						break
-					end
-					if not hasActive then
-						setIsExecuting(false)
-					end
-				end,
-				onRpc = function(msg)
-					-- msg.callJson is canonical ClientRpcCall JSON minus executionId.
-					-- Stamp executionId, decode to typed, wrap, encode to wire.
-					--
-					-- This runs on the outgoing-event thread, NOT the thread blocked
-					-- in rpc.call's event:Wait(). If encoding/sending throws here
-					-- (e.g. JSONEncode rejects a string field carrying non-UTF-8
-					-- bytes — the wire is a UTF-8-locked WebSocket text frame), the
-					-- error would otherwise be swallowed and the caller would hang
-					-- forever. Catch it and deliver an error response for this id so
-					-- rpc.call's event:Wait() returns and errors at the call site.
-					msg.callJson.executionId = executionId
-					local ok, err = pcall(function()
-						local typedCall = runtimeProto.ClientRpcCall.jsonDecode(msg.callJson)
-						local rpcMsg = rodeoProto.PluginMessage.new({
-							msg = { type = "rpc", value = typedCall },
-						})
-						client:Send(HttpService:JSONEncode(rpcMsg:jsonEncode()))
-					end)
-					if not ok then
-						-- Defer the error response. onRpc runs synchronously inside
-						-- rpc.call's send() (BindableEvent:Fire is synchronous), so a
-						-- direct Fire here would land before rpc.call reaches
-						-- event:Wait() and be missed, hanging the caller forever.
-						-- task.defer resumes after the caller is parked on Wait().
-						local errValue = tostring(err)
-						local id = msg.callJson.id
-						task.defer(function()
-							ctx.incomingEvent:Fire({
-								type = "rpc:response",
-								id = id,
-								res = { type = "error", value = errValue },
-							})
-						end)
-					end
-				end,
-			})
-
-			activeProcesses[executionId] = { ctx = ctx, kill = killFn }
-			processEntries[executionId] = {
-				name = run.scriptPath or "inline",
-				state = "running",
-			}
-			setActiveProcesses(table.clone(processEntries))
+			if run.scriptContinues then
+				-- First piece of a chunked script — stash and wait for the
+				-- ScriptChunk sequence before executing.
+				pendingRuns[run.executionId] = { run = run, parts = { run.script } }
+				return
+			end
+			executeRun(run)
+		elseif serverMsg.msg and serverMsg.msg.type == "scriptChunk" then
+			local chunk = serverMsg.msg.value
+			local pending = pendingRuns[chunk.executionId]
+			if not pending then
+				warn(`rodeo: script chunk for unknown execution {chunk.executionId} — dropping`)
+				return
+			end
+			table.insert(pending.parts, chunk.data)
+			if chunk.isLast then
+				pendingRuns[chunk.executionId] = nil
+				pending.run.script = table.concat(pending.parts)
+				pending.run.scriptContinues = nil
+				executeRun(pending.run)
+			end
 		elseif serverMsg.msg and serverMsg.msg.type == "kill" then
 			local kill = serverMsg.msg.value
+			-- A kill can land while the script is still streaming in — drop the
+			-- partial assembly so the run never starts.
+			pendingRuns[kill.executionId] = nil
 			local proc = activeProcesses[kill.executionId]
 			if proc and proc.kill then
 				proc.kill()

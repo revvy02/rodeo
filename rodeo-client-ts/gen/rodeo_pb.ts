@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file rodeo.proto.
  */
 export const file_rodeo: GenFile = /*@__PURE__*/
-  fileDesc("Cgtyb2Rlby5wcm90bxIFcm9kZW8iyAMKDkJhY2tlbmRNZXNzYWdlEioKCHJlZ2lzdGVyGAEgASgLMhYucm9kZW8uUmVnaXN0ZXJSZXF1ZXN0SAASKAoLZG9tX2Nvbm5lY3QYAiABKAsyES5yb2Rlby5Eb21Db25uZWN0SAASLgoOZG9tX2Rpc2Nvbm5lY3QYAyABKAsyFC5yb2Rlby5Eb21EaXNjb25uZWN0SAASNQoSZG9tX3BsdWdpbl9tZXNzYWdlGAQgASgLMhcucm9kZW8uRG9tUGx1Z2luTWVzc2FnZUgAEi4KDnN0YXRlX3NuYXBzaG90GAUgASgLMhQucm9kZW8uU3RhdGVTbmFwc2hvdEgAEiwKDXBsYXllcl9zdGF0dXMYBiABKAsyEy5yb2Rlby5QbGF5ZXJTdGF0dXNIABIuCg5maWxlc19jb21wbGV0ZRgHIAEoCzIULnJvZGVvLkZpbGVzQ29tcGxldGVIABIuCg5zZXNzaW9uX2V4aXRlZBgKIAEoCzIULnJvZGVvLlNlc3Npb25FeGl0ZWRIABIoCgtzYXZlX3Jlc3VsdBgLIAEoCzIRLnJvZGVvLlNhdmVSZXN1bHRIAEIFCgNtc2dKBAgIEAlKBAgJEAoiUgoJRmlsZUNodW5rEhAKCGZpbGVuYW1lGAEgASgJEhQKDGV4ZWN1dGlvbl9pZBgCIAEoCRIMCgRkYXRhGAMgASgMEg8KB2lzX2xhc3QYBCABKAgiCQoHRmlsZUFjayIlCg1GaWxlc0NvbXBsZXRlEhQKDGV4ZWN1dGlvbl9pZBgBIAEoCSJJCg9SZWdpc3RlclJlcXVlc3QSDAoEa2luZBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKBHBvcnQYAyABKA1IAIgBAUIHCgVfcG9ydCIwCgpEb21Db25uZWN0Eg4KBmRvbV9pZBgBIAEoCRISCgpzdGF0ZV9qc29uGAIgASgJIh8KDURvbURpc2Nvbm5lY3QSDgoGZG9tX2lkGAEgASgJIkkKEERvbVBsdWdpbk1lc3NhZ2USDgoGZG9tX2lkGAEgASgJEiUKB21lc3NhZ2UYAiABKAsyFC5yb2Rlby5QbHVnaW5NZXNzYWdlIkkKEERvbVNlcnZlck1lc3NhZ2USDgoGZG9tX2lkGAEgASgJEiUKB21lc3NhZ2UYAiABKAsyFC5yb2Rlby5TZXJ2ZXJNZXNzYWdlIo8BCg1TdGF0ZVNuYXBzaG90EiAKBGRvbXMYASADKAsyEi5yb2Rlby5Eb21TbmFwc2hvdBImCgdzdHVkaW9zGAIgAygLMhUucm9kZW8uU3R1ZGlvU25hcHNob3QSNAoQc3R1ZGlvX2luc3RhbmNlcxgDIAMoCzIaLnJvZGVvLlN0dWRpb0luc3RhbmNlU3RhdGUirwEKE1N0dWRpb0luc3RhbmNlU3RhdGUSFAoMc2Vzc2lvbl9ndWlkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRISCgVlcnJvchgDIAEoCUgAiAEBEhgKC3NvdXJjZV9wYXRoGAQgASgJSAGIAQESGQoMd29ya2luZ19wYXRoGAUgASgJSAKIAQFCCAoGX2Vycm9yQg4KDF9zb3VyY2VfcGF0aEIPCg1fd29ya2luZ19wYXRoIpEDCgtEb21TbmFwc2hvdBIOCgZkb21faWQYASABKAkSFwoKYmFja2VuZF9pZBgCIAEoCUgAiAEBEhEKBG1vZGUYAyABKAlIAYgBARIVCghkb21fa2luZBgEIAEoCUgCiAEBEhkKDHNlc3Npb25fZ3VpZBgFIAEoCUgDiAEBEhYKCXN0dWRpb19pZBgMIAEoCUgEiAEBEhUKCHBsYWNlX2lkGAYgASgDSAWIAQESFgoJZ2FtZV9uYW1lGAcgASgJSAaIAQESEwoLYWN0aXZlX3J1bnMYCCABKA0SEQoJY29ubmVjdGVkGAkgASgIEhYKCXVzZXJfbmFtZRgKIAEoCUgHiAEBEhQKB3VzZXJfaWQYCyABKANICIgBAUINCgtfYmFja2VuZF9pZEIHCgVfbW9kZUILCglfZG9tX2tpbmRCDwoNX3Nlc3Npb25fZ3VpZEIMCgpfc3R1ZGlvX2lkQgsKCV9wbGFjZV9pZEIMCgpfZ2FtZV9uYW1lQgwKCl91c2VyX25hbWVCCgoIX3VzZXJfaWQixwIKC1N0dWRpb1N0YXRlEhEKCXN0dWRpb19pZBgBIAEoCRISCgpiYWNrZW5kX2lkGAIgASgJEhcKCnNlc3Npb25faWQYAyABKAlIAIgBARISCgpwbGFjZV9uYW1lGAQgASgJEhAKCHBsYWNlX2lkGAUgASgDEg4KBnN0YXR1cxgGIAEoCRITCgtzdHVkaW9fbW9kZRgHIAEoCRIYCgtlZGl0X2RvbV9pZBgIIAEoCUgBiAEBEh4KBGRvbXMYCSADKAsyEC5yb2Rlby5TdHVkaW9Eb20SGAoLc291cmNlX3BhdGgYCiABKAlIAogBARIZCgx3b3JraW5nX3BhdGgYCyABKAlIA4gBAUINCgtfc2Vzc2lvbl9pZEIOCgxfZWRpdF9kb21faWRCDgoMX3NvdXJjZV9wYXRoQg8KDV93b3JraW5nX3BhdGgidQoJU3R1ZGlvRG9tEg4KBmRvbV9pZBgBIAEoCRIQCghkb21fa2luZBgCIAEoCRIWCgl1c2VyX25hbWUYAyABKAlIAIgBARIUCgd1c2VyX2lkGAQgASgDSAGIAQFCDAoKX3VzZXJfbmFtZUIKCghfdXNlcl9pZCJUCg5TdHVkaW9TbmFwc2hvdBIUCgxzZXNzaW9uX2d1aWQYASABKAkSDAoEbW9kZRgCIAEoCRIMCgRuYW1lGAMgASgJEhAKCHBsYWNlX2lkGAQgASgDIl8KDFBsYXllclN0YXR1cxINCgVzdGF0ZRgBIAEoCRIVCghwbGFjZV9pZBgCIAEoBEgAiAEBEhIKBWVycm9yGAMgASgJSAGIAQFCCwoJX3BsYWNlX2lkQggKBl9lcnJvciLUAgoNTWFzdGVyTWVzc2FnZRItCgpyZWdpc3RlcmVkGAEgASgLMhcucm9kZW8uUmVnaXN0ZXJSZXNwb25zZUgAEjUKEmRvbV9zZXJ2ZXJfbWVzc2FnZRgCIAEoCzIXLnJvZGVvLkRvbVNlcnZlck1lc3NhZ2VIABIiCgRzYXZlGAMgASgLMhIucm9kZW8uU2F2ZUNvbW1hbmRIABIsCg1ydW5fY29tcGxldGVkGAYgASgLMhMucm9kZW8uUnVuQ29tcGxldGVkSAASMwoNbGF1bmNoX3N0dWRpbxgHIAEoCzIaLnJvZGVvLkxhdW5jaFN0dWRpb0NvbW1hbmRIABIxCgxjbG9zZV9zdHVkaW8YCyABKAsyGS5yb2Rlby5DbG9zZVN0dWRpb0NvbW1hbmRIAEIFCgNtc2dKBAgEEAVKBAgFEAZKBAgIEAlKBAgJEApKBAgKEAsiUAoSQ2xvc2VTdHVkaW9Db21tYW5kEhQKDHNlc3Npb25fZ3VpZBgBIAEoCRIWCglza2lwX3NhdmUYAiABKAhIAIgBAUIMCgpfc2tpcF9zYXZlIiQKDFJ1bkNvbXBsZXRlZBIUCgxleGVjdXRpb25faWQYASABKAkiMQoQUmVnaXN0ZXJSZXNwb25zZRIKCgJpZBgBIAEoCRIRCgltYXN0ZXJfaWQYAiABKAkiTQoLU2F2ZUNvbW1hbmQSEgoKcmVxdWVzdF9pZBgBIAEoCRIZCgxzZXNzaW9uX2d1aWQYAiABKAlIAIgBAUIPCg1fc2Vzc2lvbl9ndWlkIpUBCgpTYXZlUmVzdWx0EhIKCnJlcXVlc3RfaWQYASABKAkSGQoMc2Vzc2lvbl9ndWlkGAIgASgJSACIAQESDQoFc2F2ZWQYAyABKAgSEQoEcGF0aBgEIAEoCUgBiAEBEhIKBWVycm9yGAUgASgJSAKIAQFCDwoNX3Nlc3Npb25fZ3VpZEIHCgVfcGF0aEIICgZfZXJyb3IiqAIKE0xhdW5jaFN0dWRpb0NvbW1hbmQSFwoKcGxhY2VfZmlsZRgBIAEoCUgAiAEBEhUKCHBsYWNlX2lkGAIgASgESAGIAQESDgoGZmZsYWdzGAMgAygJEhIKCmJhY2tncm91bmQYBCABKAgSEAoIZGV0YWNoZWQYBSABKAgSFgoJc2F2ZV9wYXRoGAYgASgJSAKIAQESFwoKZmZsYWdfZmlsZRgHIAEoCUgDiAEBEhQKDHNlc3Npb25fZ3VpZBgIIAEoCRIUCgxzaG93X3dpZGdldHMYCiABKAkSDwoHcHJvZmlsZRgLIAEoCEINCgtfcGxhY2VfZmlsZUILCglfcGxhY2VfaWRCDAoKX3NhdmVfcGF0aEINCgtfZmZsYWdfZmlsZUoECAkQCiI1Cg1TZXNzaW9uRXhpdGVkEhQKDHNlc3Npb25fZ3VpZBgBIAEoCRIOCgZyZWFzb24YAiABKAkinwEKEFJ1bkNsaWVudE1lc3NhZ2USJgoGc3VibWl0GAEgASgLMhQucm9kZW8uU3VibWl0UmVxdWVzdEgAEjgKDHJwY19yZXNwb25zZRgDIAEoCzIgLnJvZGVvLnJ1bnRpbWUuQ2xpZW50UnBjUmVzcG9uc2VIABIiCgRraWxsGAQgASgLMhIucm9kZW8uS2lsbENvbW1hbmRIAEIFCgNtc2ciyAQKDVN1Ym1pdFJlcXVlc3QSDgoGc2NyaXB0GAEgASgJEhEKBG1vZGUYAiABKAlIAIgBARIUCgdzZXNzaW9uGAMgASgJSAGIAQESEwoGZG9tX2lkGAQgASgJSAKIAQESFQoIZG9tX2tpbmQYDyABKAlIA4gBARIUCgdjb250ZXh0GBAgASgJSASIAQESGwoOY2FjaGVfcmVxdWlyZXMYBSABKAhIBYgBARITCgtzY3JpcHRfYXJncxgGIAMoCRIYCgtyZXR1cm5fZmlsZRgHIAEoCUgGiAEBEhgKC3Nob3dfcmV0dXJuGAggASgISAeIAQESGAoLb3V0cHV0X2ZpbGUYCSABKAlICIgBARIUCgd2ZXJib3NlGAogASgISAmIAQESGgoNaW5zdGFuY2VfcGF0aBgLIAEoCUgKiAEBEhgKC3NjcmlwdF9wYXRoGAwgASgJSAuIAQESFAoHcHJvZmlsZRgNIAEoCEgMiAEBEiQKCmxvZ19maWx0ZXIYDiABKAsyEC5yb2Rlby5Mb2dGaWx0ZXJCBwoFX21vZGVCCgoIX3Nlc3Npb25CCQoHX2RvbV9pZEILCglfZG9tX2tpbmRCCgoIX2NvbnRleHRCEQoPX2NhY2hlX3JlcXVpcmVzQg4KDF9yZXR1cm5fZmlsZUIOCgxfc2hvd19yZXR1cm5CDgoMX291dHB1dF9maWxlQgoKCF92ZXJib3NlQhAKDl9pbnN0YW5jZV9wYXRoQg4KDF9zY3JpcHRfcGF0aEIKCghfcHJvZmlsZSK5AgoIUnVuRXZlbnQSKAoHY3JlYXRlZBgBIAEoCzIVLnJvZGVvLlByb2Nlc3NDcmVhdGVkSAASFAoKZGlzY29ubmVjdBgDIAEoCUgAEiYKCmZpbGVfY2h1bmsYBCABKAsyEC5yb2Rlby5GaWxlQ2h1bmtIABImCghjb21wbGV0ZRgFIAEoCzISLnJvZGVvLlJ1bkNvbXBsZXRlSAASMAoIcnBjX2NhbGwYBiABKAsyHC5yb2Rlby5ydW50aW1lLkNsaWVudFJwY0NhbGxIABIuCg5leGVjdXRpb25fZG9uZRgHIAEoCzIULnJvZGVvLkV4ZWN1dGlvbkRvbmVIABIyChBleGVjdXRpb25fa2lsbGVkGAggASgLMhYucm9kZW8uRXhlY3V0aW9uS2lsbGVkSABCBwoFZXZlbnQiDQoLUnVuQ29tcGxldGUiJgoOUHJvY2Vzc0NyZWF0ZWQSFAoMZXhlY3V0aW9uX2lkGAEgASgJIg8KDUhlYWx0aFJlcXVlc3QiEQoPR2V0U3RhdGVSZXF1ZXN0IhYKFExpc3RQcm9jZXNzZXNSZXF1ZXN0IioKEktpbGxQcm9jZXNzUmVxdWVzdBIUCgxleGVjdXRpb25faWQYASABKAkiowIKE0xhdW5jaFN0dWRpb1JlcXVlc3QSDwoHYmFja2VuZBgBIAEoCRIXCgpwbGFjZV9maWxlGAIgASgJSACIAQESFQoIcGxhY2VfaWQYAyABKARIAYgBARIOCgZmZmxhZ3MYBCADKAkSEgoKYmFja2dyb3VuZBgFIAEoCBIQCghkZXRhY2hlZBgGIAEoCBIWCglzYXZlX3BhdGgYByABKAlIAogBARIXCgpmZmxhZ19maWxlGAggASgJSAOIAQESFAoMc2hvd193aWRnZXRzGAogASgJEg8KB3Byb2ZpbGUYCyABKAhCDQoLX3BsYWNlX2ZpbGVCCwoJX3BsYWNlX2lkQgwKCl9zYXZlX3BhdGhCDQoLX2ZmbGFnX2ZpbGVKBAgJEAoimQEKEUxhdW5jaFN0dWRpb0V2ZW50EisKCWxhdW5jaGluZxgBIAEoCzIWLnJvZGVvLlN0dWRpb0xhdW5jaGluZ0gAEiMKBXJlYWR5GAIgASgLMhIucm9kZW8uU3R1ZGlvUmVhZHlIABIpCgVlcnJvchgDIAEoCzIYLnJvZGVvLlN0dWRpb0xhdW5jaEVycm9ySABCBwoFZXZlbnQiEQoPU3R1ZGlvTGF1bmNoaW5nIjcKC1N0dWRpb1JlYWR5EhIKCmJhY2tlbmRfaWQYASABKAkSFAoMc2Vzc2lvbl9ndWlkGAIgASgJIiQKEVN0dWRpb0xhdW5jaEVycm9yEg8KB21lc3NhZ2UYASABKAkiOgoUU2V0U3R1ZGlvTW9kZVJlcXVlc3QSFAoMc2Vzc2lvbl9ndWlkGAEgASgJEgwKBG1vZGUYAiABKAkiMQoVU2V0U3R1ZGlvTW9kZVJlc3BvbnNlEgoKAm9rGAEgASgIEgwKBG1vZGUYAiABKAkiUAoSQ2xvc2VTdHVkaW9SZXF1ZXN0EhQKDHNlc3Npb25fZ3VpZBgBIAEoCRIWCglza2lwX3NhdmUYAiABKAhIAIgBAUIMCgpfc2tpcF9zYXZlImsKEENsb3NlU3R1ZGlvRXZlbnQSJwoHY2xvc2luZxgBIAEoCzIULnJvZGVvLlN0dWRpb0Nsb3NpbmdIABIlCgZjbG9zZWQYAiABKAsyEy5yb2Rlby5TdHVkaW9DbG9zZWRIAEIHCgVldmVudCIPCg1TdHVkaW9DbG9zaW5nIg4KDFN0dWRpb0Nsb3NlZCJgChBTYXZlUGxhY2VSZXF1ZXN0EhQKB2JhY2tlbmQYASABKAlIAIgBARIZCgxzZXNzaW9uX2d1aWQYAiABKAlIAYgBAUIKCghfYmFja2VuZEIPCg1fc2Vzc2lvbl9ndWlkIlwKEVNhdmVQbGFjZVJlc3BvbnNlEg0KBXNhdmVkGAEgASgIEhEKBHBhdGgYAiABKAlIAIgBARISCgVlcnJvchgDIAEoCUgBiAEBQgcKBV9wYXRoQggKBl9lcnJvciIxChNMaXN0QmFja2VuZHNSZXF1ZXN0EhEKBGtpbmQYASABKAlIAIgBAUIHCgVfa2luZCI8ChRMaXN0QmFja2VuZHNSZXNwb25zZRIkCghiYWNrZW5kcxgBIAMoCzISLnJvZGVvLkJhY2tlbmRJbmZvIjUKC0JhY2tlbmRJbmZvEgoKAmlkGAEgASgJEgwKBGtpbmQYAiABKAkSDAoEbmFtZRgDIAEoCSKNAQoNUm9kZW9TbmFwc2hvdBIkCghiYWNrZW5kcxgBIAMoCzISLnJvZGVvLkJhY2tlbmRJbmZvEiUKCXByb2Nlc3NlcxgDIAMoCzISLnJvZGVvLlByb2Nlc3NJbmZvEiMKB3N0dWRpb3MYBSADKAsyEi5yb2Rlby5TdHVkaW9TdGF0ZUoECAIQA0oECAQQBSJ3CglMb2dGaWx0ZXISEwoLZW5hYmxlX3dhcm4YASABKAgSFAoMZW5hYmxlX2Vycm9yGAIgASgIEhMKC2VuYWJsZV9pbmZvGAMgASgIEhUKDWVuYWJsZV9vdXRwdXQYBCABKAgSEwoLZW5hYmxlX2xvZ3MYBSABKAgiiQEKDkhlYWx0aFJlc3BvbnNlEhAKCGxhdW5jaGVkGAEgASgIEhUKDWNvbnRleHRfY291bnQYAiABKA0SEgoKdG90YWxfZG9tcxgDIAEoDRIUCgx0b3RhbF9xdWV1ZWQYBCABKA0SJAoIY29udGV4dHMYBSADKAsyEi5yb2Rlby5Db250ZXh0SW5mbyJkCgtDb250ZXh0SW5mbxIOCgZiaXRzZXQYASABKA0SEQoJZG9tX2NvdW50GAIgASgNEhQKDHRvdGFsX3F1ZXVlZBgDIAEoDRIcCgRkb21zGAQgAygLMg4ucm9kZW8uRG9tSW5mbyJCCgdEb21JbmZvEhAKCHJvZGVvX2lkGAEgASgJEhQKDGFjdGl2ZV9jb3VudBgCIAEoDRIPCgdpc19pZGxlGAMgASgIIuUBCgtQcm9jZXNzSW5mbxIUCgxleGVjdXRpb25faWQYASABKAkSDQoFc3RhdGUYAiABKAkSDAoEbW9kZRgDIAEoCRIPCgdjb250ZXh0GAQgASgJEhAKCGRvbV9raW5kGAkgASgJEhYKCXN0dWRpb19pZBgFIAEoCUgAiAEBEhcKCnNlc3Npb25faWQYBiABKAlIAYgBARITCgZkb21faWQYByABKAlIAogBARISCgpjcmVhdGVkX2F0GAggASgBQgwKCl9zdHVkaW9faWRCDQoLX3Nlc3Npb25faWRCCQoHX2RvbV9pZCI8ChNQcm9jZXNzTGlzdFJlc3BvbnNlEiUKCXByb2Nlc3NlcxgBIAMoCzISLnJvZGVvLlByb2Nlc3NJbmZvIjQKDEtpbGxSZXNwb25zZRIOCgZraWxsZWQYASABKAgSFAoMZXhlY3V0aW9uX2lkGAIgASgJIiUKDURpc2Nvbm5lY3RNc2cSFAoMZXhlY3V0aW9uX2lkGAEgASgJIsIBCg1QbHVnaW5NZXNzYWdlEi0KDHN0dWRpb19zdGF0ZRgBIAEoCzIVLnJvZGVvLlN0dWRpb1N0YXRlTXNnSAASKwoDcnBjGAIgASgLMhwucm9kZW8ucnVudGltZS5DbGllbnRScGNDYWxsSAASJAoEZG9uZRgDIAEoCzIULnJvZGVvLkV4ZWN1dGlvbkRvbmVIABIoCgZraWxsZWQYBCABKAsyFi5yb2Rlby5FeGVjdXRpb25LaWxsZWRIAEIFCgNtc2ci8AEKDVNlcnZlck1lc3NhZ2USJAoHd2VsY29tZRgBIAEoCzIRLnJvZGVvLldlbGNvbWVNc2dIABIgCgNydW4YAiABKAsyES5yb2Rlby5SdW5Db21tYW5kSAASOAoMcnBjX3Jlc3BvbnNlGAMgASgLMiAucm9kZW8ucnVudGltZS5DbGllbnRScGNSZXNwb25zZUgAEiIKBGtpbGwYBCABKAsyEi5yb2Rlby5LaWxsQ29tbWFuZEgAEjIKD3NldF90YXJnZXRfbW9kZRgFIAEoCzIXLnJvZGVvLlNldFRhcmdldE1vZGVNc2dIAEIFCgNtc2ciJwoQU2V0VGFyZ2V0TW9kZU1zZxITCgt0YXJnZXRfbW9kZRgBIAEoCSLFAwoOU3R1ZGlvU3RhdGVNc2cSDgoGZG9tX2lkGAEgASgJEhoKDW1jcF9zdHVkaW9faWQYAiABKAlIAIgBARIRCglpc19zZXJ2ZXIYAyABKAgSEQoJaXNfY2xpZW50GAQgASgIEhIKCmlzX3J1bm5pbmcYBSABKAgSDwoHaXNfZWRpdBgGIAEoCBIMCgRtb2RlGAcgASgJEhAKCGRvbV9raW5kGAggASgJEhEKCWdhbWVfbmFtZRgJIAEoCRIQCghwbGFjZV9pZBgKIAEoAxIPCgdnYW1lX2lkGAsgASgDEisKC2NsaWVudF9pbmZvGAwgASgLMhEucm9kZW8uQ2xpZW50SW5mb0gBiAEBEhMKBmpvYl9pZBgNIAEoCUgCiAEBEiAKE2NsaWVudF9kb21faWRzX2pzb24YDiABKAlIA4gBARIZCgxzZXNzaW9uX2d1aWQYDyABKAlIBIgBARIRCglzdHVkaW9faWQYECABKAlCEAoOX21jcF9zdHVkaW9faWRCDgoMX2NsaWVudF9pbmZvQgkKB19qb2JfaWRCFgoUX2NsaWVudF9kb21faWRzX2pzb25CDwoNX3Nlc3Npb25fZ3VpZCIrCgpDbGllbnRJbmZvEgwKBG5hbWUYASABKAkSDwoHdXNlcl9pZBgCIAEoAyIdCgpXZWxjb21lTXNnEg8KB3ZlcnNpb24YASABKAki7AMKClJ1bkNvbW1hbmQSFAoMZXhlY3V0aW9uX2lkGAEgASgJEg4KBnNjcmlwdBgCIAEoCRIPCgdjb250ZXh0GAMgASgJEhsKDmNhY2hlX3JlcXVpcmVzGAkgASgISACIAQESEwoLc2NyaXB0X2FyZ3MYCiADKAkSGAoLcmV0dXJuX2ZpbGUYCyABKAlIAYgBARIYCgtzaG93X3JldHVybhgMIAEoCEgCiAEBEhgKC291dHB1dF9maWxlGA0gASgJSAOIAQESFAoHdmVyYm9zZRgOIAEoCEgEiAEBEhoKDWluc3RhbmNlX3BhdGgYDyABKAlIBYgBARIYCgtzY3JpcHRfcGF0aBgQIAEoCUgGiAEBEhQKB3Byb2ZpbGUYEiABKAhIB4gBARIkCgpsb2dfZmlsdGVyGBMgASgLMhAucm9kZW8uTG9nRmlsdGVyQhEKD19jYWNoZV9yZXF1aXJlc0IOCgxfcmV0dXJuX2ZpbGVCDgoMX3Nob3dfcmV0dXJuQg4KDF9vdXRwdXRfZmlsZUIKCghfdmVyYm9zZUIQCg5faW5zdGFuY2VfcGF0aEIOCgxfc2NyaXB0X3BhdGhCCgoIX3Byb2ZpbGVKBAgEEAVKBAgFEAZKBAgGEAdKBAgHEAhKBAgIEAlKBAgUEBUiIwoLS2lsbENvbW1hbmQSFAoMZXhlY3V0aW9uX2lkGAEgASgJIoABCg1FeGVjdXRpb25Eb25lEhQKDGV4ZWN1dGlvbl9pZBgBIAEoCRIPCgdzdWNjZXNzGAIgASgIEhIKBWVycm9yGAMgASgJSACIAQESGQoMcmV0dXJuX3ZhbHVlGAQgASgJSAGIAQFCCAoGX2Vycm9yQg8KDV9yZXR1cm5fdmFsdWUiJwoPRXhlY3V0aW9uS2lsbGVkEhQKDGV4ZWN1dGlvbl9pZBgBIAEoCSquAQoMUHJvY2Vzc1N0YXRlEhgKFFBST0NFU1NfU1RBVEVfUVVFVUVEEAASGQoVUFJPQ0VTU19TVEFURV9SVU5OSU5HEAESFgoSUFJPQ0VTU19TVEFURV9ET05FEAISFwoTUFJPQ0VTU19TVEFURV9FUlJPUhADEhgKFFBST0NFU1NfU1RBVEVfS0lMTEVEEAQSHgoaUFJPQ0VTU19TVEFURV9ESVNDT05ORUNURUQQBTJ8Cg5CYWNrZW5kU2VydmljZRI6CgdDb250cm9sEhUucm9kZW8uQmFja2VuZE1lc3NhZ2UaFC5yb2Rlby5NYXN0ZXJNZXNzYWdlKAEwARIuCghTZW5kRmlsZRIQLnJvZGVvLkZpbGVDaHVuaxoOLnJvZGVvLkZpbGVBY2soATJBCgpSdW5TZXJ2aWNlEjMKA1J1bhIXLnJvZGVvLlJ1bkNsaWVudE1lc3NhZ2UaDy5yb2Rlby5SdW5FdmVudCgBMAEy6wQKDU1hc3RlclNlcnZpY2USNQoGSGVhbHRoEhQucm9kZW8uSGVhbHRoUmVxdWVzdBoVLnJvZGVvLkhlYWx0aFJlc3BvbnNlEjgKCEdldFN0YXRlEhYucm9kZW8uR2V0U3RhdGVSZXF1ZXN0GhQucm9kZW8uUm9kZW9TbmFwc2hvdBJICg1MaXN0UHJvY2Vzc2VzEhsucm9kZW8uTGlzdFByb2Nlc3Nlc1JlcXVlc3QaGi5yb2Rlby5Qcm9jZXNzTGlzdFJlc3BvbnNlEj0KC0tpbGxQcm9jZXNzEhkucm9kZW8uS2lsbFByb2Nlc3NSZXF1ZXN0GhMucm9kZW8uS2lsbFJlc3BvbnNlEkYKDExhdW5jaFN0dWRpbxIaLnJvZGVvLkxhdW5jaFN0dWRpb1JlcXVlc3QaGC5yb2Rlby5MYXVuY2hTdHVkaW9FdmVudDABEkoKDVNldFN0dWRpb01vZGUSGy5yb2Rlby5TZXRTdHVkaW9Nb2RlUmVxdWVzdBocLnJvZGVvLlNldFN0dWRpb01vZGVSZXNwb25zZRJDCgtDbG9zZVN0dWRpbxIZLnJvZGVvLkNsb3NlU3R1ZGlvUmVxdWVzdBoXLnJvZGVvLkNsb3NlU3R1ZGlvRXZlbnQwARI+CglTYXZlUGxhY2USFy5yb2Rlby5TYXZlUGxhY2VSZXF1ZXN0Ghgucm9kZW8uU2F2ZVBsYWNlUmVzcG9uc2USRwoMTGlzdEJhY2tlbmRzEhoucm9kZW8uTGlzdEJhY2tlbmRzUmVxdWVzdBobLnJvZGVvLkxpc3RCYWNrZW5kc1Jlc3BvbnNlYgZwcm90bzM", [file_runtime]);
+  fileDesc("Cgtyb2Rlby5wcm90bxIFcm9kZW8iyAMKDkJhY2tlbmRNZXNzYWdlEioKCHJlZ2lzdGVyGAEgASgLMhYucm9kZW8uUmVnaXN0ZXJSZXF1ZXN0SAASKAoLZG9tX2Nvbm5lY3QYAiABKAsyES5yb2Rlby5Eb21Db25uZWN0SAASLgoOZG9tX2Rpc2Nvbm5lY3QYAyABKAsyFC5yb2Rlby5Eb21EaXNjb25uZWN0SAASNQoSZG9tX3BsdWdpbl9tZXNzYWdlGAQgASgLMhcucm9kZW8uRG9tUGx1Z2luTWVzc2FnZUgAEi4KDnN0YXRlX3NuYXBzaG90GAUgASgLMhQucm9kZW8uU3RhdGVTbmFwc2hvdEgAEiwKDXBsYXllcl9zdGF0dXMYBiABKAsyEy5yb2Rlby5QbGF5ZXJTdGF0dXNIABIuCg5maWxlc19jb21wbGV0ZRgHIAEoCzIULnJvZGVvLkZpbGVzQ29tcGxldGVIABIuCg5zZXNzaW9uX2V4aXRlZBgKIAEoCzIULnJvZGVvLlNlc3Npb25FeGl0ZWRIABIoCgtzYXZlX3Jlc3VsdBgLIAEoCzIRLnJvZGVvLlNhdmVSZXN1bHRIAEIFCgNtc2dKBAgIEAlKBAgJEAoiUgoJRmlsZUNodW5rEhAKCGZpbGVuYW1lGAEgASgJEhQKDGV4ZWN1dGlvbl9pZBgCIAEoCRIMCgRkYXRhGAMgASgMEg8KB2lzX2xhc3QYBCABKAgiCQoHRmlsZUFjayIlCg1GaWxlc0NvbXBsZXRlEhQKDGV4ZWN1dGlvbl9pZBgBIAEoCSJJCg9SZWdpc3RlclJlcXVlc3QSDAoEa2luZBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKBHBvcnQYAyABKA1IAIgBAUIHCgVfcG9ydCIwCgpEb21Db25uZWN0Eg4KBmRvbV9pZBgBIAEoCRISCgpzdGF0ZV9qc29uGAIgASgJIh8KDURvbURpc2Nvbm5lY3QSDgoGZG9tX2lkGAEgASgJIkkKEERvbVBsdWdpbk1lc3NhZ2USDgoGZG9tX2lkGAEgASgJEiUKB21lc3NhZ2UYAiABKAsyFC5yb2Rlby5QbHVnaW5NZXNzYWdlIkkKEERvbVNlcnZlck1lc3NhZ2USDgoGZG9tX2lkGAEgASgJEiUKB21lc3NhZ2UYAiABKAsyFC5yb2Rlby5TZXJ2ZXJNZXNzYWdlIo8BCg1TdGF0ZVNuYXBzaG90EiAKBGRvbXMYASADKAsyEi5yb2Rlby5Eb21TbmFwc2hvdBImCgdzdHVkaW9zGAIgAygLMhUucm9kZW8uU3R1ZGlvU25hcHNob3QSNAoQc3R1ZGlvX2luc3RhbmNlcxgDIAMoCzIaLnJvZGVvLlN0dWRpb0luc3RhbmNlU3RhdGUirwEKE1N0dWRpb0luc3RhbmNlU3RhdGUSFAoMc2Vzc2lvbl9ndWlkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRISCgVlcnJvchgDIAEoCUgAiAEBEhgKC3NvdXJjZV9wYXRoGAQgASgJSAGIAQESGQoMd29ya2luZ19wYXRoGAUgASgJSAKIAQFCCAoGX2Vycm9yQg4KDF9zb3VyY2VfcGF0aEIPCg1fd29ya2luZ19wYXRoIpEDCgtEb21TbmFwc2hvdBIOCgZkb21faWQYASABKAkSFwoKYmFja2VuZF9pZBgCIAEoCUgAiAEBEhEKBG1vZGUYAyABKAlIAYgBARIVCghkb21fa2luZBgEIAEoCUgCiAEBEhkKDHNlc3Npb25fZ3VpZBgFIAEoCUgDiAEBEhYKCXN0dWRpb19pZBgMIAEoCUgEiAEBEhUKCHBsYWNlX2lkGAYgASgDSAWIAQESFgoJZ2FtZV9uYW1lGAcgASgJSAaIAQESEwoLYWN0aXZlX3J1bnMYCCABKA0SEQoJY29ubmVjdGVkGAkgASgIEhYKCXVzZXJfbmFtZRgKIAEoCUgHiAEBEhQKB3VzZXJfaWQYCyABKANICIgBAUINCgtfYmFja2VuZF9pZEIHCgVfbW9kZUILCglfZG9tX2tpbmRCDwoNX3Nlc3Npb25fZ3VpZEIMCgpfc3R1ZGlvX2lkQgsKCV9wbGFjZV9pZEIMCgpfZ2FtZV9uYW1lQgwKCl91c2VyX25hbWVCCgoIX3VzZXJfaWQixwIKC1N0dWRpb1N0YXRlEhEKCXN0dWRpb19pZBgBIAEoCRISCgpiYWNrZW5kX2lkGAIgASgJEhcKCnNlc3Npb25faWQYAyABKAlIAIgBARISCgpwbGFjZV9uYW1lGAQgASgJEhAKCHBsYWNlX2lkGAUgASgDEg4KBnN0YXR1cxgGIAEoCRITCgtzdHVkaW9fbW9kZRgHIAEoCRIYCgtlZGl0X2RvbV9pZBgIIAEoCUgBiAEBEh4KBGRvbXMYCSADKAsyEC5yb2Rlby5TdHVkaW9Eb20SGAoLc291cmNlX3BhdGgYCiABKAlIAogBARIZCgx3b3JraW5nX3BhdGgYCyABKAlIA4gBAUINCgtfc2Vzc2lvbl9pZEIOCgxfZWRpdF9kb21faWRCDgoMX3NvdXJjZV9wYXRoQg8KDV93b3JraW5nX3BhdGgidQoJU3R1ZGlvRG9tEg4KBmRvbV9pZBgBIAEoCRIQCghkb21fa2luZBgCIAEoCRIWCgl1c2VyX25hbWUYAyABKAlIAIgBARIUCgd1c2VyX2lkGAQgASgDSAGIAQFCDAoKX3VzZXJfbmFtZUIKCghfdXNlcl9pZCJUCg5TdHVkaW9TbmFwc2hvdBIUCgxzZXNzaW9uX2d1aWQYASABKAkSDAoEbW9kZRgCIAEoCRIMCgRuYW1lGAMgASgJEhAKCHBsYWNlX2lkGAQgASgDIl8KDFBsYXllclN0YXR1cxINCgVzdGF0ZRgBIAEoCRIVCghwbGFjZV9pZBgCIAEoBEgAiAEBEhIKBWVycm9yGAMgASgJSAGIAQFCCwoJX3BsYWNlX2lkQggKBl9lcnJvciLUAgoNTWFzdGVyTWVzc2FnZRItCgpyZWdpc3RlcmVkGAEgASgLMhcucm9kZW8uUmVnaXN0ZXJSZXNwb25zZUgAEjUKEmRvbV9zZXJ2ZXJfbWVzc2FnZRgCIAEoCzIXLnJvZGVvLkRvbVNlcnZlck1lc3NhZ2VIABIiCgRzYXZlGAMgASgLMhIucm9kZW8uU2F2ZUNvbW1hbmRIABIsCg1ydW5fY29tcGxldGVkGAYgASgLMhMucm9kZW8uUnVuQ29tcGxldGVkSAASMwoNbGF1bmNoX3N0dWRpbxgHIAEoCzIaLnJvZGVvLkxhdW5jaFN0dWRpb0NvbW1hbmRIABIxCgxjbG9zZV9zdHVkaW8YCyABKAsyGS5yb2Rlby5DbG9zZVN0dWRpb0NvbW1hbmRIAEIFCgNtc2dKBAgEEAVKBAgFEAZKBAgIEAlKBAgJEApKBAgKEAsiUAoSQ2xvc2VTdHVkaW9Db21tYW5kEhQKDHNlc3Npb25fZ3VpZBgBIAEoCRIWCglza2lwX3NhdmUYAiABKAhIAIgBAUIMCgpfc2tpcF9zYXZlIiQKDFJ1bkNvbXBsZXRlZBIUCgxleGVjdXRpb25faWQYASABKAkiMQoQUmVnaXN0ZXJSZXNwb25zZRIKCgJpZBgBIAEoCRIRCgltYXN0ZXJfaWQYAiABKAkiTQoLU2F2ZUNvbW1hbmQSEgoKcmVxdWVzdF9pZBgBIAEoCRIZCgxzZXNzaW9uX2d1aWQYAiABKAlIAIgBAUIPCg1fc2Vzc2lvbl9ndWlkIpUBCgpTYXZlUmVzdWx0EhIKCnJlcXVlc3RfaWQYASABKAkSGQoMc2Vzc2lvbl9ndWlkGAIgASgJSACIAQESDQoFc2F2ZWQYAyABKAgSEQoEcGF0aBgEIAEoCUgBiAEBEhIKBWVycm9yGAUgASgJSAKIAQFCDwoNX3Nlc3Npb25fZ3VpZEIHCgVfcGF0aEIICgZfZXJyb3IiqAIKE0xhdW5jaFN0dWRpb0NvbW1hbmQSFwoKcGxhY2VfZmlsZRgBIAEoCUgAiAEBEhUKCHBsYWNlX2lkGAIgASgESAGIAQESDgoGZmZsYWdzGAMgAygJEhIKCmJhY2tncm91bmQYBCABKAgSEAoIZGV0YWNoZWQYBSABKAgSFgoJc2F2ZV9wYXRoGAYgASgJSAKIAQESFwoKZmZsYWdfZmlsZRgHIAEoCUgDiAEBEhQKDHNlc3Npb25fZ3VpZBgIIAEoCRIUCgxzaG93X3dpZGdldHMYCiABKAkSDwoHcHJvZmlsZRgLIAEoCEINCgtfcGxhY2VfZmlsZUILCglfcGxhY2VfaWRCDAoKX3NhdmVfcGF0aEINCgtfZmZsYWdfZmlsZUoECAkQCiI1Cg1TZXNzaW9uRXhpdGVkEhQKDHNlc3Npb25fZ3VpZBgBIAEoCRIOCgZyZWFzb24YAiABKAkiywEKEFJ1bkNsaWVudE1lc3NhZ2USJgoGc3VibWl0GAEgASgLMhQucm9kZW8uU3VibWl0UmVxdWVzdEgAEjgKDHJwY19yZXNwb25zZRgDIAEoCzIgLnJvZGVvLnJ1bnRpbWUuQ2xpZW50UnBjUmVzcG9uc2VIABIiCgRraWxsGAQgASgLMhIucm9kZW8uS2lsbENvbW1hbmRIABIqCgxzY3JpcHRfY2h1bmsYBSABKAsyEi5yb2Rlby5TY3JpcHRDaHVua0gAQgUKA21zZyJCCgtTY3JpcHRDaHVuaxIUCgxleGVjdXRpb25faWQYASABKAkSDAoEZGF0YRgCIAEoCRIPCgdpc19sYXN0GAMgASgIIvwECg1TdWJtaXRSZXF1ZXN0Eg4KBnNjcmlwdBgBIAEoCRIRCgRtb2RlGAIgASgJSACIAQESFAoHc2Vzc2lvbhgDIAEoCUgBiAEBEhMKBmRvbV9pZBgEIAEoCUgCiAEBEhUKCGRvbV9raW5kGA8gASgJSAOIAQESFAoHY29udGV4dBgQIAEoCUgEiAEBEhsKDmNhY2hlX3JlcXVpcmVzGAUgASgISAWIAQESEwoLc2NyaXB0X2FyZ3MYBiADKAkSGAoLcmV0dXJuX2ZpbGUYByABKAlIBogBARIYCgtzaG93X3JldHVybhgIIAEoCEgHiAEBEhgKC291dHB1dF9maWxlGAkgASgJSAiIAQESFAoHdmVyYm9zZRgKIAEoCEgJiAEBEhoKDWluc3RhbmNlX3BhdGgYCyABKAlICogBARIYCgtzY3JpcHRfcGF0aBgMIAEoCUgLiAEBEhQKB3Byb2ZpbGUYDSABKAhIDIgBARIkCgpsb2dfZmlsdGVyGA4gASgLMhAucm9kZW8uTG9nRmlsdGVyEh0KEHNjcmlwdF9jb250aW51ZXMYESABKAhIDYgBAUIHCgVfbW9kZUIKCghfc2Vzc2lvbkIJCgdfZG9tX2lkQgsKCV9kb21fa2luZEIKCghfY29udGV4dEIRCg9fY2FjaGVfcmVxdWlyZXNCDgoMX3JldHVybl9maWxlQg4KDF9zaG93X3JldHVybkIOCgxfb3V0cHV0X2ZpbGVCCgoIX3ZlcmJvc2VCEAoOX2luc3RhbmNlX3BhdGhCDgoMX3NjcmlwdF9wYXRoQgoKCF9wcm9maWxlQhMKEV9zY3JpcHRfY29udGludWVzIrkCCghSdW5FdmVudBIoCgdjcmVhdGVkGAEgASgLMhUucm9kZW8uUHJvY2Vzc0NyZWF0ZWRIABIUCgpkaXNjb25uZWN0GAMgASgJSAASJgoKZmlsZV9jaHVuaxgEIAEoCzIQLnJvZGVvLkZpbGVDaHVua0gAEiYKCGNvbXBsZXRlGAUgASgLMhIucm9kZW8uUnVuQ29tcGxldGVIABIwCghycGNfY2FsbBgGIAEoCzIcLnJvZGVvLnJ1bnRpbWUuQ2xpZW50UnBjQ2FsbEgAEi4KDmV4ZWN1dGlvbl9kb25lGAcgASgLMhQucm9kZW8uRXhlY3V0aW9uRG9uZUgAEjIKEGV4ZWN1dGlvbl9raWxsZWQYCCABKAsyFi5yb2Rlby5FeGVjdXRpb25LaWxsZWRIAEIHCgVldmVudCINCgtSdW5Db21wbGV0ZSImCg5Qcm9jZXNzQ3JlYXRlZBIUCgxleGVjdXRpb25faWQYASABKAkiDwoNSGVhbHRoUmVxdWVzdCIRCg9HZXRTdGF0ZVJlcXVlc3QiFgoUTGlzdFByb2Nlc3Nlc1JlcXVlc3QiKgoSS2lsbFByb2Nlc3NSZXF1ZXN0EhQKDGV4ZWN1dGlvbl9pZBgBIAEoCSKjAgoTTGF1bmNoU3R1ZGlvUmVxdWVzdBIPCgdiYWNrZW5kGAEgASgJEhcKCnBsYWNlX2ZpbGUYAiABKAlIAIgBARIVCghwbGFjZV9pZBgDIAEoBEgBiAEBEg4KBmZmbGFncxgEIAMoCRISCgpiYWNrZ3JvdW5kGAUgASgIEhAKCGRldGFjaGVkGAYgASgIEhYKCXNhdmVfcGF0aBgHIAEoCUgCiAEBEhcKCmZmbGFnX2ZpbGUYCCABKAlIA4gBARIUCgxzaG93X3dpZGdldHMYCiABKAkSDwoHcHJvZmlsZRgLIAEoCEINCgtfcGxhY2VfZmlsZUILCglfcGxhY2VfaWRCDAoKX3NhdmVfcGF0aEINCgtfZmZsYWdfZmlsZUoECAkQCiKZAQoRTGF1bmNoU3R1ZGlvRXZlbnQSKwoJbGF1bmNoaW5nGAEgASgLMhYucm9kZW8uU3R1ZGlvTGF1bmNoaW5nSAASIwoFcmVhZHkYAiABKAsyEi5yb2Rlby5TdHVkaW9SZWFkeUgAEikKBWVycm9yGAMgASgLMhgucm9kZW8uU3R1ZGlvTGF1bmNoRXJyb3JIAEIHCgVldmVudCIRCg9TdHVkaW9MYXVuY2hpbmciNwoLU3R1ZGlvUmVhZHkSEgoKYmFja2VuZF9pZBgBIAEoCRIUCgxzZXNzaW9uX2d1aWQYAiABKAkiJAoRU3R1ZGlvTGF1bmNoRXJyb3ISDwoHbWVzc2FnZRgBIAEoCSI6ChRTZXRTdHVkaW9Nb2RlUmVxdWVzdBIUCgxzZXNzaW9uX2d1aWQYASABKAkSDAoEbW9kZRgCIAEoCSIxChVTZXRTdHVkaW9Nb2RlUmVzcG9uc2USCgoCb2sYASABKAgSDAoEbW9kZRgCIAEoCSJQChJDbG9zZVN0dWRpb1JlcXVlc3QSFAoMc2Vzc2lvbl9ndWlkGAEgASgJEhYKCXNraXBfc2F2ZRgCIAEoCEgAiAEBQgwKCl9za2lwX3NhdmUiawoQQ2xvc2VTdHVkaW9FdmVudBInCgdjbG9zaW5nGAEgASgLMhQucm9kZW8uU3R1ZGlvQ2xvc2luZ0gAEiUKBmNsb3NlZBgCIAEoCzITLnJvZGVvLlN0dWRpb0Nsb3NlZEgAQgcKBWV2ZW50Ig8KDVN0dWRpb0Nsb3NpbmciDgoMU3R1ZGlvQ2xvc2VkImAKEFNhdmVQbGFjZVJlcXVlc3QSFAoHYmFja2VuZBgBIAEoCUgAiAEBEhkKDHNlc3Npb25fZ3VpZBgCIAEoCUgBiAEBQgoKCF9iYWNrZW5kQg8KDV9zZXNzaW9uX2d1aWQiXAoRU2F2ZVBsYWNlUmVzcG9uc2USDQoFc2F2ZWQYASABKAgSEQoEcGF0aBgCIAEoCUgAiAEBEhIKBWVycm9yGAMgASgJSAGIAQFCBwoFX3BhdGhCCAoGX2Vycm9yIjEKE0xpc3RCYWNrZW5kc1JlcXVlc3QSEQoEa2luZBgBIAEoCUgAiAEBQgcKBV9raW5kIjwKFExpc3RCYWNrZW5kc1Jlc3BvbnNlEiQKCGJhY2tlbmRzGAEgAygLMhIucm9kZW8uQmFja2VuZEluZm8iNQoLQmFja2VuZEluZm8SCgoCaWQYASABKAkSDAoEa2luZBgCIAEoCRIMCgRuYW1lGAMgASgJIo0BCg1Sb2Rlb1NuYXBzaG90EiQKCGJhY2tlbmRzGAEgAygLMhIucm9kZW8uQmFja2VuZEluZm8SJQoJcHJvY2Vzc2VzGAMgAygLMhIucm9kZW8uUHJvY2Vzc0luZm8SIwoHc3R1ZGlvcxgFIAMoCzISLnJvZGVvLlN0dWRpb1N0YXRlSgQIAhADSgQIBBAFIncKCUxvZ0ZpbHRlchITCgtlbmFibGVfd2FybhgBIAEoCBIUCgxlbmFibGVfZXJyb3IYAiABKAgSEwoLZW5hYmxlX2luZm8YAyABKAgSFQoNZW5hYmxlX291dHB1dBgEIAEoCBITCgtlbmFibGVfbG9ncxgFIAEoCCKJAQoOSGVhbHRoUmVzcG9uc2USEAoIbGF1bmNoZWQYASABKAgSFQoNY29udGV4dF9jb3VudBgCIAEoDRISCgp0b3RhbF9kb21zGAMgASgNEhQKDHRvdGFsX3F1ZXVlZBgEIAEoDRIkCghjb250ZXh0cxgFIAMoCzISLnJvZGVvLkNvbnRleHRJbmZvImQKC0NvbnRleHRJbmZvEg4KBmJpdHNldBgBIAEoDRIRCglkb21fY291bnQYAiABKA0SFAoMdG90YWxfcXVldWVkGAMgASgNEhwKBGRvbXMYBCADKAsyDi5yb2Rlby5Eb21JbmZvIkIKB0RvbUluZm8SEAoIcm9kZW9faWQYASABKAkSFAoMYWN0aXZlX2NvdW50GAIgASgNEg8KB2lzX2lkbGUYAyABKAgi5QEKC1Byb2Nlc3NJbmZvEhQKDGV4ZWN1dGlvbl9pZBgBIAEoCRINCgVzdGF0ZRgCIAEoCRIMCgRtb2RlGAMgASgJEg8KB2NvbnRleHQYBCABKAkSEAoIZG9tX2tpbmQYCSABKAkSFgoJc3R1ZGlvX2lkGAUgASgJSACIAQESFwoKc2Vzc2lvbl9pZBgGIAEoCUgBiAEBEhMKBmRvbV9pZBgHIAEoCUgCiAEBEhIKCmNyZWF0ZWRfYXQYCCABKAFCDAoKX3N0dWRpb19pZEINCgtfc2Vzc2lvbl9pZEIJCgdfZG9tX2lkIjwKE1Byb2Nlc3NMaXN0UmVzcG9uc2USJQoJcHJvY2Vzc2VzGAEgAygLMhIucm9kZW8uUHJvY2Vzc0luZm8iNAoMS2lsbFJlc3BvbnNlEg4KBmtpbGxlZBgBIAEoCBIUCgxleGVjdXRpb25faWQYAiABKAkiJQoNRGlzY29ubmVjdE1zZxIUCgxleGVjdXRpb25faWQYASABKAkiwgEKDVBsdWdpbk1lc3NhZ2USLQoMc3R1ZGlvX3N0YXRlGAEgASgLMhUucm9kZW8uU3R1ZGlvU3RhdGVNc2dIABIrCgNycGMYAiABKAsyHC5yb2Rlby5ydW50aW1lLkNsaWVudFJwY0NhbGxIABIkCgRkb25lGAMgASgLMhQucm9kZW8uRXhlY3V0aW9uRG9uZUgAEigKBmtpbGxlZBgEIAEoCzIWLnJvZGVvLkV4ZWN1dGlvbktpbGxlZEgAQgUKA21zZyKcAgoNU2VydmVyTWVzc2FnZRIkCgd3ZWxjb21lGAEgASgLMhEucm9kZW8uV2VsY29tZU1zZ0gAEiAKA3J1bhgCIAEoCzIRLnJvZGVvLlJ1bkNvbW1hbmRIABI4CgxycGNfcmVzcG9uc2UYAyABKAsyIC5yb2Rlby5ydW50aW1lLkNsaWVudFJwY1Jlc3BvbnNlSAASIgoEa2lsbBgEIAEoCzISLnJvZGVvLktpbGxDb21tYW5kSAASMgoPc2V0X3RhcmdldF9tb2RlGAUgASgLMhcucm9kZW8uU2V0VGFyZ2V0TW9kZU1zZ0gAEioKDHNjcmlwdF9jaHVuaxgGIAEoCzISLnJvZGVvLlNjcmlwdENodW5rSABCBQoDbXNnIicKEFNldFRhcmdldE1vZGVNc2cSEwoLdGFyZ2V0X21vZGUYASABKAkixQMKDlN0dWRpb1N0YXRlTXNnEg4KBmRvbV9pZBgBIAEoCRIaCg1tY3Bfc3R1ZGlvX2lkGAIgASgJSACIAQESEQoJaXNfc2VydmVyGAMgASgIEhEKCWlzX2NsaWVudBgEIAEoCBISCgppc19ydW5uaW5nGAUgASgIEg8KB2lzX2VkaXQYBiABKAgSDAoEbW9kZRgHIAEoCRIQCghkb21fa2luZBgIIAEoCRIRCglnYW1lX25hbWUYCSABKAkSEAoIcGxhY2VfaWQYCiABKAMSDwoHZ2FtZV9pZBgLIAEoAxIrCgtjbGllbnRfaW5mbxgMIAEoCzIRLnJvZGVvLkNsaWVudEluZm9IAYgBARITCgZqb2JfaWQYDSABKAlIAogBARIgChNjbGllbnRfZG9tX2lkc19qc29uGA4gASgJSAOIAQESGQoMc2Vzc2lvbl9ndWlkGA8gASgJSASIAQESEQoJc3R1ZGlvX2lkGBAgASgJQhAKDl9tY3Bfc3R1ZGlvX2lkQg4KDF9jbGllbnRfaW5mb0IJCgdfam9iX2lkQhYKFF9jbGllbnRfZG9tX2lkc19qc29uQg8KDV9zZXNzaW9uX2d1aWQiKwoKQ2xpZW50SW5mbxIMCgRuYW1lGAEgASgJEg8KB3VzZXJfaWQYAiABKAMiHQoKV2VsY29tZU1zZxIPCgd2ZXJzaW9uGAEgASgJIqAECgpSdW5Db21tYW5kEhQKDGV4ZWN1dGlvbl9pZBgBIAEoCRIOCgZzY3JpcHQYAiABKAkSDwoHY29udGV4dBgDIAEoCRIbCg5jYWNoZV9yZXF1aXJlcxgJIAEoCEgAiAEBEhMKC3NjcmlwdF9hcmdzGAogAygJEhgKC3JldHVybl9maWxlGAsgASgJSAGIAQESGAoLc2hvd19yZXR1cm4YDCABKAhIAogBARIYCgtvdXRwdXRfZmlsZRgNIAEoCUgDiAEBEhQKB3ZlcmJvc2UYDiABKAhIBIgBARIaCg1pbnN0YW5jZV9wYXRoGA8gASgJSAWIAQESGAoLc2NyaXB0X3BhdGgYECABKAlIBogBARIUCgdwcm9maWxlGBIgASgISAeIAQESJAoKbG9nX2ZpbHRlchgTIAEoCzIQLnJvZGVvLkxvZ0ZpbHRlchIdChBzY3JpcHRfY29udGludWVzGBUgASgISAiIAQFCEQoPX2NhY2hlX3JlcXVpcmVzQg4KDF9yZXR1cm5fZmlsZUIOCgxfc2hvd19yZXR1cm5CDgoMX291dHB1dF9maWxlQgoKCF92ZXJib3NlQhAKDl9pbnN0YW5jZV9wYXRoQg4KDF9zY3JpcHRfcGF0aEIKCghfcHJvZmlsZUITChFfc2NyaXB0X2NvbnRpbnVlc0oECAQQBUoECAUQBkoECAYQB0oECAcQCEoECAgQCUoECBQQFSIjCgtLaWxsQ29tbWFuZBIUCgxleGVjdXRpb25faWQYASABKAkigAEKDUV4ZWN1dGlvbkRvbmUSFAoMZXhlY3V0aW9uX2lkGAEgASgJEg8KB3N1Y2Nlc3MYAiABKAgSEgoFZXJyb3IYAyABKAlIAIgBARIZCgxyZXR1cm5fdmFsdWUYBCABKAlIAYgBAUIICgZfZXJyb3JCDwoNX3JldHVybl92YWx1ZSInCg9FeGVjdXRpb25LaWxsZWQSFAoMZXhlY3V0aW9uX2lkGAEgASgJKq4BCgxQcm9jZXNzU3RhdGUSGAoUUFJPQ0VTU19TVEFURV9RVUVVRUQQABIZChVQUk9DRVNTX1NUQVRFX1JVTk5JTkcQARIWChJQUk9DRVNTX1NUQVRFX0RPTkUQAhIXChNQUk9DRVNTX1NUQVRFX0VSUk9SEAMSGAoUUFJPQ0VTU19TVEFURV9LSUxMRUQQBBIeChpQUk9DRVNTX1NUQVRFX0RJU0NPTk5FQ1RFRBAFMnwKDkJhY2tlbmRTZXJ2aWNlEjoKB0NvbnRyb2wSFS5yb2Rlby5CYWNrZW5kTWVzc2FnZRoULnJvZGVvLk1hc3Rlck1lc3NhZ2UoATABEi4KCFNlbmRGaWxlEhAucm9kZW8uRmlsZUNodW5rGg4ucm9kZW8uRmlsZUFjaygBMkEKClJ1blNlcnZpY2USMwoDUnVuEhcucm9kZW8uUnVuQ2xpZW50TWVzc2FnZRoPLnJvZGVvLlJ1bkV2ZW50KAEwATLrBAoNTWFzdGVyU2VydmljZRI1CgZIZWFsdGgSFC5yb2Rlby5IZWFsdGhSZXF1ZXN0GhUucm9kZW8uSGVhbHRoUmVzcG9uc2USOAoIR2V0U3RhdGUSFi5yb2Rlby5HZXRTdGF0ZVJlcXVlc3QaFC5yb2Rlby5Sb2Rlb1NuYXBzaG90EkgKDUxpc3RQcm9jZXNzZXMSGy5yb2Rlby5MaXN0UHJvY2Vzc2VzUmVxdWVzdBoaLnJvZGVvLlByb2Nlc3NMaXN0UmVzcG9uc2USPQoLS2lsbFByb2Nlc3MSGS5yb2Rlby5LaWxsUHJvY2Vzc1JlcXVlc3QaEy5yb2Rlby5LaWxsUmVzcG9uc2USRgoMTGF1bmNoU3R1ZGlvEhoucm9kZW8uTGF1bmNoU3R1ZGlvUmVxdWVzdBoYLnJvZGVvLkxhdW5jaFN0dWRpb0V2ZW50MAESSgoNU2V0U3R1ZGlvTW9kZRIbLnJvZGVvLlNldFN0dWRpb01vZGVSZXF1ZXN0Ghwucm9kZW8uU2V0U3R1ZGlvTW9kZVJlc3BvbnNlEkMKC0Nsb3NlU3R1ZGlvEhkucm9kZW8uQ2xvc2VTdHVkaW9SZXF1ZXN0Ghcucm9kZW8uQ2xvc2VTdHVkaW9FdmVudDABEj4KCVNhdmVQbGFjZRIXLnJvZGVvLlNhdmVQbGFjZVJlcXVlc3QaGC5yb2Rlby5TYXZlUGxhY2VSZXNwb25zZRJHCgxMaXN0QmFja2VuZHMSGi5yb2Rlby5MaXN0QmFja2VuZHNSZXF1ZXN0Ghsucm9kZW8uTGlzdEJhY2tlbmRzUmVzcG9uc2ViBnByb3RvMw", [file_runtime]);
 
 /**
  * @generated from message rodeo.BackendMessage
@@ -936,6 +936,12 @@ export type RunClientMessage = Message<"rodeo.RunClientMessage"> & {
      */
     value: KillCommand;
     case: "kill";
+  } | {
+    /**
+     * @generated from field: rodeo.ScriptChunk script_chunk = 5;
+     */
+    value: ScriptChunk;
+    case: "scriptChunk";
   } | { case: undefined; value?: undefined };
 };
 
@@ -945,6 +951,44 @@ export type RunClientMessage = Message<"rodeo.RunClientMessage"> & {
  */
 export const RunClientMessageSchema: GenMessage<RunClientMessage> = /*@__PURE__*/
   messageDesc(file_rodeo, 24);
+
+/**
+ * One piece of a script too large for a single envelope. The carrying message
+ * (SubmitRequest client→master, RunCommand master→plugin) holds the first
+ * piece plus `script_continues = true`; ScriptChunk messages follow in order
+ * on the same stream, the last one flagged. The receiver concatenates before
+ * acting. Chunks are sized so every hop clears its cap (connectrpc envelopes
+ * and the plugin WS frame limit under worst-case JSON escaping).
+ *
+ * @generated from message rodeo.ScriptChunk
+ */
+export type ScriptChunk = Message<"rodeo.ScriptChunk"> & {
+  /**
+   * Empty on the client→master hop — the run id isn't minted until the
+   * master accepts the submit. Set on the master→plugin hop so the plugin
+   * can key reassembly alongside its per-execution demux.
+   *
+   * @generated from field: string execution_id = 1;
+   */
+  executionId: string;
+
+  /**
+   * @generated from field: string data = 2;
+   */
+  data: string;
+
+  /**
+   * @generated from field: bool is_last = 3;
+   */
+  isLast: boolean;
+};
+
+/**
+ * Describes the message rodeo.ScriptChunk.
+ * Use `create(ScriptChunkSchema)` to create a new message.
+ */
+export const ScriptChunkSchema: GenMessage<ScriptChunk> = /*@__PURE__*/
+  messageDesc(file_rodeo, 25);
 
 /**
  * No id field: the master mints the run id and returns it as the first
@@ -1043,6 +1087,14 @@ export type SubmitRequest = Message<"rodeo.SubmitRequest"> & {
    * @generated from field: rodeo.LogFilter log_filter = 14;
    */
   logFilter?: LogFilter | undefined;
+
+  /**
+   * `script` holds only the first piece; ScriptChunk messages follow on the
+   * same stream (see ScriptChunk).
+   *
+   * @generated from field: optional bool script_continues = 17;
+   */
+  scriptContinues?: boolean | undefined;
 };
 
 /**
@@ -1050,7 +1102,7 @@ export type SubmitRequest = Message<"rodeo.SubmitRequest"> & {
  * Use `create(SubmitRequestSchema)` to create a new message.
  */
 export const SubmitRequestSchema: GenMessage<SubmitRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 25);
+  messageDesc(file_rodeo, 26);
 
 /**
  * @generated from message rodeo.RunEvent
@@ -1109,7 +1161,7 @@ export type RunEvent = Message<"rodeo.RunEvent"> & {
  * Use `create(RunEventSchema)` to create a new message.
  */
 export const RunEventSchema: GenMessage<RunEvent> = /*@__PURE__*/
-  messageDesc(file_rodeo, 26);
+  messageDesc(file_rodeo, 27);
 
 /**
  * @generated from message rodeo.RunComplete
@@ -1122,7 +1174,7 @@ export type RunComplete = Message<"rodeo.RunComplete"> & {
  * Use `create(RunCompleteSchema)` to create a new message.
  */
 export const RunCompleteSchema: GenMessage<RunComplete> = /*@__PURE__*/
-  messageDesc(file_rodeo, 27);
+  messageDesc(file_rodeo, 28);
 
 /**
  * First event on every run stream: carries the master-minted run id.
@@ -1141,7 +1193,7 @@ export type ProcessCreated = Message<"rodeo.ProcessCreated"> & {
  * Use `create(ProcessCreatedSchema)` to create a new message.
  */
 export const ProcessCreatedSchema: GenMessage<ProcessCreated> = /*@__PURE__*/
-  messageDesc(file_rodeo, 28);
+  messageDesc(file_rodeo, 29);
 
 /**
  * @generated from message rodeo.HealthRequest
@@ -1154,7 +1206,7 @@ export type HealthRequest = Message<"rodeo.HealthRequest"> & {
  * Use `create(HealthRequestSchema)` to create a new message.
  */
 export const HealthRequestSchema: GenMessage<HealthRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 29);
+  messageDesc(file_rodeo, 30);
 
 /**
  * @generated from message rodeo.GetStateRequest
@@ -1167,7 +1219,7 @@ export type GetStateRequest = Message<"rodeo.GetStateRequest"> & {
  * Use `create(GetStateRequestSchema)` to create a new message.
  */
 export const GetStateRequestSchema: GenMessage<GetStateRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 30);
+  messageDesc(file_rodeo, 31);
 
 /**
  * @generated from message rodeo.ListProcessesRequest
@@ -1180,7 +1232,7 @@ export type ListProcessesRequest = Message<"rodeo.ListProcessesRequest"> & {
  * Use `create(ListProcessesRequestSchema)` to create a new message.
  */
 export const ListProcessesRequestSchema: GenMessage<ListProcessesRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 31);
+  messageDesc(file_rodeo, 32);
 
 /**
  * @generated from message rodeo.KillProcessRequest
@@ -1197,7 +1249,7 @@ export type KillProcessRequest = Message<"rodeo.KillProcessRequest"> & {
  * Use `create(KillProcessRequestSchema)` to create a new message.
  */
 export const KillProcessRequestSchema: GenMessage<KillProcessRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 32);
+  messageDesc(file_rodeo, 33);
 
 /**
  * @generated from message rodeo.LaunchStudioRequest
@@ -1265,7 +1317,7 @@ export type LaunchStudioRequest = Message<"rodeo.LaunchStudioRequest"> & {
  * Use `create(LaunchStudioRequestSchema)` to create a new message.
  */
 export const LaunchStudioRequestSchema: GenMessage<LaunchStudioRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 33);
+  messageDesc(file_rodeo, 34);
 
 /**
  * @generated from message rodeo.LaunchStudioEvent
@@ -1300,7 +1352,7 @@ export type LaunchStudioEvent = Message<"rodeo.LaunchStudioEvent"> & {
  * Use `create(LaunchStudioEventSchema)` to create a new message.
  */
 export const LaunchStudioEventSchema: GenMessage<LaunchStudioEvent> = /*@__PURE__*/
-  messageDesc(file_rodeo, 34);
+  messageDesc(file_rodeo, 35);
 
 /**
  * @generated from message rodeo.StudioLaunching
@@ -1313,7 +1365,7 @@ export type StudioLaunching = Message<"rodeo.StudioLaunching"> & {
  * Use `create(StudioLaunchingSchema)` to create a new message.
  */
 export const StudioLaunchingSchema: GenMessage<StudioLaunching> = /*@__PURE__*/
-  messageDesc(file_rodeo, 35);
+  messageDesc(file_rodeo, 36);
 
 /**
  * @generated from message rodeo.StudioReady
@@ -1335,7 +1387,7 @@ export type StudioReady = Message<"rodeo.StudioReady"> & {
  * Use `create(StudioReadySchema)` to create a new message.
  */
 export const StudioReadySchema: GenMessage<StudioReady> = /*@__PURE__*/
-  messageDesc(file_rodeo, 36);
+  messageDesc(file_rodeo, 37);
 
 /**
  * @generated from message rodeo.StudioLaunchError
@@ -1352,7 +1404,7 @@ export type StudioLaunchError = Message<"rodeo.StudioLaunchError"> & {
  * Use `create(StudioLaunchErrorSchema)` to create a new message.
  */
 export const StudioLaunchErrorSchema: GenMessage<StudioLaunchError> = /*@__PURE__*/
-  messageDesc(file_rodeo, 37);
+  messageDesc(file_rodeo, 38);
 
 /**
  * @generated from message rodeo.SetStudioModeRequest
@@ -1376,7 +1428,7 @@ export type SetStudioModeRequest = Message<"rodeo.SetStudioModeRequest"> & {
  * Use `create(SetStudioModeRequestSchema)` to create a new message.
  */
 export const SetStudioModeRequestSchema: GenMessage<SetStudioModeRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 38);
+  messageDesc(file_rodeo, 39);
 
 /**
  * @generated from message rodeo.SetStudioModeResponse
@@ -1398,7 +1450,7 @@ export type SetStudioModeResponse = Message<"rodeo.SetStudioModeResponse"> & {
  * Use `create(SetStudioModeResponseSchema)` to create a new message.
  */
 export const SetStudioModeResponseSchema: GenMessage<SetStudioModeResponse> = /*@__PURE__*/
-  messageDesc(file_rodeo, 39);
+  messageDesc(file_rodeo, 40);
 
 /**
  * @generated from message rodeo.CloseStudioRequest
@@ -1422,7 +1474,7 @@ export type CloseStudioRequest = Message<"rodeo.CloseStudioRequest"> & {
  * Use `create(CloseStudioRequestSchema)` to create a new message.
  */
 export const CloseStudioRequestSchema: GenMessage<CloseStudioRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 40);
+  messageDesc(file_rodeo, 41);
 
 /**
  * @generated from message rodeo.CloseStudioEvent
@@ -1451,7 +1503,7 @@ export type CloseStudioEvent = Message<"rodeo.CloseStudioEvent"> & {
  * Use `create(CloseStudioEventSchema)` to create a new message.
  */
 export const CloseStudioEventSchema: GenMessage<CloseStudioEvent> = /*@__PURE__*/
-  messageDesc(file_rodeo, 41);
+  messageDesc(file_rodeo, 42);
 
 /**
  * @generated from message rodeo.StudioClosing
@@ -1464,7 +1516,7 @@ export type StudioClosing = Message<"rodeo.StudioClosing"> & {
  * Use `create(StudioClosingSchema)` to create a new message.
  */
 export const StudioClosingSchema: GenMessage<StudioClosing> = /*@__PURE__*/
-  messageDesc(file_rodeo, 42);
+  messageDesc(file_rodeo, 43);
 
 /**
  * @generated from message rodeo.StudioClosed
@@ -1477,7 +1529,7 @@ export type StudioClosed = Message<"rodeo.StudioClosed"> & {
  * Use `create(StudioClosedSchema)` to create a new message.
  */
 export const StudioClosedSchema: GenMessage<StudioClosed> = /*@__PURE__*/
-  messageDesc(file_rodeo, 43);
+  messageDesc(file_rodeo, 44);
 
 /**
  * @generated from message rodeo.SavePlaceRequest
@@ -1503,7 +1555,7 @@ export type SavePlaceRequest = Message<"rodeo.SavePlaceRequest"> & {
  * Use `create(SavePlaceRequestSchema)` to create a new message.
  */
 export const SavePlaceRequestSchema: GenMessage<SavePlaceRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 44);
+  messageDesc(file_rodeo, 45);
 
 /**
  * @generated from message rodeo.SavePlaceResponse
@@ -1530,7 +1582,7 @@ export type SavePlaceResponse = Message<"rodeo.SavePlaceResponse"> & {
  * Use `create(SavePlaceResponseSchema)` to create a new message.
  */
 export const SavePlaceResponseSchema: GenMessage<SavePlaceResponse> = /*@__PURE__*/
-  messageDesc(file_rodeo, 45);
+  messageDesc(file_rodeo, 46);
 
 /**
  * @generated from message rodeo.ListBackendsRequest
@@ -1549,7 +1601,7 @@ export type ListBackendsRequest = Message<"rodeo.ListBackendsRequest"> & {
  * Use `create(ListBackendsRequestSchema)` to create a new message.
  */
 export const ListBackendsRequestSchema: GenMessage<ListBackendsRequest> = /*@__PURE__*/
-  messageDesc(file_rodeo, 46);
+  messageDesc(file_rodeo, 47);
 
 /**
  * @generated from message rodeo.ListBackendsResponse
@@ -1566,7 +1618,7 @@ export type ListBackendsResponse = Message<"rodeo.ListBackendsResponse"> & {
  * Use `create(ListBackendsResponseSchema)` to create a new message.
  */
 export const ListBackendsResponseSchema: GenMessage<ListBackendsResponse> = /*@__PURE__*/
-  messageDesc(file_rodeo, 47);
+  messageDesc(file_rodeo, 48);
 
 /**
  * @generated from message rodeo.BackendInfo
@@ -1593,7 +1645,7 @@ export type BackendInfo = Message<"rodeo.BackendInfo"> & {
  * Use `create(BackendInfoSchema)` to create a new message.
  */
 export const BackendInfoSchema: GenMessage<BackendInfo> = /*@__PURE__*/
-  messageDesc(file_rodeo, 48);
+  messageDesc(file_rodeo, 49);
 
 /**
  * Full state snapshot returned by GetState
@@ -1627,7 +1679,7 @@ export type RodeoSnapshot = Message<"rodeo.RodeoSnapshot"> & {
  * Use `create(RodeoSnapshotSchema)` to create a new message.
  */
 export const RodeoSnapshotSchema: GenMessage<RodeoSnapshot> = /*@__PURE__*/
-  messageDesc(file_rodeo, 49);
+  messageDesc(file_rodeo, 50);
 
 /**
  * @generated from message rodeo.LogFilter
@@ -1664,7 +1716,7 @@ export type LogFilter = Message<"rodeo.LogFilter"> & {
  * Use `create(LogFilterSchema)` to create a new message.
  */
 export const LogFilterSchema: GenMessage<LogFilter> = /*@__PURE__*/
-  messageDesc(file_rodeo, 50);
+  messageDesc(file_rodeo, 51);
 
 /**
  * @generated from message rodeo.HealthResponse
@@ -1701,7 +1753,7 @@ export type HealthResponse = Message<"rodeo.HealthResponse"> & {
  * Use `create(HealthResponseSchema)` to create a new message.
  */
 export const HealthResponseSchema: GenMessage<HealthResponse> = /*@__PURE__*/
-  messageDesc(file_rodeo, 51);
+  messageDesc(file_rodeo, 52);
 
 /**
  * @generated from message rodeo.ContextInfo
@@ -1733,7 +1785,7 @@ export type ContextInfo = Message<"rodeo.ContextInfo"> & {
  * Use `create(ContextInfoSchema)` to create a new message.
  */
 export const ContextInfoSchema: GenMessage<ContextInfo> = /*@__PURE__*/
-  messageDesc(file_rodeo, 52);
+  messageDesc(file_rodeo, 53);
 
 /**
  * @generated from message rodeo.DomInfo
@@ -1760,7 +1812,7 @@ export type DomInfo = Message<"rodeo.DomInfo"> & {
  * Use `create(DomInfoSchema)` to create a new message.
  */
 export const DomInfoSchema: GenMessage<DomInfo> = /*@__PURE__*/
-  messageDesc(file_rodeo, 53);
+  messageDesc(file_rodeo, 54);
 
 /**
  * @generated from message rodeo.ProcessInfo
@@ -1830,7 +1882,7 @@ export type ProcessInfo = Message<"rodeo.ProcessInfo"> & {
  * Use `create(ProcessInfoSchema)` to create a new message.
  */
 export const ProcessInfoSchema: GenMessage<ProcessInfo> = /*@__PURE__*/
-  messageDesc(file_rodeo, 54);
+  messageDesc(file_rodeo, 55);
 
 /**
  * @generated from message rodeo.ProcessListResponse
@@ -1847,7 +1899,7 @@ export type ProcessListResponse = Message<"rodeo.ProcessListResponse"> & {
  * Use `create(ProcessListResponseSchema)` to create a new message.
  */
 export const ProcessListResponseSchema: GenMessage<ProcessListResponse> = /*@__PURE__*/
-  messageDesc(file_rodeo, 55);
+  messageDesc(file_rodeo, 56);
 
 /**
  * @generated from message rodeo.KillResponse
@@ -1869,7 +1921,7 @@ export type KillResponse = Message<"rodeo.KillResponse"> & {
  * Use `create(KillResponseSchema)` to create a new message.
  */
 export const KillResponseSchema: GenMessage<KillResponse> = /*@__PURE__*/
-  messageDesc(file_rodeo, 56);
+  messageDesc(file_rodeo, 57);
 
 /**
  * @generated from message rodeo.DisconnectMsg
@@ -1886,7 +1938,7 @@ export type DisconnectMsg = Message<"rodeo.DisconnectMsg"> & {
  * Use `create(DisconnectMsgSchema)` to create a new message.
  */
 export const DisconnectMsgSchema: GenMessage<DisconnectMsg> = /*@__PURE__*/
-  messageDesc(file_rodeo, 57);
+  messageDesc(file_rodeo, 58);
 
 /**
  * Plugin → Server
@@ -1929,7 +1981,7 @@ export type PluginMessage = Message<"rodeo.PluginMessage"> & {
  * Use `create(PluginMessageSchema)` to create a new message.
  */
 export const PluginMessageSchema: GenMessage<PluginMessage> = /*@__PURE__*/
-  messageDesc(file_rodeo, 58);
+  messageDesc(file_rodeo, 59);
 
 /**
  * Server → Plugin
@@ -1970,6 +2022,12 @@ export type ServerMessage = Message<"rodeo.ServerMessage"> & {
      */
     value: SetTargetModeMsg;
     case: "setTargetMode";
+  } | {
+    /**
+     * @generated from field: rodeo.ScriptChunk script_chunk = 6;
+     */
+    value: ScriptChunk;
+    case: "scriptChunk";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1978,7 +2036,7 @@ export type ServerMessage = Message<"rodeo.ServerMessage"> & {
  * Use `create(ServerMessageSchema)` to create a new message.
  */
 export const ServerMessageSchema: GenMessage<ServerMessage> = /*@__PURE__*/
-  messageDesc(file_rodeo, 59);
+  messageDesc(file_rodeo, 60);
 
 /**
  * Declarative target mode for the edit DOM to converge toward.
@@ -2001,7 +2059,7 @@ export type SetTargetModeMsg = Message<"rodeo.SetTargetModeMsg"> & {
  * Use `create(SetTargetModeMsgSchema)` to create a new message.
  */
 export const SetTargetModeMsgSchema: GenMessage<SetTargetModeMsg> = /*@__PURE__*/
-  messageDesc(file_rodeo, 60);
+  messageDesc(file_rodeo, 61);
 
 /**
  * @generated from message rodeo.StudioStateMsg
@@ -2107,7 +2165,7 @@ export type StudioStateMsg = Message<"rodeo.StudioStateMsg"> & {
  * Use `create(StudioStateMsgSchema)` to create a new message.
  */
 export const StudioStateMsgSchema: GenMessage<StudioStateMsg> = /*@__PURE__*/
-  messageDesc(file_rodeo, 61);
+  messageDesc(file_rodeo, 62);
 
 /**
  * @generated from message rodeo.ClientInfo
@@ -2129,7 +2187,7 @@ export type ClientInfo = Message<"rodeo.ClientInfo"> & {
  * Use `create(ClientInfoSchema)` to create a new message.
  */
 export const ClientInfoSchema: GenMessage<ClientInfo> = /*@__PURE__*/
-  messageDesc(file_rodeo, 62);
+  messageDesc(file_rodeo, 63);
 
 /**
  * @generated from message rodeo.WelcomeMsg
@@ -2146,7 +2204,7 @@ export type WelcomeMsg = Message<"rodeo.WelcomeMsg"> & {
  * Use `create(WelcomeMsgSchema)` to create a new message.
  */
 export const WelcomeMsgSchema: GenMessage<WelcomeMsg> = /*@__PURE__*/
-  messageDesc(file_rodeo, 63);
+  messageDesc(file_rodeo, 64);
 
 /**
  * @generated from message rodeo.RunCommand
@@ -2220,6 +2278,14 @@ export type RunCommand = Message<"rodeo.RunCommand"> & {
    * @generated from field: rodeo.LogFilter log_filter = 19;
    */
   logFilter?: LogFilter | undefined;
+
+  /**
+   * `script` holds only the first piece; ServerMessage.script_chunk messages
+   * follow on the same stream (see ScriptChunk).
+   *
+   * @generated from field: optional bool script_continues = 21;
+   */
+  scriptContinues?: boolean | undefined;
 };
 
 /**
@@ -2227,7 +2293,7 @@ export type RunCommand = Message<"rodeo.RunCommand"> & {
  * Use `create(RunCommandSchema)` to create a new message.
  */
 export const RunCommandSchema: GenMessage<RunCommand> = /*@__PURE__*/
-  messageDesc(file_rodeo, 64);
+  messageDesc(file_rodeo, 65);
 
 /**
  * @generated from message rodeo.KillCommand
@@ -2244,7 +2310,7 @@ export type KillCommand = Message<"rodeo.KillCommand"> & {
  * Use `create(KillCommandSchema)` to create a new message.
  */
 export const KillCommandSchema: GenMessage<KillCommand> = /*@__PURE__*/
-  messageDesc(file_rodeo, 65);
+  messageDesc(file_rodeo, 66);
 
 /**
  * @generated from message rodeo.ExecutionDone
@@ -2285,7 +2351,7 @@ export type ExecutionDone = Message<"rodeo.ExecutionDone"> & {
  * Use `create(ExecutionDoneSchema)` to create a new message.
  */
 export const ExecutionDoneSchema: GenMessage<ExecutionDone> = /*@__PURE__*/
-  messageDesc(file_rodeo, 66);
+  messageDesc(file_rodeo, 67);
 
 /**
  * @generated from message rodeo.ExecutionKilled
@@ -2302,7 +2368,7 @@ export type ExecutionKilled = Message<"rodeo.ExecutionKilled"> & {
  * Use `create(ExecutionKilledSchema)` to create a new message.
  */
 export const ExecutionKilledSchema: GenMessage<ExecutionKilled> = /*@__PURE__*/
-  messageDesc(file_rodeo, 67);
+  messageDesc(file_rodeo, 68);
 
 /**
  * @generated from enum rodeo.ProcessState

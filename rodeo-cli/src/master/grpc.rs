@@ -359,10 +359,44 @@ impl proto::RunService for RodeoServices {
             .map_err(|e| ConnectError::internal(format!("stream error: {e}")))?;
 
         let first_owned = first.to_owned_message();
-        let submit = match first_owned.msg {
+        let mut submit = match first_owned.msg {
             Some(proto::run_client_message::Msg::Submit(s)) => s,
             _ => return Err(ConnectError::invalid_argument("first message must be SubmitRequest")),
         };
+
+        // Chunked script: the submit carried only the first piece; drain the
+        // trailing ScriptChunk messages (in stream order) and reassemble
+        // before routing. The ceiling matches the client's sanity guard so a
+        // hand-rolled client can't stream unbounded source into memory.
+        if submit.script_continues == Some(true) {
+            let mut parts: Vec<String> = vec![std::mem::take(&mut submit.script)];
+            let mut total: usize = parts[0].len();
+            loop {
+                let msg = requests.next().await
+                    .ok_or_else(|| ConnectError::invalid_argument("stream ended mid script-chunk sequence"))?
+                    .map_err(|e| ConnectError::internal(format!("stream error during script chunks: {e}")))?;
+                match msg.to_owned_message().msg {
+                    Some(proto::run_client_message::Msg::ScriptChunk(chunk)) => {
+                        total += chunk.data.len();
+                        if total > rodeo_proto::MAX_SCRIPT_SIZE {
+                            return Err(ConnectError::invalid_argument(format!(
+                                "script exceeds the {} MB sanity ceiling",
+                                rodeo_proto::MAX_SCRIPT_SIZE / 1_048_576
+                            )));
+                        }
+                        let is_last = chunk.is_last;
+                        parts.push(chunk.data);
+                        if is_last { break; }
+                    }
+                    _ => return Err(ConnectError::invalid_argument(
+                        "expected ScriptChunk while script_continues is set",
+                    )),
+                }
+            }
+            submit.script = parts.concat();
+            submit.script_continues = None;
+        }
+        let submit = submit;
 
         // Channel for events back to client
         let (event_tx, event_rx) = mpsc::unbounded_channel::<proto::RunEvent>();

@@ -127,38 +127,72 @@ async fn run_inner(
         profile: if opts.profile { Some(true) } else { None },
         ..Default::default()
     };
-    // Sender-side guard: the submission (bundled script + args) rides one
-    // stream message; the receiving side can't skip an oversized one — it
-    // drops the whole stream on receipt, which the caller used to see as a
-    // silent exit 2 (issue #9). Refuse to send it and say why instead.
-    // Mirrors guard_relay_size for runtime rpc responses.
-    let submit_msg = proto::RunClientMessage {
-        msg: Some(proto::run_client_message::Msg::Submit(Box::new(submit))),
-        ..Default::default()
-    };
-    {
-        use buffa::Message;
-        let size = submit_msg.compute_size() as usize;
-        const SUBMIT_GUARD_MARGIN: usize = 4096;
-        if size + SUBMIT_GUARD_MARGIN > rodeo_proto::MAX_RPC_MESSAGE_SIZE {
-            let entrypoint = match &submit_msg.msg {
-                Some(proto::run_client_message::Msg::Submit(s)) => {
-                    s.script_path.clone().unwrap_or_else(|| "<inline source>".to_string())
-                }
-                _ => "<inline source>".to_string(),
-            };
-            bail!(
-                "bundled script is too large to submit: {:.1} MB exceeds the {} MB transport limit (entrypoint: {entrypoint}). \
-                 Large data doesn't belong in the bundle — bake it to files and read it at runtime \
-                 (fs.open + stream.readBytes, or roblox.import for models)",
-                size as f64 / 1_048_576.0,
-                rodeo_proto::MAX_RPC_MESSAGE_SIZE / 1_048_576,
-            );
+    // Large scripts are split across ScriptChunk messages so no hop's
+    // envelope grows with bundle size (an oversized single message drops the
+    // whole stream on the receiving side — the silent exit 2 of issue #9).
+    // The ceiling is a sanity check against accidents, not a real limit.
+    let mut submit = submit;
+    let script_len = submit.script.len();
+    if script_len > rodeo_proto::MAX_SCRIPT_SIZE {
+        let entrypoint = submit.script_path.as_deref().unwrap_or("<inline source>");
+        bail!(
+            "bundled script is absurdly large: {:.1} MB exceeds the {} MB sanity ceiling (entrypoint: {entrypoint}). \
+             This usually means the bundle swallowed something unintended. Large data doesn't belong in the \
+             bundle regardless — bake it to files and read it at runtime (fs.open + stream.readBytes, or \
+             roblox.import for models)",
+            script_len as f64 / 1_048_576.0,
+            rodeo_proto::MAX_SCRIPT_SIZE / 1_048_576,
+        );
+    }
+    let mut tail_chunks: Vec<proto::ScriptChunk> = Vec::new();
+    if script_len > rodeo_proto::SCRIPT_CHUNK_SIZE {
+        tracing::warn!(
+            "large bundle: {:.1} MB of script source (entrypoint: {}). It will run, but Studio compiles \
+             all of it per run — baking data to files and reading them at runtime starts faster",
+            script_len as f64 / 1_048_576.0,
+            submit.script_path.as_deref().unwrap_or("<inline source>"),
+        );
+        let full = std::mem::take(&mut submit.script);
+        let mut rest = full.as_str();
+        let mut pieces: Vec<&str> = Vec::new();
+        while rest.len() > rodeo_proto::SCRIPT_CHUNK_SIZE {
+            // Back off to a char boundary — a split codepoint would make the
+            // chunk invalid UTF-8 and fail serialization.
+            let mut cut = rodeo_proto::SCRIPT_CHUNK_SIZE;
+            while !rest.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            let (head, next) = rest.split_at(cut);
+            pieces.push(head);
+            rest = next;
+        }
+        pieces.push(rest);
+        submit.script = pieces[0].to_string();
+        submit.script_continues = Some(true);
+        let last = pieces.len() - 1;
+        for (i, piece) in pieces.iter().enumerate().skip(1) {
+            tail_chunks.push(proto::ScriptChunk {
+                execution_id: String::new(),
+                data: piece.to_string(),
+                is_last: i == last,
+                ..Default::default()
+            });
         }
     }
-    bidi.send(submit_msg)
+    bidi.send(proto::RunClientMessage {
+        msg: Some(proto::run_client_message::Msg::Submit(Box::new(submit))),
+        ..Default::default()
+    })
         .await
         .map_err(|e| anyhow!("failed to send submit: {e}"))?;
+    for chunk in tail_chunks {
+        bidi.send(proto::RunClientMessage {
+            msg: Some(proto::run_client_message::Msg::ScriptChunk(Box::new(chunk))),
+            ..Default::default()
+        })
+            .await
+            .map_err(|e| anyhow!("failed to send script chunk: {e}"))?;
+    }
 
     let (event_tx, event_rx) = mpsc::unbounded_channel::<RunStreamEvent>();
     let profile_dir = opts.profile_dir.clone();

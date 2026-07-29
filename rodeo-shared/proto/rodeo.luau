@@ -32,6 +32,7 @@ type _Messages = {
 	LaunchStudioCommand: _LaunchStudioCommandMessage,
 	SessionExited: _SessionExitedMessage,
 	RunClientMessage: _RunClientMessageMessage,
+	ScriptChunk: _ScriptChunkMessage,
 	SubmitRequest: _SubmitRequestMessage,
 	RunEvent: _RunEventMessage,
 	RunComplete: _RunCompleteMessage,
@@ -750,6 +751,7 @@ type _RunClientMessageFields = {
 		{ type: "submit", value: SubmitRequest }
 		| { type: "rpcResponse", value: _runtime.ClientRpcResponse }
 		| { type: "kill", value: KillCommand }
+		| { type: "scriptChunk", value: ScriptChunk }
 	)?,
 }
 
@@ -758,11 +760,37 @@ export type _RunClientMessagePartialFields = {
 		{ type: "submit", value: SubmitRequest | _SubmitRequestPartialFields }
 		| { type: "rpcResponse", value: _runtime.ClientRpcResponse | _runtime._ClientRpcResponsePartialFields }
 		| { type: "kill", value: KillCommand | _KillCommandPartialFields }
+		| { type: "scriptChunk", value: ScriptChunk | _ScriptChunkPartialFields }
 	)?,
 }
 
 export type RunClientMessage = typeof(setmetatable({} :: _RunClientMessageFields, {} :: _RunClientMessageImpl))
 type _RunClientMessageMessage = proto.Message<RunClientMessage, _RunClientMessagePartialFields>
+
+type _ScriptChunkImpl = {
+	__index: _ScriptChunkImpl,
+	new: (fields: _ScriptChunkPartialFields?) -> ScriptChunk,
+	encode: (self: ScriptChunk) -> buffer,
+	decode: (input: buffer) -> ScriptChunk,
+	jsonEncode: (self: ScriptChunk) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> ScriptChunk,
+	descriptor: proto.Descriptor,
+}
+
+type _ScriptChunkFields = {
+	executionId: string,
+	data: string,
+	isLast: boolean,
+}
+
+export type _ScriptChunkPartialFields = {
+	executionId: string?,
+	data: string?,
+	isLast: boolean?,
+}
+
+export type ScriptChunk = typeof(setmetatable({} :: _ScriptChunkFields, {} :: _ScriptChunkImpl))
+type _ScriptChunkMessage = proto.Message<ScriptChunk, _ScriptChunkPartialFields>
 
 type _SubmitRequestImpl = {
 	__index: _SubmitRequestImpl,
@@ -791,6 +819,7 @@ type _SubmitRequestFields = {
 	scriptPath: string?,
 	profile: boolean?,
 	logFilter: LogFilter?,
+	scriptContinues: boolean?,
 }
 
 export type _SubmitRequestPartialFields = {
@@ -810,6 +839,7 @@ export type _SubmitRequestPartialFields = {
 	scriptPath: string?,
 	profile: boolean?,
 	logFilter: (LogFilter | _LogFilterPartialFields)?,
+	scriptContinues: boolean?,
 }
 
 export type SubmitRequest = typeof(setmetatable({} :: _SubmitRequestFields, {} :: _SubmitRequestImpl))
@@ -1630,6 +1660,7 @@ type _ServerMessageFields = {
 		| { type: "rpcResponse", value: _runtime.ClientRpcResponse }
 		| { type: "kill", value: KillCommand }
 		| { type: "setTargetMode", value: SetTargetModeMsg }
+		| { type: "scriptChunk", value: ScriptChunk }
 	)?,
 }
 
@@ -1640,6 +1671,7 @@ export type _ServerMessagePartialFields = {
 		| { type: "rpcResponse", value: _runtime.ClientRpcResponse | _runtime._ClientRpcResponsePartialFields }
 		| { type: "kill", value: KillCommand | _KillCommandPartialFields }
 		| { type: "setTargetMode", value: SetTargetModeMsg | _SetTargetModeMsgPartialFields }
+		| { type: "scriptChunk", value: ScriptChunk | _ScriptChunkPartialFields }
 	)?,
 }
 
@@ -1786,6 +1818,7 @@ type _RunCommandFields = {
 	scriptPath: string?,
 	profile: boolean?,
 	logFilter: LogFilter?,
+	scriptContinues: boolean?,
 }
 
 export type _RunCommandPartialFields = {
@@ -1802,6 +1835,7 @@ export type _RunCommandPartialFields = {
 	scriptPath: string?,
 	profile: boolean?,
 	logFilter: (LogFilter | _LogFilterPartialFields)?,
+	scriptContinues: boolean?,
 }
 
 export type RunCommand = typeof(setmetatable({} :: _RunCommandFields, {} :: _RunCommandImpl))
@@ -5801,6 +5835,12 @@ do
 					and getmetatable((v :: any).value) == nil
 				then
 					return { type = (v :: any).type, value = messages.KillCommand.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "scriptChunk"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.ScriptChunk.new((v :: any).value) } :: any
 				end
 				return v :: any
 			end)(),
@@ -5823,6 +5863,10 @@ do
 			elseif self.msg.type == "kill" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.msg.type == "scriptChunk" then
+				local encoded = self.msg.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -5861,6 +5905,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.msg = { type = "kill", value = messages.KillCommand.decode(value) }
 					continue
+				elseif field == 5 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.msg = { type = "scriptChunk", value = messages.ScriptChunk.decode(value) }
+					continue
 				end
 
 				local length
@@ -5895,6 +5944,8 @@ do
 				output.rpcResponse = self.msg.value:jsonEncode()
 			elseif self.msg.type == "kill" then
 				output.kill = self.msg.value:jsonEncode()
+			elseif self.msg.type == "scriptChunk" then
+				output.scriptChunk = self.msg.value:jsonEncode()
 			end
 		end
 
@@ -5916,6 +5967,10 @@ do
 			self.msg = { type = "kill", value = messages.KillCommand.jsonDecode(input.kill) }
 		end
 
+		if input.scriptChunk ~= nil then
+			self.msg = { type = "scriptChunk", value = messages.ScriptChunk.jsonDecode(input.scriptChunk) }
+		end
+
 		return self
 	end
 
@@ -5927,6 +5982,141 @@ do
 	messages.RunClientMessage = _RunClientMessageImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.RunClientMessage)
+end
+
+do
+	local _ScriptChunkImpl = {}
+	_ScriptChunkImpl.__index = _ScriptChunkImpl
+
+	function _ScriptChunkImpl.new(data: _ScriptChunkPartialFields?): ScriptChunk
+		return setmetatable({
+			executionId = if data == nil or data.executionId == nil then "" else data.executionId,
+			data = if data == nil or data.data == nil then "" else data.data,
+			isLast = if data == nil or data.isLast == nil then false else data.isLast,
+		}, _ScriptChunkImpl :: _ScriptChunkImpl)
+	end
+
+	function _ScriptChunkImpl.encode(self: ScriptChunk): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.executionId ~= nil and self.executionId ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.executionId)
+		end
+
+		if self.data ~= nil and self.data ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.data)
+		end
+
+		if self.isLast then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.isLast then 1 else 0)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _ScriptChunkImpl.decode(input: buffer): ScriptChunk
+		local self = _ScriptChunkImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 3 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.isLast = value ~= 0
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.executionId = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.data = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _ScriptChunkImpl.jsonEncode(self: ScriptChunk): any
+		local output = {}
+
+		if self.executionId ~= nil and self.executionId ~= "" then
+			output.executionId = self.executionId
+		end
+
+		if self.data ~= nil and self.data ~= "" then
+			output.data = self.data
+		end
+
+		if self.isLast then
+			output.isLast = self.isLast
+		end
+
+		return output
+	end
+
+	function _ScriptChunkImpl.jsonDecode(input: { [string]: any }): ScriptChunk
+		local self = _ScriptChunkImpl.new()
+
+		if input.executionId ~= nil then
+			self.executionId = input.executionId
+		end
+
+		if input.data ~= nil then
+			self.data = input.data
+		end
+
+		if input.isLast ~= nil then
+			self.isLast = input.isLast
+		end
+
+		return self
+	end
+
+	_ScriptChunkImpl.descriptor = {
+		name = "ScriptChunk",
+		fullName = "rodeo.ScriptChunk",
+	}
+
+	messages.ScriptChunk = _ScriptChunkImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.ScriptChunk)
 end
 
 do
@@ -5956,6 +6146,7 @@ do
 					data.logFilter :: any
 				)
 				else (data.logFilter :: any) :: LogFilter,
+			scriptContinues = if data == nil or data.scriptContinues == nil then nil else data.scriptContinues,
 		}, _SubmitRequestImpl :: _SubmitRequestImpl)
 	end
 
@@ -6046,6 +6237,11 @@ do
 			output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 		end
 
+		if self.scriptContinues ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 17, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.scriptContinues then 1 else 0)
+		end
+
 		local shrunkBuffer = buffer.create(cursor)
 		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
 		return shrunkBuffer
@@ -6079,6 +6275,11 @@ do
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
 					self.profile = value ~= 0
+					continue
+				elseif field == 17 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.scriptContinues = value ~= 0
 					continue
 				end
 
@@ -6240,6 +6441,10 @@ do
 			output.logFilter = self.logFilter:jsonEncode()
 		end
 
+		if self.scriptContinues ~= nil then
+			output.scriptContinues = self.scriptContinues
+		end
+
 		return output
 	end
 
@@ -6313,6 +6518,10 @@ do
 
 		if input.logFilter ~= nil then
 			self.logFilter = messages.LogFilter.jsonDecode(input.logFilter)
+		end
+
+		if input.scriptContinues ~= nil then
+			self.scriptContinues = input.scriptContinues
 		end
 
 		return self
@@ -10725,6 +10934,12 @@ do
 					and getmetatable((v :: any).value) == nil
 				then
 					return { type = (v :: any).type, value = messages.SetTargetModeMsg.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "scriptChunk"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.ScriptChunk.new((v :: any).value) } :: any
 				end
 				return v :: any
 			end)(),
@@ -10755,6 +10970,10 @@ do
 			elseif self.msg.type == "setTargetMode" then
 				local encoded = self.msg.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.msg.type == "scriptChunk" then
+				local encoded = self.msg.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -10803,6 +11022,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.msg = { type = "setTargetMode", value = messages.SetTargetModeMsg.decode(value) }
 					continue
+				elseif field == 6 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.msg = { type = "scriptChunk", value = messages.ScriptChunk.decode(value) }
+					continue
 				end
 
 				local length
@@ -10841,6 +11065,8 @@ do
 				output.kill = self.msg.value:jsonEncode()
 			elseif self.msg.type == "setTargetMode" then
 				output.setTargetMode = self.msg.value:jsonEncode()
+			elseif self.msg.type == "scriptChunk" then
+				output.scriptChunk = self.msg.value:jsonEncode()
 			end
 		end
 
@@ -10868,6 +11094,10 @@ do
 
 		if input.setTargetMode ~= nil then
 			self.msg = { type = "setTargetMode", value = messages.SetTargetModeMsg.jsonDecode(input.setTargetMode) }
+		end
+
+		if input.scriptChunk ~= nil then
+			self.msg = { type = "scriptChunk", value = messages.ScriptChunk.jsonDecode(input.scriptChunk) }
 		end
 
 		return self
@@ -11605,6 +11835,7 @@ do
 					data.logFilter :: any
 				)
 				else (data.logFilter :: any) :: LogFilter,
+			scriptContinues = if data == nil or data.scriptContinues == nil then nil else data.scriptContinues,
 		}, _RunCommandImpl :: _RunCommandImpl)
 	end
 
@@ -11680,6 +11911,11 @@ do
 			output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 		end
 
+		if self.scriptContinues ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 21, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.scriptContinues then 1 else 0)
+		end
+
 		local shrunkBuffer = buffer.create(cursor)
 		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
 		return shrunkBuffer
@@ -11713,6 +11949,11 @@ do
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
 					self.profile = value ~= 0
+					continue
+				elseif field == 21 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.scriptContinues = value ~= 0
 					continue
 				end
 
@@ -11847,6 +12088,10 @@ do
 			output.logFilter = self.logFilter:jsonEncode()
 		end
 
+		if self.scriptContinues ~= nil then
+			output.scriptContinues = self.scriptContinues
+		end
+
 		return output
 	end
 
@@ -11908,6 +12153,10 @@ do
 
 		if input.logFilter ~= nil then
 			self.logFilter = messages.LogFilter.jsonDecode(input.logFilter)
+		end
+
+		if input.scriptContinues ~= nil then
+			self.scriptContinues = input.scriptContinues
 		end
 
 		return self
@@ -12362,6 +12611,7 @@ return {
 	LaunchStudioCommand = messages.LaunchStudioCommand,
 	SessionExited = messages.SessionExited,
 	RunClientMessage = messages.RunClientMessage,
+	ScriptChunk = messages.ScriptChunk,
 	SubmitRequest = messages.SubmitRequest,
 	RunEvent = messages.RunEvent,
 	RunComplete = messages.RunComplete,

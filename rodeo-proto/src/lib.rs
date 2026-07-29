@@ -10,6 +10,19 @@ include!(concat!(env!("OUT_DIR"), "/_connectrpc.rs"));
 /// data, because *any* fixed cap loses to an unbounded model file.
 pub const MAX_RPC_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
 
+/// Chunk size for scripts split across ScriptChunk messages. Sized for the
+/// worst hop: the backend→plugin WS forward JSON-escapes the source (~2x
+/// worst case), so 8,000,000 * 2 = 16,000,000 stays under the 16MiB
+/// (16,777,216) frame limit with ~777KB headroom — the same math as
+/// stream.luau's WRITE_CHUNK. The Rust↔Rust envelopes clear trivially.
+pub const SCRIPT_CHUNK_SIZE: usize = 8_000_000;
+
+/// Sanity ceiling on a submitted script bundle. Chunking removes the
+/// transport cliff, so this exists only to catch accidents (a bundle that
+/// swallowed a build directory), not as a real limit — Studio still has to
+/// compile whatever this admits.
+pub const MAX_SCRIPT_SIZE: usize = 256 * 1024 * 1024;
+
 pub use rodeo::*;
 pub mod runtime_types {
     pub use crate::rodeo::runtime::*;

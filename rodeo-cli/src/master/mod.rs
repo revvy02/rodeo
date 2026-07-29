@@ -343,6 +343,7 @@ impl MasterState {
             Some(rodeo_proto::server_message::Msg::Kill(_)) => "kill",
             Some(rodeo_proto::server_message::Msg::RpcResponse(_)) => "rpc_response",
             Some(rodeo_proto::server_message::Msg::SetTargetMode(_)) => "set_target_mode",
+            Some(rodeo_proto::server_message::Msg::ScriptChunk(_)) => "script_chunk",
             None => "empty",
         };
         let dom_short = &dom_id[..8.min(dom_id.len())];
@@ -428,8 +429,12 @@ impl MasterState {
         best.map(|(dom_id, _)| dom_id)
     }
 
-    /// Build a RunCommand proto from a RunRequest.
-    fn build_run_command(run: &RunRequest) -> rodeo_proto::ServerMessage {
+    /// Build the RunCommand message sequence for a RunRequest. A script over
+    /// SCRIPT_CHUNK_SIZE is split: the RunCommand carries the first piece
+    /// with `script_continues`, followed by ScriptChunk messages the plugin
+    /// reassembles. Each ServerMessage becomes its own WS frame on the
+    /// backend→plugin hop, so no frame grows with bundle size.
+    fn build_run_command(run: &RunRequest) -> Vec<rodeo_proto::ServerMessage> {
         // Pinned runs carry at most a context; routed runs resolve through the
         // defaults table. The plugin receives only the run context.
         let context = run
@@ -437,10 +442,25 @@ impl MasterState {
             .context
             .or_else(|| run.route.resolve().ok().map(|r| r.context))
             .unwrap_or(crate::shared::target::RunContext::Plugin);
-        rodeo_proto::ServerMessage {
+
+        let mut pieces: Vec<&str> = Vec::new();
+        let mut rest = run.script.as_str();
+        while rest.len() > rodeo_proto::SCRIPT_CHUNK_SIZE {
+            // Char-boundary backoff: a split codepoint would be invalid UTF-8.
+            let mut cut = rodeo_proto::SCRIPT_CHUNK_SIZE;
+            while !rest.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            let (head, next) = rest.split_at(cut);
+            pieces.push(head);
+            rest = next;
+        }
+        pieces.push(rest);
+
+        let mut messages = vec![rodeo_proto::ServerMessage {
             msg: Some(rodeo_proto::server_message::Msg::Run(Box::new(rodeo_proto::RunCommand {
                 execution_id: run.execution_id.clone(),
-                script: run.script.clone(),
+                script: pieces[0].to_string(),
                 context: context.as_str().to_string(),
                 log_filter: buffa::MessageField::some(run.log_filter.clone()),
                 cache_requires: run.cache_requires,
@@ -452,10 +472,24 @@ impl MasterState {
                 instance_path: run.instance_path.clone(),
                 script_path: run.script_path.clone(),
                 profile: run.profile,
+                script_continues: if pieces.len() > 1 { Some(true) } else { None },
                 ..Default::default()
             }))),
             ..Default::default()
+        }];
+        let last = pieces.len() - 1;
+        for (i, piece) in pieces.iter().enumerate().skip(1) {
+            messages.push(rodeo_proto::ServerMessage {
+                msg: Some(rodeo_proto::server_message::Msg::ScriptChunk(Box::new(rodeo_proto::ScriptChunk {
+                    execution_id: run.execution_id.clone(),
+                    data: piece.to_string(),
+                    is_last: i == last,
+                    ..Default::default()
+                }))),
+                ..Default::default()
+            });
         }
+        messages
     }
 
     /// Send a run command to a DOM and track it as active.
@@ -500,8 +534,9 @@ impl MasterState {
             studio = studio.as_deref().map(|s| &s[..8.min(s.len())]).unwrap_or("-"),
             "dispatch"
         );
-        let cmd = Self::build_run_command(&run);
-        self.send_to_dom(dom_id, cmd);
+        for cmd in Self::build_run_command(&run) {
+            self.send_to_dom(dom_id, cmd);
+        }
         self.active_runs.insert(run.execution_id.clone(), ActiveRun {
             execution_id: run.execution_id.clone(),
             dom_id: dom_id.to_string(),
