@@ -6,7 +6,7 @@ description: Simulate mouse, keyboard, and pointer input on running Roblox games
 ## Execution in this repo (Studio MCP / rodeo)
 
 This skill is already written around the exact tools I have:
-- `execute_luau` → MCP `mcp__Roblox_Studio__execute_luau` (or `rodeo run --target test:client`)
+- `execute_luau` → MCP `mcp__Roblox_Studio__execute_luau` (or `rodeo run --mode test --context client`)
 - `screen_capture` → MCP `mcp__Roblox_Studio__screen_capture`
 - `get_console_output` → MCP `mcp__Roblox_Studio__get_console_output`
 

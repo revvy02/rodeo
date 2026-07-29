@@ -5,7 +5,7 @@ description: Analyze and optimize Roblox scenes using SceneAnalysisService — r
 
 ## Execution in this repo (rodeo / Studio MCP)
 
-`SceneAnalysisService` only works at **runtime**, so run every query against a play DM: `rodeo run --target test:client` for rendering/triangle queries (view-dependent), `--target test:server` for memory/unparented/leak queries (server-side leaks are common). Start play via MCP `start_stop_play` or a rodeo play target. `commands/` holds the four analysis routines; `QuerySpecs.md` documents the return shapes.
+`SceneAnalysisService` only works at **runtime**, so run every query against a play DM: `rodeo run --mode test --context client` for rendering/triangle queries (view-dependent), `--mode test --context server` for memory/unparented/leak queries (server-side leaks are common). Start play via MCP `start_stop_play` or a rodeo play target. `commands/` holds the four analysis routines; `QuerySpecs.md` documents the return shapes.
 
 # Scene Analysis
 

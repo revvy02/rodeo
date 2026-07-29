@@ -43,7 +43,10 @@ end
 --- defaults to the `.rodeo-screenshots` directory. Relative paths resolve
 --- against the run client's cwd. Temporary scripted-camera state is restored
 --- after the capture. Requires a viewport (plugin context, or client context
---- in a running session). macOS only.
+--- in a running session). macOS and Windows only; other platforms error. On
+--- Windows a minimized Studio never renders its viewport, and background
+--- launches are minimized, so a capture there must be launched focused (or
+--- the window restored) or it fails after 10s.
 function roblox.capture(output: string?, options: CaptureOptions?): string
 	return (singleton :: any).roblox.capture(output, options)
 end

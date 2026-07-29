@@ -221,6 +221,7 @@ process.env         -- environment variables
 process.cwd()       -- current working directory
 process.homedir()   -- home directory
 process.execpath()  -- path to rodeo executable
+process.platform()  -- "macos" | "windows" | ...
 process.exit(code)
 
 -- Blocking execution
@@ -273,7 +274,10 @@ directory for the auto-named file (default `.rodeo-screenshots/`). `options`
 (all optional): `cframe` (scripted camera for the shot, restored after),
 `fov`, `focus`, `settle` (seconds to wait before capturing). Needs a viewport
 — plugin context, or client context in a running session (server context
-errors). macOS only.
+errors). macOS and Windows only; anywhere else it errors. On Windows a
+minimized Studio never renders its viewport, and background launches are
+minimized, so a capture there needs `--focus` (or a restored window) or it
+fails after 10s.
 
 ## Common patterns
 

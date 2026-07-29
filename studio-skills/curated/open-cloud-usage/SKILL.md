@@ -5,7 +5,7 @@ description: IMPORTANT: Before assuming ANY Roblox resource (developer products,
 
 ## Execution in this repo (rodeo / Studio MCP)
 
-Open Cloud calls run as a Luau script **inside Studio**: `rodeo run --target edit:plugin` (or MCP `execute_luau`) executing `HttpService:RequestAccessTokenScopesAsync(scopes)` for the Bearer token, then `HttpService:RequestAsync` to the endpoint. No external API key — Studio mints the token. Read `create.roblox.com/docs/cloud/llms.txt` and the per-API docs first via `http_get` (MCP `mcp__Roblox_Studio__http_get`) or `WebFetch`. Scope grants are governed by the Studio MCP / Assistant **MCP Scope Permissions** dialog; the denied-scope / 401 / 403 cases below still apply.
+Open Cloud calls run as a Luau script **inside Studio**: `rodeo run` (edit DOM at plugin identity, the default; or MCP `execute_luau`) executing `HttpService:RequestAccessTokenScopesAsync(scopes)` for the Bearer token, then `HttpService:RequestAsync` to the endpoint. No external API key — Studio mints the token. Read `create.roblox.com/docs/cloud/llms.txt` and the per-API docs first via `http_get` (MCP `mcp__Roblox_Studio__http_get`) or `WebFetch`. Scope grants are governed by the Studio MCP / Assistant **MCP Scope Permissions** dialog; the denied-scope / 401 / 403 cases below still apply.
 
 > **Verified caveat (external execution):** the token step needs a **published** place (`RequestAccessTokenScopesAsync` returns `No access token provider is available` when `game.GameId == 0`) *and* an access-token provider that appears to be supplied by the in-Studio Assistant's MCP integration — **not** plain `execute_luau` / rodeo. Expect the token step to fail when driven externally; the `http_get` doc-reading half works regardless.
 
