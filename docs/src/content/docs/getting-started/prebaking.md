@@ -64,6 +64,25 @@ Now the game requires that module instead of loading every animation at startup
 just to read its length. (A `--return` path that doesn't end in `.luau` is
 written as JSON instead.)
 
+`--return` writes one file, at the end, from the value the script returns. To
+write data files at any point — several of them, or one per iteration — call
+[`roblox.bake`](/rodeo/runtime/roblox/) directly:
+
+```luau
+local roblox = require("@rodeo/roblox")
+
+roblox.bake("src/shared/data/spawnPoints.luau", {
+    lobby = workspace.Lobby.Spawn.CFrame,
+    arena = workspace.Arena.Spawn.CFrame,
+})
+```
+
+`bake` and `--return <path>.luau` share one implementation, so the output is the
+same either way: Roblox types round-trip through their constructors
+(`vector.create`, `CFrame.new`, `Color3.new`, `Enum.Material.Plastic`), and
+values with no source representation — Instances, functions — become their
+`tostring`. Parent directories are created as needed.
+
 ## Bake instances into model files
 
 When the output is Roblox instances (generated geometry, fetched
@@ -72,7 +91,7 @@ When the output is Roblox instances (generated geometry, fetched
 rojo can mount back into the DataModel.
 
 ```luau
--- @rodeo run --target edit:plugin
+-- @rodeo run --dom edit --context plugin
 
 local roblox = require("@rodeo/roblox")
 
