@@ -109,9 +109,16 @@ pub async fn run_piped(host: &str, port: u16, mut request: RunRequest) -> Result
         }
     }
 
-    let mut result = final_result.unwrap_or(RunResult {
-        execution_id: None,
-        exit_code: 2, ok: false, output: String::new(), files: HashMap::new(), return_value: None,
+    let mut result = final_result.unwrap_or_else(|| {
+        // The stream task synthesizes a Done for every ending it can see
+        // (Complete, Disconnect, transport error/EOF), so reaching here means
+        // it died without one. Say so — a bare exit 2 with no output is
+        // indistinguishable from "never ran" (issue #9).
+        eprintln!("rodeo: run ended without a result (stream task terminated unexpectedly)");
+        RunResult {
+            execution_id: None,
+            exit_code: 2, ok: false, output: String::new(), files: HashMap::new(), return_value: None,
+        }
     });
     if result.output.is_empty() { result.output = buffered_output; }
     for (k, v) in files { result.files.entry(k).or_insert(v); }

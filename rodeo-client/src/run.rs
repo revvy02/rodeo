@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 
@@ -127,10 +127,36 @@ async fn run_inner(
         profile: if opts.profile { Some(true) } else { None },
         ..Default::default()
     };
-    bidi.send(proto::RunClientMessage {
+    // Sender-side guard: the submission (bundled script + args) rides one
+    // stream message; the receiving side can't skip an oversized one — it
+    // drops the whole stream on receipt, which the caller used to see as a
+    // silent exit 2 (issue #9). Refuse to send it and say why instead.
+    // Mirrors guard_relay_size for runtime rpc responses.
+    let submit_msg = proto::RunClientMessage {
         msg: Some(proto::run_client_message::Msg::Submit(Box::new(submit))),
         ..Default::default()
-    })
+    };
+    {
+        use buffa::Message;
+        let size = submit_msg.compute_size() as usize;
+        const SUBMIT_GUARD_MARGIN: usize = 4096;
+        if size + SUBMIT_GUARD_MARGIN > rodeo_proto::MAX_RPC_MESSAGE_SIZE {
+            let entrypoint = match &submit_msg.msg {
+                Some(proto::run_client_message::Msg::Submit(s)) => {
+                    s.script_path.clone().unwrap_or_else(|| "<inline source>".to_string())
+                }
+                _ => "<inline source>".to_string(),
+            };
+            bail!(
+                "bundled script is too large to submit: {:.1} MB exceeds the {} MB transport limit (entrypoint: {entrypoint}). \
+                 Large data doesn't belong in the bundle — bake it to files and read it at runtime \
+                 (fs.open + stream.readBytes, or roblox.import for models)",
+                size as f64 / 1_048_576.0,
+                rodeo_proto::MAX_RPC_MESSAGE_SIZE / 1_048_576,
+            );
+        }
+    }
+    bidi.send(submit_msg)
         .await
         .map_err(|e| anyhow!("failed to send submit: {e}"))?;
 
@@ -404,7 +430,36 @@ async fn message_loop(
                             }
                         }
                     }
-                    _ => break,
+                    // Transport-level endings. `Disconnect` above is the
+                    // *server-sent* teardown; these arms are the transport
+                    // itself dying — e.g. the master dropping the stream on
+                    // receipt of an oversized submission. A silent break here
+                    // left run_piped to fabricate a bare exit 2 with empty
+                    // output (issue #9), so surface the reason on the output
+                    // stream (the only error channel consumers read) and
+                    // synthesize a terminal Done.
+                    ended => {
+                        let reason = match ended {
+                            Err(e) => format!("rodeo: run stream failed: {e}\n"),
+                            _ => "rodeo: run stream closed before the run completed (the server dropped the connection — an oversized submission exceeds the transport limit)\n".to_string(),
+                        };
+                        let _ = event_tx.send(RunStreamEvent::Output {
+                            kind: runtime::CapturedStreamKind::Stderr,
+                            chunk: reason,
+                        });
+                        let files_out = std::mem::take(&mut file_buffers);
+                        let _ = event_tx.send(RunStreamEvent::Done {
+                            result: RunResult {
+                                execution_id: execution_id.clone(),
+                                exit_code: 2,
+                                ok: false,
+                                output: String::new(),
+                                files: files_out,
+                                return_value: return_value.take(),
+                            },
+                        });
+                        break;
+                    }
                 }
             }
             msg = response_rx.recv() => {
