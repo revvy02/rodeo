@@ -299,6 +299,26 @@ minimized Studio never renders its viewport, and background launches are
 minimized, so a capture there needs `--focus` (or a restored window) or it
 fails after 10s.
 
+### `@lune` adapters — run lune-flavored code unchanged
+
+rodeo ships adapters that map lune's std lib onto its own runtime, so scripts
+(and dependencies) written for lune run inside Studio with rodeo's host doing
+the I/O:
+
+```lua
+require("@lune/fs")       -- readFile/writeFile/isFile/isDir/readDir/remove*/writeDir/copy/move/metadata
+require("@lune/process")  -- args, env, cwd, exit, os
+require("@lune/serde")    -- encode/decode
+require("@lune/stdio")    -- write/ewrite
+require("@lune/task")     -- Roblox task global re-export
+```
+
+This is also the practical answer to the wally/roblox-target package wall
+(instance-path requires can't bundle — issue #6): **pesde packages published
+with a `lune` target work under rodeo bundling as-is**, since their `@lune/*`
+imports resolve through these adapters. Prefer lune-target deps for run
+scripts.
+
 ## Common patterns
 
 ```bash
