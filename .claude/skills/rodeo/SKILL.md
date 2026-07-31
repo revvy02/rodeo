@@ -319,6 +319,16 @@ with a `lune` target work under rodeo bundling as-is**, since their `@lune/*`
 imports resolve through these adapters. Prefer lune-target deps for run
 scripts.
 
+`@lute/*` adapters exist too, for lute-flavored code:
+
+```lua
+require("@lute/fs")       -- handle-based open/read/write/close, readIntoBuffer, stat (Duration timestamps), recursive copy/move/rmdir; link/symlink/watch error
+require("@lute/io")       -- write(...)/read
+require("@lute/process")  -- args, env, cwd, homedir, execPath, run, system, exit; pid/onSignal error
+require("@lute/task")     -- Roblox task + resume/deferSelf; wait/delay accept @lute/time Durations
+require("@lute/time")     -- Instant/Duration with full arithmetic and comparisons (pure Luau)
+```
+
 ## Common patterns
 
 ```bash

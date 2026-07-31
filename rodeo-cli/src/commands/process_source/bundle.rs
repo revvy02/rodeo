@@ -146,30 +146,48 @@ fn bundle_inner(
 ///
 /// Called from `client::run()` on all scripts (both file-based and inline `--source`)
 /// before submission to the serve WebSocket.
+///
+/// Runs replacement passes to a fixpoint: a shim body may itself require
+/// another shim (e.g. @lute/fs requires @lute/time for Duration timestamps),
+/// and a single pass only resolves that when the inner shim's turn happens to
+/// come later in iteration order. Shims must not require themselves — the
+/// iteration cap turns that mistake into an error instead of unbounded
+/// growth.
 pub fn inline_shims(source: &str) -> Result<String> {
     let adapters = adapters::load_adapters();
     let mut result = source.to_string();
 
-    for adapter in adapters {
-        let escaped_alias = regex::escape(adapter.alias);
-        for &(require_path, shim_src) in adapter.shims {
-            let pattern_str = if require_path.is_empty() {
-                format!(r#"require\(["']{}["']\)"#, escaped_alias)
-            } else {
-                format!(r#"require\(["']{}/{}["']\)"#, escaped_alias, require_path)
-            };
-            let re = Regex::new(&pattern_str)
-                .context("invalid regex for adapter shim")?;
+    for _pass in 0..8 {
+        let before_len = result.len();
+        let mut changed = false;
+        for adapter in adapters {
+            let escaped_alias = regex::escape(adapter.alias);
+            for &(require_path, shim_src) in adapter.shims {
+                let pattern_str = if require_path.is_empty() {
+                    format!(r#"require\(["']{}["']\)"#, escaped_alias)
+                } else {
+                    format!(r#"require\(["']{}/{}["']\)"#, escaped_alias, require_path)
+                };
+                let re = Regex::new(&pattern_str)
+                    .context("invalid regex for adapter shim")?;
 
-            if re.is_match(&result) {
-                let comment_re = Regex::new(r"--[^\n]*\n").unwrap();
-                let clean_shim = comment_re.replace_all(shim_src, "\n");
-                let iife = format!("(function() {} end)()", clean_shim.trim());
-                result = re.replace_all(&result, iife.as_str()).to_string();
+                if re.is_match(&result) {
+                    let comment_re = Regex::new(r"--[^\n]*\n").unwrap();
+                    let clean_shim = comment_re.replace_all(shim_src, "\n");
+                    let iife = format!("(function() {} end)()", clean_shim.trim());
+                    result = re.replace_all(&result, iife.as_str()).to_string();
+                    changed = true;
+                }
             }
         }
+        if !changed {
+            return Ok(result);
+        }
+        // Growth without convergence after several passes = a shim cycle.
+        if _pass == 7 && result.len() > before_len {
+            bail!("adapter shim expansion did not converge (shim require cycle?)");
+        }
     }
-
     Ok(result)
 }
 
