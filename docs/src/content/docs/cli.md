@@ -56,7 +56,7 @@ Run a script in Studio
 
 ###### **Options:**
 
-* `-s`, `--source <SOURCE>` — Execute source code passed as string
+* `-s`, `--source <SOURCE>` — Execute source code passed as string. Hyphen-leading values are legal — Luau hotcomments (`--!native`, `--!optimize 2`) start scripts, and clap would otherwise reject them as flags
 * `--sourcemap <SOURCEMAP>` — Path to sourcemap.json for instance resolution
 * `--output <OUTPUT>` — Path to file for execution output (prints/logs)
 * `--return <RETURN_FILE>` — Path to file for return value JSON
