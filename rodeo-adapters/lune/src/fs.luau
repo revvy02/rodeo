@@ -1,16 +1,21 @@
--- @lune/fs shim — maps to rodeo's fs + stream RPCs
+-- @lune/fs shim — maps to rodeo's fs + stream RPCs.
+-- Conformance target: lune's own fs tests (tests-new/adapters/lune/fs/).
 local g = _G.__rodeo_procs[_G.__rodeo_eid]
 
+-- Byte streams rather than the string stream: file contents are arbitrary
+-- binary, and the string path is UTF-8-lossy on the wire.
 local function readFile(path: string): string
 	local h = g.fs.open(path, "r")
-	local content = g.stream.read(h)
+	local content = g.stream.readBytes(h)
 	g.stream.close(h)
-	return content or ""
+	return buffer.tostring(content)
 end
 
-local function writeFile(path: string, content: string)
+-- lune accepts strings and buffers.
+local function writeFile(path: string, content: string | buffer)
 	local h = g.fs.open(path, "w")
-	g.stream.write(h, content)
+	local buf = if typeof(content) == "buffer" then content else buffer.fromstring(content :: string)
+	g.stream.writeBytes(h, buf)
 	g.stream.close(h)
 end
 
@@ -21,7 +26,7 @@ end
 
 local function isDir(path: string): boolean
 	local ok, result = pcall(g.fs.type, path)
-	return ok and result == "directory"
+	return ok and result == "dir"
 end
 
 local function readDir(path: string): { string }
@@ -37,7 +42,16 @@ local function removeFile(path: string)
 	g.fs.remove(path)
 end
 
+-- lune's removeDir removes contents too; the host rmdir is non-recursive.
 local function removeDir(path: string)
+	for _, entry in g.fs.listdir(path) do
+		local child = path .. "/" .. entry.name
+		if isDir(child) then
+			removeDir(child)
+		else
+			g.fs.remove(child)
+		end
+	end
 	g.fs.rmdir(path)
 end
 
@@ -45,23 +59,50 @@ local function writeDir(path: string)
 	g.fs.mkdir(path)
 end
 
+-- lune's copy handles directories recursively; the host copy is file-only.
 local function copy(from: string, to: string)
-	g.fs.copy(from, to)
+	if isDir(from) then
+		g.fs.mkdir(to)
+		for _, entry in g.fs.listdir(from) do
+			copy(from .. "/" .. entry.name, to .. "/" .. entry.name)
+		end
+	else
+		g.fs.copy(from, to)
+	end
 end
 
 local function move(from: string, to: string)
-	g.fs.copy(from, to)
-	g.fs.remove(from)
+	copy(from, to)
+	if isDir(from) then
+		removeDir(from)
+	else
+		g.fs.remove(from)
+	end
+end
+
+-- lune metadata: `exists = false` for missing paths (never throws), kind,
+-- and DateTime timestamps — Studio's native DateTime satisfies
+-- typeof(x) == "DateTime" and value equality, so mint real ones from the
+-- stat millis.
+local function toDateTime(millis: number?): DateTime?
+	if millis == nil then
+		return nil
+	end
+	return DateTime.fromUnixTimestampMillis(millis)
 end
 
 local function metadata(path: string)
-	local stat = g.fs.stat(path)
+	local ok, stat = pcall(g.fs.stat, path)
+	if not ok then
+		return { exists = false }
+	end
 	return {
-		kind = if stat.type == "file" then "file" elseif stat.type == "directory" then "dir" else stat.type,
-		permissions = stat.permissions,
-		createdAt = stat.created,
-		modifiedAt = stat.modified,
-		accessedAt = stat.accessed,
+		exists = true,
+		kind = stat.type,
+		permissions = { readOnly = false },
+		createdAt = toDateTime(stat.createdMillis),
+		modifiedAt = toDateTime(stat.modifiedMillis),
+		accessedAt = toDateTime(stat.accessedMillis),
 	}
 end
 

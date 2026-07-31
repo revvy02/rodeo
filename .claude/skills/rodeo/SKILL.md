@@ -310,7 +310,7 @@ require("@lune/fs")       -- readFile/writeFile/isFile/isDir/readDir/remove*/wri
 require("@lune/process")  -- args, env, cwd, exit, os
 require("@lune/serde")    -- encode/decode
 require("@lune/stdio")    -- write/ewrite
-require("@lune/task")     -- Roblox task global re-export
+require("@lune/task")     -- Roblox task, wait/delay clamped to lune's out-of-range handling
 ```
 
 This is also the practical answer to the wally/roblox-target package wall

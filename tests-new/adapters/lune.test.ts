@@ -1,0 +1,173 @@
+// Lune adapter conformance: run lune's own (verbatim) test scripts through
+// `rodeo run` against a resident Studio, holding the @lune adapters to lune's
+// ground truth. See tests-new/adapters/lune/README.md for provenance.
+//
+// Every .luau file under lune/ must be classified by the manifest below —
+// an unclassified file fails the suite, so upstream additions force a
+// conscious triage instead of silently not running.
+//
+//   run          — executes via `rodeo run`, must exit 0
+//   gap          — in-scope module, unimplemented surface; skipped with reason
+//   out-of-scope — no adapter for the module; skipped with reason
+//   helper       — required by tests, not a test itself
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
+import { cliStudioHandle } from "../cli/helpers.js";
+
+const PORT = 46280;
+const ROOT = join(import.meta.dir, "..", "..");
+const RODEO = join(ROOT, "bin", "rodeo");
+const SUITE_DIR = join(import.meta.dir, "lune");
+
+// ---------------------------------------------------------------------------
+// Manifest
+// ---------------------------------------------------------------------------
+
+// Files that must pass. Paths relative to lune/.
+const RUN: string[] = [
+  "fs/copy.luau",
+  "fs/dirs.luau",
+  "fs/files.luau",
+  "fs/metadata.luau",
+  "fs/move.luau",
+  "process/args.luau",
+  "process/cwd.luau",
+  "process/exit.luau",
+  "serde/json/decode.luau",
+  "stdio/ewrite.luau",
+  "stdio/write.luau",
+  "task/cancel.luau",
+  "task/defer.luau",
+  "task/delay.luau",
+  "task/spawn.luau",
+  "task/wait.luau",
+  "globals/coroutine.luau",
+  "globals/error.luau",
+  "globals/type.luau",
+  "globals/warn.luau",
+];
+
+// Script args some tests assume their runner provides (lune's own runner
+// passes args). Harness provisioning, not a test edit.
+const ARGS: Record<string, string[]> = {
+  "process/args.luau": ["Foo", "Bar"],
+};
+
+// Prefix (directory or exact file) → reason. In-scope modules, missing surface.
+const GAP: Record<string, string> = {
+  "process/create": "adapter has no process.create (use @rodeo/process create/run)",
+  "process/exec": "adapter has no process.exec (use @rodeo/process run/system)",
+  "process/env.luau": "rodeo env is a read-only remote snapshot; lune env is assignable",
+  "serde/compression": "adapter has no serde.compress/decompress",
+  "serde/hashing": "adapter has no serde.hash/hmac",
+  "serde/json/encode.luau": "lune asserts its exact encoder output; HttpService key order/pretty differ",
+  "serde/jsonc": "serde shim is json-only (no jsonc)",
+  "serde/toml": "serde shim is json-only (no toml)",
+  "stdio/color.luau": "adapter has no stdio.color",
+  "stdio/style.luau": "adapter has no stdio.style",
+  "stdio/prompt.luau": "adapter has no stdio.prompt (no interactive stdin in a run)",
+  "globals/_G.luau": "lune expects a pristine _G; rodeo publishes runtime state there by design",
+  "globals/_VERSION.luau": "reports Studio's Luau version, not 'Lune x.y.z'",
+};
+
+// Prefix → reason. Whole modules with no adapter.
+const OUT_OF_SCOPE: Record<string, string> = {
+  "datetime": "no @lune/datetime adapter",
+  "luau": "no @lune/luau adapter (loadstring is Studio-restricted)",
+  "net": "no @lune/net adapter (HttpService semantics differ)",
+  "regex": "no @lune/regex adapter",
+  "require": "lune require semantics vs darklua bundling (issue #6 territory)",
+  "roblox": "no @lune/roblox adapter (Studio natives differ from lune's reimpl)",
+  "stdio/format.luau": "requires @lune/regex and @lune/roblox",
+  "globals/pcall.luau": "requires @lune/net",
+  "globals/typeof.luau": "requires @lune/roblox",
+};
+
+// Required by tests; not tests themselves.
+const HELPERS: string[] = [
+  "fs/utils.luau",
+  "task/fcheck.luau",
+  "serde/json/source.luau",
+  "serde/jsonc/source.luau",
+  "serde/toml/source.luau",
+];
+
+// ---------------------------------------------------------------------------
+// Harness
+// ---------------------------------------------------------------------------
+
+function allLuauFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true, recursive: true })) {
+    if (entry.isFile() && entry.name.endsWith(".luau")) {
+      out.push(relative(SUITE_DIR, join(entry.parentPath, entry.name)));
+    }
+  }
+  return out.sort();
+}
+
+function classify(file: string): { state: string; reason?: string } {
+  if (RUN.includes(file)) return { state: "run" };
+  if (HELPERS.includes(file)) return { state: "helper" };
+  for (const [prefix, reason] of Object.entries(GAP)) {
+    if (file === prefix || file.startsWith(prefix + "/")) return { state: "gap", reason };
+  }
+  for (const [prefix, reason] of Object.entries(OUT_OF_SCOPE)) {
+    if (file === prefix || file.startsWith(prefix + "/")) return { state: "out-of-scope", reason };
+  }
+  return { state: "unclassified" };
+}
+
+const studio = cliStudioHandle(PORT);
+const scratchDirs: string[] = [];
+
+beforeAll(async () => {
+  await studio.spawn();
+}, 180_000);
+
+afterAll(async () => {
+  await studio.close();
+  for (const d of scratchDirs) {
+    try { rmSync(d, { recursive: true, force: true }); } catch {}
+  }
+});
+
+describe("lune conformance", () => {
+  const files = allLuauFiles(SUITE_DIR);
+
+  it("manifest classifies every file", () => {
+    const unclassified = files.filter((f) => classify(f).state === "unclassified");
+    expect(unclassified, "add these to the manifest (run/gap/out-of-scope/helper)").toEqual([]);
+  });
+
+  for (const file of files) {
+    const { state, reason } = classify(file);
+    if (state === "helper" || state === "unclassified") continue;
+    if (state !== "run") {
+      it.skip(`[${state}] ${file} — ${reason}`, () => {});
+      continue;
+    }
+    it(
+      file,
+      () => {
+        // Fresh cwd per test: lune's fs tests write bin/-relative paths, and
+        // rodeo's fs executes at the run client's cwd — a scratch dir keeps
+        // that out of the repo (and out of rodeo's actual bin/).
+        const cwd = mkdtempSync(join(tmpdir(), "rodeo-lune-conformance-"));
+        scratchDirs.push(cwd);
+        const extraArgs = ARGS[file] ? ["--", ...ARGS[file]] : [];
+        const proc = Bun.spawnSync(
+          [RODEO, "run", join(SUITE_DIR, file), "--port", String(PORT), ...extraArgs],
+          { cwd, stdout: "pipe", stderr: "pipe", timeout: 90_000 },
+        );
+        const stdout = proc.stdout?.toString() ?? "";
+        const stderr = proc.stderr?.toString() ?? "";
+        expect(proc.exitCode, `${file}\n--- stdout:\n${stdout}\n--- stderr:\n${stderr}`).toBe(0);
+      },
+      120_000,
+    );
+  }
+});
