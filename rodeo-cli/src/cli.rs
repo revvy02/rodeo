@@ -84,8 +84,10 @@ pub enum Commands {
         /// Path to the script to execute, or '-' for stdin
         script: Option<String>,
 
-        /// Execute source code passed as string
-        #[arg(short, long)]
+        /// Execute source code passed as string. Hyphen-leading values are
+        /// legal — Luau hotcomments (`--!native`, `--!optimize 2`) start
+        /// scripts, and clap would otherwise reject them as flags.
+        #[arg(short, long, allow_hyphen_values = true)]
         source: Option<String>,
 
         /// Path to sourcemap.json for instance resolution
@@ -238,8 +240,9 @@ pub enum Commands {
     ProcessSource {
         /// Script file to process
         script: Option<String>,
-        /// Inline source to process
-        #[arg(long)]
+        /// Inline source to process. Hyphen-leading values are legal (Luau
+        /// hotcomments) — see Run's `source`.
+        #[arg(long, allow_hyphen_values = true)]
         source: Option<String>,
         /// Path to rojo sourcemap.json
         #[arg(long)]
