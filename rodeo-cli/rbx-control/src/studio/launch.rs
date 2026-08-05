@@ -142,17 +142,9 @@ impl Studio {
         // the parent-death behavior.
         #[cfg(target_os = "windows")]
         let parent_args: Vec<String> = Vec::new();
-        // macOS/Linux keep the parent-death behavior — except for detached
-        // launches: `-parentPid` makes Studio self-exit when this backend
-        // dies, which defeats detach entirely (Ctrl+C on the CLI → backend
-        // exits → Studio kills *itself* a few seconds later, bypassing every
-        // detach-aware cleanup path).
         #[cfg(not(target_os = "windows"))]
-        let parent_args: Vec<String> = if opts.detached {
-            Vec::new()
-        } else {
-            vec!["-parentPid".to_string(), std::process::id().to_string()]
-        };
+        let parent_args: Vec<String> =
+            vec!["-parentPid".to_string(), std::process::id().to_string()];
 
         // When a RunScript bootstrap is requested, every target launches via
         // `-task RunScript ... -runScriptFile <path>` (verified to open local
