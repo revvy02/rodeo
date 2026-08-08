@@ -25,9 +25,12 @@ local failed = process.run({ "sh", "-c", "exit 3" })
 check(failed.ok == false, "failed run.ok wrong")
 check(failed.exitcode == 3, `failed run.exitcode wrong: {failed.exitcode}`)
 
--- system: through the shell
+-- system: through the shell. The shell is the platform's own (`sh -c`, or
+-- `cmd /C` on Windows, which has no sh), and cmd's echo terminates with CRLF —
+-- a shell artifact, not an adapter difference, so compare line-ending-agnostic.
 local sys = process.system("echo lute-system")
-check(sys.ok and sys.stdout == "lute-system\n", "system output wrong")
+local sysOut = (sys.stdout:gsub("\r\n", "\n"))
+check(sys.ok and sysOut == "lute-system\n", `system output wrong: '{sys.stdout}'`)
 
 -- unsupported surface errors clearly
 check(not pcall(process.pid), "pid should error under rodeo")

@@ -103,7 +103,10 @@ function allLuauFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true, recursive: true })) {
     if (entry.isFile() && entry.name.endsWith(".luau")) {
-      out.push(relative(SUITE_DIR, join(entry.parentPath, entry.name)));
+      // Normalize to forward slashes: the manifests above are written with
+      // them, but `relative` yields backslashes on Windows, which would leave
+      // every nested file unclassified.
+      out.push(relative(SUITE_DIR, join(entry.parentPath, entry.name)).replaceAll("\\", "/"));
     }
   }
   return out.sort();
