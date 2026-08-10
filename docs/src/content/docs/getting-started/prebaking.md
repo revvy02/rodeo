@@ -15,13 +15,15 @@ into your repo. There are two things worth baking: **data** and **instances**.
 ## Bake data into a module
 
 Some values can only be obtained from a live runtime: an animation's length, the
-moment a sound becomes audible, a computed lookup table. Compute them in Studio,
-`return` the result, and point `--return` at a `.luau` file. rodeo serializes the
-return value into a Luau module in your source.
+moment a sound becomes audible, a computed lookup table. Compute them in Studio
+and write them into your source tree with
+[`roblox.bake`](/rodeo/runtime/roblox/), which serializes a value as a Luau
+module.
 
 ```luau
--- @rodeo run --return src/shared/data/animationLengths.luau --place
+-- @rodeo run --place
 
+local roblox = require("@rodeo/roblox")
 local ContentProvider = game:GetService("ContentProvider")
 local animations = require(game.ReplicatedStorage.shared.assets.animations)
 
@@ -40,7 +42,7 @@ for name, id in animations do
     lengths[name] = animator:LoadAnimation(anim).Length
 end
 
-return lengths
+roblox.bake("src/shared/data/animationLengths.luau", lengths)
 ```
 
 Run it:
@@ -49,39 +51,45 @@ Run it:
 rodeo run cacheAnimationLengths.luau
 ```
 
-rodeo writes the returned table to `src/shared/data/animationLengths.luau` as a
-ready-to-require module:
+`src/shared/data/animationLengths.luau` is now a ready-to-require module:
 
 ```luau
 return {
-    idle = 4.0,
-    walk = 0.8333,
-    -- ...
+    ["idle"] = 4,
+    ["walk"] = 0.8333,
 }
 ```
 
-Now the game requires that module instead of loading every animation at startup
-just to read its length. (A `--return` path that doesn't end in `.luau` is
-written as JSON instead.)
+The game requires that module instead of loading every animation at startup just
+to read its length.
 
-`--return` writes one file, at the end, from the value the script returns. To
-write data files at any point — several of them, or one per iteration — call
-[`roblox.bake`](/rodeo/runtime/roblox/) directly:
+Roblox types round-trip through their constructors, so baked data keeps its
+types when required back:
 
 ```luau
-local roblox = require("@rodeo/roblox")
-
 roblox.bake("src/shared/data/spawnPoints.luau", {
     lobby = workspace.Lobby.Spawn.CFrame,
-    arena = workspace.Arena.Spawn.CFrame,
+    material = Enum.Material.Plastic,
+    tint = Color3.new(1, 0, 0),
 })
 ```
 
-`bake` and `--return <path>.luau` share one implementation, so the output is the
-same either way: Roblox types round-trip through their constructors
-(`vector.create`, `CFrame.new`, `Color3.new`, `Enum.Material.Plastic`), and
-values with no source representation — Instances, functions — become their
-`tostring`. Parent directories are created as needed.
+```luau
+return {
+    ["lobby"] = CFrame.new(12, 4, -30, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+    ["material"] = Enum.Material.Plastic,
+    ["tint"] = Color3.new(1, 0, 0),
+}
+```
+
+Values with no source representation — Instances, functions — become their
+`tostring`. Parent directories are created as needed, and `bake` can be called
+as often as you like: several files, or one per iteration of a loop.
+
+For the single-value case there is a flag shorthand: `--return <path>.luau`
+writes the script's return value through the same implementation, once, when the
+run ends. (A `--return` path that doesn't end in `.luau` is written as JSON
+instead.)
 
 ## Bake instances into model files
 

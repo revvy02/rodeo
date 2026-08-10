@@ -115,12 +115,14 @@ print(roots[1].ClassName, roots[1].Name)'
 Model Map
 ```
 
-### Write return values to a file
+### Bake data into your source tree
 
-`--return` writes the script's return value to a file. A `.luau` file gets the value serialized as Luau source, preserving data types like `Vector3` or `CFrame`. The output is valid Luau you can `require` from other code.
+`roblox.bake` writes a value to a `.luau` module. Roblox types round-trip through their constructors, so the file is valid Luau you can `require` from other code — this is how you precompute runtime-only data (animation lengths, generated lookup tables) and commit it.
 
 ```bash
-$ rodeo run --return dump.luau --source "return { coins = 120, spawn = workspace.Map.Spawn.Position }"
+$ rodeo run --source '
+local roblox = require("@rodeo/roblox")
+roblox.bake("dump.luau", { coins = 120, spawn = workspace.Map.Spawn.Position })'
 ```
 
 ```lua
@@ -130,6 +132,40 @@ return {
 	["spawn"] = vector.create(0, 5, 0),
 }
 ```
+
+`--return dump.luau` does the same for a script's return value, once, when the run ends. A `--return` path that doesn't end in `.luau` is written as JSON.
+
+## State
+
+`rodeo state` shows what's connected right now as tables joined by a short studio id: the studios split by origin, their DOMs, and the runs executing on them.
+
+```bash
+$ rodeo state
+LOCAL
+ ID        MODE  SOURCE_PATH    WORKING_PATH                    STATUS
+ 68298c7b  edit  ./MyGame.rbxl  .rodeo/.temp/rodeo-<uuid>.rbxl  connected
+
+UPLOADED
+ ID        MODE  PLACE           STATUS
+ 9aec44bb  test  Place1 (12345)  connected
+
+DOMS
+ ID        KIND    STUDIO    USER
+ 2a32ef67  edit    9aec44bb  -
+ f37d718d  server  9aec44bb  -
+ b8f11a11  client  9aec44bb  revvy02 (902015375)
+
+RUNS
+ ID            STATE    MODE  KIND    CONTEXT  DOM       STUDIO
+ b0ec4d9a103b  running  test  client  client   b8f11a11  9aec44bb
+```
+
+- **LOCAL**: Studios opened from a place file, showing the file you asked for and the working copy Studio actually has open.
+- **UPLOADED**: Studios opened from a place id.
+- **DOMS**: one row per DataModel, linked to its studio. Client DOMs show the player.
+- **RUNS**: each run joined to the DOM and studio it runs on, with its resolved route.
+
+Scope a run to a studio with `--studio-id <id>`. `rodeo kill <id>` takes either a run id or a studio id, and `rodeo save <studio-id>` commits a Studio's place back to its source file. Ids change each launch, so read them from `rodeo state` rather than hardcoding. Add `--json` for the raw snapshot.
 
 ## Docs
 
