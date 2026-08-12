@@ -11,8 +11,9 @@ Only five modules have adapters today (`fs`, `process`, `serde`, `stdio`,
 tests fail wholesale until an adapter exists, and the harness manifest
 records them as out-of-scope rather than letting them noise up the run.
 
-- Source: `lune-org/lune` `tests/`, pinned at the commit the
-  `submodules/lune` checkout points to (copied at `7f1849c`).
+- Source: `lune-org/lune` `tests/`, copied at `7f1849c` — the commit the
+  `submodules/lune` submodule pins, so the provenance is checkable from a
+  fresh clone.
 - License: MPL-2.0 (see `LICENSE.txt`, copied from the lune repository).
 - Update flow: pull `submodules/lune`, re-copy the five directories
   verbatim, re-run the harness, reconcile the manifest.
