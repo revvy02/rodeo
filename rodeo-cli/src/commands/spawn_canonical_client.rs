@@ -448,7 +448,7 @@ fn read_run_opts(params: &Value) -> RunCodeOpts {
         dom_kind: str_opt("domKind"),
         context: str_opt("context"),
         show_return: params.get("showReturn").and_then(|v| v.as_bool()).unwrap_or(false),
-        cache_requires: params.get("cacheRequires").and_then(|v| v.as_bool()).unwrap_or(false),
+        reload_requires: params.get("reloadRequires").and_then(|v| v.as_bool()).unwrap_or(false),
         verbose: params.get("verbose").and_then(|v| v.as_bool()).unwrap_or(false),
         script_args: params.get("scriptArgs").and_then(|v| v.as_array())
             .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())

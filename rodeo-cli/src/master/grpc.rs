@@ -509,7 +509,7 @@ impl proto::RunService for RodeoServices {
                 session: submit.session,
                 dom_id: submit.dom_id,
                 log_filter: submit.log_filter.into_option().unwrap_or_default(),
-                cache_requires: submit.cache_requires,
+                reload_requires: submit.reload_requires,
                 script_args: if submit.script_args.is_empty() { None } else { Some(submit.script_args) },
                 return_file: submit.return_file,
                 show_return: submit.show_return,

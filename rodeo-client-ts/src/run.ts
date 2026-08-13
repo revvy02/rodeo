@@ -28,7 +28,7 @@ type CommonRunOpts = {
   /** Run context the code executes as (cf. Roblox Script.RunContext). */
   context?: "plugin" | "server" | "client" | "elevated";
   showReturn?: boolean;
-  cacheRequires?: boolean;
+  reloadRequires?: boolean;
   verbose?: boolean;
   scriptArgs?: string[];
   profile?: string;

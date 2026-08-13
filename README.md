@@ -88,18 +88,20 @@ true
 
 ### Access live module state in a play test
 
-`--mode test --context client` runs at client identity in a play test. With `--cache-requires`, the execution has access to the same module state as your running game code. Mutate it in one run, read it back in the next.
+`--mode test --context client` runs at client identity in a play test. Instance requires resolve to the same modules your running game code is using, so you can mutate state in one run and read it back in the next.
 
 ```bash
-$ rodeo run --mode test --context client --cache-requires --source '
+$ rodeo run --mode test --context client --source '
 local m = require(game.ReplicatedStorage.Counter)
 m.value += 1
 print("value is now", m.value)'
 value is now 1
 
-$ rodeo run --mode test --context client --cache-requires --show-return --source "return require(game.ReplicatedStorage.Counter).value"
+$ rodeo run --mode test --context client --show-return --source "return require(game.ReplicatedStorage.Counter).value"
 1
 ```
+
+Pass `--reload-requires` for the opposite: rodeo re-evaluates the require tree so the run gets its own freshly-initialized copies, isolated from the game's state.
 
 ### Export and import models
 

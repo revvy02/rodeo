@@ -25,7 +25,7 @@ export type LogFilter = {
 export type ExecutionParams = {
 	executionId: string,
 	logFilter: LogFilter?,
-	cacheRequires: boolean?,
+	reloadRequires: boolean?,
 	verbose: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
@@ -61,15 +61,20 @@ local function executeInContext(ctx: utils.ExecutionContext, context: RunContext
 	log.debug(`START`)
 	log.debug(`ctx.module: {ctx.module:GetFullName()}`)
 	log.debug(`context: {context}`)
-	log.debug(`cacheRequires: {params.cacheRequires or false}`)
+	log.debug(`reloadRequires: {params.reloadRequires or false}`)
 
 	-- Get module path BEFORE traversal (so we can re-resolve after if it gets cloned)
 	local modulePath = requireResolver.getAbsoluteInstancePath(ctx.module)
 	log.debug(`modulePath: {modulePath or "nil"}`)
 
-	-- Setup uncacheable require traversal (from plugin context, before execution)
+	-- Instance requires use the VM's require cache by default — Roblox's own
+	-- semantics, so a require resolves to the live module the surrounding game
+	-- is already using. `reloadRequires` opts into re-evaluation: the traversal
+	-- clones the require tree so this run gets its own freshly-initialized
+	-- copies (test isolation, or picking up edits made since the modules were
+	-- first required).
 	local traversalCleanup: (() -> ())? = nil
-	if not params.cacheRequires then
+	if params.reloadRequires then
 		log.debug(`Setting up uncachable require traversal...`)
 		traversalCleanup = requireResolver.setupUncachableRequireModuleTraversal(ctx.module, params.executionId, log)
 		log.debug(`Traversal setup complete`)

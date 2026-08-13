@@ -320,7 +320,11 @@ message SubmitRequest {
   optional string dom_id = 4;
   optional string dom_kind = 15; // server | client
   optional string context = 16;  // plugin | server | client | elevated (cf. Script.RunContext)
-  optional bool cache_requires = 5;
+  // Re-evaluate instance requires instead of reusing the VM's require cache.
+  // Absent = cached (Roblox's own semantics): a require resolves to the live
+  // module the surrounding game is already using. Set = the plugin clones the
+  // require tree so the run gets its own freshly-initialized copies.
+  optional bool reload_requires = 5;
   repeated string script_args = 6;
   optional string return_file = 7;
   optional bool show_return = 8;
@@ -624,7 +628,8 @@ message RunCommand {
   // resolved those when it picked the DOM this command is sent to.
   string context = 3;
   reserved 4, 5, 6, 7, 8;    // old flat enable_warn/error/info/output/logs
-  optional bool cache_requires = 9;
+  // See SubmitRequest.reload_requires.
+  optional bool reload_requires = 9;
   repeated string script_args = 10;
   optional string return_file = 11;
   optional bool show_return = 12;

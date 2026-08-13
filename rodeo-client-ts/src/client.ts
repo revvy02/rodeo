@@ -83,7 +83,7 @@ async function daemonRunCode(
       domKind: route.domKind ?? null,
       context: opts.context ?? null,
       showReturn: opts.showReturn ?? false,
-      cacheRequires: opts.cacheRequires ?? false,
+      reloadRequires: opts.reloadRequires ?? false,
       verbose: opts.verbose ?? false,
       scriptArgs: opts.scriptArgs ?? [],
       profileDir: profileDir ?? null,

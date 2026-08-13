@@ -79,7 +79,7 @@ Run a script in Studio
 * `--no-info` — Disable info output
 * `--no-print` — Disable print statements
 * `--no-output` — Disable all output
-* `--cache-requires` — Enable module caching (skip reloader for better performance)
+* `--reload-requires` — Re-evaluate instance requires instead of reusing the VM's require cache. By default a require resolves to the live module the game is already using; this gives the run its own fresh copies
 * `--ppid <PPID>` — Parent PID — exit when this process dies
 * `--host <HOST>` — Host of running server
 

@@ -66,7 +66,7 @@ Run a script in Studio.
 - `--show-return` — print return value to stdout (any size; streamed in chunks)
 - `--return <path>` — write return value to file: `.luau`/`.lua` emits Luau source, anything else JSON. Size-unbounded — the value lives in the file and is NOT also returned in-wire.
 - `--output <path>` — write execution output (prints/logs) to file
-- `--cache-requires` — use cached module state (see below)
+- `--reload-requires` — re-evaluate instance requires instead of using the live cached modules (see below)
 - `--place [<value>]` — launch Studio: empty (no value), a place ID (number), or a file path (`.rbxl`/`.rbxlx`). Guarantees a fresh place even if a serve already has one open; the run is pinned to it and it closes after the run (unless `--detach`).
 - `--place.universe <id>` — universe ID (auto-resolved from place ID if omitted)
 - `--detach` — keep Studio running after rodeo exits
@@ -200,11 +200,13 @@ defaults to edit, and edit has only an edit DOM).
 | Test | Edit + server + client (F5) |
 | Play | Edit + server + N clients via `StudioTestService:ExecuteMultiplayerTestAsync` (one Studio; the engine caps multiplayer-test clients at 8) |
 
-## `--cache-requires`
+## `--reload-requires`
 
-When passed, the script gets access to the global module state for the context it's in. Useful for debugging — you can inspect loaded modules, shared state, etc.
+Instance requires (`require(game.ReplicatedStorage.Foo)`) use the VM's require cache by default — Roblox's own semantics, so a require resolves to the **live module the surrounding game is already using**. Mutate state in one run and the next run sees it; inspect a running game's modules and you get its real state.
 
-Without it, rodeo uses an uncacheable require traversal (module cloning) so each execution gets fresh module state — good for testing, since stale cached modules can silently run old code.
+`--reload-requires` opts into re-evaluation: rodeo clones the require tree so the run gets its own freshly-initialized copies. Use it for test isolation, or to pick up edits made to a DOM ModuleScript since it was first required. The cost is that it structurally clones and renames instances in the place for the duration of the run.
+
+Filesystem requires are unaffected either way — the bundler inlines them, so they're fresh on every run regardless.
 
 ## `@rodeo` API
 

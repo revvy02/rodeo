@@ -809,7 +809,7 @@ type _SubmitRequestFields = {
 	domId: string?,
 	domKind: string?,
 	context: string?,
-	cacheRequires: boolean?,
+	reloadRequires: boolean?,
 	scriptArgs: { string },
 	returnFile: string?,
 	showReturn: boolean?,
@@ -829,7 +829,7 @@ export type _SubmitRequestPartialFields = {
 	domId: string?,
 	domKind: string?,
 	context: string?,
-	cacheRequires: boolean?,
+	reloadRequires: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
 	showReturn: boolean?,
@@ -1808,7 +1808,7 @@ type _RunCommandFields = {
 	executionId: string,
 	script: string,
 	context: string,
-	cacheRequires: boolean?,
+	reloadRequires: boolean?,
 	scriptArgs: { string },
 	returnFile: string?,
 	showReturn: boolean?,
@@ -1825,7 +1825,7 @@ export type _RunCommandPartialFields = {
 	executionId: string?,
 	script: string?,
 	context: string?,
-	cacheRequires: boolean?,
+	reloadRequires: boolean?,
 	scriptArgs: { string }?,
 	returnFile: string?,
 	showReturn: boolean?,
@@ -6131,7 +6131,7 @@ do
 			domId = if data == nil or data.domId == nil then nil else data.domId,
 			domKind = if data == nil or data.domKind == nil then nil else data.domKind,
 			context = if data == nil or data.context == nil then nil else data.context,
-			cacheRequires = if data == nil or data.cacheRequires == nil then nil else data.cacheRequires,
+			reloadRequires = if data == nil or data.reloadRequires == nil then nil else data.reloadRequires,
 			scriptArgs = if data == nil or data.scriptArgs == nil then {} else data.scriptArgs,
 			returnFile = if data == nil or data.returnFile == nil then nil else data.returnFile,
 			showReturn = if data == nil or data.showReturn == nil then nil else data.showReturn,
@@ -6184,9 +6184,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.context)
 		end
 
-		if self.cacheRequires ~= nil then
+		if self.reloadRequires ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.cacheRequires then 1 else 0)
+			output, cursor = proto.writeVarInt(output, cursor, if self.reloadRequires then 1 else 0)
 		end
 
 		if self.scriptArgs ~= nil and #self.scriptArgs > 0 then
@@ -6259,7 +6259,7 @@ do
 				if field == 5 then
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
-					self.cacheRequires = value ~= 0
+					self.reloadRequires = value ~= 0
 					continue
 				elseif field == 8 then
 					local value
@@ -6397,8 +6397,8 @@ do
 			output.context = self.context
 		end
 
-		if self.cacheRequires ~= nil then
-			output.cacheRequires = self.cacheRequires
+		if self.reloadRequires ~= nil then
+			output.reloadRequires = self.reloadRequires
 		end
 
 		if self.scriptArgs ~= nil and #self.scriptArgs > 0 then
@@ -6475,8 +6475,8 @@ do
 			self.context = input.context
 		end
 
-		if input.cacheRequires ~= nil then
-			self.cacheRequires = input.cacheRequires
+		if input.reloadRequires ~= nil then
+			self.reloadRequires = input.reloadRequires
 		end
 
 		if input.scriptArgs ~= nil then
@@ -11820,7 +11820,7 @@ do
 			executionId = if data == nil or data.executionId == nil then "" else data.executionId,
 			script = if data == nil or data.script == nil then "" else data.script,
 			context = if data == nil or data.context == nil then "" else data.context,
-			cacheRequires = if data == nil or data.cacheRequires == nil then nil else data.cacheRequires,
+			reloadRequires = if data == nil or data.reloadRequires == nil then nil else data.reloadRequires,
 			scriptArgs = if data == nil or data.scriptArgs == nil then {} else data.scriptArgs,
 			returnFile = if data == nil or data.returnFile == nil then nil else data.returnFile,
 			showReturn = if data == nil or data.showReturn == nil then nil else data.showReturn,
@@ -11858,9 +11858,9 @@ do
 			output, cursor = proto.writeString(output, cursor, self.context)
 		end
 
-		if self.cacheRequires ~= nil then
+		if self.reloadRequires ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 9, proto.wireTypes.varint)
-			output, cursor = proto.writeVarInt(output, cursor, if self.cacheRequires then 1 else 0)
+			output, cursor = proto.writeVarInt(output, cursor, if self.reloadRequires then 1 else 0)
 		end
 
 		if self.scriptArgs ~= nil and #self.scriptArgs > 0 then
@@ -11933,7 +11933,7 @@ do
 				if field == 9 then
 					local value
 					value, cursor = proto.readVarInt(input, cursor)
-					self.cacheRequires = value ~= 0
+					self.reloadRequires = value ~= 0
 					continue
 				elseif field == 12 then
 					local value
@@ -12044,8 +12044,8 @@ do
 			output.context = self.context
 		end
 
-		if self.cacheRequires ~= nil then
-			output.cacheRequires = self.cacheRequires
+		if self.reloadRequires ~= nil then
+			output.reloadRequires = self.reloadRequires
 		end
 
 		if self.scriptArgs ~= nil and #self.scriptArgs > 0 then
@@ -12110,8 +12110,8 @@ do
 			self.context = input.context
 		end
 
-		if input.cacheRequires ~= nil then
-			self.cacheRequires = input.cacheRequires
+		if input.reloadRequires ~= nil then
+			self.reloadRequires = input.reloadRequires
 		end
 
 		if input.scriptArgs ~= nil then

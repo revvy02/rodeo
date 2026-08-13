@@ -19,7 +19,7 @@ pub struct RunRequest {
     /// applies)
     pub dom_id: Option<String>,
     pub log_filter: proto::LogFilter,
-    pub cache_requires: Option<bool>,
+    pub reload_requires: Option<bool>,
     pub script_args: Option<Vec<String>>,
     pub return_file: Option<String>,
     pub show_return: Option<bool>,
@@ -141,7 +141,7 @@ impl DomConnection {
                     script: run.script.clone(),
                     context: context.as_str().to_string(),
                     log_filter: buffa::MessageField::some(run.log_filter.clone()),
-                    cache_requires: run.cache_requires,
+                    reload_requires: run.reload_requires,
                     script_args: run.script_args.clone().unwrap_or_default(),
                     return_file: run.return_file.clone(),
                     show_return: run.show_return,

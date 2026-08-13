@@ -113,7 +113,7 @@ local function runViaDaemon(
 		domKind = opts.domKind,
 		context = opts.context,
 		showReturn = opts.showReturn == true,
-		cacheRequires = opts.cacheRequires == true,
+		reloadRequires = opts.reloadRequires == true,
 		verbose = opts.verbose == true,
 		scriptArgs = opts.scriptArgs or {},
 		profileDir = profileDir,

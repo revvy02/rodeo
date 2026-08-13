@@ -71,7 +71,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 		local killFn = runtime.executeInContext(ctx, context, {
 			executionId = executionId,
 			logFilter = logFilter,
-			cacheRequires = run.cacheRequires,
+			reloadRequires = run.reloadRequires,
 			verbose = run.verbose or verbose,
 			scriptArgs = scriptArgs,
 			returnFile = run.returnFile,

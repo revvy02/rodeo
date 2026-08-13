@@ -208,7 +208,7 @@ export function makeCliRunFn(
     if (opts.source !== undefined) args.push("--source", opts.source);
     if (opts.sourcemap !== undefined) args.push("--sourcemap", opts.sourcemap);
     if (opts.showReturn) args.push("--show-return");
-    if (opts.cacheRequires) args.push("--cache-requires");
+    if (opts.reloadRequires) args.push("--reload-requires");
     if (opts.mode !== undefined) args.push("--mode", opts.mode);
     if (opts.domKind !== undefined) args.push("--dom", opts.domKind);
     if (opts.context !== undefined) args.push("--context", opts.context);

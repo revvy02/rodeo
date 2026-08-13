@@ -147,9 +147,17 @@ pub enum Commands {
         #[arg(long)]
         no_output: bool,
 
-        /// Enable module caching (skip reloader for better performance)
+        /// Re-evaluate instance requires instead of reusing the VM's require
+        /// cache. By default a require resolves to the live module the game is
+        /// already using; this gives the run its own fresh copies.
         #[arg(long)]
-        cache_requires: bool,
+        reload_requires: bool,
+
+        /// Removed in 1.3.0: caching is the default now. Present only to fail
+        /// loudly — a silently-flipped default would mean runs quietly reading
+        /// different module state than before.
+        #[arg(long = "cache-requires", hide = true)]
+        cache_requires_removed: bool,
 
         /// Script arguments (passed after --)
         #[arg(last = true)]

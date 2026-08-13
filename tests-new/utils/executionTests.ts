@@ -523,29 +523,52 @@ export function targetIdentity(run: RunFn): void {
   });
 }
 
-// ── cacheRequires (2 tests) ──────────────────────────────────────────────
+// ── reloadRequires (4 tests) ──────────────────────────────────────────────
 
-export function cacheRequires(run: RunFn): void {
-  it("run:server sees mutated global state with cache-requires", async () => {
-    const result = await run({
-      mode: "run",
-      context: "server",
-      cacheRequires: true,
-      source: "return require(game.ReplicatedStorage.globalState).value",
-    });
+// The fixture place's own scripts set `globalState.value = "mutated"` at
+// runtime, so this module distinguishes the two require polarities exactly:
+// the cached (default) path resolves to the live module the game mutated,
+// while --reload-requires clones the require tree and yields a fresh copy
+// still holding its initial "original".
+// Both run:server cases run first on purpose: the test:client cases need a
+// run→play transition, which hangs for 60s on Studio versions where the
+// session never reaches play mode (a requires-free script reproduces it
+// identically). Ordering keeps that from poisoning the run-mode assertions.
+export function reloadRequires(run: RunFn): void {
+  const requireGlobalState = "return require(game.ReplicatedStorage.globalState).value";
+
+  it("run:server requires resolve to the game's live module by default", async () => {
+    const result = await run({ mode: "run", context: "server", source: requireGlobalState });
     expect(result.ok).toBe(true);
     expect(result.return).toBe("mutated");
   });
 
-  it("test:client sees mutated global state with cache-requires", async () => {
+  it("run:server --reload-requires gets a fresh copy, not the live module", async () => {
+    const result = await run({
+      mode: "run",
+      context: "server",
+      reloadRequires: true,
+      source: requireGlobalState,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.return).toBe("original");
+  });
+
+  it("test:client requires resolve to the game's live module by default", async () => {
+    const result = await run({ mode: "test", context: "client", source: requireGlobalState });
+    expect(result.ok).toBe(true);
+    expect(result.return).toBe("mutated");
+  });
+
+  it("test:client --reload-requires gets a fresh copy, not the live module", async () => {
     const result = await run({
       mode: "test",
       context: "client",
-      cacheRequires: true,
-      source: "return require(game.ReplicatedStorage.globalState).value",
+      reloadRequires: true,
+      source: requireGlobalState,
     });
     expect(result.ok).toBe(true);
-    expect(result.return).toBe("mutated");
+    expect(result.return).toBe("original");
   });
 }
 
@@ -677,12 +700,16 @@ export function execFiltering(run: RunFn): void {
 // ── uncachedRequireTraversal (6 tests) ───────────────────────────────────
 
 export function uncachedRequireTraversal(run: RunFn): void {
+  // Fresh module state is opt-in: --reload-requires runs the cloning
+  // traversal. (Before 1.3.0 this was the default and the flag was
+  // --cache-requires for the opposite.)
   const exec = (source: string) =>
     run({
       mode: "run",
       context: "server",
       source,
       verbose: true,
+      reloadRequires: true,
     });
 
   it("leaf require gets fresh state", async () => {
@@ -741,13 +768,14 @@ export function uncachedRequireTraversal(run: RunFn): void {
 // ── cachedRequireTraversal (4 tests) ─────────────────────────────────────
 
 export function cachedRequireTraversal(run: RunFn): void {
+  // Cached requires are the default now — no flag: the require resolves to
+  // the live module the game already mutated.
   const exec = (source: string) =>
     run({
       mode: "run",
       context: "server",
       source,
       verbose: true,
-      cacheRequires: true,
     });
 
   it("leaf require sees mutated state", async () => {

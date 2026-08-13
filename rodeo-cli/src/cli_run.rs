@@ -30,7 +30,7 @@ pub struct RunRequest {
     /// this run just launched via `--place`, or an explicit `--studio-id`).
     pub session: Option<String>,
     pub log_filter: proto::LogFilter,
-    pub cache_requires: bool,
+    pub reload_requires: bool,
     pub script_args: Vec<String>,
     pub return_file: Option<String>,
     pub show_return: bool,
@@ -57,7 +57,7 @@ pub async fn run_piped(host: &str, port: u16, mut request: RunRequest) -> Result
         dom_kind: request.route.dom_kind.map(|d| d.as_str().to_string()),
         context: request.route.context.map(|c| c.as_str().to_string()),
         show_return: request.show_return,
-        cache_requires: request.cache_requires,
+        reload_requires: request.reload_requires,
         verbose: request.verbose,
         script_args: request.script_args,
         profile: request.profile,

@@ -25,7 +25,7 @@ pub struct RunCodeOpts {
     /// Run context: "plugin" | "server" | "client" | "elevated".
     pub context: Option<String>,
     pub show_return: bool,
-    pub cache_requires: bool,
+    pub reload_requires: bool,
     pub verbose: bool,
     pub script_args: Vec<String>,
     pub profile: bool,
@@ -116,7 +116,7 @@ async fn run_inner(
         session: session_guid,
         dom_id: if dom_id.is_empty() { None } else { Some(dom_id.to_string()) },
         log_filter: opts.log_filter.map(buffa::MessageField::some).unwrap_or_else(buffa::MessageField::none),
-        cache_requires: if opts.cache_requires { Some(true) } else { None },
+        reload_requires: if opts.reload_requires { Some(true) } else { None },
         script_args: opts.script_args,
         return_file: opts.return_file,
         show_return: if opts.show_return { Some(true) } else { None },

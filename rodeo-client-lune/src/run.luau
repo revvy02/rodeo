@@ -16,7 +16,7 @@ export type DomRunCodeOpts = {
 	sourcemap: string?,
 	context: ("plugin" | "server" | "client" | "elevated")?,
 	showReturn: boolean?,
-	cacheRequires: boolean?,
+	reloadRequires: boolean?,
 	verbose: boolean?,
 	scriptArgs: { string }?,
 	profile: string?,

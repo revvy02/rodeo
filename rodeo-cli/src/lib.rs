@@ -268,7 +268,15 @@ pub async fn run() {
             };
             commands::serve::main(port, mode).await
         }
-        Commands::Run { script, source, sourcemap, output, return_file, show_return, mode, dom_kind, context, studio_id, no_warn, no_error, no_info, no_print, no_output, cache_requires, script_args, ppid, server, place, fflags } => {
+        Commands::Run { script, source, sourcemap, output, return_file, show_return, mode, dom_kind, context, studio_id, no_warn, no_error, no_info, no_print, no_output, reload_requires, cache_requires_removed, script_args, ppid, server, place, fflags } => {
+            if cache_requires_removed {
+                eprintln!(
+                    "rodeo: --cache-requires was removed — caching instance requires is the default now.\n\
+                     Drop the flag for the same behavior, or pass --reload-requires to re-evaluate them\n\
+                     (the old default: each run gets freshly-initialized copies of the require tree)."
+                );
+                std::process::exit(2);
+            }
             if let Some(ppid) = ppid { parent_exit::on_parent_exit(ppid); }
             let script_args = if script_args.is_empty() { directive_script_args } else { script_args };
             commands::run::main(commands::run::RunArgs {
@@ -278,7 +286,7 @@ pub async fn run() {
                 context: context.map(|c| c.as_str().to_string()),
                 studio_id,
                 no_warn, no_error, no_info, no_print, no_output,
-                cache_requires, script_args,
+                reload_requires, script_args,
                 server, place, fflags,
                 verbose,
             }).await

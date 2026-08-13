@@ -4,7 +4,7 @@ import { existsSync, rmSync } from "node:fs";
 import {
   autoTransition,
   bundle,
-  cacheRequires,
+  reloadRequires,
   cachedRequireTraversal,
   ensureReturn,
   errorHandling,
@@ -42,7 +42,7 @@ describe("rodeo runtime (CLI)", () => {
 // ── Fixture-place suites ──────────────────────────────────────────────
 // These need their own backgrounded Studio because the place file isn't the
 // default empty one — they open rojo-built projects with specific content
-// (traversal mutator Script, context-project cache-requires harness).
+// (traversal mutator Script, context-project require-polarity harness).
 
 describe("uncached require traversal (CLI)", () => {
   const FIXTURE = "tests-new/fixtures/traversal-project";
@@ -84,7 +84,7 @@ describe("cached require traversal (CLI)", () => {
   cachedRequireTraversal(makeCliRunFn(PORT));
 });
 
-describe("target cache requires (CLI)", () => {
+describe("target require polarity (CLI)", () => {
   const FIXTURE = "tests-new/fixtures/context-project";
   const PLACE = `${FIXTURE}/place.rbxl`;
   const PORT = 46062;
@@ -100,5 +100,5 @@ describe("target cache requires (CLI)", () => {
     try { if (existsSync(PLACE)) rmSync(PLACE); } catch {}
   });
 
-  cacheRequires(makeCliRunFn(PORT));
+  reloadRequires(makeCliRunFn(PORT));
 });
