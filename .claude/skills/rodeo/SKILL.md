@@ -5,7 +5,7 @@ description: CLI tool for Roblox Studio that lets you create studio instances, a
 
 # rodeo
 
-CLI that executes Luau code inside Roblox Studio via WebSocket. Studio is the runtime, and rodeo connects to it, sends scripts, and streams output back. It's designed to be used like a conventional language runtime.
+CLI that executes Luau code inside Roblox Studio. Studio is the runtime. rodeo connects to it over a WebSocket, sends scripts, and streams output back. Use it like a conventional language runtime.
 
 ## Quick start
 
@@ -20,27 +20,27 @@ rodeo kill <id>                         # kill a run OR close a studio by id (fr
 rodeo save <studio-id>                  # save a studio's place back to its source file
 ```
 
-`rodeo run --place` is sufficient to spawn a studio with an empty place. The studio process is attached to that run process, and will terminate if that run process gets terminated. You can do `rodeo run --place --detach` to ensure that studio instance persists even if that run process is ended.
+`rodeo run --place` spawns a Studio with an empty place. That Studio belongs to the run process and closes when the run ends. Add `--detach` to keep the Studio alive after the run exits.
 
 ## Use your own studio
 
-Launch a studio for your own work rather than routing to one that is already
-connected. A run with no `--place`, `--studio-id`, or `--dom-id` matches **any**
-connected DOM, so running `rodeo state`, seeing a studio, and using it is the
-easy mistake — that studio is usually someone's working session with unsaved
-edits and a particular place open. Your script mutates its DOM, `--save` writes
-to their file, and `rodeo kill <studio-id>` closes it out from under them.
+Launch your own Studio. Do not route work into one that is already connected.
 
-Use a studio you did not launch only when:
+A run with no `--place`, `--studio-id`, or `--dom-id` matches **any** connected
+DOM. So the easy mistake is to run `rodeo state`, see a Studio, and use it.
+That Studio usually belongs to someone else, with unsaved edits and a specific
+place open. Your script mutates its DOM, `--save` writes to their file, and
+`rodeo kill <studio-id>` closes it on them.
+
+Use a Studio you did not launch only when:
 
 - you opened it earlier and know what is in it,
 - the task is explicitly about that session ("the place I have open"), or
-- you were told which studio to use.
+- you were told which Studio to use.
 
-Otherwise start your own with `rodeo run --place` (add `--detach` to keep it
-alive across several runs, then `rodeo kill <studio-id>` when finished), and
-pin follow-up runs to it with `--studio-id` so they cannot drift onto another
-studio.
+Otherwise start your own with `rodeo run --place`. Add `--detach` to keep it
+alive across several runs, then `rodeo kill <studio-id>` when you finish. Pin
+follow-up runs with `--studio-id` so they cannot drift onto another Studio.
 
 ## Commands
 
@@ -113,22 +113,22 @@ RUNS
 
 `--json` emits the full snapshot (including `sourcePath`/`workingPath`).
 
-`rodeo kill <id>` takes a run id or a studio id (unique prefixes ok) and
-resolves which kind it names: a run match kills the run, a studio match closes
-that Studio (detached ones included; its active runs fail as disconnected).
-Ids change each launch, so read them from `rodeo state` rather than storing
-them.
+`rodeo kill <id>` takes a run id or a Studio id. Unique prefixes work. A run
+id kills the run. A Studio id closes that Studio, including detached ones, and
+its active runs fail as disconnected. Ids change on every launch, so read them
+from `rodeo state` instead of storing them.
 
-`rodeo save [studio-id] [--out <path>]` saves a studio's place. Targets the
-only connected Studio when the id is omitted; errors listing candidates when
-several are connected. The saved place is then committed: to `--out` when
-given, otherwise back to the launch's SOURCE_PATH — so the default persists the live place into the file
-you opened. Blank-place studios with no `--out` just save their working file.
-Manually-opened Studios can't be saved this way (no rodeo session).
+`rodeo save [studio-id] [--out <path>]` saves a Studio's place. Omit the id to
+target the only connected Studio; with several connected it errors and lists
+them. It then writes the saved place to `--out`, or back to the launch's
+SOURCE_PATH by default — so a plain `rodeo save` persists the live place into
+the file you opened. A blank-place Studio with no `--out` keeps its working
+file. You cannot save a manually-opened Studio this way, because it has no
+rodeo session.
 
 ## Directives
 
-A single-line comment that pre-fills `rodeo run` flags — full parity with the CLI, so scripts declare their own runtime configuration:
+A single-line comment that pre-fills `rodeo run` flags. It accepts every CLI flag, so a script declares its own runtime configuration:
 
 ```luau
 -- @rodeo run --place ./game.rbxl --mode test --context client --save -- --user frank
@@ -137,37 +137,37 @@ local process = require("@rodeo/process")
 print(process.args)  --> { "--user", "frank" }
 ```
 
-Then just `rodeo run my-script.luau` — no flags at the call site. Everything after `--` becomes `process.args`.
+Then run `rodeo run my-script.luau` with no flags. Everything after `--` becomes `process.args`.
 
-The directive is the base configuration; the CLI overrides it per layer: a flag passed on the CLI replaces the directive's copy of that flag (repeatable flags like `--fflag.override` accumulate instead), and a CLI `--` tail replaces the directive's script args wholesale.
+The directive is the base configuration. The CLI overrides it per layer. A flag on the CLI replaces the directive's copy of that flag, except repeatable flags like `--fflag.override`, which accumulate. A `--` tail on the CLI replaces the directive's script args entirely.
 
 ## DOM Targeting: --mode / --context / --dom
 
-Three orthogonal flags, all optional with sensible defaults. `--mode` picks the
-Studio mode, `--dom` which DataModel to run on, and `--context` the identity
-level to run at.
+Three independent flags. All are optional and have defaults. `--mode` picks the
+Studio mode, `--dom` picks the DataModel to run on, and `--context` picks the
+identity to run at.
 
 - **mode** — `edit`, `run`, `test`, `play`
 - **dom** — `edit`, `server`, `client`. Which DataModel. The edit DOM exists in
-  every mode, so `--dom edit` targets it even while a test/play session runs,
-  without disturbing the session. The DOM is the **communication boundary**:
-  code on the same DOM shares instances (BindableEvents); different DOMs talk
-  via RemoteEvents.
+  every mode, so `--dom edit` reaches it even while a test or play session runs,
+  and does not disturb that session. The DOM is the **communication boundary**.
+  Code on the same DOM shares instances through BindableEvents. Code on
+  different DOMs communicates through RemoteEvents.
 - **context** — the **identity level**, not a script class:
   - `plugin` — plugin identity
   - `server` — the identity server-side code runs at when the game is running
   - `client` — the identity client-side code runs at when running (LocalScripts / `RunContext = Client`)
   - `elevated` — command-bar identity (via StudioMCP), for privileged APIs
 
-  Each context is an **independent Luau VM** on the DOM — separate global state,
-  so contexts can't touch each other's Luau values directly (they coordinate
-  through DOM instances). A ModuleScript has no fixed context: it runs at
-  whatever context `require`s it.
+  Each context is an **independent Luau VM** on the DOM with its own global
+  state. Contexts cannot read each other's Luau values, so they coordinate
+  through DOM instances. A ModuleScript has no fixed context. It runs at
+  whatever context requires it.
 
-Defaults: `mode` defaults to **edit** and is **never inferred** from `--context`/
-`--dom`, so a server/client run needs `--mode` (`--context server` alone resolves
-to edit+server and errors). `context` alone implies its DOM; `mode` alone → the
-mode's primary DOM at its native context.
+`mode` defaults to **edit**, and rodeo **never infers** it from `--context` or
+`--dom`. So a server or client run must pass `--mode`: `--context server` alone
+resolves to edit+server, which errors. `context` alone implies its DOM. `mode`
+alone selects that mode's primary DOM at its native context.
 
 ### Common combinations
 
@@ -201,11 +201,11 @@ defaults to edit, and edit has only an edit DOM).
 
 ## `--reload-requires`
 
-Instance requires (`require(game.ReplicatedStorage.Foo)`) use the VM's require cache by default — Roblox's own semantics, so a require resolves to the **live module the surrounding game is already using**. Mutate state in one run and the next run sees it; inspect a running game's modules and you get its real state.
+Instance requires (`require(game.ReplicatedStorage.Foo)`) use the require cache by default. This matches Roblox's own semantics: the require resolves to the **live module the running game already uses**. Mutate state in one run and the next run sees it. Inspect a running game's modules and you get its real state.
 
-`--reload-requires` opts into re-evaluation: the run gets its own freshly-initialized copies instead. Use it for test isolation, or to pick up edits made to a DOM ModuleScript since it was first required. Note it temporarily adds and renames instances in the open place while the run is in flight.
+`--reload-requires` re-evaluates them instead, so the run gets its own fresh copies. Use it for test isolation, or to pick up edits you made to a DOM ModuleScript after it was first required. It temporarily adds and renames instances in the open place while the run is in flight.
 
-Filesystem requires are unaffected either way — the bundler inlines them, so they're fresh on every run regardless.
+Filesystem requires are fresh on every run either way, because the bundler inlines them.
 
 ## `@rodeo` API
 
@@ -282,23 +282,25 @@ roblox.bake(path, value)                 -- write a table/value as a Luau module
 roblox.capture(output?, options?) -> string  -- screenshot Studio, returns absolute path
 ```
 
-`bake` emits `return <value>` with Roblox types as constructors (vectors,
-CFrames, colors, enums), so the file requires straight back into Studio.
-Instances and functions become their `tostring`. Parent directories are created
-as needed.
+`bake` emits `return <value>` and writes Roblox types as constructors
+(vectors, CFrames, colors, enums), so you can require the file straight back
+into Studio. Instances and functions become their `tostring`. `bake` creates
+parent directories as needed.
 
-Arbitrarily large models are fine for import/export. XML output is picked by
-extension.
+`import` and `export` handle arbitrarily large models. The file extension
+selects XML or binary output.
 
-`capture`'s `output` is an exact file path when it ends in `.png`, otherwise a
-directory for the auto-named file (default `.rodeo-screenshots/`). `options`
-(all optional): `cframe` (scripted camera for the shot, restored after),
-`fov`, `focus`, `settle` (seconds to wait before capturing). Needs a viewport
-— plugin context, or client context in a running session (server context
-errors). macOS and Windows only; anywhere else it errors. On Windows a
-minimized Studio never renders its viewport, and background launches are
-minimized, so a capture there needs `--focus` (or a restored window) or it
-fails after 10s.
+`capture` treats `output` as an exact file path when it ends in `.png`.
+Otherwise it treats it as a directory for the auto-named file, and defaults to
+`.rodeo-screenshots/`. All `options` are optional: `cframe` (scripted camera
+for the shot, restored afterward), `fov`, `focus`, and `settle` (seconds to
+wait before capturing).
+
+`capture` needs a viewport, so use plugin context, or client context in a
+running session. Server context errors. It runs on macOS and Windows only. On
+Windows a minimized Studio never renders its viewport, and background launches
+are minimized, so launch with `--focus` or restore the window first. Otherwise
+the capture fails after 10s.
 
 ### `@lune` adapters — run lune-flavored code unchanged
 
@@ -314,10 +316,10 @@ require("@lune/stdio")    -- write/ewrite
 require("@lune/task")     -- Roblox task, wait/delay clamped to lune's out-of-range handling
 ```
 
-This is also the practical answer to the wally/roblox-target package wall
-(instance-path requires can't bundle — issue #6): **pesde packages published
-with a `lune` target work under rodeo bundling as-is**, since their `@lune/*`
-imports resolve through these adapters. Prefer lune-target deps for run
+This also solves the wally/roblox-target package wall, where instance-path
+requires cannot bundle (issue #6): **pesde packages published with a `lune`
+target work under rodeo bundling as-is**, because their `@lune/*` imports
+resolve through these adapters. Prefer lune-target dependencies for run
 scripts.
 
 `@lute/*` adapters exist too, for lute-flavored code:
