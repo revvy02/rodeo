@@ -63,8 +63,8 @@ Run a script in Studio.
 - `--dom edit|server|client` — which DOM (usually inferred); `edit` targets the edit DOM even while a test/play session runs
 - `--studio-id <id>` — scope routing to one studio (id from `rodeo state`; unique prefix ok)
 - `--dom-id <id>` — pin the run to one DOM (id from `rodeo state`; unique prefix ok). Only `--context` may accompany it
-- `--show-return` — print return value to stdout (any size; streamed in chunks)
-- `--return <path>` — write return value to file: `.luau`/`.lua` emits Luau source, anything else JSON. Size-unbounded — the value lives in the file and is NOT also returned in-wire.
+- `--show-return` — print return value to stdout (any size)
+- `--return <path>` — write return value to file: `.luau`/`.lua` emits Luau source, anything else JSON. Size-unbounded.
 - `--output <path>` — write execution output (prints/logs) to file
 - `--reload-requires` — re-evaluate instance requires instead of using the live cached modules (see below)
 - `--place [<value>]` — launch Studio: empty (no value), a place ID (number), or a file path (`.rbxl`/`.rbxlx`). Guarantees a fresh place even if a serve already has one open; the run is pinned to it and it closes after the run (unless `--detach`).
@@ -72,7 +72,7 @@ Run a script in Studio.
 - `--detach` — keep Studio running after rodeo exits
 - `--focus` — bring Studio to foreground on launch (default: background)
 - `--show-widgets <spec>` — allow-list of Studio dock widgets to keep; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
-- `--save [path]` — save the place after the run through the verified save path (retried until the file's mtime changes; a missed save is a nonzero exit, never silent). Bare `--save` opens the source file directly and saves into it; `--save <path>` saves to that path. With `--detach`, saves at run end and leaves Studio open
+- `--save [path]` — save the place after the run; a missed save is a nonzero exit, never silent. Bare `--save` opens the source file directly and saves into it; `--save <path>` saves to that path. With `--detach`, saves at run end and leaves Studio open
 - `--profile [dir]` — enable microprofiler auto-capture and collect dumps (optional output directory)
 - `--sourcemap <path>` — path to sourcemap.json for instance resolution
 - `--host <host>` / `--port <port>` — server address (default: localhost:44872)
@@ -121,9 +121,8 @@ them.
 
 `rodeo save [studio-id] [--out <path>]` saves a studio's place. Targets the
 only connected Studio when the id is omitted; errors listing candidates when
-several are connected. The save is verified (retried until the working file's
-mtime changes), then committed: to `--out` when given, otherwise back to the
-launch's SOURCE_PATH — so the default persists the live place into the file
+several are connected. The saved place is then committed: to `--out` when
+given, otherwise back to the launch's SOURCE_PATH — so the default persists the live place into the file
 you opened. Blank-place studios with no `--out` just save their working file.
 Manually-opened Studios can't be saved this way (no rodeo session).
 
@@ -191,7 +190,7 @@ Any combination that isn't a valid (mode, dom, context) triple errors at
 submit — including a server/client `--context`/`--dom` with no `--mode` (mode
 defaults to edit, and edit has only an edit DOM).
 
-### Studio modes (derived from connected DOMs)
+### Studio modes
 
 | Mode | DOMs |
 |------|-----|
@@ -204,7 +203,7 @@ defaults to edit, and edit has only an edit DOM).
 
 Instance requires (`require(game.ReplicatedStorage.Foo)`) use the VM's require cache by default — Roblox's own semantics, so a require resolves to the **live module the surrounding game is already using**. Mutate state in one run and the next run sees it; inspect a running game's modules and you get its real state.
 
-`--reload-requires` opts into re-evaluation: rodeo clones the require tree so the run gets its own freshly-initialized copies. Use it for test isolation, or to pick up edits made to a DOM ModuleScript since it was first required. The cost is that it structurally clones and renames instances in the place for the duration of the run.
+`--reload-requires` opts into re-evaluation: the run gets its own freshly-initialized copies instead. Use it for test isolation, or to pick up edits made to a DOM ModuleScript since it was first required. Note it temporarily adds and renames instances in the open place while the run is in flight.
 
 Filesystem requires are unaffected either way — the bundler inlines them, so they're fresh on every run regardless.
 
@@ -268,9 +267,9 @@ io.read()  -- read line from stdin
 
 ```lua
 stream.read(handle) -> string?        -- text; one-shot (~16MiB cap on files — use readBytes for big files)
-stream.write(handle, data)            -- chunked automatically; any size is safe
-stream.readBytes(handle) -> buffer    -- chunked automatically; any size is safe
-stream.writeBytes(handle, data: buffer) -- chunked automatically; any size is safe
+stream.write(handle, data)            -- any size is safe
+stream.readBytes(handle) -> buffer    -- any size is safe
+stream.writeBytes(handle, data: buffer) -- any size is safe
 stream.close(handle)
 ```
 
@@ -284,12 +283,12 @@ roblox.capture(output?, options?) -> string  -- screenshot Studio, returns absol
 ```
 
 `bake` emits `return <value>` with Roblox types as constructors (vectors,
-CFrames, colors, enums), so the file requires straight back into Studio — the
-same path `--return <file>.luau` uses. Instances and functions become their
-`tostring`. Parent directories are created as needed.
+CFrames, colors, enums), so the file requires straight back into Studio.
+Instances and functions become their `tostring`. Parent directories are created
+as needed.
 
-Import/export stream through the transport in chunks and write atomically —
-arbitrarily large models are fine. XML output is picked by extension.
+Arbitrarily large models are fine for import/export. XML output is picked by
+extension.
 
 `capture`'s `output` is an exact file path when it ends in `.png`, otherwise a
 directory for the auto-named file (default `.rodeo-screenshots/`). `options`
@@ -380,5 +379,5 @@ rodeo kill <studio-id>                                 # close the Studio
 - Return values >2MiB without a `--return` file fail the run by design — pass a file path for big payloads
 - `--place` always opens its own fresh place, even when another place is already open on the serve — runs never silently land in a resident place
 - **`--place file.rbxl` without `--save` opens a temp COPY** (the WORKING_PATH in `rodeo state`) — in-Studio edits and manual Cmd+S land in the copy, which is deleted when the Studio closes. Persist with `rodeo save <studio-id>` (commits back to SOURCE_PATH) before closing, or launch with `--save` to open the source directly
-- `stream.read` on a file handle is a one-shot read (~16MiB transport cap) — an oversized read fails that call with a size error (the run survives); use `fs.open` + `stream.readBytes` for big files, which chunks any size
+- `stream.read` on a file handle is a single read and fails on very large files (~16MiB); the run survives — use `fs.open` + `stream.readBytes`, which handles any size
 - A killed/disconnected run exits 2 with `rodeo: run disconnected: <reason>` on stderr; an explicit `rodeo kill` exits 1
