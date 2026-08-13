@@ -347,8 +347,8 @@ rodeo run --return data.json --source "return bigTable"
 rodeo run script.luau -- arg1 arg2
 # In script: local args = require("@rodeo/process").args
 
-# Multiplayer test: create the session with its client(s) up front, then run on the server.
-# (Client-first matters on Studio 0.726–0.729: growing a running session crashes — see Gotchas.)
+# Multiplayer test: start the session with a client, then run on the server.
+# Append more clients to a running session with the same --mode play --dom client.
 rodeo run --place --mode play --dom client --show-return --source "return game.Players.LocalPlayer.UserId"
 rodeo run --mode play --context server --source "print(#game.Players:GetPlayers())"
 
@@ -373,7 +373,6 @@ rodeo kill <studio-id>                                 # close the Studio
 - `--mode run|test|play` when the studio isn't already in that mode → auto-transitions
 - `--context elevated` requires Studio's AI assistant / StudioMCP to be available — rodeo bridges to elevated identity through it
 - **`--context elevated` can hang ~10s and fail if the Studio never connected to StudioMCP** — the Assistant plugin only opens its MCP socket when the Assistant panel is opened, and `mcp-server.enabled=true` alone doesn't guarantee it (github.com/revvy02/rodeo issue #4). Recovery: open the AI Assistant panel in that Studio
-- **Never grow a running play session on Studio 0.726–0.729** — `StudioTestService:AddPlayers` SIGSEGVs the play-server process ~0.6s in (engine bug, reproduced with zero rodeo code). A fresh `--mode play` test spawns its one client up front via `ExecuteMultiplayerTestAsync` (fine); appending another (`--mode play --dom client` against an already-running session, which calls `AddPlayers`) crashes it. `EndTest` also silently no-ops on 0.729. This is why the isolatedPlay/playProfiling suites can have known failures on these versions
 - Luau hotcomments work, including via `--source` — put `--!native` at the top of a script for a large speedup on numeric code
 - `rodeo setup` must be run once per project for `@rodeo/*` imports
 - Return values >2MiB without a `--return` file fail the run by design — pass a file path for big payloads
