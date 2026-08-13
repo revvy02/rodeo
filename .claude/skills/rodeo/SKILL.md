@@ -42,6 +42,22 @@ Otherwise start your own with `rodeo run --place`. Add `--detach` to keep it
 alive across several runs, then `rodeo kill <studio-id>` when you finish. Pin
 follow-up runs with `--studio-id` so they cannot drift onto another Studio.
 
+On a shared machine, other agents and people run their own serves and Studios
+at the same time:
+
+- **Never run `pkill RobloxStudio`, and never kill a Studio you did not
+  launch.** Find yours by the temp place path in its arguments:
+  `ps -eo pid,command | grep "RobloxStudio -task"` prints
+  `-localPlaceFile .../.rodeo/.temp/rodeo-<uuid>.rbxl`. Match the uuid to your
+  own launch.
+- `rodeo kill <studio-id>` closes Studios that the current serve launched. For
+  a leftover Studio from an earlier serve, kill its pid instead. Studio ignores
+  SIGTERM, so send SIGKILL.
+- **Give each harness its own port** (`rodeo serve --port <n>`). Two agents on
+  one port route runs into each other's sessions.
+- When a serve restarts, Studios from earlier runs reconnect to it. If
+  `rodeo state` lists more than one Studio, pin every run with `--studio-id`.
+
 ## Commands
 
 ### `rodeo serve`
@@ -207,6 +223,21 @@ Instance requires (`require(game.ReplicatedStorage.Foo)`) use the require cache 
 
 Filesystem requires are fresh on every run either way, because the bundler inlines them.
 
+Two consequences decide which mode you need:
+
+- **To mutate live game state, use the default.** A script that drives the
+  running game through its own modules — inserting into a jobs table, setting
+  ECS components the real systems react to — must reach the live instances.
+  Under `--reload-requires` those writes land in a fresh copy that the game
+  never reads.
+- **`--reload-requires` re-runs module top-level code, and modules with
+  load-time side effects can hang or error under it** even though they load
+  fine in the real game: `WaitForChild` on instances a server script creates at
+  boot, HTTP calls in the require path, load-order assumptions. The failure
+  reads as `Requested module experienced an error while loading` and names only
+  the outermost require. Bisect it with `pcall(require, ...)` down the
+  dependency chain, one level at a time, until you isolate the module.
+
 ## `@rodeo` API
 
 Run `rodeo setup` once per project to generate types and `.luaurc`.
@@ -369,6 +400,37 @@ rodeo run --place MyGame.rbxl --detach --source "..."  # edits land in a temp co
 rodeo save <studio-id>                                 # commit the copy back to MyGame.rbxl
 rodeo kill <studio-id>                                 # close the Studio
 ```
+
+## Verifying game behavior
+
+Patterns that pay off when you use rodeo to reproduce a bug and prove a fix:
+
+- **Capture the bug first, then the fix.** Build the place from the unfixed
+  source, drive the repro, screenshot. Rebuild with the fix, run the same
+  driver script, screenshot again. Two captures with identical steps are much
+  stronger evidence than a passing assertion, and the first one proves your
+  repro actually reproduces the bug.
+- **Rebuild before every run.** The place file is a snapshot. Run your build
+  task after any source edit, before launching. Testing a stale build silently
+  verifies old code.
+- **The server drives, the client observes.** `roblox.capture` needs a
+  viewport, so a `--context server` run cannot screenshot. Split the work: one
+  `--context server` run mutates game state, a parallel `--context client` run
+  waits and captures. Coordinate the stages through workspace attributes. The
+  server calls `workspace:SetAttribute("TEST_STAGE", n)` and the client polls
+  it, since attributes replicate from server to client immediately.
+- **Drive state through the game's own write paths.** To simulate a gameplay
+  event, find the exact `world:set` or module call the real flow performs and
+  call that, rather than approximating the effect. Replication and downstream
+  systems then behave as they do in production.
+- **Pump batched networking yourself.** Libraries with a manual event loop
+  (such as zap's `manual_event_loop`) are flushed by a game script that only
+  services the main VM's copy of the module. A run gets its own VM, so its
+  `Fire` calls sit in a buffer forever. Call the library's send function
+  yourself afterward. The same applies to anything a game-script loop flushes.
+- **Filter engine noise.** Local sessions print `Failed to load sound/asset ...
+  not authorized` for team-owned assets. Pipe run output through a filter, or
+  write it with `--output` and grep the file. Do not mistake it for the bug.
 
 ## Gotchas
 
