@@ -90,7 +90,7 @@ Run a script in Studio
 * `--place <PLACE>` — Launch Studio: empty (no value), place ID (number), or file path (.rbxl/.rbxlx)
 * `--dom-id <DOM_ID>` — Pin the run to a specific DOM by id (from `rodeo state`; unique prefix ok). Only --context may accompany it — no mode/dom routing
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
-* `--focus` — Bring Studio to the foreground on launch (default: background)
+* `--focus` — Bring Studio to the front on launch (default: background). Studio only takes keyboard focus when it opens on the display you are working on; on another display it is raised there and your focus stays put
 * `--detach` — Keep Studio/Player running after rodeo exits
 * `--show-widgets <WIDGETS>` — Allow-list of Studio dock widgets to keep visible; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
 * `--profile <PROFILE>` — Enable microprofiler auto-capture and collect dumps (optional: output directory)

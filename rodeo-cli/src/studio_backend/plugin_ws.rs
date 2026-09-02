@@ -182,6 +182,17 @@ pub async fn handle_studio_client<S, R>(
         // installed always send the guid, so this covers only manual installs.
         let _ = try_claim_session_from_handshake(&mut *guard, &dom_id);
 
+        // A DOM connecting is a moment Studio activates itself: the edit DOM
+        // as Studio comes up, a server/client DOM as a session starts. Arm
+        // the focus guard on its Studio so that activation is handed back.
+        let studio = guard.doms.get(&dom_id)
+            .and_then(|d| d.session_guid.as_ref())
+            .and_then(|sg| guard.studio_instances.get(sg))
+            .and_then(|inst| inst.studio.clone());
+        if let Some(studio) = studio {
+            tokio::task::spawn_blocking(move || studio.guard_focus(std::time::Duration::from_secs(60)));
+        }
+
         // Relay dom_connect to master
         if let Some(ref relay_tx) = guard.relay_tx {
             let state_json = initial_state.as_ref()

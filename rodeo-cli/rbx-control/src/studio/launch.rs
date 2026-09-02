@@ -327,12 +327,23 @@ impl Studio {
         self.detached
     }
 
-    /// Bring the Studio window to the foreground.
+    /// Bring Studio to the front of its own display. Keyboard focus only
+    /// moves to Studio when the user is working on that display (see
+    /// `launch_control::Child::focus`).
     pub fn focus(&self) -> Result<()> {
         if let Some(ref handle) = *self.handle.lock().unwrap() {
             handle.focus().context("failed to focus Studio")?;
         }
         Ok(())
+    }
+
+    /// For the next `window`, undo any activation Studio grabs for itself
+    /// (it does so when a test session starts or ends). See
+    /// `launch_control::Child::guard_focus`.
+    pub fn guard_focus(&self, window: std::time::Duration) {
+        if let Some(ref handle) = *self.handle.lock().unwrap() {
+            handle.guard_focus(window);
+        }
     }
 
     /// One pre-warm probe of Studio's accessibility connection: walk the menu
@@ -408,21 +419,30 @@ impl Studio {
         // steals its foreground mid-chord, dropping the Ctrl+S (the place's
         // mtime never changes and the save hangs to timeout). On macOS,
         // CGEvent delivery wants the window frontmost first and has no
-        // foreground-steal race, so keep the pre-focus there.
-        #[cfg(target_os = "macos")]
-        match self.focus() {
-            Ok(()) => tracing::info!(
-                pid = self.pid,
-                elapsed_ms = started.elapsed().as_millis() as u64,
-                "save: focus confirmed",
-            ),
-            Err(e) => tracing::warn!(
-                pid = self.pid,
-                "save: focus did not confirm (continuing with keystroke anyway): {e}",
-            ),
-        }
+        // foreground-steal race, so activate there — unconditionally, since
+        // the chord only reaches the frontmost app — and hand activation
+        // back afterwards if the user was working on another display.
         let guard = self.handle.lock().unwrap();
         if let Some(ref handle) = *guard {
+            #[cfg(target_os = "macos")]
+            let hand_back = match handle.activate() {
+                Ok(prev) => {
+                    tracing::info!(
+                        pid = self.pid,
+                        elapsed_ms = started.elapsed().as_millis() as u64,
+                        hand_back = ?prev,
+                        "save: activated for keystroke",
+                    );
+                    prev
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        pid = self.pid,
+                        "save: activation did not confirm (continuing with keystroke anyway): {e}",
+                    );
+                    None
+                }
+            };
             tracing::info!(
                 pid = handle.id(),
                 place = ?self.place_path,
@@ -440,6 +460,13 @@ impl Studio {
             match &ks_result {
                 Ok(()) => tracing::info!(pid = handle.id(), "save: send_keystroke returned Ok"),
                 Err(e) => tracing::warn!(pid = handle.id(), "save: send_keystroke failed: {e}"),
+            }
+            #[cfg(target_os = "macos")]
+            if let Some(prev) = hand_back {
+                // Give the chord a moment to be consumed while Studio is
+                // frontmost, then return the user's key window and focus.
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                handle.restore_focus(prev);
             }
             ks_result.context("failed to send save keystroke to Studio")?;
             Ok(())

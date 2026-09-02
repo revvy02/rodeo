@@ -166,6 +166,13 @@ impl Studio {
             },
         )?;
         tracing::info!(session_guid = sg_short, pid = inner.pid(), "spawn: Studio process spawned");
+        if opts.background {
+            // A background Studio activates itself when its first session
+            // starts (the initial mode is baked into the bootstrap, so no
+            // SetTargetMode is relayed for it). Guard from spawn so that
+            // activation is handed straight back; transitions re-arm later.
+            inner.guard_focus(std::time::Duration::from_secs(120));
+        }
 
         Ok(Studio {
             session_guid,
@@ -188,6 +195,9 @@ impl Studio {
     pub fn place_path(&self) -> Option<&Path> { self.inner.place_path() }
     pub fn save(&self) -> Result<()> { self.inner.save() }
     pub fn mark_saved(&self) { self.inner.mark_saved() }
+    /// Undo activation Studio grabs for itself during a mode transition
+    /// (see `rbx_control::studio::Studio::guard_focus`).
+    pub fn guard_focus(&self, window: std::time::Duration) { self.inner.guard_focus(window) }
     pub fn warm_save_menu_once(&self) -> bool { self.inner.warm_save_menu_once() }
     pub fn kill(&self) { self.inner.kill() }
 

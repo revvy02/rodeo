@@ -86,7 +86,8 @@ Run a script in Studio.
 - `--place [<value>]` — launch Studio: empty (no value), a place ID (number), or a file path (`.rbxl`/`.rbxlx`). Guarantees a fresh place even if a serve already has one open; the run is pinned to it and it closes after the run (unless `--detach`).
 - `--place.universe <id>` — universe ID (auto-resolved from place ID if omitted)
 - `--detach` — keep Studio running after rodeo exits
-- `--focus` — bring Studio to foreground on launch (default: background)
+- `--focus` — bring Studio to the front on launch (default: background). Studio takes keyboard focus only if it opens on the display you're working on; on another display it's raised there and your focus stays where it is
+- Without `--focus`, Studio stays in the background on every display: it opens without activating, and when it activates itself (Studio does this as a test session starts or ends) rodeo hands focus straight back to the app you were in — unless you switched to Studio yourself (click or ⌘-Tab)
 - `--show-widgets <spec>` — allow-list of Studio dock widgets to keep; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
 - `--save [path]` — save the place after the run; a missed save is a nonzero exit, never silent. Bare `--save` opens the source file directly and saves into it; `--save <path>` saves to that path. With `--detach`, saves at run end and leaves Studio open
 - `--profile [dir]` — enable microprofiler auto-capture and collect dumps (optional output directory)

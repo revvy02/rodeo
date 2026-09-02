@@ -298,7 +298,9 @@ pub struct PlaceArgs {
     #[arg(long = "place.universe", value_name = "UNIVERSE_ID", help_heading = "Launch")]
     pub place_universe: Option<u64>,
 
-    /// Bring Studio to the foreground on launch (default: background)
+    /// Bring Studio to the front on launch (default: background). Studio only
+    /// takes keyboard focus when it opens on the display you are working on;
+    /// on another display it is raised there and your focus stays put
     #[arg(long)]
     pub focus: bool,
 

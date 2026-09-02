@@ -344,6 +344,23 @@ async fn handle_master_msg(
             let json = serde_json::to_string(&server_msg).unwrap();
             let guard = state.lock().await;
             if let Some(dom_conn) = guard.doms.get(&dom_id) {
+                // A mode transition makes Studio activate itself when the
+                // session starts (and again when it ends), stealing keyboard
+                // focus from whatever the user is in — on any display. Arm
+                // the focus guard on that Studio so the activation is handed
+                // straight back; every transition re-arms it.
+                if matches!(server_msg.msg, Some(proto::server_message::Msg::SetTargetMode(_))) {
+                    let studio = dom_conn
+                        .session_guid
+                        .as_ref()
+                        .and_then(|sg| guard.studio_instances.get(sg))
+                        .and_then(|inst| inst.studio.clone());
+                    if let Some(studio) = studio {
+                        tokio::task::spawn_blocking(move || {
+                            studio.guard_focus(std::time::Duration::from_secs(60))
+                        });
+                    }
+                }
                 match dom_conn.studio_tx.send(json) {
                     Ok(_) => tracing::debug!(dom = dom_short, kind, "backend → plugin: forwarded"),
                     Err(e) => tracing::warn!(dom = dom_short, kind, "backend → plugin: channel closed: {e}"),
