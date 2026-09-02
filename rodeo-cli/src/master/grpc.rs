@@ -743,10 +743,16 @@ impl proto::MasterService for RodeoServices {
             _ => return Err(ConnectError::invalid_argument(format!("unknown mode '{}'", mode))),
         }
 
-        // Write target_modes and push SetTargetModeMsg to the edit DOM — plugin drives the transition.
+        // Write target_modes and push SetTargetModeMsg to the edit DOM — plugin
+        // drives the transition. No DOM for the session is a hard error: the
+        // client would otherwise wait on a transition nobody was asked to make.
         let mut guard = self.state.lock().await;
-        guard.set_target_mode(&session_guid, &mode);
+        let pushed = guard.set_target_mode(&session_guid, &mode);
         drop(guard);
+        if let Err(msg) = pushed {
+            tracing::warn!(session = &session_guid[..8.min(session_guid.len())], mode = mode.as_str(), "set_studio_mode: {msg}");
+            return Err(ConnectError::failed_precondition(msg));
+        }
 
         Ok((proto::SetStudioModeResponse { ok: true, mode, ..Default::default() }, Context::default()))
     }

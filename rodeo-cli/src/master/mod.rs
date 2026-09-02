@@ -732,7 +732,11 @@ impl MasterState {
 
     /// Explicitly set a studio's target mode (used by SetStudioMode RPC).
     /// Broadcasts to every DOM in the studio regardless of pending queue.
-    pub fn set_target_mode(&mut self, session_guid: &str, mode: &str) {
+    /// Record `mode` as the target for `session_guid` and push it to every
+    /// connected DOM of that session. Errors when no such DOM exists: the
+    /// plugin drives the transition, so with nothing to send to, nothing would
+    /// ever happen and a caller waiting on the resulting state would hang.
+    pub fn set_target_mode(&mut self, session_guid: &str, mode: &str) -> Result<(), String> {
         let mut doms: Vec<String> = {
             let mut found = Vec::new();
             for backend in self.backends.values() {
@@ -745,7 +749,12 @@ impl MasterState {
             }
             found
         };
-        if doms.is_empty() { return; }
+        if doms.is_empty() {
+            return Err(format!(
+                "no connected DOM for studio session {session_guid}: the Studio is not running, \
+                 its plugin is disconnected, or it was launched by a different rodeo server"
+            ));
+        }
         doms.sort();
 
         self.target_modes.insert(session_guid.to_string(), (mode.to_string(), doms.clone()));
@@ -759,6 +768,7 @@ impl MasterState {
             };
             self.send_to_dom(&dom_id, msg);
         }
+        Ok(())
     }
 
     /// Forward a typed ClientRpcCall from a DOM's plugin to the run client.
