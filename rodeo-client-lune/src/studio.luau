@@ -76,8 +76,15 @@ export type MultiplayerTestClient = domMod.Dom & {
 	disconnect: () -> (),
 }
 
+-- Bound on a call that waits for Studio state to change (a Studio to connect,
+-- a mode transition to produce its DOMs, a client to join). Omit to wait
+-- indefinitely.
+export type WaitOpts = {
+	timeoutMs: number?,
+}
+
 export type MultiplayerTestServer = domMod.Dom & {
-	connectClient: () -> MultiplayerTestClient,
+	connectClient: (opts: WaitOpts?) -> MultiplayerTestClient,
 	close: () -> (),
 }
 
@@ -87,13 +94,13 @@ export type Studio = {
 	editDom: domMod.Dom,
 	serverDom: domMod.Dom?,
 	clientDom: domMod.Dom?,
-	setMode: (mode: string) -> (),
+	setMode: (mode: string, opts: WaitOpts?) -> (),
 	getMode: () -> string,
 	save: () -> SaveResult,
 	close: () -> (),
 	getDoms: () -> { domMod.Dom },
 	runCode: (opts: run.RunCodeOpts) -> run.RunResult,
-	startMultiplayerTest: () -> MultiplayerTestServer,
+	startMultiplayerTest: (opts: WaitOpts?) -> MultiplayerTestServer,
 }
 
 local function createStudio(
@@ -125,8 +132,12 @@ local function createStudio(
 		return exec.runViaDaemon(daemon, "studio.runCode", { studioHandle = handle }, opts)
 	end
 
-	function self.setMode(mode)
-		local resp = daemon.call("studio.setMode", { studioHandle = handle, mode = mode })
+	function self.setMode(mode, opts)
+		local resp = daemon.call("studio.setMode", {
+			studioHandle = handle,
+			mode = mode,
+			timeoutMs = if opts then opts.timeoutMs else nil,
+		})
 		if mode == "edit" then
 			self.serverDom = nil
 			self.clientDom = nil
@@ -160,9 +171,10 @@ local function createStudio(
 		daemon.call("studio.close", { studioHandle = handle })
 	end
 
-	function self.startMultiplayerTest()
+	function self.startMultiplayerTest(opts)
 		local resp = daemon.call("studio.startMultiplayerTest", {
 			studioHandle = handle,
+			timeoutMs = if opts then opts.timeoutMs else nil,
 		})
 		local mpHandle = resp.mpHandle
 
@@ -177,8 +189,11 @@ local function createStudio(
 
 		local server = buildVm(resp.serverDomId) :: any
 
-		function server.connectClient(): MultiplayerTestClient
-			local r = daemon.call("mp.connectClient", { mpHandle = mpHandle })
+		function server.connectClient(opts: WaitOpts?): MultiplayerTestClient
+			local r = daemon.call("mp.connectClient", {
+				mpHandle = mpHandle,
+				timeoutMs = if opts then opts.timeoutMs else nil,
+			})
 			local client = buildVm(r.clientDomId) :: any
 
 			function client.disconnect()
@@ -207,6 +222,8 @@ export type OpenOpts = {
 	background: boolean?,
 	profile: boolean?,
 	showWidgets: string?,
+	detached: boolean?,
+	timeoutMs: number?,
 }
 
 export type OpenPlaceOpts = {
@@ -215,6 +232,8 @@ export type OpenPlaceOpts = {
 	background: boolean?,
 	profile: boolean?,
 	showWidgets: string?,
+	detached: boolean?,
+	timeoutMs: number?,
 }
 
 export type OpenFileOpts = {
@@ -222,6 +241,8 @@ export type OpenFileOpts = {
 	background: boolean?,
 	profile: boolean?,
 	showWidgets: string?,
+	detached: boolean?,
+	timeoutMs: number?,
 }
 
 export type StudioBackend = {
@@ -263,6 +284,7 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			profile = opts.profile == true,
 			showWidgets = opts.showWidgets,
 			detached = opts.detached == true,
+			timeoutMs = opts.timeoutMs,
 		})
 	end
 
@@ -275,6 +297,7 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			profile = opts.profile == true,
 			showWidgets = opts.showWidgets,
 			detached = opts.detached == true,
+			timeoutMs = opts.timeoutMs,
 		})
 	end
 
@@ -288,6 +311,7 @@ local function createStudioBackend(handle: string, info: BackendInfo, daemon: Da
 			profile = opts.profile == true,
 			showWidgets = opts.showWidgets,
 			detached = opts.detached == true,
+			timeoutMs = opts.timeoutMs,
 		})
 	end
 

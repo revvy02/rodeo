@@ -7,8 +7,24 @@ use crate::proto;
 use crate::transport::Transport;
 use crate::dom::Dom;
 
-const DOM_WAIT_TIMEOUT_MS: u64 = 60_000;
 const DOM_POLL_INTERVAL_MS: u64 = 200;
+
+/// Describe a wait failure: the deadline and what the studio actually looked
+/// like at that moment, so the caller can tell "Studio never entered play"
+/// from "no client DOM connected" without a separate state query.
+fn wait_timeout_error(session_guid: &str, timeout: Duration, last: Option<&proto::StudioState>) -> anyhow::Error {
+    let seen = match last {
+        Some(s) => {
+            let kinds: Vec<&str> = s.doms.iter().map(|v| v.dom_kind.as_str()).collect();
+            format!("status={} mode={} doms=[{}]", s.status, s.studio_mode, kinds.join(","))
+        }
+        None => "studio not present in state".to_string(),
+    };
+    anyhow!(
+        "timed out after {:?} waiting for studio instance {} to reach expected state ({seen})",
+        timeout, session_guid
+    )
+}
 
 
 // ---------------------------------------------------------------------------
@@ -27,6 +43,9 @@ pub struct OpenOpts {
     /// `--show-widgets` allow-list spec (`None` = normal; `Some("none")` = hide
     /// all; `Some("output,...")` = keep those).
     pub show_widgets: Option<String>,
+    /// Bound on waiting for the edit DOM to connect after launch. `None`
+    /// (the default) waits indefinitely.
+    pub timeout: Option<Duration>,
 }
 
 /// Options for `StudioBackend::open_place` — open by place ID.
@@ -42,6 +61,9 @@ pub struct OpenPlaceOpts {
     /// `--show-widgets` allow-list spec (`None` = normal; `Some("none")` = hide
     /// all; `Some("output,...")` = keep those).
     pub show_widgets: Option<String>,
+    /// Bound on waiting for the edit DOM to connect after launch. `None`
+    /// waits indefinitely.
+    pub timeout: Option<Duration>,
 }
 
 /// Options for `StudioBackend::open_file` — open by file path.
@@ -57,6 +79,9 @@ pub struct OpenFileOpts {
     /// `--show-widgets` allow-list spec (`None` = normal; `Some("none")` = hide
     /// all; `Some("output,...")` = keep those).
     pub show_widgets: Option<String>,
+    /// Bound on waiting for the edit DOM to connect after launch. `None`
+    /// waits indefinitely.
+    pub timeout: Option<Duration>,
 }
 
 #[derive(Clone)]
@@ -82,7 +107,7 @@ impl StudioBackend {
             fflag_file: opts.fflag_file,
             show_widgets: opts.show_widgets.unwrap_or_default(),
             ..Default::default()
-        }).await
+        }, opts.timeout).await
     }
 
     pub async fn open_place(&self, opts: OpenPlaceOpts) -> Result<Studio> {
@@ -97,7 +122,7 @@ impl StudioBackend {
             fflag_file: opts.fflag_file,
             show_widgets: opts.show_widgets.unwrap_or_default(),
             ..Default::default()
-        }).await
+        }, opts.timeout).await
     }
 
     pub async fn open_file(&self, opts: OpenFileOpts) -> Result<Studio> {
@@ -112,13 +137,15 @@ impl StudioBackend {
             fflag_file: opts.fflag_file,
             show_widgets: opts.show_widgets.unwrap_or_default(),
             ..Default::default()
-        }).await
+        }, opts.timeout).await
     }
 
     /// Low-level launch — use when building the LaunchStudioRequest outside the
     /// typed OpenOpts/OpenPlaceOpts/OpenFileOpts helpers (e.g. for the CLI
-    /// commands/run.rs orchestration).
-    pub async fn launch(&self, req: proto::LaunchStudioRequest) -> Result<Studio> {
+    /// commands/run.rs orchestration). `timeout` bounds the wait for the edit
+    /// DOM after the backend reports the Studio connected; `None` waits
+    /// indefinitely.
+    pub async fn launch(&self, req: proto::LaunchStudioRequest, timeout: Option<Duration>) -> Result<Studio> {
         let mut stream = self.transport.master()
             .launch_studio(req)
             .await
@@ -142,7 +169,7 @@ impl StudioBackend {
                     // studio-first state).
                     let inst = studio.wait_for_instance(
                         |s| s.doms.iter().any(|v| v.dom_kind == "edit"),
-                        DOM_WAIT_TIMEOUT_MS,
+                        timeout,
                     ).await?;
                     studio.edit_dom = studio.dom_by_kind(&inst, "edit");
                     return Ok(studio);
@@ -208,19 +235,25 @@ impl Studio {
     /// Poll the canonical studio-first state until this Studio satisfies `pred`.
     /// Replaces per-DOM polling — callers express the whole-instance condition
     /// they expect (e.g. "a server DOM and N client DOMs are present").
-    pub async fn wait_for_instance<F>(&self, pred: F, timeout_ms: u64) -> Result<proto::StudioState>
+    ///
+    /// `timeout` is opt-in: `None` polls until the predicate holds or the
+    /// master becomes unreachable. Pass `Some` to fail after that long.
+    pub async fn wait_for_instance<F>(&self, pred: F, timeout: Option<Duration>) -> Result<proto::StudioState>
     where
         F: Fn(&proto::StudioState) -> bool,
     {
-        let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+        let deadline = timeout.map(|t| Instant::now() + t);
         loop {
-            if let Some(s) = self.instance_state().await? {
-                if pred(&s) {
-                    return Ok(s);
+            let current = self.instance_state().await?;
+            if let Some(s) = current.as_ref() {
+                if pred(s) {
+                    return Ok(current.unwrap());
                 }
             }
-            if Instant::now() >= deadline {
-                bail!("timed out waiting for studio instance {} to reach expected state", self.session_guid);
+            if let (Some(deadline), Some(timeout)) = (deadline, timeout) {
+                if Instant::now() >= deadline {
+                    return Err(wait_timeout_error(&self.session_guid, timeout, current.as_ref()));
+                }
             }
             tokio::time::sleep(Duration::from_millis(DOM_POLL_INTERVAL_MS)).await;
         }
@@ -233,7 +266,9 @@ impl Studio {
             .map(|v| Dom::from_studio_dom(studio, v, self.transport.clone()))
     }
 
-    pub async fn set_mode(&mut self, mode: &str) -> Result<()> {
+    /// Transition this Studio to `mode` and wait for the member DOMs that mode
+    /// implies to connect. `timeout` is opt-in: `None` waits indefinitely.
+    pub async fn set_mode(&mut self, mode: &str, timeout: Option<Duration>) -> Result<()> {
         self.transport.master()
             .set_studio_mode(proto::SetStudioModeRequest {
                 session_guid: self.session_guid.clone(),
@@ -260,7 +295,7 @@ impl Studio {
                 let has_client = !want_client || s.doms.iter().any(|v| v.dom_kind == "client");
                 has_server && has_client
             },
-            DOM_WAIT_TIMEOUT_MS,
+            timeout,
         ).await?;
 
         self.server_dom = self.dom_by_kind(&inst, "server");
@@ -327,8 +362,9 @@ impl Studio {
     /// `StudioTestService:ExecuteMultiplayerTestAsync` with `num_players` client
     /// DataModels. Runs the start snippet on the edit DOM (fire-and-forget — the
     /// API yields for the session's life), then waits on the canonical studio
-    /// state for the server + N client DOMs to register.
-    pub async fn start_multiplayer_test(&self, num_players: u32) -> Result<MultiplayerTest> {
+    /// state for the server + N client DOMs to register. `timeout` is opt-in:
+    /// `None` waits indefinitely.
+    pub async fn start_multiplayer_test(&self, num_players: u32, timeout: Option<Duration>) -> Result<MultiplayerTest> {
         let edit = self.edit_dom.as_ref()
             .ok_or_else(|| anyhow!("start_multiplayer_test requires an open edit Studio"))?;
 
@@ -347,7 +383,7 @@ impl Studio {
                 s.doms.iter().any(|v| v.dom_kind == "server")
                     && s.doms.iter().filter(|v| v.dom_kind == "client").count() == n
             },
-            DOM_WAIT_TIMEOUT_MS,
+            timeout,
         ).await?;
 
         let server = self.dom_by_kind(&inst, "server")
@@ -385,7 +421,8 @@ impl MultiplayerTest {
 
     /// Connect one more client DataModel (`StudioTestService:AddPlayers(1)` on
     /// the server), wait for it to register, and return its Dom handle.
-    pub async fn connect_client(&mut self) -> Result<Dom> {
+    /// `timeout` is opt-in: `None` waits indefinitely.
+    pub async fn connect_client(&mut self, timeout: Option<Duration>) -> Result<Dom> {
         let known: std::collections::HashSet<String> =
             self.clients.iter().map(|v| v.dom_id.clone()).collect();
         self.server.run_code(crate::run::RunCodeOpts {
@@ -395,7 +432,7 @@ impl MultiplayerTest {
         let known_pred = known.clone();
         let inst = self.wait_for_instance(move |s| {
             s.doms.iter().any(|v| v.dom_kind == "client" && !known_pred.contains(&v.dom_id))
-        }).await?;
+        }, timeout).await?;
         self.clients = inst.doms.iter()
             .filter(|v| v.dom_kind == "client")
             .map(|v| Dom::from_studio_dom(&inst, v, self.transport.clone()))
@@ -429,25 +466,29 @@ impl MultiplayerTest {
         Ok(())
     }
 
-    /// Poll this test's studio (by session_guid) until `pred` holds.
-    async fn wait_for_instance<F>(&self, pred: F) -> Result<proto::StudioState>
+    /// Poll this test's studio (by session_guid) until `pred` holds. `timeout`
+    /// is opt-in: `None` polls until the predicate holds.
+    async fn wait_for_instance<F>(&self, pred: F, timeout: Option<Duration>) -> Result<proto::StudioState>
     where
         F: Fn(&proto::StudioState) -> bool,
     {
-        let deadline = Instant::now() + Duration::from_millis(DOM_WAIT_TIMEOUT_MS);
+        let deadline = timeout.map(|t| Instant::now() + t);
         loop {
             let state = self.transport.master()
                 .get_state(proto::GetStateRequest::default())
                 .await
                 .map_err(|e| anyhow!("get_state failed: {e}"))?
                 .into_owned();
-            if let Some(s) = state.studios.into_iter().find(|s| s.session_id.as_deref() == Some(self.session_guid.as_str())) {
-                if pred(&s) {
-                    return Ok(s);
+            let current = state.studios.into_iter().find(|s| s.session_id.as_deref() == Some(self.session_guid.as_str()));
+            if let Some(s) = current.as_ref() {
+                if pred(s) {
+                    return Ok(current.unwrap());
                 }
             }
-            if Instant::now() >= deadline {
-                bail!("timed out waiting for multiplayer test state");
+            if let (Some(deadline), Some(timeout)) = (deadline, timeout) {
+                if Instant::now() >= deadline {
+                    return Err(wait_timeout_error(&self.session_guid, timeout, current.as_ref()));
+                }
             }
             tokio::time::sleep(Duration::from_millis(DOM_POLL_INTERVAL_MS)).await;
         }

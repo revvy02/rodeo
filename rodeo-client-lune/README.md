@@ -35,7 +35,10 @@ client.close()
 
 `StudioBackend.open(opts)` / `.openPlace(opts)` / `.openFile(opts)` → `Studio` with:
 - `editVm.runCode({ source, target?, showReturn?, ... })` → `RunResult { ok, output, exitCode }`
-- `startMultiplayerTest()` → `MultiplayerTestServer` (a Vm with `connectClient()` → `MultiplayerTestClient` with `disconnect()`, and `close()` to end the test)
+- `setMode(mode, { timeoutMs? })` — enters `run`/`test`/`play`/`edit` and waits for the DOMs that mode implies
+- `startMultiplayerTest({ timeoutMs? })` → `MultiplayerTestServer` (a Vm with `connectClient({ timeoutMs? })` → `MultiplayerTestClient` with `disconnect()`, and `close()` to end the test)
+
+Every call that waits on Studio state (`open*`, `setMode`, `startMultiplayerTest`, `connectClient`) waits indefinitely unless `timeoutMs` is passed.
 - `close()`
 
 See [`src/init.luau`](src/init.luau) for the full type surface.

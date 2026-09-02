@@ -297,7 +297,14 @@ export class RodeoClient {
 // StudioBackend / options
 // ---------------------------------------------------------------------------
 
-export type OpenPlaceOpts = {
+/** Bound on a call that waits for Studio state to change (a Studio to
+ *  connect, a mode transition to produce its DOMs, a client to join).
+ *  Omit to wait indefinitely. */
+export type WaitOpts = {
+  timeoutMs?: number;
+};
+
+export type OpenPlaceOpts = WaitOpts & {
   placeId: number;
   fflags?: string[];
   background?: boolean;
@@ -312,7 +319,7 @@ export type OpenPlaceOpts = {
   detached?: boolean;
 };
 
-export type OpenFileOpts = {
+export type OpenFileOpts = WaitOpts & {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
@@ -323,7 +330,7 @@ export type OpenFileOpts = {
   detached?: boolean;
 };
 
-export type OpenOpts = {
+export type OpenOpts = WaitOpts & {
   fflags?: string[];
   background?: boolean;
   profile?: boolean;
@@ -355,6 +362,7 @@ export class StudioBackend {
       profile: opts.profile ?? false,
       showWidgets: opts.showWidgets,
       detached: opts.detached ?? false,
+      timeoutMs: opts.timeoutMs,
     });
   }
 
@@ -367,6 +375,7 @@ export class StudioBackend {
       profile: opts.profile ?? false,
       showWidgets: opts.showWidgets,
       detached: opts.detached ?? false,
+      timeoutMs: opts.timeoutMs,
     });
   }
 
@@ -379,6 +388,7 @@ export class StudioBackend {
       profile: opts.profile ?? false,
       showWidgets: opts.showWidgets,
       detached: opts.detached ?? false,
+      timeoutMs: opts.timeoutMs,
     });
   }
 
@@ -429,11 +439,13 @@ export class Studio {
     return daemonRunCode(this.daemon, "studio.runCode", { studioHandle: this.studioHandle }, opts);
   }
 
-  async setMode(mode: string): Promise<void> {
+  /** Transition the Studio and wait for the DOMs that mode implies to
+   *  connect. Waits indefinitely unless `opts.timeoutMs` is given. */
+  async setMode(mode: string, opts: WaitOpts = {}): Promise<void> {
     const resp = await this.daemon.request<{
       serverDomId?: string | null;
       clientDomId?: string | null;
-    }>("studio.setMode", { studioHandle: this.studioHandle, mode });
+    }>("studio.setMode", { studioHandle: this.studioHandle, mode, timeoutMs: opts.timeoutMs });
 
     if (mode === "edit") {
       this.serverDom = null;
@@ -486,12 +498,12 @@ export class Studio {
    *  later with `connectClient()`: `StudioTestService:AddPlayers` crashes the
    *  Studio server on some engine versions (observed on 0.726: SIGSEGV the
    *  moment a client is added to a running test). Defaults to 0 clients. */
-  async startMultiplayerTest(numPlayers: number = 0): Promise<MultiplayerTestServer> {
+  async startMultiplayerTest(numPlayers: number = 0, opts: WaitOpts = {}): Promise<MultiplayerTestServer> {
     const resp = await this.daemon.request<{
       mpHandle: string;
       serverDomId: string;
       clientDomIds?: string[];
-    }>("studio.startMultiplayerTest", { studioHandle: this.studioHandle, numPlayers });
+    }>("studio.startMultiplayerTest", { studioHandle: this.studioHandle, numPlayers, timeoutMs: opts.timeoutMs });
 
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
     const snap = findDomSnapshot(state, resp.serverDomId);
@@ -533,9 +545,9 @@ export class MultiplayerTestServer extends Dom {
    *  WARNING: on some Studio engine versions (0.726) adding a player to a
    *  running multiplayer test crashes the server (SIGSEGV). Prefer passing the
    *  client count to `startMultiplayerTest(numPlayers)` up front. */
-  async connectClient(): Promise<MultiplayerTestClient> {
+  async connectClient(opts: WaitOpts = {}): Promise<MultiplayerTestClient> {
     const resp = await this.daemon.request<{ clientDomId: string }>(
-      "mp.connectClient", { mpHandle: this.mpHandle },
+      "mp.connectClient", { mpHandle: this.mpHandle, timeoutMs: opts.timeoutMs },
     );
     const state = await this.daemon.request<StateSnapshotDTO>("client.getState");
     const snap = findDomSnapshot(state, resp.clientDomId);

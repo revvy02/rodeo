@@ -652,20 +652,23 @@ async fn launch_play_processes(
             path: p.clone(),
             fflags: fflag_overrides, background, profile,
             save: None, detached: false, fflag_file, show_widgets: show_widgets.clone(),
+            timeout: None,
         }).await?,
         PlaceTarget::PlaceId { place_id, .. } => backend.open_place(OpenPlaceOpts {
             place_id: *place_id,
             fflags: fflag_overrides, background, profile,
             save: None, detached: false, fflag_file, show_widgets: show_widgets.clone(),
+            timeout: None,
         }).await?,
         PlaceTarget::Empty => backend.open(OpenOpts {
             fflags: fflag_overrides, background, profile,
             save: None, detached: false, fflag_file, show_widgets: show_widgets.clone(),
+            timeout: None,
         }).await?,
         PlaceTarget::Content(_) => bail!("Content place target is not supported for play launch"),
     };
 
-    studio.start_multiplayer_test(initial_clients).await
+    studio.start_multiplayer_test(initial_clients, None).await
         .context("failed to start multiplayer test")?;
     tracing::info!("multiplayer test started");
 

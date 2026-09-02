@@ -253,6 +253,13 @@ async fn insert_studio(state: &State, studio: Studio) -> (String, Arc<Mutex<Stud
     (handle, arc)
 }
 
+/// Optional `timeoutMs` param shared by every call that waits on studio
+/// state (open*, setMode, startMultiplayerTest, mp.connectClient). Absent =
+/// wait indefinitely.
+fn parse_timeout(params: &Value) -> Option<std::time::Duration> {
+    params.get("timeoutMs").and_then(|v| v.as_u64()).map(std::time::Duration::from_millis)
+}
+
 fn parse_open_opts(params: &Value) -> rodeo_client::studio::OpenOpts {
     rodeo_client::studio::OpenOpts {
         fflags: params.get("fflags").and_then(|v| v.as_array())
@@ -264,6 +271,7 @@ fn parse_open_opts(params: &Value) -> rodeo_client::studio::OpenOpts {
         detached: params.get("detached").and_then(|v| v.as_bool()).unwrap_or(false),
         fflag_file: params.get("fflagFile").and_then(|v| v.as_str()).map(String::from),
         show_widgets: params.get("showWidgets").and_then(|v| v.as_str()).map(String::from),
+        timeout: parse_timeout(params),
     }
 }
 
@@ -290,6 +298,7 @@ async fn studio_open_place(state: Arc<State>, params: Value) -> Result<Value> {
         detached: opts.detached,
         fflag_file: opts.fflag_file,
         show_widgets: opts.show_widgets,
+        timeout: opts.timeout,
     }).await?;
     let session_guid = studio.session_guid.clone();
     let edit_dom_id = studio.edit_dom().dom_id.clone();
@@ -312,6 +321,7 @@ async fn studio_open_file(state: Arc<State>, params: Value) -> Result<Value> {
         detached: opts.detached,
         fflag_file: opts.fflag_file,
         show_widgets: opts.show_widgets,
+        timeout: opts.timeout,
     }).await?;
     let session_guid = studio.session_guid.clone();
     let edit_dom_id = studio.edit_dom().dom_id.clone();
@@ -324,8 +334,9 @@ async fn studio_set_mode(state: Arc<State>, params: Value) -> Result<Value> {
     let mode = params.get("mode").and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("mode required"))?
         .to_string();
+    let timeout = parse_timeout(&params);
     let mut guard = studio.lock().await;
-    guard.set_mode(&mode).await?;
+    guard.set_mode(&mode, timeout).await?;
     Ok(json!({
         "serverDomId": guard.server_dom.as_ref().map(|v| v.dom_id.clone()),
         "clientDomId": guard.client_dom.as_ref().map(|v| v.dom_id.clone()),
@@ -371,7 +382,8 @@ async fn studio_start_multiplayer_test(state: Arc<State>, params: Value) -> Resu
     // clientDomIds, rather than starting at 0 and growing via mp.connectClient.
     // Defaults to 0 for backwards compatibility.
     let num_players = params.get("numPlayers").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-    let mp = studio.lock().await.start_multiplayer_test(num_players).await?;
+    let timeout = parse_timeout(&params);
+    let mp = studio.lock().await.start_multiplayer_test(num_players, timeout).await?;
     let server_dom_id = mp.server.dom_id.clone();
     let client_dom_ids: Vec<String> = mp.clients().iter().map(|v| v.dom_id.clone()).collect();
     let handle = state.mint_handle("mp");
@@ -388,7 +400,8 @@ async fn lookup_mp(state: &State, params: &Value) -> Result<Arc<Mutex<Multiplaye
 
 async fn mp_connect_client(state: Arc<State>, params: Value) -> Result<Value> {
     let mp = lookup_mp(&state, &params).await?;
-    let client = mp.lock().await.connect_client().await?;
+    let timeout = parse_timeout(&params);
+    let client = mp.lock().await.connect_client(timeout).await?;
     Ok(json!({ "clientDomId": client.dom_id }))
 }
 
