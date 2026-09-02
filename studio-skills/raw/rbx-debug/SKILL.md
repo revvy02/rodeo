@@ -60,9 +60,17 @@ If the `OnStopped` callback throws an error or does not return a resume action, 
 - **Edit DataModel:** breakpoints are set on the specific script instance and do not propagate to clones, but they **do** propagate to corresponding scripts in play DMs at the start of a playtest.
 - **Recommendation:** call `ClearBreakpoints()` before setting new ones in bulk to avoid leftover breakpoints causing unexpected stops.
 
-### Miscellaneous Notes
-- Calling `Pause()` while already stopped at a breakpoint has no effect.
-- Avoid uncaught errors in any lambda attached to the `Resumed` event.
+### Suspended Operations
+It is safe to inspect runtime state with `ScriptDebuggerService` while the DataModel is stopped. Do not do any of the following while the DataModel is stopped (including in the `OnStopped` or `Resumed` event callbacks):
+- Modify the DataModel (move instances, set properties)
+- Throw unhandled errors or attempt to break again
+- Call yielding functions
+
+### Server Breakpoints on Start
+Avoid setting breakpoints that are expected to be hit immediately once server DataModel scripts begin execting. These might be hit before the game finishes initializing.
+
+### Parallel Threads
+The behavior of this API with parallel Luau is undefined.
 
 ---
 
@@ -161,7 +169,7 @@ debugger:SetExceptionBreakMode(Enum.DebugBreakModeType.Unhandled)
 
 Requests the debugger to pause at the next safe point. Asynchronous — returns immediately. When the thread pauses, `OnStopped` fires with reason `Pause`. Has no effect if already stopped.
 
-**Constraint:** only meaningful when the DataModel is running during a playtest.
+**Constraint:** only meaningful when the DataModel is running during a playtest. Calling `Pause()` while already stopped at a breakpoint has no effect.
 
 ```lua
 debugger:Pause()
@@ -343,16 +351,6 @@ end)
 | `ScriptDebugStopped` | `Reason: ScriptStoppedReason`, `ThreadIds: {number}`, `ExceptionText: string?` |
 | `ScriptDebugThread` | `Id: number`, `Name: string` |
 | `ScriptVariable` | `Name: string`, `Value: string`, `Type: string`, `Scope: ScriptVariableScope`, `VariablesReference: number` |
-
----
-
-## Constraints & Edge Cases
-
-### OnStopped is Special
-**Do not modify the DataModel** (move instances, set properties) inside `OnStopped` — only inspect thread state with `ScriptDebuggerService` methods. Modifying the DataModel results in undefined behavior.
-
-### Parallel Threads
-The behavior of this API with parallel Luau is undefined.
 
 ---
 

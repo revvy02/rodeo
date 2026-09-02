@@ -113,8 +113,8 @@ This tells the agent:
 
 | User says | How to pick | Example |
 |-----------|------------|---------|
-| "iPhone" / "phone" / "mobile" | Latest iPhone — highest generation number | iPhone 17 Pro > iPhone 16 > iPhone 14 Pro |
-| "iPad" / "tablet" | Latest iPad — highest generation number | iPad Pro 3rd Gen > iPad 6th Gen > iPad 2 |
+| "iPhone" / "phone" / "mobile" | Latest iPhone — highest generation number | iPhone 17 Pro > iPhone 16 Pro Max > iPhone 16 |
+| "iPad" / "tablet" | Latest iPad — highest generation number | iPad Pro M5 (13in) > iPad Air 5th Gen > iPad 10th Gen |
 | "Xbox" / "console" | Match "Xbox" in name | Xbox One |
 | "PlayStation" / "PS" | Match "PS" in name, highest number | PS5 > PS4 |
 | "VR" / "Quest" / "headset" | Match "Quest" or "Meta", highest number | Meta Quest 3 > Meta Quest 2 |
@@ -133,7 +133,7 @@ When analyzing screenshots, be aware of each device's physical traits:
 
 | Device type | What to watch for |
 |-------------|-------------------|
-| **iPhone X+ (14 Pro, XR)** | Notch on left edge in landscape. If `ScreenInsets=CoreUISafeInsets`, UI may go under the notch. Home indicator at bottom reduces usable space. |
+| **iPhone X+ (16 Pro, 17 Pro, XR, etc.)** | Notch/Dynamic Island on left edge in landscape. If `ScreenInsets=CoreUISafeInsets`, UI may go under the notch. Home indicator at bottom reduces usable space. |
 | **Low-end phones (Galaxy A06, etc.)** | Narrow viewport (~360px height in landscape). Fixed-pixel UI takes a huge proportion. Touch targets may be too small. |
 | **iPad** | Wide aspect ratio, lots of space. UI designed for phone may look sparse. Text that was fine on phone may be too small on tablet at arm's length. |
 | **Xbox / Console** | TV overscan — TVs cut off 5-10% at each edge. UI elements placed at the very edge may not be visible. Text must be large enough to read from couch distance (~3m). |
@@ -188,7 +188,7 @@ local svc = game:GetService("StudioDeviceSimulatorService")
 local devices = svc:GetDeviceListAsync()
 for _, id in devices do
     local info = svc:GetDeviceInfoAsync(id)
-    if info.Name == "iPhone 14 Pro" then
+    if info.Name == "iPhone 17 Pro" then
         svc:SetDeviceAsync(id)
         task.wait(0.2)  -- MUST wait for viewport update
         break
@@ -215,7 +215,7 @@ task.wait(0.2)
 
 ### Key rules
 
-- **Always search by name** — device IDs are internal strings like `"iphone_14_Pro_v2"`, not display names
+- **Always search by name** — device IDs are internal strings like `"iphone_17_pro"`, not display names
 - **Always `task.wait(0.2)` after any setter** — viewport updates are async; 0.1s is sometimes too short
 - **Always use `pcall`** — all methods can error (no active device, PlayServer blocked, etc.)
 - **Getters require active device too** — `GetResolutionAsync`, `GetPixelDensityAsync`, `GetScalingModeAsync` error if no device active
@@ -301,7 +301,7 @@ When it sees `Size:{0, 200},{0, 50}` → "always 200×50 pixels, will overflow i
 
 ### Screenshot checklist
 
-After each device/orientation change, look for these in the screenshot. **Use the game settings from Step 0 and the device characteristics table to inform your analysis** — e.g., if device is iPhone 14 Pro and `ScreenInsets=CoreUISafeInsets`, check if UI near the left edge (notch area) is affected.
+After each device/orientation change, look for these in the screenshot. **Use the game settings from Step 0 and the device characteristics table to inform your analysis** — e.g., if device is iPhone 17 Pro and `ScreenInsets=CoreUISafeInsets`, check if UI near the left edge (Dynamic Island area) is affected.
 
 | # | Check | What it looks like |
 |---|-------|--------------------|
@@ -421,8 +421,8 @@ For multi-device comparison, include a summary table:
 ```
 | Device            | Resolution | Viewport   | Issues                    |
 |-------------------|-----------|------------|---------------------------|
-| iPhone 14 Pro     | 852x393   | 734x372    | None                      |
-| iPad Pro 3rd Gen  | 1194x833  | 1194x813   | None                      |
+| iPhone 17 Pro     | 874x402   | 750x362    | None                      |
+| iPad Pro M5 (13in)| 1376x1032 | 1376x1012  | None                      |
 | Xbox One          | 1920x1080 | 1920x1080  | Score text slightly small  |
 ```
 
@@ -499,8 +499,8 @@ UI Structure:
 | Device              | Resolution | Viewport   | Issues                              |
 |---------------------|-----------|------------|-------------------------------------|
 | Samsung Galaxy A06  | 800x360   | 705x338    | HUD covers ~99% of screen width     |
-| iPhone 14 Pro       | 852x393   | 734x372    | None                                |
-| iPad Pro 3rd Gen    | 1194x833  | 1194x813   | HUD text getting small              |
+| iPhone 17 Pro       | 874x402   | 750x362    | None                                |
+| iPad Pro M5 (13in)  | 1376x1032 | 1376x1012  | HUD text getting small              |
 | Xbox One            | 1920x1080 | 1920x1080  | Timer text too small for TV/couch   |
 
 Findings:
@@ -522,7 +522,7 @@ Full API reference for the Device Simulator Lua API. This document is for agent 
 
 Roblox Studio has a **Device Simulator** that resizes the game viewport to match a real device's screen resolution. It doesn't run on a real phone — it changes how Studio renders the viewport so you can preview how your game would look on that device.
 
-When you activate a device (e.g., iPhone 14 Pro at 852x393), Studio:
+When you activate a device (e.g., iPhone 17 Pro at 874x402), Studio:
 1. Resizes the viewport to that resolution
 2. The game's UI re-layouts based on the new `Camera.ViewportSize`
 3. You see what a player on that device would see
@@ -548,7 +548,7 @@ No simulation ("default")
 
 ### Device presets vs overrides
 
-- **Device preset** = a named device with fixed Width, Height, PixelDensity (e.g., "iPhone 14 Pro" = 852x393 @ 460dpi)
+- **Device preset** = a named device with fixed Width, Height, PixelDensity (e.g., "iPhone 17 Pro" = 874x402 @ 460dpi)
 - **Overrides** = you can change resolution and DPI after activating a device
 - `SetDeviceAsync` **clears** resolution and DPI overrides (resets to device native)
 - `SetOrientationAsync` does **NOT** clear overrides
@@ -565,21 +565,21 @@ local devices = svc:GetDeviceListAsync()
 -- 2. Find the device by display name
 for _, id in devices do
     local info = svc:GetDeviceInfoAsync(id)
-    if info.Name == "iPhone 14 Pro" then
+    if info.Name == "iPhone 17 Pro" then
 
         -- 3. Activate the device (viewport resizes)
         svc:SetDeviceAsync(id)
         task.wait(0.2)  -- MUST wait for viewport to update
 
         -- 4. Read the result
-        print(workspace.CurrentCamera.ViewportSize)  -- e.g., 734, 372
+        print(workspace.CurrentCamera.ViewportSize)  -- e.g., 750, 362
         break
     end
 end
 ```
 
 Key rules:
-- **Always search by name** — device IDs are internal strings like `"iphone_14_Pro_v2"`, not display names
+- **Always search by name** — device IDs are internal strings like `"iphone_17_pro"`, not display names
 - **Always `task.wait(0.2)` after any setter** — viewport updates are async
 - **Check `GetDeviceAsync()` to verify** — returns the active device ID, or `"default"` if not simulating
 
@@ -594,14 +594,14 @@ local svc = game:GetService("StudioDeviceSimulatorService")
 
 #### Core pattern: find device by name, then activate
 
-Device IDs are internal strings (e.g., `"iphone_14_Pro_v2"`) — NOT the display name. Always search by `Name`:
+Device IDs are internal strings (e.g., `"iphone_17_pro"`) — NOT the display name. Always search by `Name`:
 
 ```lua
 local svc = game:GetService("StudioDeviceSimulatorService")
 local devices = svc:GetDeviceListAsync()
 for _, id in devices do
     local info = svc:GetDeviceInfoAsync(id)
-    if info.Name == "iPhone 14 Pro" then
+    if info.Name == "iPhone 17 Pro" then
         svc:SetDeviceAsync(id)
         task.wait(0.2)
         break
@@ -684,23 +684,23 @@ Enum.DeviceForm.VR
 
 Returns an array of internal ID strings — NOT display names:
 ```lua
-{"ipad_2", "ipad_mini_1st_Generation", "ipad_6th_Generation", "iphone_4S", "iphone_14_Pro_v2", ...}
+{"iphone_XR", "iphone_11", "iphone_13", "iphone_16", "iphone_17_pro", "ipad_10th_generation", "ipad_pro_M4_11in", "ipad_pro_M5_13in", "samsung_galaxy_a06", "samsung_galaxy_s25_ultra", "meta_quest_3", "xbox", ...}
 ```
 
 #### GetDeviceInfoAsync
 
 ```lua
 {
-    DeviceId = "iphone_14_Pro_v2",    -- internal ID (used for SetDeviceAsync)
-    Name = "iPhone 14 Pro",            -- display name (use this for matching)
-    Width = 852,
-    Height = 393,
+    DeviceId = "iphone_17_pro",        -- internal ID (used for SetDeviceAsync)
+    Name = "iPhone 17 Pro",            -- display name (use this for matching)
+    Width = 874,
+    Height = 402,
     PixelDensity = 460,
     ResolutionScale = 3,
     DeviceForm = Enum.DeviceForm.Phone, -- Phone, Tablet, Desktop, Console, VR
     IsCustom = false,
-    PortraitKeyboardHeight = 346,
-    LandscapeKeyboardHeight = 209,
+    PortraitKeyboardHeight = 306,
+    LandscapeKeyboardHeight = 181,
 }
 ```
 

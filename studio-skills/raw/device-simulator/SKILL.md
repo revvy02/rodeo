@@ -113,8 +113,8 @@ This tells the agent:
 
 | User says | How to pick | Example |
 |-----------|------------|---------|
-| "iPhone" / "phone" / "mobile" | Latest iPhone — highest generation number | iPhone 17 Pro > iPhone 16 > iPhone 14 Pro |
-| "iPad" / "tablet" | Latest iPad — highest generation number | iPad Pro 3rd Gen > iPad 6th Gen > iPad 2 |
+| "iPhone" / "phone" / "mobile" | Latest iPhone — highest generation number | iPhone 17 Pro > iPhone 16 Pro Max > iPhone 16 |
+| "iPad" / "tablet" | Latest iPad — highest generation number | iPad Pro M5 (13in) > iPad Air 5th Gen > iPad 10th Gen |
 | "Xbox" / "console" | Match "Xbox" in name | Xbox One |
 | "PlayStation" / "PS" | Match "PS" in name, highest number | PS5 > PS4 |
 | "VR" / "Quest" / "headset" | Match "Quest" or "Meta", highest number | Meta Quest 3 > Meta Quest 2 |
@@ -133,7 +133,7 @@ When analyzing screenshots, be aware of each device's physical traits:
 
 | Device type | What to watch for |
 |-------------|-------------------|
-| **iPhone X+ (14 Pro, XR)** | Notch on left edge in landscape. If `ScreenInsets=CoreUISafeInsets`, UI may go under the notch. Home indicator at bottom reduces usable space. |
+| **iPhone X+ (16 Pro, 17 Pro, XR, etc.)** | Notch/Dynamic Island on left edge in landscape. If `ScreenInsets=CoreUISafeInsets`, UI may go under the notch. Home indicator at bottom reduces usable space. |
 | **Low-end phones (Galaxy A06, etc.)** | Narrow viewport (~360px height in landscape). Fixed-pixel UI takes a huge proportion. Touch targets may be too small. |
 | **iPad** | Wide aspect ratio, lots of space. UI designed for phone may look sparse. Text that was fine on phone may be too small on tablet at arm's length. |
 | **Xbox / Console** | TV overscan — TVs cut off 5-10% at each edge. UI elements placed at the very edge may not be visible. Text must be large enough to read from couch distance (~3m). |
@@ -188,7 +188,7 @@ local svc = game:GetService("StudioDeviceSimulatorService")
 local devices = svc:GetDeviceListAsync()
 for _, id in devices do
     local info = svc:GetDeviceInfoAsync(id)
-    if info.Name == "iPhone 14 Pro" then
+    if info.Name == "iPhone 17 Pro" then
         svc:SetDeviceAsync(id)
         task.wait(0.2)  -- MUST wait for viewport update
         break
@@ -215,7 +215,7 @@ task.wait(0.2)
 
 ### Key rules
 
-- **Always search by name** — device IDs are internal strings like `"iphone_14_Pro_v2"`, not display names
+- **Always search by name** — device IDs are internal strings like `"iphone_17_pro"`, not display names
 - **Always `task.wait(0.2)` after any setter** — viewport updates are async; 0.1s is sometimes too short
 - **Always use `pcall`** — all methods can error (no active device, PlayServer blocked, etc.)
 - **Getters require active device too** — `GetResolutionAsync`, `GetPixelDensityAsync`, `GetScalingModeAsync` error if no device active
@@ -301,7 +301,7 @@ When it sees `Size:{0, 200},{0, 50}` → "always 200×50 pixels, will overflow i
 
 ### Screenshot checklist
 
-After each device/orientation change, look for these in the screenshot. **Use the game settings from Step 0 and the device characteristics table to inform your analysis** — e.g., if device is iPhone 14 Pro and `ScreenInsets=CoreUISafeInsets`, check if UI near the left edge (notch area) is affected.
+After each device/orientation change, look for these in the screenshot. **Use the game settings from Step 0 and the device characteristics table to inform your analysis** — e.g., if device is iPhone 17 Pro and `ScreenInsets=CoreUISafeInsets`, check if UI near the left edge (Dynamic Island area) is affected.
 
 | # | Check | What it looks like |
 |---|-------|--------------------|
@@ -421,8 +421,8 @@ For multi-device comparison, include a summary table:
 ```
 | Device            | Resolution | Viewport   | Issues                    |
 |-------------------|-----------|------------|---------------------------|
-| iPhone 14 Pro     | 852x393   | 734x372    | None                      |
-| iPad Pro 3rd Gen  | 1194x833  | 1194x813   | None                      |
+| iPhone 17 Pro     | 874x402   | 750x362    | None                      |
+| iPad Pro M5 (13in)| 1376x1032 | 1376x1012  | None                      |
 | Xbox One          | 1920x1080 | 1920x1080  | Score text slightly small  |
 ```
 
@@ -499,8 +499,8 @@ UI Structure:
 | Device              | Resolution | Viewport   | Issues                              |
 |---------------------|-----------|------------|-------------------------------------|
 | Samsung Galaxy A06  | 800x360   | 705x338    | HUD covers ~99% of screen width     |
-| iPhone 14 Pro       | 852x393   | 734x372    | None                                |
-| iPad Pro 3rd Gen    | 1194x833  | 1194x813   | HUD text getting small              |
+| iPhone 17 Pro       | 874x402   | 750x362    | None                                |
+| iPad Pro M5 (13in)  | 1376x1032 | 1376x1012  | HUD text getting small              |
 | Xbox One            | 1920x1080 | 1920x1080  | Timer text too small for TV/couch   |
 
 Findings:

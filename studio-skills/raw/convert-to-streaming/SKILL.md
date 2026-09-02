@@ -3,22 +3,23 @@ name: convert-to-streaming
 description: Convert a non-streaming Roblox game to use streaming or fix streaming bugs and anti-patterns.
 ---
 
-# Convert to Streaming
+# Convert to Streaming Skill
 
-Converts a Roblox experience to use instance streaming. Runs through 9
-steps with validation and a summary at the end.
+## When to Use
 
-All reference documentation and step scripts are inlined below:
+Only when a user explicitly asks to convert their game to streaming or audit and fix a streaming-enabled game.
 
-- Step descriptions: [Step 1](#step-1-configure-workspace) through [Step 9](#step-9-summary)
-- Reference sections: [Workspace Configuration](#reference-workspace-configuration),
-  [Model Refactoring](#reference-model-refactoring),
-  [ModelStreamingMode](#reference-modelstreamingmode),
-  [Anti-Patterns](#reference-streaming-anti-patterns),
-  [Prefetches and MRFs](#reference-prefetches-and-mrfs)
-- Step scripts appendix: [Shared Helpers](#shared-helpers) (prepend to the
-  scripts below), [Inventory](#inventory-script), [Refactoring](#refactoring-script),
-  [Streaming Mode](#streaming-mode-script), [LOD](#lod-script)
+## Overview
+
+Converts a Roblox game to use instance streaming. Runs through 9
+steps with validation and a summary at the end. Each step dispatches
+work to subagents — the orchestrator dispatches and collects, never
+reading raw script source or large JSON responses directly.
+
+Reference material and Luau step scripts live in the
+[Appendix](#appendix--reference-material-for-subagent-prompts) at the
+end of this file. Copy relevant sections into subagent prompts as
+directed by each step below.
 
 ## Prerequisites
 
@@ -41,617 +42,712 @@ framework). When flagging, explain why and suggest the architectural change.
 
 ## Subagent Delegation
 
-If the host environment exposes a subagent / sub-assistant tool (Roblox Studio MCP's `subagent`, Roblox Studio Assistant's subagent, Claude Code's `Agent`,  or similar), delegate the
-following tasks to isolated sub-sessions rather than doing them inline:
+Dispatch all work to subagents. Prefer the host environment's **native**
+agent tool over MCP-provided subagent tools — native agents run the same
+model as the orchestrator and have access to all connected MCP tools.
+Specifically:
 
-- **Per-script anti-pattern analysis in Step 6 — the default execution
-  model.** One subagent per client script. The orchestrator hands each
-  subagent the script path, the critical-path set, and the Step 4
-  classifications, and collects the disposition. Scripts are
-  independent; keeping each one's context out of the orchestrator is
-  what makes coverage tractable on games with many client scripts.
-- **External reference rewrites in Step 3.** One subagent per high-priority
-  entry reads the referencing scripts and proposes edits.
-- **Targeted inventory-cache queries.** "Find all models under X with
-  property Y" — a subagent with a single `execute_luau` call can answer
-  without loading the whole skill.
+- **Claude Code:** Use the `Agent` tool (not `mcp__Roblox_Studio__subagent`).
+- **Roblox Studio Assistant:** Use the built-in subagent tool.
+- **Other environments:** Use whatever spawns an isolated sub-session with
+  access to `execute_luau`, `script_read`, `script_grep`, `multi_edit`, and
+  `inspect_instance`.
 
-If no subagent tool is available, do the work inline — the skill is
-correct either way. When working inline, be especially careful about the
-Step 6 coverage check: a long client-script list is easy to drop entries
-from without per-script isolation.
+The orchestrator never calls `script_read`, `script_grep`, or interprets
+raw `execute_luau` output directly — subagents do that and return compact
+structured results.
+
+If a subagent tool call fails with a tool-not-found error, fall back to
+performing that step's work inline. Otherwise, always dispatch.
+
+Subagents must **not** write to the change-log file directly — they return
+structured change-log entries and the orchestrator appends them in sequence.
 
 ## Caching Lifecycle
 
 Step scripts cache state in `_G` (e.g., `_G["step:inventory:v1"]`). This
 lives in the Studio process and is lost when Studio closes. If Studio
-restarts mid-conversion, re-run Step 2. Changing `CACHE_KEY` forces a fresh scan.
+restarts mid-conversion, re-run Step 2.
+
+## Change Log
+
+The conversion produces a markdown change log. Before Step 1:
+
+1. Check whether a local file-writing tool is available (e.g., Claude Code's
+   `Write` tool). The Roblox Studio MCP tools do **not** count.
+2. If available, create `streaming_conversion_changes.md` with this skeleton:
+
+```
+# Streaming Conversion Changes
+
+Conversion started: YYYY-MM-DD HH:MM (local time)
+
+## Workspace Properties
+
+## Asset Relocations
+
+## Model Structure Refactoring
+
+## ModelStreamingMode Changes
+
+## LevelOfDetail Changes
+
+## Script Anti-Pattern Fixes
+
+## Prefetches and Replication Foci
+
+## Validation Fixes
+
+## Warnings / Manual Review
+```
+
+3. If no file-writing tool is available, skip the change log entirely.
+
+**Recording rules:** Append after each step. Enumerate every modified
+instance (full paths, not counts). Subagents return change-log entries;
+the orchestrator appends them in sequence.
 
 ---
 
+# Orchestration Steps
+
 ## Step 1: Configure Workspace
 
-Apply the recommended Workspace streaming properties from the
-[Workspace Configuration reference](#reference-workspace-configuration) below.
+**Depends on:** Nothing.
 
-Execute each property change via Luau. Properties that are not scriptable
-should be flagged for manual configuration in Studio's Properties panel.
+**Action:** Run `execute_luau`:
+
+```lua
+game.Workspace:ApplyRecommendedStreamingSettings()
+```
+
+**Pass forward:** Nothing. Append to change log: "Applied recommended
+streaming settings via ApplyRecommendedStreamingSettings()."
 
 ---
 
 ## Step 2: Inventory
 
-Structural scan of the entire DataModel. Produces bucketed summaries and
-caches full data for follow-up queries.
+**Depends on:** Step 1 complete.
 
-### Dependencies
+**Action:** Dispatch one subagent.
 
-None (first step).
+**Subagent prompt:**
 
-### Luau Script
+> Run the inventory scan for the streaming conversion.
+>
+> 1. Execute the Luau script below via `execute_luau`. Prepend the Shared
+>    Helpers block before the Inventory Script body (both are in the
+>    convert-to-streaming skill's Step Scripts Appendix).
+>    Parameters: `CACHE_KEY = "v1"`, `ROOT_PATH = "Workspace"`.
+>
+> 2. Interpret the returned summary. Report back ONLY:
+>    - `modelCounts`: total models, by size band, by type (container/interactive/decorative/largeDefault)
+>    - `clientScripts`: the full list from `summary.scripts.clientScripts`
+>    - `refactoringCandidateCount`: number of refactoring candidates
+>    - `borderlineAtomicCount`: number of borderline items
+>    - `notableLarge`: the top large models list
+>    - Any errors encountered
+>
+> Do NOT return the raw JSON output. Summarize into the structure above.
 
-See [Inventory Script](#inventory-script) in the Step Scripts appendix.
+**Collect:** `inventorySummary` with fields listed above.
 
-#### Parameters
-
-| Parameter   | Default       | Description                                          |
-| ----------- | ------------- | ---------------------------------------------------- |
-| `CACHE_KEY` | `"v1"`        | Change to force a fresh scan                         |
-| `ROOT_PATH` | `"Workspace"` | Root for model/container scanning (scripts scan all services regardless) |
-
-### Behavior
-
-Inventory is always read-only.
-
-1. Run the inventory script and review the summary.
-2. Check borderline Atomic items — these may need co-location verification
-   or context about the model's purpose.
-3. Check refactoring candidates — note which have scripts (will need script
-   updates after refactoring).
-4. For deeper investigation, query the cache with targeted Luau snippets:
-
-```lua
--- Example: get all models under a specific path
-local cache = _G["step:inventory:v1"]
-local results = {}
-for _, m in cache.models do
-    if string.find(m.path, "^Workspace%.Buildings") then
-        table.insert(results, { path = m.path, maxExtent = m.maxExtent })
-    end
-end
-return results
-```
+**Pass forward:** `inventorySummary.clientScripts` (used in Step 6),
+`inventorySummary.refactoringCandidateCount` (sanity check for Step 3).
 
 ---
 
 ## Step 3: Refactoring — Scan, Review, Apply
 
-Restructures the hierarchy by grouping loose BaseParts into sub-models so
-that LOD and streaming modes can be applied at the right granularity.
+**Depends on:** Step 2 (`inventorySummary`).
 
-See the [Model Refactoring reference](#reference-model-refactoring) below
-for the full heuristics (grouping strategy, naming conventions, size
-thresholds, execution order).
+### Action 1: Scan
 
-### Dependencies
+Dispatch one subagent.
 
-Requires: Step 2 (inventory) cache.
+**Subagent prompt:**
 
-### Luau Script
+> Run the refactoring scan for the streaming conversion.
+>
+> 1. Execute the Luau script below via `execute_luau`. Prepend the Shared
+>    Helpers block before the Refactoring Script body (both are in the
+>    convert-to-streaming skill's Step Scripts Appendix).
+>    Parameters: `MODE = "scan"`, `CACHE_KEY = "v1"`.
+>
+> 2. From the result, report back:
+>    - `processedCandidates`: list of {path, looseParts, hasScripts, operationCount}
+>    - `candidatesWithScripts`: list of {path, looseParts}
+>    - `estimatedNewModels`, `estimatedPartsGrouped`
+>    - `externalReferences`: the full list (sorted by priority)
+>    - `externalReferencesByPriority`: {high, medium, low} counts
+>
+> Do NOT return the raw JSON. Structure as above.
 
-See [Refactoring Script](#refactoring-script) in the Step Scripts appendix.
+**Collect:** `refactoringScan`.
 
-#### Parameters
+### Action 2: External reference rewrites (one subagent per high-priority entry)
 
-| Parameter             | Default  | Description                                                                 |
-| --------------------- | -------- | --------------------------------------------------------------------------- |
-| `MODE`                | `"scan"` | `"scan"` or `"apply"`                                                       |
-| `CACHE_KEY`           | `"v1"`   | Must match inventory cache key                                              |
-| `EXCLUDED_PART_NAMES` | `nil`    | Apply mode only: list of part names to skip (references couldn't be fixed) |
+For each entry in `refactoringScan.externalReferences` where
+`priority == "high"`, dispatch one subagent:
 
-### Behavior
+**Subagent prompt:**
 
-1. Run scan mode and sanity-check the grouping in `processedCandidates`.
-2. Process `externalReferences` by priority (see the Model Refactoring
-   reference for the triage rules). The part moves from
-   `<containerPath>.<partName>` to `<containerPath>.<modelName>.<partName>`,
-   so rewrites insert the model name between container and part:
-   - `:WaitForChild("Arch01")` → `:WaitForChild("Arch01_Group"):WaitForChild("Arch01")`
-   - `.Arch01` → `.Arch01_Group.Arch01`
+> Rewrite external references for a refactored part in the streaming conversion.
+>
+> Context: The refactoring step will move the part `{partName}` from
+> `{containerPath}.{partName}` into a new sub-model at
+> `{containerPath}.{modelName}.{partName}`. Scripts that reference this part
+> by name need updating.
+>
+> Referencing scripts: {referencingScripts list}
+>
+> Instructions:
+> 1. Read each referencing script via `script_read`.
+> 2. For each occurrence of `{partName}` in a path expression (dot-indexing,
+>    `:WaitForChild("{partName}")`, bracket-indexing), insert the model name
+>    between the container and the part:
+>    - `.{partName}` → `.{modelName}.{partName}`
+>    - `:WaitForChild("{partName}")` → `:WaitForChild("{modelName}"):WaitForChild("{partName}")`
+> 3. Apply edits via `multi_edit`.
+> 4. If a script is too complex to rewrite confidently, do NOT edit it.
+>
+> Return:
+> - `status`: "rewritten" or "exclude"
+> - `scripts`: list of paths edited (if rewritten)
+> - `reason`: why excluded (if exclude)
+> - `changeLogEntries`: list of {path, description} for each edit
 
-   For references that can't be rewritten confidently, add the part name to
-   `EXCLUDED_PART_NAMES` — excluded parts stay in their original container.
-3. For each candidate in `candidatesWithScripts`, read scripts in the
-   refactored container and update in-container references (e.g.,
-   `script.Parent.Rock` → `script.Parent.Rock_Group.Rock`).
-4. Run apply mode with `EXCLUDED_PART_NAMES` set.
-5. Pass `modifiedPaths` to the atomic step as `RESCAN_SUBTREES`.
+**Collect per entry:** If `status == "exclude"`, add `partName` to
+`excludedPartNames` list.
 
-### Edge Cases
+For `medium` priority entries: process if fewer than 10. For `low` priority:
+bulk-add to `excludedPartNames` without dispatching subagents.
 
-- **Oversized models are processed before containers** — the inventory
-  identifies both oversized models (>250 studs with loose parts) and
-  Folders/Workspace with loose parts. Both are included in the candidates list.
-- **Spatial clustering** groups parts by proximity, not by name. The largest
-  part seeds each cluster, and nearby parts are added until the cluster's
-  bounding box reaches 250 studs. Parts too small for LOD (< 10 studs) are
-  left ungrouped.
+### Action 3: Internal reference updates (one subagent per candidatesWithScripts container)
+
+For each entry in `refactoringScan.candidatesWithScripts`, dispatch one subagent:
+
+**Subagent prompt:**
+
+> Update internal script references after model refactoring.
+>
+> Container: `{containerPath}`
+> Operations planned: parts will be moved into sub-models as follows:
+> {list of modelName → [partNames] from the scan}
+>
+> Instructions:
+> 1. Find all scripts that are descendants of `{containerPath}` using
+>    `script_grep` for common reference patterns (`script.Parent.`).
+> 2. Read each script via `script_read`.
+> 3. For references like `script.Parent.{partName}`, rewrite to
+>    `script.Parent.{modelName}.{partName}` where the part is moving into
+>    that model.
+> 4. Apply edits via `multi_edit`.
+> 5. If a script is too complex, do NOT edit it — flag it.
+>
+> Return:
+> - `status`: "updated" or "flagged"
+> - `edits`: list of {scriptPath, change description}
+> - `changeLogEntries`: list of {path, description}
+
+### Action 4: Apply refactoring
+
+Dispatch one subagent.
+
+**Subagent prompt:**
+
+> Apply the refactoring plan for the streaming conversion.
+>
+> 1. Execute the Luau script below via `execute_luau`. Prepend the Shared
+>    Helpers block before the Refactoring Script body.
+>    Parameters: `MODE = "apply"`, `CACHE_KEY = "v1"`,
+>    `EXCLUDED_PART_NAMES = {excludedPartNames list or nil}`.
+>
+> 2. Report back:
+>    - `modelsCreated`, `partsGrouped`, `partsSkipped`
+>    - `modifiedPaths`: the full list
+>    - `createdModels`: the full list of {modelPath, containerPath, modelName, partNames}
+>    - `errors`: any errors
+>
+> Do NOT return raw JSON. Structure as above.
+
+**Collect:** `refactoringResult`. Save `modifiedPaths` for Step 4.
+
+**Pass forward:** `refactoringResult.modifiedPaths` (used in Step 4),
+`refactoringResult.createdModels` (for change log).
+
+Append to change log: list every created model with its path and parts.
 
 ---
 
-## Step 4: ModelStreamingMode Classification — Re-scan, Review, Apply
+## Step 4: ModelStreamingMode Classification
 
-Classifies `ModelStreamingMode` for all Workspace models. Auto-classifies
-clear-cut cases and returns borderline items for LLM review.
+**Depends on:** Step 3 (`modifiedPaths`).
 
-See the [ModelStreamingMode reference](#reference-modelstreamingmode) below
-for the full classification heuristics and threshold reference.
+### Action 1: Scan
 
-### Dependencies
+Dispatch one subagent.
 
-Requires: Step 2 (inventory) cache. Step 3 (refactoring) should be applied
-first so classifications reflect the refactored hierarchy.
+**Subagent prompt:**
 
-### Luau Script
+> Run the streaming mode scan for the streaming conversion.
+>
+> 1. Execute the Luau script below via `execute_luau`. Prepend the Shared
+>    Helpers block before the Streaming Mode Script body.
+>    Parameters: `MODE = "scan"`, `CACHE_KEY = "v1"`,
+>    `RESCAN_SUBTREES = {modifiedPaths list or nil}`.
+>
+> 2. Report back:
+>    - `totalModels`, `alreadyCorrect`, `changesNeeded`
+>    - `autoAtomic`, `autoDefault`
+>    - `borderlineItems`: the full list with {path, source, currentMode,
+>      recommendedMode, reason, maxExtent, descendants, interactive}
+>
+> Do NOT return raw JSON.
 
-See [Streaming Mode Script](#streaming-mode-script) in the Step Scripts appendix.
+**Collect:** `streamingModeScan`.
 
-#### Parameters
+### Action 2: Borderline resolution (one subagent per borderline item)
 
-| Parameter          | Default  | Description                                        |
-| ------------------ | -------- | -------------------------------------------------- |
-| `MODE`             | `"scan"` | `"scan"` or `"apply"`                              |
-| `CACHE_KEY`        | `"v1"`   | Must match inventory cache key                     |
-| `RESCAN_SUBTREES`  | `nil`    | List of paths to re-scan after refactoring         |
+For each item in `streamingModeScan.borderlineItems`, dispatch one subagent:
 
-### Re-scan Mechanism
+**Subagent prompt:**
 
-When refactoring creates or moves models, the inventory cache becomes stale.
-The atomic step handles this:
+> Resolve a borderline ModelStreamingMode classification.
+>
+> Model path: `{path}`
+> Max extent: {maxExtent} studs
+> Descendants: {descendants}
+> Interactive components: {interactive object}
+> Borderline reason: {reason}
+>
+> Use the ModelStreamingMode reference from the convert-to-streaming skill
+> (the section between `---BEGIN STREAMING MODE REFERENCE---` and
+> `---END STREAMING MODE REFERENCE---`).
+>
+> Instructions:
+> 1. If extent > 50 studs AND the model has child Models, query child Model
+>    positions via `execute_luau`:
+>    ```lua
+>    local model = game:FindFirstChild("{path segments}", true) -- use resolvePath
+>    local positions = {}
+>    for _, child in model:GetChildren() do
+>      if child:IsA("Model") then
+>        table.insert(positions, {name=child.Name, pos=child:GetPivot().Position})
+>      end
+>    end
+>    return positions
+>    ```
+> 2. If any pair of child Model centers is >100 studs apart → organizational
+>    container → `Default`.
+> 3. If primarily BasePart descendants with interactive components and
+>    co-located → `Atomic`.
+> 4. If extent > 500 studs or descendants > 1500 → `Default` regardless.
+>
+> Return: `{ path: "...", mode: "Atomic" or "Default", reason: "one line" }`
 
-1. If `_G["step:inventory:<key>"].dirty == true`, the scan triggers a re-scan
-2. It checks `_G["step:refactoring:<key>"].modifiedPaths` for specific paths
-3. For each modified path, it removes old model entries and re-scans that subtree
-4. The inventory cache is updated in-place and the dirty flag is cleared
+**Collect:** All resolutions as `borderlineResolutions` map.
 
-Pass `modifiedPaths` from the refactoring step as `RESCAN_SUBTREES` for
-explicit control.
+### Action 3: Write resolutions and apply
 
-### Behavior
+Dispatch one subagent.
 
-1. Set `RESCAN_SUBTREES` to the refactoring step's `modifiedPaths`.
-2. Run scan mode. This triggers a re-scan of modified subtrees and also
-   scans storage services.
-3. Review borderline items (includes storage-side Models). For each, decide
-   the final classification:
-   - **Extent 375-500 studs**: Check if the model is a single cohesive object
-     or an organizational container with distributed children.
-   - **Descendants 1125-1500**: Verify the model is primarily BasePart descendants,
-     not a hierarchy of child Models.
-   - **Extent > 50 studs**: Run a co-location check to verify child Models are
-     within ~100 studs of each other.
-4. Write resolutions to the cache before running apply mode:
+**Subagent prompt:**
 
-   ```lua
-   local cache = _G["step:streaming-mode:v1"]
-   cache.borderlineResolutions["Workspace.Buildings.Elevator"] = { mode = "Atomic" }
-   cache.borderlineResolutions["Workspace.Map.LargeBuilding"] = { mode = "Default" }
-   ```
+> Apply streaming mode classifications for the streaming conversion.
+>
+> 1. First, write borderline resolutions to cache via `execute_luau`:
+>    ```lua
+>    local cache = _G["step:streaming-mode:v1"]
+>    {for each resolution: cache.borderlineResolutions["{path}"] = { mode = "{mode}" }}
+>    return "ok"
+>    ```
+>
+> 2. Then execute the Streaming Mode Script with `MODE = "apply"`,
+>    `CACHE_KEY = "v1"`. Prepend Shared Helpers.
+>
+> 3. Report back:
+>    - `changed`, `skipped`, `errorCount`
+>    - List of all models set to Atomic (paths)
+>    - List of all errors
+>
+> Do NOT return raw JSON.
 
-5. Run apply mode. Apply mode sets `ModelStreamingMode` on the source Models
-   in place. Clones parented to Workspace inherit the property automatically —
-   no per-clone change needed.
+**Collect:** `streamingModeResult`.
 
-Storage-side Models (tagged `source = "template"`) are scanned alongside
-Workspace models. Apply the same heuristics — see the
-[Runtime-Cloned Templates reference](#runtime-cloned-templates) for rationale
-and the `:Clone()` confirmation check. Override scan roots via `STORAGE_PATHS`.
+**Pass forward:** List of Atomic model paths (`atomicModelPaths`) for Step 6.
+
+Append to change log: list every model whose mode changed, with the new mode.
 
 ---
 
 ## Step 5: LOD Classification
 
-Classifies `LevelOfDetail` for all Workspace models. Applies `SLIM`
-to the highest eligible model in each branch of the hierarchy — once LOD is
-set on a model, its children are skipped since the parent's LOD mesh already
-covers their geometry at distance.
+**Depends on:** Step 3 complete (refactoring must be applied first).
 
-### Dependencies
+**Action:** Dispatch one subagent.
 
-Must run AFTER Step 3 (refactoring) so that newly created sub-models are
-included.
+**Subagent prompt:**
 
-### Luau Script
+> Run the LOD classification for the streaming conversion.
+>
+> 1. Execute the LOD Script via `execute_luau` (this script is
+>    self-contained — do NOT prepend Shared Helpers).
+>
+> 2. Report back:
+>    - `changed`, `alreadySet`, `tooSmall`, `tooLarge`, `noGeometry`
+>    - `changedPaths`: the full list of model paths set to SLIM
+>
+> Do NOT return raw JSON.
 
-See [LOD Script](#lod-script) in the Step Scripts appendix.
+**Collect:** `lodResult`.
 
-No parameters. The script runs a live traversal of Workspace and applies
-LOD in a single pass.
+**Pass forward:** `lodResult.changedPaths` (for change log).
 
-### Behavior
-
-Run the script. It does a **live traversal** of Workspace (not cache) to
-ensure newly created sub-models from refactoring are included. LOD
-classification is entirely mechanical (threshold-based); review the output
-to verify the numbers are reasonable.
-
-### Traversal Behavior
-
-The apply mode descends the model tree top-down. When it finds an eligible
-model, it sets LOD and **stops descending** into that model's children. If a
-model is too large, it skips LOD and continues descending to find eligible
-children deeper in the hierarchy.
-
-Example: Airport (500 studs) → skip, descend → Jet (80 studs) → set LOD,
-stop → JetBridge (30 studs) → set LOD, stop.
-
-### Classification Criteria
-
-Extent is computed from **visible parts only** (`Transparency < 1`). Invisible
-parts (collision boxes, ad tracking volumes, trigger regions) are excluded so
-they don't inflate the bounding box.
-
-| Condition                 | Action                 | Reason                                           |
-| ------------------------- | ---------------------- | ------------------------------------------------ |
-| No visible parts          | Skip                   | No visible geometry                              |
-| < 10 studs (visible)      | Skip                   | Too small to produce meaningful LOD mesh         |
-| 10-250 studs (visible)    | Set `SLIM`    | Ideal range — stop descending                    |
-| > 250 studs (multi-part)  | Skip, descend          | Too large — look for eligible children instead   |
-| > 250 studs (single-part) | Set `SLIM`    | Transitions out of LOD quickly — stop descending |
+Append to change log: list every model set to SLIM.
 
 ---
 
 ## Step 6: Fix Script Anti-Patterns
 
-Scans client scripts for streaming-incompatible patterns and applies fixes.
-This step is LLM-driven — there is no Luau step script.
+**Depends on:** Step 2 (`clientScripts`), Step 4 (`atomicModelPaths`).
 
-See the [Streaming Anti-Patterns reference](#reference-streaming-anti-patterns)
-below for the full anti-pattern catalog with severity levels, fix patterns,
-and "What to Ignore" rules.
+### Action 1: Preprocessing grep
 
-### Dependencies
+Dispatch one subagent.
 
-Requires: Step 2 (inventory) cache for the script list and client script
-paths. Step 4 (streaming mode) classifications are used to apply the "descendants
-of atomic models can be directly indexed" ignore rule.
+**Subagent prompt:**
 
-### Execution Strategy
+> Run preprocessing grep queries for the streaming conversion anti-pattern scan.
+>
+> Run all of the following `script_grep` queries and compile results:
+> - `workspace[.:]`
+> - `game.Workspace`
+> - `GetService("Workspace")`
+> - `GetService('Workspace')`
+> - `FindFirstChildOfClass`
+> - `FindFirstChildWhichIsA`
+> - `local %w+ = workspace`
+> - `local %w+ = game:GetService`
+> - `FireClient`
+> - `.Parent =`
+> - `:Clone()`
+> - `CharacterAdded`
+> - `OnClientEvent`
+> - `DescendantAdded`
+> - `DescendantRemoving`
+> - `CollectionService`
+> - `GetTagged`
+> - `RunService`
+> - `BindToRenderStep`
+> - `RenderStepped`
+> - `Heartbeat`
+> - `GetBoundingBox`
+> - `GetExtentsSize`
+> - `while true`
+> - `task.wait`
+>
+> For each script that appears in any grep result, count hits by pattern
+> category (workspace access, FindFirstChild variants, stored refs,
+> CharacterAdded, remote handlers, DescendantAdded/Removing,
+> CollectionService, render loops, spatial queries, polling loops).
+>
+> Return a prioritized list:
+> - LocalScripts first, then client ModuleScripts, then others
+> - Within each group, sort by total hit count descending
+> - Format: `[{scriptPath, hitCategories: {category: count}, totalHits}]`
+> - Include ALL scripts from the client script set in the output, even
+>   those with zero grep hits. Zero-hit scripts still need processing
+>   (grep misses service-style access, stored refs via parameters,
+>   module-scope hazards).
+>
+> Client script set (only report hits for these):
+> {clientScripts list}
 
-The unit of work in Step 6 is the **client script**, and the correctness
-signal is **coverage**: every entry in `inventory.scripts.clientScripts`
-must end with a recorded disposition (fixed / already safe / flagged for
-manual review / skipped with reason). Grep is a preprocessing tool that
-prioritizes the queue and surfaces patterns — it does not replace the
-per-script walk.
+**Collect:** `scriptQueue` — prioritized list of scripts to process.
 
-#### 1. Search for workspace access patterns
+### Action 2: Build critical-path set
 
-Use `script_grep` to search across all scripts:
+Dispatch one subagent.
 
-- `workspace[.:]` — direct workspace access (AP#1, #2, #3, #5, #6, #10)
-- `game.Workspace` — fully qualified access
-- `GetService("Workspace")` — service-style access (single and double quotes)
-- `FindFirstChildOfClass` and `FindFirstChildWhichIsA` — silent-nil
-  variants of AP#2. These return nil when nothing matches and don't
-  appear in the `workspace[.:]` grep when called on a captured ref
-  (`model:FindFirstChildOfClass(...)`). Treat every match as a script
-  needing a nil guard before the result is dereferenced.
-- `local %w+ = workspace` and `local %w+ = game:GetService%("Workspace"%)`
-  — module-scope captures. Each match is **two signals at once**: an
-  alias (re-grep the variable name to find downstream uses, treat as
-  workspace-equivalent) and an AP#4 candidate (the captured instance is
-  long-lived and subject to stream-out — needs nil guard or
-  `AncestryChanged` listener depending on access cadence).
-- `self%.%w+ = ` capturing a workspace instance, and any
-  `RunService.Heartbeat` / `RenderStepped` / `BindToRenderStep` callback
-  that reads such a field — AP#4 hot path.
-- `FireClient` — server sending workspace Instance refs to clients (anti-pattern #8)
-- `.Parent =` in client scripts — check for reparenting workspace instances to non-streaming containers (anti-pattern #13)
-- `:Clone()` — runtime-cloned templates parented to Workspace (template classification in Step 4, and sibling-ref preservation here)
+**Subagent prompt:**
 
-#### 1.5. Build the critical-path script set
+> Build the critical-path script set for the streaming conversion.
+>
+> The critical path is every script and function that runs during game
+> startup before the loading screen exits. WaitForChild on the critical
+> path will HANG the game — these scripts must use FindFirstChild + nil
+> guard instead.
+>
+> Instructions:
+> 1. Read every LocalScript in `StarterPlayer.StarterPlayerScripts` and
+>    `ReplicatedFirst` via `script_read`.
+> 2. For each, trace `require()` calls to find transitively-required modules.
+> 3. Identify the loading-screen exit line: `SetCoreGuiEnabled`,
+>    `LoadingScreen:Destroy()`, `:SetAttribute("Loaded"`, or similar.
+> 4. Everything before the exit line is critical path.
+> 5. Follow function calls made before the exit line recursively.
+>
+> Return:
+> - `criticalPathScripts`: list of script paths on the critical path
+> - `exitSignal`: description of the loading-screen exit line found
+> - `criticalFunctions`: list of function names called before exit
 
-Before applying any `WaitForChild` fixes, trace the client initialization
-chain per the [Hazard: WaitForChild on Critical Initialization Paths](#hazard-waitforchild-on-critical-initialization-paths)
-section in the Anti-Patterns reference below. **Applying `WaitForChild` on
-a critical-path site will hang game startup** — this is the highest-stakes
-rule in Step 6.
+**Collect:** `criticalPathSet`.
 
-Record a `criticalPath` set containing:
-- Every `LocalScript` in `StarterPlayerScripts` and `ReplicatedFirst`.
-- Every ModuleScript reachable via `require` from those scripts, where the code
-  that runs at require time (or inside functions called before the loading
-  screen exit) is considered critical.
-- Every function name called directly or transitively from a critical-path
-  script before the loading-screen exit line.
+### Action 3: Per-script anti-pattern fix (one subagent per client script)
 
-For the specific game being converted, identify the loading-screen exit line
-first — `LoadingScreen:SetAttribute(...)`, `playerGui.LoadingScreen:Destroy()`,
-`StarterGui:SetCoreGuiEnabled(Chat, true)`, or equivalent. Everything above
-that line in the startup flow is critical path.
+For each script in `scriptQueue`, dispatch one subagent (do NOT skip
+zero-hit scripts — grep misses service-style access, stored refs via
+parameters, and module-scope hazards):
 
-When applying a fix inside the critical-path set, use `FindFirstChild` + nil
-guard — never `WaitForChild`. When applying a fix outside the set (e.g., a
-button-click handler, a remote handler fired by gameplay), `WaitForChild` is
-permitted with an appropriate timeout.
+**Subagent prompt:**
 
-#### 2. Prioritize scripts
+> Fix streaming anti-patterns in a single client script.
+>
+> Script path: `{scriptPath}`
+> Hit categories from grep: {hitCategories}
+> Is on critical path: {yes/no, based on criticalPathSet}
+> Critical functions (if on critical path): {criticalFunctions}
+> Atomic model paths (descendants can be directly indexed after WaitForChild
+> on the ancestor): {atomicModelPaths}
+>
+> Use the full Streaming Anti-Patterns reference from the convert-to-streaming
+> skill (the section between `---BEGIN ANTI-PATTERN REFERENCE---` and
+> `---END ANTI-PATTERN REFERENCE---`).
+>
+> Instructions:
+> 1. Read the script via `script_read`.
+> 2. Check for workspace aliases (`local ws = workspace` etc.). If found,
+>    run `script_grep` for the alias name to find downstream uses.
+> 3. Walk the FULL anti-pattern catalog (AP#1 through AP#13 + all hazards)
+>    against this script. Do not stop after the first issue — a single
+>    script commonly has multiple. For each pattern, apply the specific
+>    decision logic from the reference:
+>    - AP#1: Includes `game:GetService("Workspace").X.Y` — same pattern
+>      as `workspace.X.Y`, convert identically.
+>    - AP#3: Distinguish "works with available items" (add ChildAdded) vs
+>      "requires completeness" (searching by property/owner/name to find a
+>      specific instance → MUST flag for server-side migration). When code
+>      iterates children to find one matching a condition, that is a
+>      completeness requirement — flag it even if you also fix AP#1.
+>    - AP#4: Stored refs need nil+Parent guards at EVERY access site, even
+>      if obtained via WaitForChild. Do NOT "fix" by eliminating the stored
+>      ref or moving lookups into functions — the guard (`if ref and
+>      ref.Parent then`) MUST appear in the output source at each use site.
+>      Polling loops (`while true` + `task.wait`) need nil+Parent guard at
+>      the top of each iteration.
+>    - AP#5: Check raycast direction length — flag if >= 500 studs.
+>    - AP#8: ALL OnClientEvent handlers that receive or use workspace
+>      Instance references need `pcall` wrapping — not just bulk loops.
+>      Wrap the handler body (or loop body) in pcall so cascading errors
+>      from nil Instance refs are caught. A nil guard alone is NOT
+>      sufficient for AP#8.
+>    - AP#10: GetBoundingBox/GetExtentsSize on non-atomic models → flag.
+>    - AP#13: Load-bearing caches (module reads back from cache) → flag.
+>      Non-load-bearing (written but never read) → auto-remove.
+>    - Module-scope WaitForChild (outside any function) IS a hazard even
+>      though WaitForChild is the normal fix — move to lazy getter.
+> 4. Apply "What to Ignore" rules:
+>    - Skip if this is a server script
+>    - Skip accesses to non-streaming containers (ReplicatedStorage, etc.)
+>    - Skip accesses to descendants of atomic models (use atomicModelPaths)
+>    - Skip accesses to non-spatial instances directly under Workspace.
+>      Specifically: `workspace.Configuration`, `workspace.Settings`, or
+>      any Configuration/Folder/ValueBase directly under Workspace that
+>      contains only non-spatial children is ALWAYS replicated and NEVER
+>      streams. Do NOT add WaitForChild to these paths — leave direct
+>      access unchanged.
+> 5. For fixes on the critical path: use FindFirstChild + nil guard, NEVER
+>    WaitForChild. For fixes off the critical path: WaitForChild is fine.
+> 6. Apply ALL fixes via `multi_edit` in one call.
+> 7. Flag for manual review (do not skip silently) when:
+>    - A fix requires server-side migration (AP#3 completeness, AP#5
+>      long-range queries)
+>    - Client bounds are unreliable (AP#10 on non-atomic models)
+>    - A cache removal would break downstream readers (AP#13 load-bearing)
+>    IMPORTANT: A script can be BOTH "fixed" (for some patterns) AND
+>    "flagged" (for others). When flagging, ALWAYS populate flaggedItems
+>    with the script path, the anti-pattern ID, and why. The orchestrator
+>    uses flaggedItems to build the manual-review summary that graders
+>    check — if you omit it, the flag is invisible.
+>
+> Return:
+> ```
+> {
+>   scriptPath: "...",
+>   disposition: "fixed" | "already_safe" | "flagged",
+>   antiPatternsFixed: ["AP#1", "AP#4", ...],
+>   changeLogEntries: [{path, antiPattern, description}],
+>   flaggedItems: [{description, reason}]
+> }
+> ```
 
-Process scripts in this order:
-1. **LocalScripts** — most affected by streaming
-2. **ModuleScripts** required by LocalScripts (typically in
-   `ReplicatedStorage.Modules.Client` or `ReplicatedFirst.Modules` —
-   `ReplicatedFirst` modules often run *before* the rest of the client and
-   need the same review)
-3. **Server scripts** — scan only for prefetch candidates (Step 7), not anti-patterns
+**Collect per script:** Record disposition. Append `changeLogEntries` to
+change log. Record `flaggedItems` for the summary.
 
-Use the inventory's `scripts.clientScripts` list for the full set of client
-script paths.
+### Action 4: Coverage check
 
-#### 3. Read and analyze each script
+After all subagents return, verify every script in `clientScripts` has a
+disposition (fixed / already_safe / flagged). If any are missing, dispatch
+subagents for them.
 
-For each client script in the queue (regardless of whether it had
-preprocessing hits — a script with zero hits gets the "already safe"
-disposition, not skipped):
-
-1. Read the full script with `script_read`.
-2. Check for local aliases (e.g. `local ws = workspace`,
-   `local ws = game:GetService("Workspace")`). When present, re-grep the
-   alias identifier (`ws[%.:]`) and treat every hit as workspace access.
-3. Walk the **full** anti-pattern catalog against this script — don't
-   stop after finding the first issue. A single script commonly has two
-   or more issues (e.g. an AP#1 direct index AND a refactor-path update
-   from Step 3, or a module-scope capture that's simultaneously an AP#1
-   alias and an AP#4 stored ref).
-4. Apply the "What to Ignore" rules — skip server scripts, non-streaming
-   container accesses, accesses to descendants of Atomic models (use Step 4
-   classifications), non-spatial instance accesses.
-
-#### 4. Apply fixes
-
-Process scripts one at a time: read, identify every applicable
-anti-pattern, batch edits via `multi_edit`, move on. Record the
-disposition for each script (fixed with which anti-patterns, already
-safe, flagged, skipped-with-reason) — this is the input to the coverage
-check below.
-
-#### 5. Default to per-script subagent delegation
-
-When a subagent tool is available, dispatch one subagent per client
-script by default. The orchestrator's job becomes: enumerate the script
-set, hand each script to a subagent with the critical-path set + Step 4
-classifications + a reference to this skill, and collect results. This
-avoids running out of attention mid-queue on games with many client
-scripts — the failure mode that leaves a script unexamined.
-
-Only skip the subagent pattern if no such tool is available. See
-[Subagent Delegation](#subagent-delegation) for the tool preference
-order.
-
-#### 6. Coverage check
-
-Before declaring Step 6 done, reconcile processed scripts against
-`inventory.scripts.clientScripts`. Every entry must have a recorded
-disposition. If any are missing, go back and process them — skipping a
-script is not the same as dispositioning it.
-
-### Behavior
-
-For each fix, use the appropriate pattern from the
-[Anti-Patterns reference](#reference-streaming-anti-patterns). Flag
-out-of-scope items for manual review with an explanation.
-
-### Investigating client-server context
-
-When an anti-pattern involves a client-server interaction (e.g., a
-`RemoteEvent` handler that iterates workspace instances), read the
-corresponding server script that fires the event before deciding whether to
-fix or flag. This helps determine:
-
-- Whether the event is **targeted** (fired to a specific player) or
-  **broadcast** to all players — if targeted, the client-side filtering may
-  be redundant.
-- What **data the server already has** that could eliminate the client-side
-  workspace query entirely.
-- Whether the correct fix is a local script change or a server-side
-  architectural change.
-
-Use this context to write **actionable recommendations** rather than
-generic warnings. For example, instead of "this iteration may miss
-streamed-out instances," write "the server already knows which player's
-house is being robbed — consider having the server send the alert only to
-the affected player, removing the need for the client-side Placeables
-check."
-
-### Scope Boundaries
-
-Make cross-script changes when needed (adding RemoteEvents/RemoteFunctions,
-moving queries to the server, updating both client and server scripts).
-When adding server-side handlers, validate all client inputs.
-
-Flag for manual review only when the fix requires redesigning a core game
-system (e.g., rewriting a level loading architecture).
+**Pass forward:** All `flaggedItems` (for Step 9 summary), all dispositions.
 
 ---
 
 ## Step 7: Add Prefetches and MRFs
 
-Identifies and adds `RequestStreamAroundAsync` prefetches before CFrame
-moves and `AddReplicationFocus` / `RemoveReplicationFocus` for areas that
-need continuous streaming. This step is LLM-driven — there is no Luau
-step script.
+**Depends on:** Step 2 (inventory for script paths).
 
-See the [Prefetches and MRFs reference](#reference-prefetches-and-mrfs) below
-for the full implementation patterns, guidelines, and identification
-heuristics.
+### Action 1: Find teleport patterns
 
-### Dependencies
+Run these `script_grep` queries directly (small output):
+- `PivotTo`
+- `SetPrimaryPartCFrame`
+- `HumanoidRootPart`
+- `MoveTo`
+- `RequestStreamAroundAsync`
 
-Requires: Step 2 (inventory) cache for script paths.
+Identify which **server scripts** have teleport-pattern hits.
 
-### Search Patterns
+### Action 2: Per-script prefetch analysis (one subagent per server script with hits)
 
-Use `script_grep` to find teleport and movement patterns:
+For each server script with teleport grep hits, dispatch one subagent:
 
-- `PivotTo` — modern teleport API
-- `SetPrimaryPartCFrame` — deprecated but widely used
-- `HumanoidRootPart` + `CFrame` — direct CFrame assignment
-- `MoveTo` — model movement
-- `CharacterAdded` — spawn/respawn logic
-- `RequestStreamAroundAsync` — check if prefetches already exist
+**Subagent prompt:**
 
-#### Distinguishing player teleports from object movement
+> Analyze a server script for prefetch opportunities in the streaming conversion.
+>
+> Script path: `{scriptPath}`
+> Grep hits: {which patterns matched}
+>
+> Use the Prefetches and MRFs reference from the convert-to-streaming skill.
+>
+> Instructions:
+> 1. Read the script via `script_read`.
+> 2. For each teleport pattern, determine if it moves a PLAYER'S CHARACTER
+>    to a new position. Do NOT add prefetches for:
+>    - Moving vehicles to the player's current position
+>    - Animating doors, platforms, or mechanisms
+>    - Moving NPCs or non-player models
+> 3. For each confirmed player teleport, add
+>    `player:RequestStreamAroundAsync(position, 5)` before the CFrame move
+>    via `multi_edit`.
+> 4. Identify MRF candidates (server-created assemblies handed to clients,
+>    repeated zone travel, etc.) — return as recommendations only.
+>
+> Return:
+> ```
+> {
+>   scriptPath: "...",
+>   prefetchesAdded: [{line, trigger, positionExpr}],
+>   mrfCandidates: [{description, heuristic}],
+>   changeLogEntries: [{path, description}]
+> }
+> ```
 
-Many `SetPrimaryPartCFrame` calls move objects (doors, vehicles, mechanisms)
-rather than teleporting players. Only add prefetches when the code is moving
-a **player's character** to a new position. Look for:
+**Collect:** Append `changeLogEntries` to change log. Record `mrfCandidates`
+for summary.
 
-- `Character:PivotTo(...)` or `Character:SetPrimaryPartCFrame(...)`
-- `HumanoidRootPart.CFrame = ...` where the CFrame is a distant position
-- `Player:LoadCharacter()` followed by a CFrame repositioning
-- Server scripts that receive a position from a RemoteEvent and move a character
-
-Do NOT add prefetches for:
-- Moving vehicles to the player's current position
-- Animating doors, platforms, or mechanisms
-- Moving NPCs or non-player models
-
-### Behavior
-
-Add prefetch calls before CFrame moves. Prefetches are always safe to add
-(single-line, local change). MRFs may require discussion with the user if
-the setup is non-trivial.
-
-1. Search for teleport patterns across server scripts.
-2. Read each script to determine if it moves players (not objects).
-3. For each player teleport, add `RequestStreamAroundAsync` before the move:
-
-   ```lua
-   -- Before any CFrame move:
-   player:RequestStreamAroundAsync(destinationPosition, 5)
-   character:PivotTo(destinationCFrame)
-   ```
-
-4. For MRF candidates, determine if the use case warrants a replication focus.
-   MRFs require server-side changes and may be out of scope for automated
-   conversion — flag complex MRF candidates for manual review.
-
-See the [Prefetches and MRFs reference → Identification Heuristics](#reference-prefetches-and-mrfs)
-for the full MRF candidate list.
+**Pass forward:** `mrfCandidates` (for Step 9 summary).
 
 ---
 
 ## Step 8: Validation
 
-Comprehensive validation that every prior step landed correctly and that
-the game runs cleanly under streaming. Fix any regressions found before
-producing the summary.
+**Depends on:** Steps 1–7 complete.
 
-### Dependencies
+### Action 1: Start play session
 
-Runs after Steps 1–7 are complete.
+Call `start_stop_play` with `is_start: true`.
 
-### Playability gate
+### Action 2: Playability gate
 
-A clean console is not the same as a working game. Before classifying
-console output, confirm the character is alive and on the ground. **If any
-of the following hold, they block Step 9 regardless of how clean the
-console is — a game that does not run is a game that does not run.**
+Run via `execute_luau` (small output, do directly):
 
-- Respawn counter > 1 during the observation window — death loop. Character
-  is falling into a void, hitting a death plane, or the state machine
-  thinks they're dead.
-- Y position decreases monotonically without stabilizing — freefall. Ground
-  geometry is missing or streamed out at spawn.
-- Position unchanged for the full window with `Humanoid.Health > 0` — stuck
-  or frozen. State machine hung before spawn completed.
-- Console contains repeating `Respawning` / death logs at regular intervals.
+```lua
+local Players = game:GetService("Players")
+local player = Players:GetPlayers()[1]
+if not player then return { error = "no player" } end
+local char = player.Character
+if not char then return { error = "no character" } end
+local hrp = char:FindFirstChild("HumanoidRootPart")
+local hum = char:FindFirstChild("Humanoid")
+if not hrp or not hum then return { error = "no hrp/humanoid" } end
+task.wait(3)
+local pos1 = hrp.Position
+task.wait(5)
+local pos2 = hrp.Position
+return {
+    health = hum.Health,
+    y1 = pos1.Y, y2 = pos2.Y,
+    moved = (pos2 - pos1).Magnitude > 0.1,
+    alive = hum.Health > 0
+}
+```
 
-Use `screen_capture` to verify visible geometry, and sample
-`HumanoidRootPart.Position` / `Humanoid.Health` via `execute_luau` over
-~10s. If the gate fails, trace which system failed to initialize. If the
-root cause is external (DataStore unavailable in Studio, etc.), surface it
-explicitly rather than silently declaring success.
+If Y is decreasing monotonically (freefall) or health is 0 (death loop),
+stop and diagnose before continuing.
 
-### Execution Strategy
+### Action 3: Check console
 
-#### 1. Runtime validation via play session
-
-Start a play session, verify the game is actually playable, then analyze
-console output.
-
-1. Call `mcp__Roblox_Studio__start_stop_play` with `is_start: true`.
-2. Wait for full initialization — loading screen dismissal and the main
-   gameplay state. If the game exposes a "loaded" signal or attribute, use
-   it; otherwise allow enough time for the first few client/server frames
-   and for the console to quiesce.
-3. Run the [Playability gate](#playability-gate). If any condition holds,
-   stop and fix the root cause before continuing.
-4. Call `mcp__Roblox_Studio__get_console_output` and classify each error.
-
-Error categories and fixes:
+Call `get_console_output`. Classify errors:
 
 | Symptom | Fix |
 | --- | --- |
-| Cascading init errors (nil refs from server data) | Wrap construction/init/requires in pcall per anti-pattern #8 "Downstream" |
-| Per-frame errors from orphaned connections | Call `destroy()` before removing from lookup table ("pcall around initialization" hazard) |
-| `Infinite yield possible on WaitForChild(...)` | Critical path: `FindFirstChild` + nil guard. Otherwise: add timeout + nil guard |
-| `Requested module experienced an error while loading` | Wrap the require in pcall — cached permanently for session |
-| `attempt to index nil with ...` on previously-working refs | Anti-pattern #4 — check before use or `AncestryChanged` |
-| Path-not-found after refactoring | Update path for new sub-model wrapper (Step 3) |
-| Stuck at spawn / `PauseOutsideLoadedArea` | Missing prefetch on spawn/respawn — re-check Step 7 |
+| `nil` ref errors from server data | AP#8 pcall wrapper |
+| Per-frame errors from orphaned connections | destroy before removing |
+| `Infinite yield possible` | Critical path: FindFirstChild + nil. Otherwise: timeout |
+| `module experienced an error` | pcall around require |
+| `attempt to index nil` on workspace refs | AP#4 nil guard |
+| Path-not-found after refactoring | Update path for new wrapper |
 
-#### 2. Movement validation
+### Action 4: Fix errors (one subagent per distinct error)
 
-Many streaming issues only manifest after the player moves. Exercise
-streaming explicitly.
+For each distinct console error, dispatch one subagent:
 
-1. Pick representative locations: spawn, a mid-range gameplay area, and a
-   far-range area across the map. Use the inventory cache's `notableLarge`
-   list or known zone entry points as targets.
-2. For each location, use `mcp__Roblox_Studio__character_navigation` to
-   move the player there. Capture console output after each move.
-3. If the game has teleports, exercise them — call the triggering
-   RemoteEvent via `mcp__Roblox_Studio__execute_luau` or drive the UI via
-   `mcp__Roblox_Studio__user_mouse_input`.
-4. Errors that appear only after movement are streaming-specific:
-   - `attempt to index nil with ...` after moving away from an instance →
-     stale reference (anti-pattern #4)
-   - Gameplay systems that stop working at distance → completeness
-     assumption (anti-pattern #3)
-   - Raycasts returning unexpected results at range → anti-pattern #5
-   - Distance checks using stale positions → anti-pattern #6
+**Subagent prompt:**
 
-#### 3. Fix and re-validate
+> Fix a validation error found during the streaming conversion.
+>
+> Error message: `{errorMessage}`
+> Likely script (from stack trace): `{scriptPath}`
+> Error category: {category from table above}
+> Critical-path scripts: {criticalPathSet.criticalPathScripts}
+>
+> Use the Streaming Anti-Patterns reference from the convert-to-streaming
+> skill (between `---BEGIN ANTI-PATTERN REFERENCE---` and
+> `---END ANTI-PATTERN REFERENCE---`).
+>
+> Instructions:
+> 1. Read the script via `script_read`.
+> 2. Identify the anti-pattern causing the error.
+> 3. Apply the fix via `multi_edit`.
+> 4. If on the critical path, use FindFirstChild + nil guard, NEVER WaitForChild.
+>
+> Return:
+> ```
+> {
+>   scriptPath: "...",
+>   antiPattern: "AP#N",
+>   fixApplied: "description",
+>   changeLogEntries: [{path, description}]
+> }
+> ```
 
-For each error, identify the anti-pattern, apply the fix from the
-reference, and re-run the relevant validation part. Distinguish
-pre-existing errors (unrelated to the conversion) from regressions
-introduced by the conversion — pre-existing errors can be noted in the
-summary without blocking completion. Do not proceed to Step 9 until the
-game runs cleanly through initialization and movement.
+### Action 5: Movement validation
 
-#### 4. Stop the play session
+Use `character_navigation` to move to 2-3 representative locations (use
+`inventorySummary.notableLarge` for targets). After each move, check
+console for new errors. Fix any new errors with subagents as in Action 4.
 
-Call `mcp__Roblox_Studio__start_stop_play` with `is_start: false` to
-return to edit mode before producing the summary.
+### Action 6: Stop play session
 
-### Behavior
+Call `start_stop_play` with `is_start: false`.
 
-Start play → analyze console → move across the map → fix regressions →
-stop play. Proceed to Step 9 only after a clean run.
-
-This step is fully LLM-driven — no step script. Use judgment to:
-
-- Decide when initialization is complete (loading screen dismissal,
-  quiesced console, or a known "ready" signal).
-- Classify each console error and pick the correct fix from the catalog.
-- Distinguish pre-existing errors from conversion-introduced regressions.
-- Choose which locations to test — a small map may only need spawn +
-  mid-range; a sprawling map with distinct zones needs one per zone.
-- Decide when to stop iterating — chasing flaky Studio-only errors is not
-  worthwhile; focus on reproducible regressions.
+Append all fix `changeLogEntries` to the change log.
 
 ---
 
@@ -661,8 +757,32 @@ After conversion, produce a summary using **every** section below. Do not
 output results from earlier steps until this point. If a section has no
 items, write "None."
 
-### Workspace properties changed
-List all changed properties with old → new values.
+**Persist warnings for grading.** After producing the summary, write all
+flagged/manual-review items to `ServerStorage.LastSkillSummary` via
+`execute_luau` so automated graders can read them:
+
+```lua
+local ss = game:GetService("ServerStorage")
+local sv = ss:FindFirstChild("LastSkillSummary")
+if not sv then
+    sv = Instance.new("StringValue")
+    sv.Name = "LastSkillSummary"
+    sv.Parent = ss
+end
+sv.Value = [[
+{paste the full "Warnings / manual review needed" section here,
+ including script names, anti-pattern IDs, and descriptions}
+]]
+return "ok"
+```
+
+Include every flagged script name, the anti-pattern ID, and the reason
+in the value string. The grader searches for keywords like script names,
+"GetBoundingBox", "raycast", "reparent", "cache", etc.
+
+### Workspace streaming configured
+State that streaming was enabled and the recommended Workspace streaming
+settings were applied.
 
 ### Model structure refactored
 Number of new sub-models created, total parts grouped, containers
@@ -690,13 +810,29 @@ For each: script path, anchor BasePart, lifecycle, reason.
 ### Warnings / manual review needed
 List all items requiring manual review with explanations.
 
+### Change log file
+If a change log was produced, give the absolute path to
+`streaming_conversion_changes.md` and tell the user it contains the
+full per-change record — useful for reviewing what was modified and why.
+If file-writing wasn't available in this environment, say so explicitly
+so the user knows no change log exists.
+
+---
+
+# Appendix — Reference Material for Subagent Prompts
+
+The following sections contain reference documentation and Luau scripts.
+Copy relevant sections into subagent prompts as directed by the
+orchestration steps above.
+
 ---
 
 ## Reference: Workspace Configuration
 
 ### Workspace Streaming Properties
 
-Recommended defaults unless game design requires different values:
+`Workspace:ApplyRecommendedStreamingSettings()` sets all recommended
+properties in one call:
 
 | Property                 | Value                    | Reason                                                       |
 | ------------------------ | ------------------------ | ------------------------------------------------------------ |
@@ -896,6 +1032,8 @@ Do **not**:
 
 ## Reference: ModelStreamingMode
 
+---BEGIN STREAMING MODE REFERENCE---
+
 Controls how a Model participates in instance streaming. Set via the
 `ModelStreamingMode` property on Model instances.
 
@@ -1034,9 +1172,13 @@ for non-Workspace instances.
 location; only the `ModelStreamingMode` property is changed. Clones created
 from it inherit the property.
 
+---END STREAMING MODE REFERENCE---
+
 ---
 
 ## Reference: Streaming Anti-Patterns
+
+---BEGIN ANTI-PATTERN REFERENCE---
 
 Patterns in Luau scripts that break or degrade under instance streaming. Use this
 catalog to identify issues in existing code and to avoid introducing them in new code.
@@ -1055,9 +1197,20 @@ local part = workspace.SomeModel.SomePart
 local door = workspace.Building.Door.DoorPart
 ```
 
-**Fix:** Replace with `WaitForChild` chains:
+Also applies to service-style access — `game:GetService("Workspace")` returns the
+same Workspace instance and the same dot-chain is equally broken:
+```lua
+-- BROKEN: Same issue via GetService
+local npc = game:GetService("Workspace").Town.NPCs.Vendor
+```
+
+**Fix:** Replace the entire chain with `workspace:WaitForChild(...)`. When the
+access uses `game:GetService("Workspace")`, replace that prefix with `workspace`:
 ```lua
 local part = workspace:WaitForChild("SomeModel"):WaitForChild("SomePart")
+
+-- Service-style fix: replace game:GetService("Workspace").X.Y.Z entirely
+local npc = workspace:WaitForChild("Town"):WaitForChild("NPCs"):WaitForChild("Vendor")
 ```
 
 For descendants of atomically replicated models (`Atomic`, `Persistent`, or
@@ -1247,6 +1400,28 @@ If the same stored ref is read from a handful of non-loop call sites as well, ke
 the "check before use" guard at those sites — the listener handles the hot path,
 the per-call-site checks handle the cold paths.
 
+**Fix (polling loop — `while true` with `task.wait()`):** Any workspace Instance
+reference accessed inside a polling loop can go stale during `task.wait()`. This
+applies whether the ref is a module-scope variable, a field on a parameter object
+(e.g. `entry.target`), or an upvalue. Add a nil/Parent guard at the **top** of each
+iteration, before dereferencing:
+```lua
+-- BEFORE: obj may stream out during task.wait()
+while true do
+    local part = obj:FindFirstChild("Attachment")  -- errors if streamed out
+    if part then break end
+    task.wait()
+end
+
+-- AFTER: guard at the top of each iteration
+while true do
+    if not obj or not obj.Parent then break end
+    local part = obj:FindFirstChild("Attachment")
+    if part then break end
+    task.wait()
+end
+```
+
 #### 5. Client-side spatial queries assuming geometry exists (SEVERITY: MEDIUM)
 
 Raycasts and spatial queries silently miss unstreamed geometry. Nearby
@@ -1398,14 +1573,36 @@ data with Instance references (level data, entity tables, UI configs),
 some refs will be nil for unstreamed instances. Systems that create
 objects in a loop — component frameworks, entity systems, UI builders,
 service initializers — need pcall resilience so one nil ref doesn't crash
-the loop. Wrap construction, initialization, and module requires in pcall:
+the loop. This includes `require()` calls on Instance refs (ModuleScripts
+sent from the server may be nil), property accesses on received data tables
+that hold Instance refs, and `obj:initialize()` calls that internally read
+workspace instances.
+
+Wrap the **entire loop body** — including `require`, construction, and
+initialization — in pcall:
 
 ```lua
-for id, obj in pairs(objects) do
-    local ok, err = pcall(obj.initialize, obj)
+-- BEFORE: one nil ref crashes the entire loop
+for id, entry in pairs(serverData.entities) do
+    local Module = require(entry.module)
+    local obj = Module.new(id, entry.config)
+    obj:initialize()
+    registry[id] = obj
+end
+
+-- AFTER: pcall isolates each iteration
+for id, entry in pairs(serverData.entities) do
+    local ok, err = pcall(function()
+        local Module = require(entry.module)
+        local obj = Module.new(id, entry.config)
+        obj:initialize()
+        registry[id] = obj
+    end)
     if not ok then
-        pcall(obj.destroy, obj)  -- always destroy before removing; see "pcall around initialization" hazard
-        objects[id] = nil
+        if registry[id] then
+            pcall(registry[id].destroy, registry[id])
+            registry[id] = nil
+        end
     end
 end
 ```
@@ -1750,6 +1947,8 @@ These do **not** need streaming-related fixes:
   accesses to these if they are nested inside a streamable ancestor (e.g., a Folder
   inside a Model that could stream out).
 
+---END ANTI-PATTERN REFERENCE---
+
 ---
 
 ## Reference: Prefetches and MRFs
@@ -2073,32 +2272,6 @@ local function categorizeScript(script: Instance): string
 	return "unknown"
 end
 
-------------------------------------------------------------------------
--- Workspace streaming config
-------------------------------------------------------------------------
-
-local function readWorkspaceConfig()
-	local ws = workspace
-	local config = { StreamingEnabled = ws.StreamingEnabled }
-
-	local enumProps = {
-		"ModelStreamingBehavior",
-		"StreamingIntegrityMode",
-		"StreamOutBehavior",
-	}
-	for _, name in enumProps do
-		local ok, val = pcall(function() return ws[name].Name end)
-		config[name] = ok and val or nil
-	end
-
-	local numProps = { "StreamingMinRadius", "StreamingTargetRadius" }
-	for _, name in numProps do
-		local ok, val = pcall(function() return ws[name] end)
-		config[name] = ok and val or nil
-	end
-
-	return config
-end
 
 ------------------------------------------------------------------------
 -- Model scanning (Workspace hierarchy)
@@ -2305,10 +2478,7 @@ if not root then
 	return { error = `Could not resolve path: {ROOT_PATH}` }
 end
 
--- 1. Workspace config
-local workspaceConfig = readWorkspaceConfig()
-
--- 2. Scan models (workspace + configured template paths)
+-- 1. Scan models (workspace + configured template paths)
 allModels = {}
 scanModels(root, ROOT_PATH, "workspace")
 
@@ -2361,7 +2531,9 @@ for _, s in allScripts do
 	if s.category == "client" or s.category == "server" or s.category == "module" then
 		scriptsByCategory[s.category] += 1
 	end
-	if s.category == "client" then
+	local SERVER_ONLY_SERVICES = { ServerScriptService = true, ServerStorage = true }
+	if s.category == "client"
+		or (s.category == "module" and not SERVER_ONLY_SERVICES[s.service]) then
 		table.insert(clientScriptPaths, s.path)
 	end
 end
@@ -2381,8 +2553,6 @@ end
 
 -- Build summary (returned to LLM, must fit in MCP output)
 local summary = {
-	workspaceConfig = workspaceConfig,
-
 	models = {
 		total = #allModels,
 		bySize = bySize,
@@ -2426,7 +2596,6 @@ _G[cacheId] = {
 	models = allModels,
 	scripts = allScripts,
 	containers = allContainers,
-	workspaceConfig = workspaceConfig,
 	buckets = buckets,
 	refactoringCandidates = refactoringCandidates,
 	dirty = false,
@@ -2713,18 +2882,6 @@ local function runScan()
 		return string.find(source, "%f[%w_]" .. escapePattern(name) .. "%f[^%w_]") ~= nil
 	end
 
-	-- Scan all script sources for references to reparented part names. Each
-	-- match is emitted as an externalReferences entry so the LLM can rewrite
-	-- the reference to account for the new model wrapper. Parts are NOT
-	-- removed from the plan here — the LLM runs apply with EXCLUDED_PART_NAMES
-	-- for any parts whose references it couldn't safely rewrite.
-	--
-	-- Each entry is tagged with a priority so the LLM can triage rather than
-	-- blanket-exclude. A part whose name appears in hundreds of scripts is
-	-- almost always false-positive noise ("1", "Light", "Color"), so the
-	-- review cost isn't worth it — but a large part (>=100 studs, where LOD
-	-- savings are real) or a small-reference case (<=3 scripts, cheap to
-	-- read) is worth reviewing even if the other dimension is borderline.
 	local LARGE_EXTENT_THRESHOLD = 100
 	local MEDIUM_EXTENT_THRESHOLD = 50
 	local FEW_SCRIPTS_THRESHOLD = 3
@@ -2741,15 +2898,11 @@ local function runScan()
 		end
 		local scriptHitCount = #referencingScripts
 		if scriptHitCount > 0 then
-			-- Deduplicate ops: the same op appears in `ops` multiple times
-			-- if the cluster contains multiple parts sharing this name.
 			local seen: { [any]: boolean } = {}
 			for _, op in ops do
 				if seen[op] then continue end
 				seen[op] = true
 
-				-- Largest part in this cluster bearing this name — the
-				-- relevant extent for judging LOD payoff.
 				local namedPartExtent = 0
 				for _, part in op._parts do
 					if part.Name == name then
@@ -2783,8 +2936,6 @@ local function runScan()
 		end
 	end
 
-	-- Sort so the highest-priority, largest entries surface first. This is
-	-- the order the LLM should process them in.
 	local priorityRank = { high = 3, medium = 2, low = 1 }
 	table.sort(externalReferences, function(a, b)
 		if a.priority ~= b.priority then
@@ -2840,6 +2991,8 @@ local function runApply()
 	local partsSkipped = 0
 	local modifiedPaths = {}
 	local errors = {}
+	local createdModels = {}
+	local skippedParts = {}
 
 	for _, op in plan do
 		if op.action == "group" then
@@ -2854,14 +3007,20 @@ local function runApply()
 			model.Parent = container
 
 			local moved = 0
+			local movedPartNames = {}
 			for _, part in op._parts do
 				if excluded[part.Name] then
 					partsSkipped += 1
+					table.insert(skippedParts, {
+						containerPath = op.containerPath,
+						partName = part.Name,
+					})
 					continue
 				end
 				if part.Parent == container then
 					part.Parent = model
 					moved += 1
+					table.insert(movedPartNames, part.Name)
 				end
 			end
 
@@ -2869,6 +3028,12 @@ local function runApply()
 				modelsCreated += 1
 				partsGrouped += moved
 				modifiedPaths[op.containerPath] = true
+				table.insert(createdModels, {
+					modelPath = op.containerPath .. "." .. op.modelName,
+					containerPath = op.containerPath,
+					modelName = op.modelName,
+					partNames = movedPartNames,
+				})
 			else
 				model:Destroy()
 			end
@@ -2893,6 +3058,8 @@ local function runApply()
 		partsGrouped = partsGrouped,
 		partsSkipped = partsSkipped,
 		modifiedPaths = pathList,
+		createdModels = createdModels,
+		skippedParts = skippedParts,
 		errorCount = #errors,
 		errors = errors,
 	}
@@ -2913,7 +3080,7 @@ end
 
 ## Streaming Mode Script
 
-Used by [Step 4: ModelStreamingMode Classification](#step-4-modelstreamingmode-classification--re-scan-review-apply).
+Used by [Step 4: ModelStreamingMode Classification](#step-4-modelstreamingmode-classification).
 
 ```lua
 -- ModelStreamingMode classification. "scan" classifies all models (auto +
@@ -3237,13 +3404,15 @@ local tooSmall = 0
 local tooLarge = 0
 local noGeometry = 0
 local alreadySet = 0
+local changedPaths = {}
 
 -- Descends the tree looking for the highest eligible model in each branch.
 -- When LOD is set on a model, its children are skipped (the parent's LOD
 -- mesh already covers their geometry at distance).
-local function applyLod(instance: Instance)
+local function applyLod(instance: Instance, path: string)
 	for _, child in instance:GetChildren() do
 		local lodApplied = false
+		local childPath = path .. "." .. child.Name
 
 		if child:IsA("Model") then
 			local maxExt, visCount = visibleExtent(child)
@@ -3266,6 +3435,7 @@ local function applyLod(instance: Instance)
 					end)
 					if ok then
 						changed += 1
+						table.insert(changedPaths, childPath)
 						lodApplied = true
 					end
 				end
@@ -3275,12 +3445,12 @@ local function applyLod(instance: Instance)
 		-- Only recurse into children if LOD was NOT applied at this level.
 		-- A parent's LOD mesh covers all descendant geometry at distance.
 		if not lodApplied and (child:IsA("Model") or child:IsA("Folder")) then
-			applyLod(child)
+			applyLod(child, childPath)
 		end
 	end
 end
 
-applyLod(workspace)
+applyLod(workspace, "Workspace")
 
 return {
 	changed = changed,
@@ -3288,5 +3458,6 @@ return {
 	tooSmall = tooSmall,
 	tooLarge = tooLarge,
 	noGeometry = noGeometry,
+	changedPaths = changedPaths,
 }
 ```
