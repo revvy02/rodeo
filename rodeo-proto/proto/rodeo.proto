@@ -86,6 +86,8 @@ message RegisterRequest {
   string kind = 1;          // "studio" or "player"
   string name = 2;          // hostname
   optional uint32 port = 3; // local HTTP port (for studio backends)
+  // Backend's build id (rodeo_proto::BUILD_ID). Master rejects a mismatch.
+  string version = 4;
 }
 
 message DomConnect {
@@ -503,6 +505,9 @@ message HealthResponse {
   uint32 total_doms = 3;
   uint32 total_queued = 4;
   repeated ContextInfo contexts = 5;
+  // Master's build id (rodeo_proto::BUILD_ID). Clients compare it to their
+  // own before reusing a master; empty = a master older than the handshake.
+  string version = 6;
 }
 
 message ContextInfo {
@@ -609,6 +614,10 @@ message StudioStateMsg {
   // children via clone). The master groups DOMs into studios by this and
   // addresses them by it (--studio-id). Present for owned AND manual studios.
   string studio_id = 16;
+  // Plugin's build id (constants.BUILD_ID, injected at plugin build from the
+  // same version + git sha as the CLI). Sent on the first WS message; the
+  // backend refuses the DOM on a mismatch.
+  string plugin_version = 17;
 }
 
 message ClientInfo {
@@ -617,6 +626,8 @@ message ClientInfo {
 }
 
 message WelcomeMsg {
+  // Backend's build id. The plugin shows a mismatch in its widget; the
+  // backend is the enforcing side (see StudioStateMsg.plugin_version).
   string version = 1;
 }
 

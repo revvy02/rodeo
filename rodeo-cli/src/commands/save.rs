@@ -18,6 +18,7 @@ pub async fn main(id: Option<&str>, host: &str, port: u16, out: Option<String>) 
         bail!("provide a Studio ID or omit it to target the only connected Studio");
     }
     let client = RodeoClient::connect(host, port)?;
+    client.check_version().await?;
     let snapshot = client.get_state().await?;
 
     let matches: Vec<_> = snapshot

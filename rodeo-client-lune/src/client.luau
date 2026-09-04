@@ -50,6 +50,9 @@ export type ConnectOpts = {
 }
 
 export type RodeoClient = {
+	-- Build id of the master this client connected to (`version[+git sha]`).
+	-- Equals the spawned `rodeo` binary's, since connect refuses a mismatch.
+	serverVersion: string,
 	getState: () -> StateSnapshot,
 	listProcesses: () -> { ProcessInfo },
 	kill: (executionId: string) -> (),
@@ -145,15 +148,30 @@ local function connect(opts: ConnectOpts): RodeoClient
 	local timeoutMs = opts.readyTimeoutMs or 30000
 	local pollMs = opts.readyPollMs or 200
 	local deadline = os.clock() + timeoutMs / 1000
+	local healthy = false
 	while os.clock() < deadline do
 		local ok, result = pcall(daemon.call, "client.isHealthy", {})
 		if ok and result == true then
-			return self
+			healthy = true
+			break
 		end
 		task.wait(pollMs / 1000)
 	end
-	pcall(daemon.shutdown)
-	error(`rodeo.connect: timed out after {timeoutMs}ms waiting for rodeo at {opts.host or "localhost"}:{opts.port}`)
+	if not healthy then
+		pcall(daemon.shutdown)
+		error(`rodeo.connect: timed out after {timeoutMs}ms waiting for rodeo at {opts.host or "localhost"}:{opts.port}`)
+	end
+
+	-- Version handshake: the master must be the same rodeo build as the
+	-- binary the daemon was spawned from. Fails fast rather than letting a
+	-- stale serve surface as odd errors (RODEO_SKIP_VERSION_CHECK=1 overrides).
+	local check = daemon.call("client.checkVersion", {})
+	if not check.ok then
+		pcall(daemon.shutdown)
+		error(`rodeo.connect: {check.message or "version mismatch"}`)
+	end
+	self.serverVersion = check.server
+	return self
 end
 
 return {

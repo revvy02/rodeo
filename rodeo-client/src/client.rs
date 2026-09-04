@@ -38,6 +38,37 @@ impl RodeoClient {
             .is_ok()
     }
 
+    /// Raw health probe. Errors if the master is unreachable.
+    pub async fn health(&self) -> Result<proto::HealthResponse> {
+        Ok(self.transport
+            .master()
+            .health(proto::HealthRequest::default())
+            .await
+            .map_err(|e| anyhow!("health failed: {e}"))?
+            .into_owned())
+    }
+
+    /// Verify the master's build id equals this client's (`BUILD_ID`). Every
+    /// entry point that reuses an already-running master calls this after
+    /// the health probe: the probe says "something is listening", this says
+    /// "and it is the same build". A mismatch is an error naming both sides
+    /// and the fix; `RODEO_SKIP_VERSION_CHECK` downgrades it to a warning.
+    pub async fn check_version(&self) -> Result<()> {
+        let health = self.health().await?;
+        let label = format!("the master at {}:{}", self.host(), self.port());
+        match proto::check_peer_version(&label, &health.version) {
+            Ok(()) => Ok(()),
+            Err(msg) if proto::version_check_skipped() => {
+                tracing::warn!("{msg} ({} set, continuing)", proto::SKIP_VERSION_CHECK_ENV);
+                Ok(())
+            }
+            Err(msg) => bail!(
+                "{msg}. Stop that serve and start one from this rodeo, or set {}=1 to proceed anyway.",
+                proto::SKIP_VERSION_CHECK_ENV
+            ),
+        }
+    }
+
     /// Poll `is_healthy` up to ~15s. Returns true if the master responded.
     pub async fn wait_for_healthy(&self) -> bool {
         for _ in 0..30 {

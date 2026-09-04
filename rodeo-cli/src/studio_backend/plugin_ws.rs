@@ -109,6 +109,18 @@ fn error_response(eid: &str, rpc_id: &str, message: String) -> proto::runtime_ty
     }
 }
 
+/// First server→plugin message. Carries our build id so the plugin can
+/// display a mismatch (the backend enforces it, see the gate below).
+fn welcome_msg() -> proto::ServerMessage {
+    proto::ServerMessage {
+        msg: Some(proto::server_message::Msg::Welcome(Box::new(proto::WelcomeMsg {
+            version: proto::BUILD_ID.to_string(),
+            ..Default::default()
+        }))),
+        ..Default::default()
+    }
+}
+
 /// Handle a studio (plugin) client connection.
 /// The first message is the initial studio_state (parsed by caller).
 pub async fn handle_studio_client<S, R>(
@@ -153,6 +165,25 @@ pub async fn handle_studio_client<S, R>(
         mcp_studio_id = &initial_mcp_studio_id[..8.min(initial_mcp_studio_id.len())],
         "dom connected"
     );
+
+    // Version gate. The plugin reports its build id on the first message; a
+    // DOM running another build is refused here rather than routed to, since
+    // its RunCommand/RPC shapes may not match ours. The welcome goes out first
+    // so the plugin can show the mismatch in its widget, then the socket
+    // closes. The plugin keeps retrying on its normal cadence, so it connects
+    // once the plugin file is rewritten (next serve start) or the matching
+    // serve comes up on this port.
+    let plugin_version = initial_state.as_ref().map(|s| s.plugin_version.as_str()).unwrap_or("");
+    if let Err(msg) = proto::check_peer_version("this Studio's rodeo plugin", plugin_version) {
+        if proto::version_check_skipped() {
+            tracing::warn!("{msg} ({} set, accepting)", proto::SKIP_VERSION_CHECK_ENV);
+        } else {
+            tracing::error!("{msg}; refusing DOM until the plugin matches");
+            let _ = ws_tx.send(Message::Text(serde_json::to_string(&welcome_msg()).unwrap().into())).await;
+            let _ = ws_tx.send(Message::Close(None)).await;
+            return;
+        }
+    }
 
     // Register DOM
     {
@@ -209,14 +240,7 @@ pub async fn handle_studio_client<S, R>(
         }
 
         // Send welcome
-        let welcome = proto::ServerMessage {
-            msg: Some(proto::server_message::Msg::Welcome(Box::new(proto::WelcomeMsg {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                ..Default::default()
-            }))),
-            ..Default::default()
-        };
-        let _ = ws_tx.send(Message::Text(serde_json::to_string(&welcome).unwrap().into())).await;
+        let _ = ws_tx.send(Message::Text(serde_json::to_string(&welcome_msg()).unwrap().into())).await;
     }
 
     // Message loop

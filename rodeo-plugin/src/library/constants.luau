@@ -4,6 +4,10 @@ return {
 
 	-- Rodeo version, injected at build time by darklua (inject_global_value).
 	VERSION = RODEO_VERSION,
+	-- Build id (`version[+git sha]`), injected the same way. Sent on the WS
+	-- handshake as StudioStateMsg.pluginVersion; the backend refuses a DOM
+	-- whose id differs from its own, and reports its own in WelcomeMsg.version.
+	BUILD_ID = RODEO_BUILD_ID,
 
 	-- Default connection settings. The static plugin auto-connects to the
 	-- studio backend's WebSocket on this port (= rodeo-cli's SERVE_PORT + 1;

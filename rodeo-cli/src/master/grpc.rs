@@ -53,6 +53,18 @@ impl proto::BackendService for RodeoServices {
             _ => return Err(ConnectError::invalid_argument("first message must be RegisterRequest")),
         };
 
+        // Version gate: a backend from another build must not join this
+        // master. Same binary today (serve spawns both from current_exe), but
+        // remote backends make this a real boundary.
+        if let Err(msg) = proto::check_peer_version(&format!("backend '{}'", register.name), &register.version) {
+            if proto::version_check_skipped() {
+                tracing::warn!("{msg} ({} set, accepting)", proto::SKIP_VERSION_CHECK_ENV);
+            } else {
+                tracing::error!("{msg}; rejecting registration");
+                return Err(ConnectError::failed_precondition(msg));
+            }
+        }
+
         let backend_id = uuid::Uuid::new_v4().to_string();
         let kind = register.kind.clone();
 
@@ -598,6 +610,7 @@ impl proto::MasterService for RodeoServices {
         let total_doms = doms.len() as u32;
         let total_queued = guard.pending_runs.len() as u32;
         Ok((proto::HealthResponse {
+            version: proto::BUILD_ID.to_string(),
             launched: !guard.backends.is_empty(),
             context_count: 0,
             total_doms,

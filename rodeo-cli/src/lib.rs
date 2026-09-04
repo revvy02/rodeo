@@ -12,8 +12,7 @@ use cli::{Cli, Commands};
 use util::config;
 
 fn build_banner() -> String {
-    let version = env!("CARGO_PKG_VERSION");
-    let left_label = format!(" v{version} ");
+    let left_label = format!(" v{} ", rodeo_proto::BUILD_ID);
     let right_label = " rvy ";
     let pad = 3;
 

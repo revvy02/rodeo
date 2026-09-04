@@ -100,6 +100,8 @@ local function AppProvider(props: AppProviderProps)
 	-- WebSocket state
 	local wsUrl, setWsUrl = React.useState(nil :: string?)
 	local connected, setConnected = React.useState(false)
+	-- Backend build id from the welcome message; nil until received.
+	local serverVersion, setServerVersion = React.useState(nil :: string?)
 
 	-- Execution state
 	local isExecuting, setIsExecuting = React.useState(false)
@@ -110,6 +112,12 @@ local function AppProvider(props: AppProviderProps)
 		if isExecuting then
 			local hex = COLORS.executing:ToHex()
 			return `<font color="#{hex}">Executing</font>`
+		elseif connected and serverVersion ~= nil and serverVersion ~= constants.BUILD_ID then
+			-- The backend refuses a mismatched plugin (see plugin_ws.rs), so
+			-- this is what the user sees between the welcome and the close.
+			local hex = COLORS.error:ToHex()
+			local server = if serverVersion == "" then "older build" else `v{serverVersion}`
+			return `<font color="#{hex}">Version mismatch (server {server})</font>`
 		elseif connected then
 			local hex = COLORS.success:ToHex()
 			return `<font color="#{hex}">Connected</font>`
@@ -117,7 +125,7 @@ local function AppProvider(props: AppProviderProps)
 			local hex = COLORS.error:ToHex()
 			return `<font color="#{hex}">Disconnected</font>`
 		end
-	end, { isExecuting, connected }) :: string
+	end, { isExecuting, connected, serverVersion }) :: string
 
 	-- Store client in state so message handler effect can access it
 	local client, setClient = React.useState(nil :: any)
@@ -165,6 +173,7 @@ local function AppProvider(props: AppProviderProps)
 						isEdit = state.isEdit,
 						mode = state.mode,
 						domKind = state.domKind,
+						pluginVersion = constants.BUILD_ID,
 						gameName = state.gameName,
 						placeId = state.placeId,
 						gameId = state.gameId,
@@ -197,6 +206,8 @@ local function AppProvider(props: AppProviderProps)
 			setWsUrl(nil)
 			setClient(nil)
 			setActiveProcesses({})
+			-- Keep serverVersion: a mismatch closes the socket immediately and
+			-- the status should stay readable while the plugin retries.
 		end)
 
 		setClient(newClient)
@@ -220,6 +231,7 @@ local function AppProvider(props: AppProviderProps)
 			verbose = verbose,
 			setIsExecuting = setIsExecuting,
 			setActiveProcesses = setActiveProcesses,
+			setServerVersion = setServerVersion,
 		})
 
 		return cleanup

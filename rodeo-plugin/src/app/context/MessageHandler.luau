@@ -24,6 +24,8 @@ type CreateHandlerArgs = {
 	verbose: boolean,
 	setIsExecuting: (boolean) -> (),
 	setActiveProcesses: ({ [string]: ProcessEntry }) -> (),
+	-- Backend build id from WelcomeMsg ("" if the backend predates it).
+	setServerVersion: (string) -> (),
 }
 
 local function createHandler(args: CreateHandlerArgs): () -> ()
@@ -31,6 +33,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 	local verbose = args.verbose
 	local setIsExecuting = args.setIsExecuting
 	local setActiveProcesses = args.setActiveProcesses
+	local setServerVersion = args.setServerVersion
 
 	-- Track active processes keyed by executionId
 	local activeProcesses: { [string]: { ctx: utils.ExecutionContext, kill: (() -> ())? } } = {}
@@ -165,8 +168,13 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 
 		if serverMsg.msg and serverMsg.msg.type == "welcome" then
 			local welcome = serverMsg.msg.value
-			if welcome.version and welcome.version ~= constants.VERSION then
-				warn(`[rodeo] Version mismatch: plugin is v{constants.VERSION}, server is v{welcome.version}`)
+			local serverVersion = welcome.version or ""
+			setServerVersion(serverVersion)
+			-- Display only: the backend is the enforcing side (it closes the
+			-- socket on a mismatch). An older backend that doesn't check still
+			-- gets a working plugin, as before.
+			if serverVersion ~= constants.BUILD_ID then
+				warn(`[rodeo] Version mismatch: plugin is v{constants.BUILD_ID}, server is v{serverVersion}`)
 			end
 		elseif serverMsg.msg and serverMsg.msg.type == "run" then
 			local run = serverMsg.msg.value

@@ -152,6 +152,27 @@ async fn dispatch(state: Arc<State>, method: &str, params: Value) -> Result<Valu
     match method {
         // client.*
         "client.isHealthy" => Ok(json!(state.client.is_healthy().await)),
+        // Version handshake for wrappers: `ok` is the verdict (honours
+        // RODEO_SKIP_VERSION_CHECK), `message` explains a mismatch. Wrappers
+        // call it once isHealthy is true and refuse to proceed on !ok.
+        "client.checkVersion" => {
+            use rodeo_client::proto::{check_peer_version, version_check_skipped, SKIP_VERSION_CHECK_ENV};
+            let health = state.client.health().await?;
+            let label = format!("the master at {}:{}", state.client.host(), state.client.port());
+            let (ok, message) = match check_peer_version(&label, &health.version) {
+                Ok(()) => (true, None),
+                Err(msg) => (
+                    version_check_skipped(),
+                    Some(format!("{msg}. Stop that serve and start one from this rodeo, or set {SKIP_VERSION_CHECK_ENV}=1 to proceed anyway.")),
+                ),
+            };
+            Ok(json!({
+                "ok": ok,
+                "server": health.version,
+                "client": rodeo_client::BUILD_ID,
+                "message": message,
+            }))
+        }
         "client.getState" => {
             let mut snapshot = serde_json::to_value(state.client.get_state().await?)?;
             // proto3 JSON omits empty `repeated` fields, but the wire contract

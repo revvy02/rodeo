@@ -27,3 +27,36 @@ pub use rodeo::*;
 pub mod runtime_types {
     pub use crate::rodeo::runtime::*;
 }
+
+/// Build identity of this binary: `<version>[+<git sha>]`, computed by
+/// build.rs. Every hop compares it on its handshake — run client → master
+/// (HealthResponse.version), backend → master (RegisterRequest.version),
+/// plugin → backend (StudioStateMsg.plugin_version) — and a mismatch is an
+/// error, not a warning: the CLI, master, backend and plugin ship as one unit
+/// and there is no supported mixed configuration. Exact match, no ranges.
+pub const BUILD_ID: &str = env!("RODEO_BUILD_ID");
+
+/// Set to any value other than `0`/empty to downgrade every version check to
+/// a warning. For deliberately testing a new component against an old one.
+pub const SKIP_VERSION_CHECK_ENV: &str = "RODEO_SKIP_VERSION_CHECK";
+
+pub fn version_check_skipped() -> bool {
+    std::env::var(SKIP_VERSION_CHECK_ENV)
+        .map(|v| !v.is_empty() && v != "0")
+        .unwrap_or(false)
+}
+
+/// Compare a peer's reported build id against ours. `Ok(())` on exact match;
+/// otherwise a message naming both sides, suitable for an error or a warning.
+/// An empty `peer` is a build that predates the handshake (it reports nothing).
+pub fn check_peer_version(peer_label: &str, peer: &str) -> Result<(), String> {
+    if peer == BUILD_ID {
+        return Ok(());
+    }
+    let peer_desc = if peer.is_empty() {
+        "an older build that reports no version".to_string()
+    } else {
+        format!("v{peer}")
+    };
+    Err(format!("version mismatch: {peer_label} is {peer_desc}, this rodeo is v{BUILD_ID}"))
+}

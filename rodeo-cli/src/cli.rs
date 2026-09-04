@@ -40,7 +40,7 @@ const STYLES: Styles = Styles::styled()
 
 #[derive(Parser)]
 #[command(name = "rodeo", about = "Command-line interface for Roblox Studio")]
-#[command(version, styles = STYLES)]
+#[command(version = rodeo_proto::BUILD_ID, styles = STYLES)]
 pub struct Cli {
     /// Enable debug output
     #[arg(short, long, global = true)]

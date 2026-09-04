@@ -202,12 +202,14 @@ type _RegisterRequestFields = {
 	kind: string,
 	name: string,
 	port: number?,
+	version: string,
 }
 
 export type _RegisterRequestPartialFields = {
 	kind: string?,
 	name: string?,
 	port: number?,
+	version: string?,
 }
 
 export type RegisterRequest = typeof(setmetatable({} :: _RegisterRequestFields, {} :: _RegisterRequestImpl))
@@ -1445,6 +1447,7 @@ type _HealthResponseFields = {
 	totalDoms: number,
 	totalQueued: number,
 	contexts: { ContextInfo },
+	version: string,
 }
 
 export type _HealthResponsePartialFields = {
@@ -1453,6 +1456,7 @@ export type _HealthResponsePartialFields = {
 	totalDoms: number?,
 	totalQueued: number?,
 	contexts: { ContextInfo | _ContextInfoPartialFields }?,
+	version: string?,
 }
 
 export type HealthResponse = typeof(setmetatable({} :: _HealthResponseFields, {} :: _HealthResponseImpl))
@@ -1726,6 +1730,7 @@ type _StudioStateMsgFields = {
 	clientDomIdsJson: string?,
 	sessionGuid: string?,
 	studioId: string,
+	pluginVersion: string,
 }
 
 export type _StudioStateMsgPartialFields = {
@@ -1745,6 +1750,7 @@ export type _StudioStateMsgPartialFields = {
 	clientDomIdsJson: string?,
 	sessionGuid: string?,
 	studioId: string?,
+	pluginVersion: string?,
 }
 
 export type StudioStateMsg = typeof(setmetatable({} :: _StudioStateMsgFields, {} :: _StudioStateMsgImpl))
@@ -2549,6 +2555,7 @@ do
 			kind = if data == nil or data.kind == nil then "" else data.kind,
 			name = if data == nil or data.name == nil then "" else data.name,
 			port = if data == nil or data.port == nil then nil else data.port,
+			version = if data == nil or data.version == nil then "" else data.version,
 		}, _RegisterRequestImpl :: _RegisterRequestImpl)
 	end
 
@@ -2569,6 +2576,11 @@ do
 		if self.port ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
 			output, cursor = proto.writeVarInt(output, cursor, self.port)
+		end
+
+		if self.version ~= nil and self.version ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.version)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -2604,6 +2616,11 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.name = proto.decodeString(value)
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.version = proto.decodeString(value)
 					continue
 				end
 
@@ -2644,6 +2661,10 @@ do
 			output.port = self.port
 		end
 
+		if self.version ~= nil and self.version ~= "" then
+			output.version = self.version
+		end
+
 		return output
 	end
 
@@ -2660,6 +2681,10 @@ do
 
 		if input.port ~= nil then
 			self.port = input.port
+		end
+
+		if input.version ~= nil then
+			self.version = input.version
 		end
 
 		return self
@@ -9645,6 +9670,7 @@ do
 				end
 				return out
 			end)(),
+			version = if data == nil or data.version == nil then "" else data.version,
 		}, _HealthResponseImpl :: _HealthResponseImpl)
 	end
 
@@ -9678,6 +9704,11 @@ do
 				output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
+		end
+
+		if self.version ~= nil and self.version ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.version)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -9723,6 +9754,11 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					table.insert(self.contexts, messages.ContextInfo.decode(value))
+					continue
+				elseif field == 6 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.version = proto.decodeString(value)
 					continue
 				end
 
@@ -9775,6 +9811,10 @@ do
 			output.contexts = newOutput
 		end
 
+		if self.version ~= nil and self.version ~= "" then
+			output.version = self.version
+		end
+
 		return output
 	end
 
@@ -9804,6 +9844,10 @@ do
 			end
 
 			self.contexts = newOutput
+		end
+
+		if input.version ~= nil then
+			self.version = input.version
 		end
 
 		return self
@@ -11237,6 +11281,7 @@ do
 			clientDomIdsJson = if data == nil or data.clientDomIdsJson == nil then nil else data.clientDomIdsJson,
 			sessionGuid = if data == nil or data.sessionGuid == nil then nil else data.sessionGuid,
 			studioId = if data == nil or data.studioId == nil then "" else data.studioId,
+			pluginVersion = if data == nil or data.pluginVersion == nil then "" else data.pluginVersion,
 		}, _StudioStateMsgImpl :: _StudioStateMsgImpl)
 	end
 
@@ -11323,6 +11368,11 @@ do
 		if self.studioId ~= nil and self.studioId ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 16, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.studioId)
+		end
+
+		if self.pluginVersion ~= nil and self.pluginVersion ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 17, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.pluginVersion)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -11424,6 +11474,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.studioId = proto.decodeString(value)
 					continue
+				elseif field == 17 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.pluginVersion = proto.decodeString(value)
+					continue
 				end
 
 				local length
@@ -11515,6 +11570,10 @@ do
 			output.studioId = self.studioId
 		end
 
+		if self.pluginVersion ~= nil and self.pluginVersion ~= "" then
+			output.pluginVersion = self.pluginVersion
+		end
+
 		return output
 	end
 
@@ -11583,6 +11642,10 @@ do
 
 		if input.studioId ~= nil then
 			self.studioId = input.studioId
+		end
+
+		if input.pluginVersion ~= nil then
+			self.pluginVersion = input.pluginVersion
 		end
 
 		return self

@@ -14,7 +14,19 @@ local BUNDLE_DIR = OUT_DIR .. "/plugin_bundle"
 -- Read CLI version (single source of truth for plugin's RODEO_VERSION global)
 local cargoToml = serde.decode("toml", fs.readFile("rodeo-cli/Cargo.toml"))
 local version = cargoToml.package.version
-print(`Plugin build: version {version}`)
+
+-- Build id = version[+short git sha], byte-identical to rodeo-proto/build.rs's
+-- RODEO_BUILD_ID for the same checkout: the backend refuses a plugin whose id
+-- differs from its own, so both sides must derive it the same way.
+local buildId = version
+local gitResult = process.exec("git", { "rev-parse", "--short=7", "HEAD" })
+if gitResult.ok then
+	local sha = gitResult.stdout:gsub("%s+$", "")
+	if #sha > 0 then
+		buildId = `{version}+{sha}`
+	end
+end
+print(`Plugin build: version {version} (build id {buildId})`)
 
 -- Clean prior artifacts
 if fs.isDir(OUT_DIR) then
@@ -38,7 +50,7 @@ process.exec("darklua", {
 	BUNDLE_DIR .. "/src",
 	"--config",
 	"rodeo-plugin/.darklua.json",
-}, { stdio = "forward", env = { RODEO_VERSION = version } })
+}, { stdio = "forward", env = { RODEO_VERSION = version, RODEO_BUILD_ID = buildId } })
 
 -- Assemble bundle tree
 fs.copy("rodeo-plugin/roblox_packages", BUNDLE_DIR .. "/roblox_packages")

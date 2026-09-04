@@ -126,6 +126,7 @@ async fn persistent_mode(args: RunArgs) -> Result<()> {
     // tear down), otherwise start and own it (Some — we hold it open below).
     let owned: Option<super::serve::ServeHandle> =
         if RodeoClient::connect(&host, port)?.is_healthy().await {
+            RodeoClient::connect(&host, port)?.check_version().await?;
             None
         } else {
             Some(super::serve::start_full_serve(port).await?)
@@ -398,6 +399,10 @@ async fn submit_and_run(cfg: RunConfig) -> Result<rodeo_client::RunResult> {
             bail!("no rodeo server found at {}:{}. Run 'rodeo serve --port {}' first.", cfg.host, cfg.port, cfg.port);
         }
     }
+    // The master answering may be another build (a serve left running across
+    // an upgrade or rebuild, or another project's on this port). Refuse to
+    // run against it rather than let proto drift surface as odd failures.
+    RodeoClient::connect(&cfg.host, cfg.port)?.check_version().await?;
 
     // Resolve --dom-id / --studio-id prefixes against live state.
     let dom_id = match cfg.dom_id.as_deref() {

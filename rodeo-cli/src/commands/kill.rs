@@ -15,6 +15,7 @@ pub async fn main(id: &str, host: &str, port: u16) -> Result<()> {
         bail!("provide a run ID or Studio ID (see `rodeo state`)");
     }
     let client = RodeoClient::connect(host, port)?;
+    client.check_version().await?;
     let snapshot = client.get_state().await?;
 
     let run_matches: Vec<&str> = snapshot

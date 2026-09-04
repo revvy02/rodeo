@@ -61,6 +61,16 @@ rodeo run --source 'return game.PlaceId'
 
 When you're done, quit the Studio yourself; because it's detached, rodeo won't close it for you.
 
+## Version compatibility
+
+The CLI, the master started by `rodeo serve`, its Studio backend, and the Studio plugin must all come from the same rodeo build. Each component reports a build id (`<version>+<git sha>`, `rodeo --version` prints yours) on its handshake, and a mismatch is an error:
+
+- `rodeo run`, `rodeo kill`, `rodeo save`, and the TypeScript/Luau clients refuse a master built from a different rodeo. This happens when a serve is left running across an upgrade or rebuild, or when another project's serve is on the same port. Stop that serve and start one from the current binary.
+- The studio backend refuses a plugin built from a different rodeo. The plugin shows `Version mismatch` in its widget and keeps retrying; it connects once the plugin file is rewritten (every serve start does this) or the matching serve is on its port.
+- `rodeo state` reports the master's build id and warns on a mismatch instead of failing.
+
+Set `RODEO_SKIP_VERSION_CHECK=1` to downgrade every check to a warning.
+
 ## Where to go next
 
 See the full [CLI reference](/rodeo/cli/) for every subcommand and flag, or move on to [Runtime usage](/rodeo/getting-started/runtime-usage/) for what scripts can do inside Studio.

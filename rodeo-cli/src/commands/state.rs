@@ -42,12 +42,27 @@ fn print_section(title: &str, columns: usize, table: &mut Table) {
 }
 
 pub async fn main(host: &str, port: u16, json: bool) -> Result<()> {
-    let snapshot = RodeoClient::connect(host, port)?.get_state().await?;
+    let client = RodeoClient::connect(host, port)?;
+    let health = client.health().await?;
+    let snapshot = client.get_state().await?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&snapshot)?);
         return Ok(());
     }
+
+    // `state` is the diagnostic, so a version mismatch is reported, not fatal:
+    // it is how you find out which build the master on this port is.
+    let master_version = if health.version.is_empty() {
+        "(older build, no version reported)".to_string()
+    } else {
+        format!("v{}", health.version)
+    };
+    println!("{} {master_version}", style("master").bold());
+    if let Err(msg) = rodeo_client::proto::check_peer_version("this master", &health.version) {
+        println!("{}", style(format!("warning: {msg}")).yellow());
+    }
+    println!();
 
     // Normalized, flat tables joined by the short studio id: studio-level
     // facts once in the studio sections, one row per DOM in DOMS referencing

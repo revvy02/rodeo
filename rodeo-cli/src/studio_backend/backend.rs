@@ -47,6 +47,7 @@ pub async fn connect_to_master(
             kind: "studio".to_string(),
             name: hostname,
             port: local_port.map(|p| p as u32),
+            version: proto::BUILD_ID.to_string(),
             ..Default::default()
         }))),
         ..Default::default()
@@ -55,7 +56,9 @@ pub async fn connect_to_master(
     // Read RegisterResponse (first MasterMessage)
     let first = bidi.message().await
         .map_err(|e| anyhow::anyhow!("expected RegisterResponse: {e}"))?
-        .ok_or_else(|| anyhow::anyhow!("stream closed before RegisterResponse"))?;
+        .ok_or_else(|| anyhow::anyhow!(
+            "stream closed before RegisterResponse (a master from another rodeo build rejects registration; its log names both versions)"
+        ))?;
     let first_owned = first.to_owned_message();
     let (backend_id, master_id) = match first_owned.msg {
         Some(proto::master_message::Msg::Registered(r)) => (r.id, r.master_id),

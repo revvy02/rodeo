@@ -103,7 +103,7 @@ local function AppContent()
 			BackgroundTransparency = 1,
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			Text = `v{constants.VERSION}`,
+			Text = `v{constants.BUILD_ID}`,
 			TextColor3 = COLORS.textDim,
 			TextSize = 14,
 			Font = Enum.Font.Arcade,

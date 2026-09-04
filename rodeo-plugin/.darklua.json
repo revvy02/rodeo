@@ -7,6 +7,11 @@
             "env": "RODEO_VERSION"
         },
         {
+            "rule": "inject_global_value",
+            "identifier": "RODEO_BUILD_ID",
+            "env": "RODEO_BUILD_ID"
+        },
+        {
             "rule": "convert_require",
             "current": {
                 "name": "path"

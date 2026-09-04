@@ -19,3 +19,4 @@ pub use dom::Dom;
 pub use run::{RunCodeOpts, RunResult, RunStream};
 
 pub use rodeo_proto as proto;
+pub use rodeo_proto::BUILD_ID;

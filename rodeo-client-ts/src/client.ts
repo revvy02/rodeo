@@ -204,8 +204,15 @@ export type ConnectOpts = {
   readyPollMs?: number;
 };
 
+/** Result of the daemon's `client.checkVersion` handshake. */
+type VersionCheck = { ok: boolean; server: string; client: string; message?: string };
+
 export class RodeoClient {
   readonly daemon: Daemon;
+  /** Build id of the master this client connected to (`version[+git sha]`).
+   *  Equals the build id of the `rodeo` binary the daemon was spawned from,
+   *  since `connect` refuses a mismatch. */
+  serverVersion = "";
 
   private constructor(url: string) {
     const { host, port } = parseUrl(url);
@@ -213,23 +220,35 @@ export class RodeoClient {
   }
 
   /** Connect to a running `rodeo serve` and block until it's healthy.
-   *  Throws after `readyTimeoutMs` (default 30s) if the server never responds. */
+   *  Throws after `readyTimeoutMs` (default 30s) if the server never responds,
+   *  and immediately if the master is a different rodeo build than the
+   *  `rodeo` binary on PATH (set RODEO_SKIP_VERSION_CHECK=1 to override). */
   static async connect(url: string, opts: ConnectOpts = {}): Promise<RodeoClient> {
     const timeoutMs = opts.readyTimeoutMs ?? 30_000;
     const pollMs = opts.readyPollMs ?? 200;
     const client = new RodeoClient(url);
     const deadline = Date.now() + timeoutMs;
+    let healthy = false;
     while (Date.now() < deadline) {
       try {
-        const ok = await client.daemon.request<boolean>("client.isHealthy");
-        if (ok) return client;
+        healthy = await client.daemon.request<boolean>("client.isHealthy");
+        if (healthy) break;
       } catch {
         // server not up yet — retry until deadline
       }
       await new Promise((r) => setTimeout(r, pollMs));
     }
-    await client.daemon.shutdown().catch(() => {});
-    throw new Error(`RodeoClient.connect: timed out after ${timeoutMs}ms waiting for rodeo at ${url}`);
+    if (!healthy) {
+      await client.daemon.shutdown().catch(() => {});
+      throw new Error(`RodeoClient.connect: timed out after ${timeoutMs}ms waiting for rodeo at ${url}`);
+    }
+    const check = await client.daemon.request<VersionCheck>("client.checkVersion");
+    if (!check.ok) {
+      await client.daemon.shutdown().catch(() => {});
+      throw new Error(`RodeoClient.connect: ${check.message ?? "version mismatch"}`);
+    }
+    client.serverVersion = check.server;
+    return client;
   }
 
   /** Call this in afterAll / teardown to shut down the daemon subprocess. */
