@@ -292,16 +292,39 @@ fn absolutize(p: &Path) -> String {
 /// never mutated — routing happens at runtime via the RunScript bootstrap, so
 /// the original file opens unchanged.
 fn prepare_place(place: Option<&str>, save: &SaveMode) -> Result<PathBuf> {
+    // A non-empty path is a request to open THAT file. Refuse anything that
+    // isn't one before touching the filesystem: this used to fall through to
+    // the empty-place branch, so a path the backend couldn't see (relative to
+    // the client's cwd, a typo, a directory) silently opened a blank place and
+    // the script failed later on a missing DataModel (issue #1). The CLI and
+    // rodeo-client absolutize paths before sending; this catches everything
+    // else (hand-rolled clients, MCP) and any drift.
+    let place = place.filter(|p| !p.is_empty());
+    if let Some(p) = place {
+        let path = Path::new(p);
+        if path.is_dir() {
+            bail!("place path '{p}' is a directory, expected an .rbxl/.rbxlx file");
+        }
+        if !path.is_file() {
+            let cwd = std::env::current_dir()
+                .map(|c| c.display().to_string())
+                .unwrap_or_else(|_| "?".to_string());
+            let hint = if path.is_absolute() {
+                String::new()
+            } else {
+                format!(" (relative paths resolve against the studio backend's cwd, {cwd}; pass an absolute path)")
+            };
+            bail!("place file '{p}' not found{hint}");
+        }
+        // The old DOM-parse-and-stamp step implicitly rejected non-place
+        // files; without it a corrupted file would copy fine and Studio would
+        // hang opening garbage instead of failing fast.
+        validate_place_file(p)?;
+    }
+    let has_place = place.is_some();
+
     let temp_dir = Path::new(".rodeo/.temp");
     std::fs::create_dir_all(temp_dir).context("failed to create temp dir")?;
-
-    let has_place = place.is_some_and(|p| !p.is_empty() && Path::new(p).is_file());
-    if has_place {
-        // Validate up front. The old DOM-parse-and-stamp step implicitly
-        // rejected non-place files; without it a corrupted file would copy
-        // fine and Studio would hang opening garbage instead of failing fast.
-        validate_place_file(place.unwrap())?;
-    }
 
     match save {
         SaveMode::NoSave => {
@@ -352,6 +375,34 @@ fn prepare_place(place: Option<&str>, save: &SaveMode) -> Result<PathBuf> {
             }
             Ok(out_path)
         }
+    }
+}
+
+#[cfg(test)]
+mod prepare_place_tests {
+    use super::*;
+
+    #[test]
+    fn missing_place_file_is_an_error_not_a_blank_place() {
+        let err = prepare_place(Some("/definitely/not/here.rbxl"), &SaveMode::NoSave)
+            .expect_err("missing place must fail");
+        assert!(err.to_string().contains("not found"), "{err}");
+    }
+
+    #[test]
+    fn relative_missing_path_hints_at_backend_cwd() {
+        let err = prepare_place(Some("build.rbxl"), &SaveMode::NoSave)
+            .expect_err("missing place must fail");
+        let msg = err.to_string();
+        assert!(msg.contains("not found") && msg.contains("absolute path"), "{msg}");
+    }
+
+    #[test]
+    fn directory_is_rejected() {
+        let dir = std::env::temp_dir();
+        let err = prepare_place(Some(dir.to_str().unwrap()), &SaveMode::NoSave)
+            .expect_err("directory must fail");
+        assert!(err.to_string().contains("is a directory"), "{err}");
     }
 }
 

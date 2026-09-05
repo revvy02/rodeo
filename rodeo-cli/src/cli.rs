@@ -347,6 +347,9 @@ impl PlaceArgs {
         } else {
             let abs = std::fs::canonicalize(val)
                 .map_err(|e| anyhow::anyhow!("place file '{val}' not found: {e}"))?;
+            if !abs.is_file() {
+                anyhow::bail!("place path '{val}' is not a file, expected an .rbxl/.rbxlx place");
+            }
             Ok(Some(PlaceTarget::File(abs.to_string_lossy().into_owned())))
         }
     }

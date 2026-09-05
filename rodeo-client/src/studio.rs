@@ -126,9 +126,18 @@ impl StudioBackend {
     }
 
     pub async fn open_file(&self, opts: OpenFileOpts) -> Result<Studio> {
+        // Resolve against THIS process's cwd before sending: the backend that
+        // opens the file may run elsewhere and would resolve a relative path
+        // against its own cwd (it now fails loudly rather than opening a blank
+        // place, but the error should name the caller's intent, not the
+        // backend's directory). Also fails fast here if the file is missing.
+        let path = std::fs::canonicalize(&opts.path)
+            .map_err(|e| anyhow!("place file '{}' not found: {e}", opts.path))?
+            .to_string_lossy()
+            .into_owned();
         self.launch(proto::LaunchStudioRequest {
             backend: self.id.clone(),
-            place_file: Some(opts.path),
+            place_file: Some(path),
             fflags: opts.fflags,
             background: opts.background,
             detached: opts.detached,
