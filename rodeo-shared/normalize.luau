@@ -36,16 +36,30 @@ local TYPE_CONVERTERS = {
 	end,
 }
 
-local function normalize(value)
+-- `inProgress` is the set of tables on the current descent path. A table met
+-- again while it is still being normalized is a cycle: emit a marker (as the
+-- print path does) instead of recursing until the stack overflows (issue #15,
+-- e.g. returning a jecs world or any self-referential table). Tables are
+-- removed on the way back up, so a DAG that shares a subtable is duplicated,
+-- not marked.
+local CYCLE_MARKER = "*** cycle ***"
+
+local function normalize(value, inProgress: { [any]: boolean }?)
 	local t = typeof(value)
 	local converter = TYPE_CONVERTERS[t]
 	if converter then
 		return converter(value)
 	elseif t == "table" then
+		local seen = inProgress or {}
+		if seen[value] then
+			return CYCLE_MARKER
+		end
+		seen[value] = true
 		local result = {}
 		for k, v in pairs(value) do
-			result[k] = normalize(v)
+			result[k] = normalize(v, seen)
 		end
+		seen[value] = nil
 		return result
 	elseif t == "string" or t == "number" or t == "boolean" then
 		return value

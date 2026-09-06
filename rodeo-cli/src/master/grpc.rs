@@ -410,6 +410,27 @@ impl proto::RunService for RodeoServices {
         }
         let submit = submit;
 
+        // Version gate: a run client from another build (or one older than
+        // the handshake, which sends nothing) must not execute here. Delivered
+        // below as a Disconnect event rather than a stream error: a handler
+        // error surfaces on the client as a bare "stream closed", while the
+        // Created + Disconnect pair is what every client version already
+        // renders as "run disconnected: <reason>" (same path as invalid route).
+        let version_error = match proto::check_peer_version("the run client", &submit.client_version) {
+            Ok(()) => None,
+            Err(msg) if proto::version_check_skipped() => {
+                tracing::warn!("{msg} ({} set, accepting run)", proto::SKIP_VERSION_CHECK_ENV);
+                None
+            }
+            Err(msg) => {
+                tracing::error!("{msg}; rejecting run");
+                Some(format!(
+                    "{msg}. Use the rodeo this serve was started from, or set {}=1 to proceed anyway.",
+                    proto::SKIP_VERSION_CHECK_ENV
+                ))
+            }
+        };
+
         // Channel for events back to client
         let (event_tx, event_rx) = mpsc::unbounded_channel::<proto::RunEvent>();
 
@@ -496,6 +517,17 @@ impl proto::RunService for RodeoServices {
                 }))),
                 ..Default::default()
             });
+
+            if let Some(msg) = version_error {
+                let _ = event_tx.send(proto::RunEvent {
+                    event: Some(proto::run_event::Event::Disconnect(msg)),
+                    ..Default::default()
+                });
+                let output_stream =
+                    tokio_stream::wrappers::UnboundedReceiverStream::new(event_rx)
+                        .map(|msg| Ok(msg));
+                return Ok((Box::pin(output_stream), Context::default()));
+            }
 
             let route = match route {
                 Ok(r) => r,

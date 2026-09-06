@@ -339,6 +339,12 @@ message SubmitRequest {
   // `script` holds only the first piece; ScriptChunk messages follow on the
   // same stream (see ScriptChunk).
   optional bool script_continues = 17;
+  // Run client's build id (rodeo_proto::BUILD_ID). The master refuses a
+  // mismatch (or an empty value from a client older than the handshake), so a
+  // stale client fails with a version error instead of executing against a
+  // plugin whose shapes it doesn't match (issue #15). The reverse direction
+  // (new client, old master) is checked client-side via HealthResponse.version.
+  string client_version = 18;
 }
 
 // ---------------------------------------------------------------------------

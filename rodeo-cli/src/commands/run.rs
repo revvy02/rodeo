@@ -297,7 +297,12 @@ fn prepare_execution(args: RunArgs, resolved: ResolvedScript) -> Result<RunConfi
         script_args: args.script_args,
         verbose: args.verbose,
         instance_path: resolved.instance_path,
-        script_path: resolved.script_path.or(args.source),
+        // Only a real file path travels as script_path. Inline runs (stdin,
+        // --source) used to send the whole source here, which the plugin then
+        // assigned as the ModuleScript's Name — Instance.Name caps at 200,000
+        // chars, so any inline script over that failed before its first line
+        // (issue #16). The plugin names inline runs `inline-<executionId>`.
+        script_path: resolved.script_path,
         output_file: args.output,
         return_file: args.return_file,
         show_return: args.show_return,

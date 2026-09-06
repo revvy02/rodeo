@@ -58,9 +58,11 @@ export type ExecutionContext = {
 }
 
 local function createExecutionContext(source: string, context: RunContext, executionId: string, instancePath: string?, scriptPath: string?): ExecutionContext
-	-- Determine module name for stack traces
-	-- Priority: instancePath → scriptPath → source
-	local moduleName = source
+	-- Determine module name for stack traces.
+	-- Priority: instancePath → scriptPath → inline-<executionId>. Never the
+	-- source itself: Instance.Name caps at 200,000 chars, so naming a run by
+	-- its content made large inline scripts fail before executing (issue #16).
+	local moduleName = `inline-{executionId}`
 	if instancePath then
 		local lastSegment = string.match(instancePath, '%["([^"]+)"%]$')
 		if lastSegment then

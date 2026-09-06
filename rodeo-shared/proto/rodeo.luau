@@ -822,6 +822,7 @@ type _SubmitRequestFields = {
 	profile: boolean?,
 	logFilter: LogFilter?,
 	scriptContinues: boolean?,
+	clientVersion: string,
 }
 
 export type _SubmitRequestPartialFields = {
@@ -842,6 +843,7 @@ export type _SubmitRequestPartialFields = {
 	profile: boolean?,
 	logFilter: (LogFilter | _LogFilterPartialFields)?,
 	scriptContinues: boolean?,
+	clientVersion: string?,
 }
 
 export type SubmitRequest = typeof(setmetatable({} :: _SubmitRequestFields, {} :: _SubmitRequestImpl))
@@ -6172,6 +6174,7 @@ do
 				)
 				else (data.logFilter :: any) :: LogFilter,
 			scriptContinues = if data == nil or data.scriptContinues == nil then nil else data.scriptContinues,
+			clientVersion = if data == nil or data.clientVersion == nil then "" else data.clientVersion,
 		}, _SubmitRequestImpl :: _SubmitRequestImpl)
 	end
 
@@ -6265,6 +6268,11 @@ do
 		if self.scriptContinues ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 17, proto.wireTypes.varint)
 			output, cursor = proto.writeVarInt(output, cursor, if self.scriptContinues then 1 else 0)
+		end
+
+		if self.clientVersion ~= nil and self.clientVersion ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 18, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.clientVersion)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -6371,6 +6379,11 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.context = proto.decodeString(value)
 					continue
+				elseif field == 18 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.clientVersion = proto.decodeString(value)
+					continue
 				end
 
 				local length
@@ -6470,6 +6483,10 @@ do
 			output.scriptContinues = self.scriptContinues
 		end
 
+		if self.clientVersion ~= nil and self.clientVersion ~= "" then
+			output.clientVersion = self.clientVersion
+		end
+
 		return output
 	end
 
@@ -6547,6 +6564,10 @@ do
 
 		if input.scriptContinues ~= nil then
 			self.scriptContinues = input.scriptContinues
+		end
+
+		if input.clientVersion ~= nil then
+			self.clientVersion = input.clientVersion
 		end
 
 		return self

@@ -65,7 +65,7 @@ When you're done, quit the Studio yourself; because it's detached, rodeo won't c
 
 The CLI, the master started by `rodeo serve`, its Studio backend, and the Studio plugin must all come from the same rodeo build. Each component reports a build id (`<version>+<git sha>`, `rodeo --version` prints yours) on its handshake, and a mismatch is an error:
 
-- `rodeo run`, `rodeo kill`, `rodeo save`, and the TypeScript/Luau clients refuse a master built from a different rodeo. This happens when a serve is left running across an upgrade or rebuild, or when another project's serve is on the same port. Stop that serve and start one from the current binary.
+- `rodeo run`, `rodeo kill`, `rodeo save`, and the TypeScript/Luau clients refuse a master built from a different rodeo, and the master refuses runs submitted by a client built from a different rodeo (including clients older than this check). This happens when a serve is left running across an upgrade or rebuild, or when another project's serve is on the same port. Stop that serve and start one from the current binary.
 - The studio backend refuses a plugin built from a different rodeo. The plugin shows `Version mismatch` in its widget and keeps retrying; it connects once the plugin file is rewritten (every serve start does this) or the matching serve is on its port.
 - `rodeo state` reports the master's build id and warns on a mismatch instead of failing.
 

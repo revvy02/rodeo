@@ -125,6 +125,7 @@ async fn run_inner(
         instance_path: opts.instance_path,
         script_path: opts.script_path,
         profile: if opts.profile { Some(true) } else { None },
+        client_version: proto::BUILD_ID.to_string(),
         ..Default::default()
     };
     // Large scripts are split across ScriptChunk messages so no hop's

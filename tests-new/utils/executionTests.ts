@@ -30,6 +30,24 @@ export function inlineSource(run: RunFn): void {
     expect(result.return).toEqual({ a: 1, b: "hello" });
   });
 
+  // Issue #16: inline runs used to be named after their full source, and
+  // Instance.Name caps at 200,000 chars, so anything larger failed with
+  // "Unable to assign property Name" before its first line ran.
+  it("inline source larger than the Instance.Name limit runs", async () => {
+    const payload = "x".repeat(225_000);
+    const result = await run({ source: `local payload = [[${payload}]]\nreturn #payload` });
+    expect(result.ok).toBe(true);
+    expect(result.return).toBe(payload.length);
+  });
+
+  // Issue #15 (second half): a self-referential return value must come back
+  // with a cycle marker, not blow the stack inside normalize.
+  it("cyclic return value is marked, not a stack overflow", async () => {
+    const result = await run({ source: "local t = { name = 'root' }\nt.self = t\nreturn t" });
+    expect(result.ok).toBe(true);
+    expect(result.return).toEqual({ name: "root", self: "*** cycle ***" });
+  });
+
   it("inline source captures print output", async () => {
     const result = await run({ source: "print('hello from inline')\nreturn nil" });
     expect(result.ok).toBe(true);

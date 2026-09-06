@@ -145,7 +145,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 
 		activeProcesses[executionId] = { ctx = ctx, kill = killFn }
 		processEntries[executionId] = {
-			name = run.scriptPath or "inline",
+			name = run.scriptPath or `inline-{executionId}`,
 			state = "running",
 		}
 		setActiveProcesses(table.clone(processEntries))
