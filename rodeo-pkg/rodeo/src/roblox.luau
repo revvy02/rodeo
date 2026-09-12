@@ -40,7 +40,7 @@ end
 --- Captures a Studio screenshot and copies it to a stable path, returning
 --- that absolute path. `output` ending in `.png` is the exact file path; any
 --- other value is a directory the auto-named `.png` lands in; omitted
---- defaults to the `.rodeo-screenshots` directory. Relative paths resolve
+--- defaults to the `.rodeo/.temp/captures` directory. Relative paths resolve
 --- against the run client's cwd. Temporary scripted-camera state is restored
 --- after the capture. Requires a viewport (plugin context, or client context
 --- in a running session). macOS and Windows only; other platforms error. On

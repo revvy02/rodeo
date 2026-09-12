@@ -20,7 +20,9 @@ type CaptureOptions = {
 
 -- Capture a Studio screenshot and copy it to a stable path. `output` ending
 -- in .png is the exact file path; any other value is a directory the
--- auto-named .png lands in; nil defaults to the .rodeo-screenshots directory.
+-- auto-named .png lands in; nil defaults to .rodeo/.temp/captures (next to
+-- the profiles and logs rodeo already keeps under .rodeo/.temp, which is the
+-- directory projects gitignore, rather than a new top-level directory).
 -- Owns temporary scripted-camera state for one capture and always restores
 -- the camera state it found. Returns the absolute output path.
 local function capture(output: string?, options: CaptureOptions?): string
@@ -134,7 +136,7 @@ local function capture(output: string?, options: CaptureOptions?): string
 		if output and output:lower():sub(-4) == ".png" then
 			outputPath = output
 		else
-			local directory = output or ".rodeo-screenshots"
+			local directory = output or ".rodeo/.temp/captures"
 			if directory:sub(-1) == "/" then
 				directory = directory:sub(1, -2)
 			end

@@ -324,7 +324,7 @@ selects XML or binary output.
 
 `capture` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to
-`.rodeo-screenshots/`. All `options` are optional: `cframe` (scripted camera
+`.rodeo/.temp/captures/`. All `options` are optional: `cframe` (scripted camera
 for the shot, restored afterward), `fov`, `focus`, and `settle` (seconds to
 wait before capturing).
 
