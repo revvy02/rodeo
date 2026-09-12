@@ -16,11 +16,19 @@ Verify:
 rodeo --version
 ```
 
-## Install the Studio plugin
+## Studio plugin
+
+There is no separate install step. The plugin is embedded in the CLI and written to Studio's local plugins folder as `rodeo.rbxm` whenever a serve starts:
 
 ```bash
-rodeo plugin
+rodeo serve
+# or, which starts a serve if none is running on the port
+rodeo run --place
 ```
+
+The file is rewritten only when it differs from the running CLI's embedded plugin, so upgrading rodeo updates the plugin on the next serve start. Studio reloads a local plugin when its file changes, including in Studios that are already open.
+
+Launched Studios connect to the serve that launched them. A Studio you open manually connects to the serve on the default port.
 
 ## Generate type definitions
 
