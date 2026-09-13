@@ -31,3 +31,10 @@ roblox_install = "1"
 rbx_binary = "3.0"
 rbx_dom_weak = "4.2"
 rbx_xml = "3.0"
+
+# roblox.capture finalize: decode the engine's PNG, resample to the viewport
+# size, re-encode. `image` for the codec, fast_image_resize for a SIMD Lanczos
+# (image's own resize is single-threaded scalar and takes many seconds on the
+# 15360x8640 frames a 7680-wide capture produces on a 2x display).
+image = { version = "0.25", default-features = false, features = ["png"] }
+fast_image_resize = "6"

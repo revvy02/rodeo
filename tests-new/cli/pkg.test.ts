@@ -1,5 +1,5 @@
 import { describe, beforeAll, afterAll } from "bun:test";
-import { smoke, fs, io, process as processTests, roblox } from "../utils/pkgTests.js";
+import { smoke, fs, io, process as processTests, roblox, capture } from "../utils/pkgTests.js";
 import { cliStudioHandle } from "./helpers.js";
 
 describe("rodeo pkg (CLI)", () => {
@@ -12,4 +12,5 @@ describe("rodeo pkg (CLI)", () => {
   describe("rodeo.io", () => io(cli.runFn));
   describe("rodeo.process", () => processTests(cli.runFn));
   describe("rodeo.roblox", () => roblox(cli.runFn));
+  describe("rodeo.capture", () => capture(cli.runFn));
 });

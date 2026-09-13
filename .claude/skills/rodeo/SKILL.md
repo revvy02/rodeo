@@ -311,7 +311,7 @@ stream.close(handle)
 roblox.import(path) -> { Instance }      -- load .rbxm/.rbxmx as Instances
 roblox.export(path, { instances })       -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
 roblox.bake(path, value)                 -- write a table/value as a Luau module
-roblox.capture(output?, options?) -> string  -- screenshot Studio, returns absolute path
+roblox.capture(output?, options?) -> (string, { width, height })  -- screenshot Studio
 ```
 
 `bake` emits `return <value>` and writes Roblox types as constructors
@@ -325,14 +325,25 @@ selects XML or binary output.
 `capture` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to
 `.rodeo/.temp/captures/`. All `options` are optional: `cframe` (scripted camera
-for the shot, restored afterward), `fov`, `focus`, and `settle` (seconds to
-wait before capturing).
+for the shot, restored afterward), `fov`, `focus`, `settle` (seconds to wait
+before capturing), `device` (a Studio device-simulator preset id such as
+`"iphone_13"` or `"hd_1080"`; layout, insets and orientation come from the
+preset), and `viewportSize` (a `Vector2`, the `Camera.ViewportSize` to capture
+at, width at most 7680; with `device` it overrides the preset's resolution).
+
+The written image is always exactly the capture's `Camera.ViewportSize`, so
+UI offsets map 1:1 onto pixels and the size is the same on every machine;
+the engine's larger high-DPI frame is resampled down. For a sharper or larger
+image, raise `viewportSize`. `device`/`viewportSize` drive Studio's device
+simulator for the shot and restore it afterward, like the camera fields; the
+second return value is `{ width, height }`. A frame captured before the new
+viewport rendered is reported as an error (raise `settle`), never retried.
 
 `capture` needs a viewport, so use plugin context, or client context in a
-running session. Server context errors. It runs on macOS and Windows only. On
-Windows a minimized Studio never renders its viewport, and background launches
-are minimized, so launch with `--focus` or restore the window first. Otherwise
-the capture fails after 10s.
+running session. Server context errors. It runs on macOS and Windows only.
+Frames beyond roughly 16384 physical pixels never complete and fail after
+10s, as does a minimized Studio on Windows (background launches are
+minimized there; launch with `--focus` or restore the window first).
 
 ### `@lune` adapters — run lune-flavored code unchanged
 

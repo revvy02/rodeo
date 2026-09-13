@@ -11,6 +11,7 @@ local runtime = require(script.Parent.Parent.Parent.library.runtime)
 local utils = require(script.Parent.Parent.Parent.library.utils)
 local constants = require(script.Parent.Parent.Parent.library.constants)
 local mode_driver = require(script.Parent.Parent.Parent.library.mode_driver)
+local simulator = require(script.Parent.Parent.Parent.library.simulator)
 local rodeoProto = require(script.Parent.Parent.Parent.Parent.proto.rodeo)
 local runtimeProto = require(script.Parent.Parent.Parent.Parent.proto.runtime)
 
@@ -92,6 +93,9 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 					}) },
 				})
 				client:Send(HttpService:JSONEncode(msg:jsonEncode()))
+				-- Safety net: a capture that died mid-way leaves the simulator
+				-- applied; the shim restores on its own success/error paths.
+				pcall(simulator.restore, executionId)
 				activeProcesses[executionId] = nil
 				processEntries[executionId] = nil
 				setActiveProcesses(table.clone(processEntries))
@@ -117,28 +121,55 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 				-- forever. Catch it and deliver an error response for this id so
 				-- rpc.call's event:Wait() returns and errors at the call site.
 				msg.callJson.executionId = executionId
+				local id = msg.callJson.id
+				-- Responses are deferred: onRpc runs synchronously inside
+				-- rpc.call's send() (BindableEvent:Fire is synchronous), so a
+				-- direct Fire here would land before rpc.call reaches
+				-- event:Wait() and be missed, hanging the caller forever.
+				-- task.defer resumes after the caller is parked on Wait().
+				local function respond(res)
+					task.defer(function()
+						ctx.incomingEvent:Fire({ type = "rpc:response", id = id, res = res })
+					end)
+				end
 				local ok, err = pcall(function()
 					local typedCall = runtimeProto.ClientRpcCall.jsonDecode(msg.callJson)
+					local reqType = typedCall.req and typedCall.req.type
+					-- Plugin-handled RPCs: device-simulator sessions for
+					-- roblox.capture. The service is PluginSecurity, so the
+					-- run (LocalScript identity in client context) can't drive
+					-- it; this handler runs at plugin identity in the same DOM.
+					if reqType == "robloxSimulatorApply" then
+						local req = typedCall.req.value
+						task.spawn(function()
+							local okApply, width, height = pcall(simulator.apply, executionId, req.device, req.width, req.height)
+							if okApply then
+								respond({ type = "robloxSimulatorApply", value = { width = width, height = height } })
+							else
+								respond({ type = "error", value = tostring(width) })
+							end
+						end)
+						return
+					elseif reqType == "robloxSimulatorRestore" then
+						task.spawn(function()
+							local okRestore, restoreErr = pcall(simulator.restore, executionId)
+							if okRestore then
+								respond({ type = "robloxSimulatorRestore", value = {} })
+							else
+								respond({ type = "error", value = tostring(restoreErr) })
+							end
+						end)
+						return
+					end
 					local rpcMsg = rodeoProto.PluginMessage.new({
 						msg = { type = "rpc", value = typedCall },
 					})
 					client:Send(HttpService:JSONEncode(rpcMsg:jsonEncode()))
 				end)
 				if not ok then
-					-- Defer the error response. onRpc runs synchronously inside
-					-- rpc.call's send() (BindableEvent:Fire is synchronous), so a
-					-- direct Fire here would land before rpc.call reaches
-					-- event:Wait() and be missed, hanging the caller forever.
-					-- task.defer resumes after the caller is parked on Wait().
-					local errValue = tostring(err)
-					local id = msg.callJson.id
-					task.defer(function()
-						ctx.incomingEvent:Fire({
-							type = "rpc:response",
-							id = id,
-							res = { type = "error", value = errValue },
-						})
-					end)
+					-- e.g. JSONEncode rejecting a string field carrying non-UTF-8
+					-- bytes (the wire is a UTF-8-locked WebSocket text frame).
+					respond({ type = "error", value = tostring(err) })
 				end
 			end,
 		})
@@ -150,6 +181,12 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 		}
 		setActiveProcesses(table.clone(processEntries))
 	end
+
+	-- Custom simulator devices persist in Studio settings; drop any left by a
+	-- crashed capture before this plugin session starts making new ones.
+	task.spawn(function()
+		pcall(simulator.sweep)
+	end)
 
 	local connection = client.MessageReceived:Connect(function(message: string)
 		local success, decoded = pcall(function()
@@ -205,6 +242,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 			-- partial assembly so the run never starts.
 			pendingRuns[kill.executionId] = nil
 			local proc = activeProcesses[kill.executionId]
+			pcall(simulator.restore, kill.executionId)
 			if proc and proc.kill then
 				proc.kill()
 			else

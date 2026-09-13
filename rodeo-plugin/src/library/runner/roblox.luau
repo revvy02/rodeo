@@ -41,5 +41,40 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		stream.close(h)
 	end
 
+	-- Internal plumbing for the roblox.capture shim (rodeo-pkg/rodeo/shims/
+	-- roblox.luau), which composes these with the fs/process API. Not part of
+	-- the typed public surface.
+
+	-- Ask the plugin to select a simulator preset and/or a custom desktop device
+	-- at width x height for this execution. Returns the resulting
+	-- Camera.ViewportSize.
+	function roblox._simulatorApply(device: string?, width: number?, height: number?): (number, number)
+		local runtime = _G.__rodeo_runtime_proto
+		local res = rpc.call("roblox_simulator_apply", runtime.RobloxSimulatorApplyRequest.new({
+			device = device,
+			width = width,
+			height = height,
+		}))
+		return res.width, res.height
+	end
+
+	function roblox._simulatorRestore()
+		local runtime = _G.__rodeo_runtime_proto
+		rpc.call("roblox_simulator_restore", runtime.RobloxSimulatorRestoreRequest.new({}))
+	end
+
+	-- Host side of a capture: verify the engine's frame against the viewport,
+	-- resample to exactly width x height, write output, delete source.
+	function roblox._captureFinalize(source: string, output: string, width: number, height: number): (number, number)
+		local runtime = _G.__rodeo_runtime_proto
+		local res = rpc.call("roblox_capture_finalize", runtime.RobloxCaptureFinalizeRequest.new({
+			source = source,
+			output = output,
+			width = width,
+			height = height,
+		}))
+		return res.width, res.height
+	end
+
 	return roblox
 end

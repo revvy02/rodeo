@@ -214,6 +214,12 @@ pub async fn dispatch_client(
 
         // roblox
         Some(Req::RobloxExport(r)) => async_arm("roblox.export", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
+        Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(r), Res::RobloxCaptureFinalize).await,
+        // Simulator sessions are handled inside the plugin (plugin identity);
+        // one reaching the run client means the plugin predates them.
+        Some(Req::RobloxSimulatorApply(_)) | Some(Req::RobloxSimulatorRestore(_)) => Some(Res::Error(
+            "roblox.capture device/viewportSize need a rodeo plugin that handles simulator RPCs; restart serve so the plugin matches this rodeo".to_string(),
+        )),
 
         None => Some(Res::Error("missing req".to_string())),
     };

@@ -87,6 +87,44 @@ message RobloxExportRequest {
   string handle = 1;
 }
 
+// Device-simulator session for roblox.capture. Handled by the PLUGIN (plugin
+// identity can drive StudioDeviceSimulatorService; the run's own identity in
+// client context cannot), never forwarded to the run client. One session per
+// execution: apply selects a preset and/or a custom desktop device at the
+// requested viewport and returns the resulting Camera.ViewportSize; restore
+// puts back whatever was active before (the plugin also restores when the
+// execution completes or is killed).
+message RobloxSimulatorApplyRequest {
+  optional string device = 1;   // StudioDeviceSimulatorService preset id
+  optional uint32 width = 2;    // viewport override / custom device size
+  optional uint32 height = 3;
+}
+
+message RobloxSimulatorApplyResponse {
+  uint32 width = 1;             // Camera.ViewportSize after the change
+  uint32 height = 2;
+}
+
+message RobloxSimulatorRestoreRequest {}
+
+// Finalize a capture on the run client: decode the engine's PNG at `source`,
+// check it is a whole multiple of the viewport (a stale frame from before a
+// viewport change is not), resample it to exactly width x height, write it
+// atomically to `output`, delete `source`.
+message RobloxCaptureFinalizeRequest {
+  string source = 1;
+  string output = 2;
+  uint32 width = 3;             // Camera.ViewportSize at capture time
+  uint32 height = 4;
+}
+
+message RobloxCaptureFinalizeResponse {
+  uint32 width = 1;             // written image size (== request)
+  uint32 height = 2;
+  uint32 source_width = 3;      // engine frame size before resampling
+  uint32 source_height = 4;
+}
+
 // ---------------------------------------------------------------------------
 // Filesystem operations
 // ---------------------------------------------------------------------------
@@ -275,7 +313,11 @@ message ClientRpcCall {
     McpCallRequest          mcp_call           = 40;
 
     // roblox: 50-59
-    RobloxExportRequest     roblox_export      = 50;
+    RobloxExportRequest            roblox_export            = 50;
+    // 51-52 are plugin-handled (see RobloxSimulatorApplyRequest).
+    RobloxSimulatorApplyRequest    roblox_simulator_apply   = 51;
+    RobloxSimulatorRestoreRequest  roblox_simulator_restore = 52;
+    RobloxCaptureFinalizeRequest   roblox_capture_finalize  = 53;
   }
 }
 
@@ -322,6 +364,9 @@ message ClientRpcResponse {
     McpCallResponse         mcp_call           = 40;
 
     // roblox: 50-59
-    Ok                      roblox_export      = 50;
+    Ok                             roblox_export            = 50;
+    RobloxSimulatorApplyResponse   roblox_simulator_apply   = 51;
+    Ok                             roblox_simulator_restore = 52;
+    RobloxCaptureFinalizeResponse  roblox_capture_finalize  = 53;
   }
 }

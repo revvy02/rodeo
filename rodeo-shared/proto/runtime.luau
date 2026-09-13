@@ -22,6 +22,11 @@ type _Messages = {
 	StreamWriteBytesRequest: _StreamWriteBytesRequestMessage,
 	StreamCloseRequest: _StreamCloseRequestMessage,
 	RobloxExportRequest: _RobloxExportRequestMessage,
+	RobloxSimulatorApplyRequest: _RobloxSimulatorApplyRequestMessage,
+	RobloxSimulatorApplyResponse: _RobloxSimulatorApplyResponseMessage,
+	RobloxSimulatorRestoreRequest: _RobloxSimulatorRestoreRequestMessage,
+	RobloxCaptureFinalizeRequest: _RobloxCaptureFinalizeRequestMessage,
+	RobloxCaptureFinalizeResponse: _RobloxCaptureFinalizeResponseMessage,
 	FsExistsRequest: _FsExistsRequestMessage,
 	FsExistsResponse: _FsExistsResponseMessage,
 	FsStatRequest: _FsStatRequestMessage,
@@ -409,6 +414,155 @@ export type _RobloxExportRequestPartialFields = {
 
 export type RobloxExportRequest = typeof(setmetatable({} :: _RobloxExportRequestFields, {} :: _RobloxExportRequestImpl))
 type _RobloxExportRequestMessage = proto.Message<RobloxExportRequest, _RobloxExportRequestPartialFields>
+
+type _RobloxSimulatorApplyRequestImpl = {
+	__index: _RobloxSimulatorApplyRequestImpl,
+	new: (fields: _RobloxSimulatorApplyRequestPartialFields?) -> RobloxSimulatorApplyRequest,
+	encode: (self: RobloxSimulatorApplyRequest) -> buffer,
+	decode: (input: buffer) -> RobloxSimulatorApplyRequest,
+	jsonEncode: (self: RobloxSimulatorApplyRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxSimulatorApplyRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxSimulatorApplyRequestFields = {
+	device: string?,
+	width: number?,
+	height: number?,
+}
+
+export type _RobloxSimulatorApplyRequestPartialFields = {
+	device: string?,
+	width: number?,
+	height: number?,
+}
+
+export type RobloxSimulatorApplyRequest = typeof(setmetatable(
+	{} :: _RobloxSimulatorApplyRequestFields,
+	{} :: _RobloxSimulatorApplyRequestImpl
+))
+type _RobloxSimulatorApplyRequestMessage = proto.Message<
+	RobloxSimulatorApplyRequest,
+	_RobloxSimulatorApplyRequestPartialFields
+>
+
+type _RobloxSimulatorApplyResponseImpl = {
+	__index: _RobloxSimulatorApplyResponseImpl,
+	new: (fields: _RobloxSimulatorApplyResponsePartialFields?) -> RobloxSimulatorApplyResponse,
+	encode: (self: RobloxSimulatorApplyResponse) -> buffer,
+	decode: (input: buffer) -> RobloxSimulatorApplyResponse,
+	jsonEncode: (self: RobloxSimulatorApplyResponse) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxSimulatorApplyResponse,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxSimulatorApplyResponseFields = {
+	width: number,
+	height: number,
+}
+
+export type _RobloxSimulatorApplyResponsePartialFields = {
+	width: number?,
+	height: number?,
+}
+
+export type RobloxSimulatorApplyResponse = typeof(setmetatable(
+	{} :: _RobloxSimulatorApplyResponseFields,
+	{} :: _RobloxSimulatorApplyResponseImpl
+))
+type _RobloxSimulatorApplyResponseMessage = proto.Message<
+	RobloxSimulatorApplyResponse,
+	_RobloxSimulatorApplyResponsePartialFields
+>
+
+type _RobloxSimulatorRestoreRequestImpl = {
+	__index: _RobloxSimulatorRestoreRequestImpl,
+	new: (fields: _RobloxSimulatorRestoreRequestPartialFields?) -> RobloxSimulatorRestoreRequest,
+	encode: (self: RobloxSimulatorRestoreRequest) -> buffer,
+	decode: (input: buffer) -> RobloxSimulatorRestoreRequest,
+	jsonEncode: (self: RobloxSimulatorRestoreRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxSimulatorRestoreRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxSimulatorRestoreRequestFields = {}
+
+export type _RobloxSimulatorRestoreRequestPartialFields = {}
+
+export type RobloxSimulatorRestoreRequest = typeof(setmetatable(
+	{} :: _RobloxSimulatorRestoreRequestFields,
+	{} :: _RobloxSimulatorRestoreRequestImpl
+))
+type _RobloxSimulatorRestoreRequestMessage = proto.Message<
+	RobloxSimulatorRestoreRequest,
+	_RobloxSimulatorRestoreRequestPartialFields
+>
+
+type _RobloxCaptureFinalizeRequestImpl = {
+	__index: _RobloxCaptureFinalizeRequestImpl,
+	new: (fields: _RobloxCaptureFinalizeRequestPartialFields?) -> RobloxCaptureFinalizeRequest,
+	encode: (self: RobloxCaptureFinalizeRequest) -> buffer,
+	decode: (input: buffer) -> RobloxCaptureFinalizeRequest,
+	jsonEncode: (self: RobloxCaptureFinalizeRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxCaptureFinalizeRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxCaptureFinalizeRequestFields = {
+	source: string,
+	output: string,
+	width: number,
+	height: number,
+}
+
+export type _RobloxCaptureFinalizeRequestPartialFields = {
+	source: string?,
+	output: string?,
+	width: number?,
+	height: number?,
+}
+
+export type RobloxCaptureFinalizeRequest = typeof(setmetatable(
+	{} :: _RobloxCaptureFinalizeRequestFields,
+	{} :: _RobloxCaptureFinalizeRequestImpl
+))
+type _RobloxCaptureFinalizeRequestMessage = proto.Message<
+	RobloxCaptureFinalizeRequest,
+	_RobloxCaptureFinalizeRequestPartialFields
+>
+
+type _RobloxCaptureFinalizeResponseImpl = {
+	__index: _RobloxCaptureFinalizeResponseImpl,
+	new: (fields: _RobloxCaptureFinalizeResponsePartialFields?) -> RobloxCaptureFinalizeResponse,
+	encode: (self: RobloxCaptureFinalizeResponse) -> buffer,
+	decode: (input: buffer) -> RobloxCaptureFinalizeResponse,
+	jsonEncode: (self: RobloxCaptureFinalizeResponse) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxCaptureFinalizeResponse,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxCaptureFinalizeResponseFields = {
+	width: number,
+	height: number,
+	sourceWidth: number,
+	sourceHeight: number,
+}
+
+export type _RobloxCaptureFinalizeResponsePartialFields = {
+	width: number?,
+	height: number?,
+	sourceWidth: number?,
+	sourceHeight: number?,
+}
+
+export type RobloxCaptureFinalizeResponse = typeof(setmetatable(
+	{} :: _RobloxCaptureFinalizeResponseFields,
+	{} :: _RobloxCaptureFinalizeResponseImpl
+))
+type _RobloxCaptureFinalizeResponseMessage = proto.Message<
+	RobloxCaptureFinalizeResponse,
+	_RobloxCaptureFinalizeResponsePartialFields
+>
 
 type _FsExistsRequestImpl = {
 	__index: _FsExistsRequestImpl,
@@ -1086,6 +1240,9 @@ type _ClientRpcCallFields = {
 		| { type: "processKill", value: ProcessKillRequest }
 		| { type: "mcpCall", value: McpCallRequest }
 		| { type: "robloxExport", value: RobloxExportRequest }
+		| { type: "robloxSimulatorApply", value: RobloxSimulatorApplyRequest }
+		| { type: "robloxSimulatorRestore", value: RobloxSimulatorRestoreRequest }
+		| { type: "robloxCaptureFinalize", value: RobloxCaptureFinalizeRequest }
 	)?,
 }
 
@@ -1118,6 +1275,18 @@ export type _ClientRpcCallPartialFields = {
 		| { type: "processKill", value: ProcessKillRequest | _ProcessKillRequestPartialFields }
 		| { type: "mcpCall", value: McpCallRequest | _McpCallRequestPartialFields }
 		| { type: "robloxExport", value: RobloxExportRequest | _RobloxExportRequestPartialFields }
+		| {
+			type: "robloxSimulatorApply",
+			value: RobloxSimulatorApplyRequest | _RobloxSimulatorApplyRequestPartialFields,
+		}
+		| {
+			type: "robloxSimulatorRestore",
+			value: RobloxSimulatorRestoreRequest | _RobloxSimulatorRestoreRequestPartialFields,
+		}
+		| {
+			type: "robloxCaptureFinalize",
+			value: RobloxCaptureFinalizeRequest | _RobloxCaptureFinalizeRequestPartialFields,
+		}
 	)?,
 }
 
@@ -1164,6 +1333,9 @@ type _ClientRpcResponseFields = {
 		| { type: "processKill", value: Ok }
 		| { type: "mcpCall", value: McpCallResponse }
 		| { type: "robloxExport", value: Ok }
+		| { type: "robloxSimulatorApply", value: RobloxSimulatorApplyResponse }
+		| { type: "robloxSimulatorRestore", value: Ok }
+		| { type: "robloxCaptureFinalize", value: RobloxCaptureFinalizeResponse }
 	)?,
 }
 
@@ -1197,6 +1369,15 @@ export type _ClientRpcResponsePartialFields = {
 		| { type: "processKill", value: Ok | _OkPartialFields }
 		| { type: "mcpCall", value: McpCallResponse | _McpCallResponsePartialFields }
 		| { type: "robloxExport", value: Ok | _OkPartialFields }
+		| {
+			type: "robloxSimulatorApply",
+			value: RobloxSimulatorApplyResponse | _RobloxSimulatorApplyResponsePartialFields,
+		}
+		| { type: "robloxSimulatorRestore", value: Ok | _OkPartialFields }
+		| {
+			type: "robloxCaptureFinalize",
+			value: RobloxCaptureFinalizeResponse | _RobloxCaptureFinalizeResponsePartialFields,
+		}
 	)?,
 }
 
@@ -2807,6 +2988,652 @@ do
 	messages.RobloxExportRequest = _RobloxExportRequestImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.RobloxExportRequest)
+end
+
+do
+	local _RobloxSimulatorApplyRequestImpl = {}
+	_RobloxSimulatorApplyRequestImpl.__index = _RobloxSimulatorApplyRequestImpl
+
+	function _RobloxSimulatorApplyRequestImpl.new(
+		data: _RobloxSimulatorApplyRequestPartialFields?
+	): RobloxSimulatorApplyRequest
+		return setmetatable({
+			device = if data == nil or data.device == nil then nil else data.device,
+			width = if data == nil or data.width == nil then nil else data.width,
+			height = if data == nil or data.height == nil then nil else data.height,
+		}, _RobloxSimulatorApplyRequestImpl :: _RobloxSimulatorApplyRequestImpl)
+	end
+
+	function _RobloxSimulatorApplyRequestImpl.encode(self: RobloxSimulatorApplyRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.device ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.device)
+		end
+
+		if self.width ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.width)
+		end
+
+		if self.height ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.height)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxSimulatorApplyRequestImpl.decode(input: buffer): RobloxSimulatorApplyRequest
+		local self = _RobloxSimulatorApplyRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.width = value
+					continue
+				elseif field == 3 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.height = value
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.device = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxSimulatorApplyRequestImpl.jsonEncode(self: RobloxSimulatorApplyRequest): any
+		local output = {}
+
+		if self.device ~= nil then
+			output.device = self.device
+		end
+
+		if self.width ~= nil then
+			output.width = self.width
+		end
+
+		if self.height ~= nil then
+			output.height = self.height
+		end
+
+		return output
+	end
+
+	function _RobloxSimulatorApplyRequestImpl.jsonDecode(input: { [string]: any }): RobloxSimulatorApplyRequest
+		local self = _RobloxSimulatorApplyRequestImpl.new()
+
+		if input.device ~= nil then
+			self.device = input.device
+		end
+
+		if input.width ~= nil then
+			self.width = input.width
+		end
+
+		if input.height ~= nil then
+			self.height = input.height
+		end
+
+		return self
+	end
+
+	_RobloxSimulatorApplyRequestImpl.descriptor = {
+		name = "RobloxSimulatorApplyRequest",
+		fullName = "rodeo.runtime.RobloxSimulatorApplyRequest",
+	}
+
+	messages.RobloxSimulatorApplyRequest = _RobloxSimulatorApplyRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxSimulatorApplyRequest)
+end
+
+do
+	local _RobloxSimulatorApplyResponseImpl = {}
+	_RobloxSimulatorApplyResponseImpl.__index = _RobloxSimulatorApplyResponseImpl
+
+	function _RobloxSimulatorApplyResponseImpl.new(
+		data: _RobloxSimulatorApplyResponsePartialFields?
+	): RobloxSimulatorApplyResponse
+		return setmetatable({
+			width = if data == nil or data.width == nil then 0 else data.width,
+			height = if data == nil or data.height == nil then 0 else data.height,
+		}, _RobloxSimulatorApplyResponseImpl :: _RobloxSimulatorApplyResponseImpl)
+	end
+
+	function _RobloxSimulatorApplyResponseImpl.encode(self: RobloxSimulatorApplyResponse): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.width ~= nil and self.width ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.width)
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.height)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxSimulatorApplyResponseImpl.decode(input: buffer): RobloxSimulatorApplyResponse
+		local self = _RobloxSimulatorApplyResponseImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 1 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.width = value
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.height = value
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				-- No fields
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxSimulatorApplyResponseImpl.jsonEncode(self: RobloxSimulatorApplyResponse): any
+		local output = {}
+
+		if self.width ~= nil and self.width ~= 0 then
+			output.width = self.width
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output.height = self.height
+		end
+
+		return output
+	end
+
+	function _RobloxSimulatorApplyResponseImpl.jsonDecode(input: { [string]: any }): RobloxSimulatorApplyResponse
+		local self = _RobloxSimulatorApplyResponseImpl.new()
+
+		if input.width ~= nil then
+			self.width = input.width
+		end
+
+		if input.height ~= nil then
+			self.height = input.height
+		end
+
+		return self
+	end
+
+	_RobloxSimulatorApplyResponseImpl.descriptor = {
+		name = "RobloxSimulatorApplyResponse",
+		fullName = "rodeo.runtime.RobloxSimulatorApplyResponse",
+	}
+
+	messages.RobloxSimulatorApplyResponse = _RobloxSimulatorApplyResponseImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxSimulatorApplyResponse)
+end
+
+do
+	local _RobloxSimulatorRestoreRequestImpl = {}
+	_RobloxSimulatorRestoreRequestImpl.__index = _RobloxSimulatorRestoreRequestImpl
+
+	function _RobloxSimulatorRestoreRequestImpl.new(
+		data: _RobloxSimulatorRestoreRequestPartialFields?
+	): RobloxSimulatorRestoreRequest
+		return setmetatable({}, _RobloxSimulatorRestoreRequestImpl :: _RobloxSimulatorRestoreRequestImpl)
+	end
+
+	function _RobloxSimulatorRestoreRequestImpl.encode(self: RobloxSimulatorRestoreRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxSimulatorRestoreRequestImpl.decode(input: buffer): RobloxSimulatorRestoreRequest
+		local self = _RobloxSimulatorRestoreRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				-- No fields
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxSimulatorRestoreRequestImpl.jsonEncode(self: RobloxSimulatorRestoreRequest): any
+		local output = {}
+
+		return output
+	end
+
+	function _RobloxSimulatorRestoreRequestImpl.jsonDecode(input: { [string]: any }): RobloxSimulatorRestoreRequest
+		local self = _RobloxSimulatorRestoreRequestImpl.new()
+
+		return self
+	end
+
+	_RobloxSimulatorRestoreRequestImpl.descriptor = {
+		name = "RobloxSimulatorRestoreRequest",
+		fullName = "rodeo.runtime.RobloxSimulatorRestoreRequest",
+	}
+
+	messages.RobloxSimulatorRestoreRequest = _RobloxSimulatorRestoreRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxSimulatorRestoreRequest)
+end
+
+do
+	local _RobloxCaptureFinalizeRequestImpl = {}
+	_RobloxCaptureFinalizeRequestImpl.__index = _RobloxCaptureFinalizeRequestImpl
+
+	function _RobloxCaptureFinalizeRequestImpl.new(
+		data: _RobloxCaptureFinalizeRequestPartialFields?
+	): RobloxCaptureFinalizeRequest
+		return setmetatable({
+			source = if data == nil or data.source == nil then "" else data.source,
+			output = if data == nil or data.output == nil then "" else data.output,
+			width = if data == nil or data.width == nil then 0 else data.width,
+			height = if data == nil or data.height == nil then 0 else data.height,
+		}, _RobloxCaptureFinalizeRequestImpl :: _RobloxCaptureFinalizeRequestImpl)
+	end
+
+	function _RobloxCaptureFinalizeRequestImpl.encode(self: RobloxCaptureFinalizeRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.source ~= nil and self.source ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.source)
+		end
+
+		if self.output ~= nil and self.output ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.output)
+		end
+
+		if self.width ~= nil and self.width ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.width)
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.height)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxCaptureFinalizeRequestImpl.decode(input: buffer): RobloxCaptureFinalizeRequest
+		local self = _RobloxCaptureFinalizeRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 3 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.width = value
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.height = value
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.source = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.output = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxCaptureFinalizeRequestImpl.jsonEncode(self: RobloxCaptureFinalizeRequest): any
+		local output = {}
+
+		if self.source ~= nil and self.source ~= "" then
+			output.source = self.source
+		end
+
+		if self.output ~= nil and self.output ~= "" then
+			output.output = self.output
+		end
+
+		if self.width ~= nil and self.width ~= 0 then
+			output.width = self.width
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output.height = self.height
+		end
+
+		return output
+	end
+
+	function _RobloxCaptureFinalizeRequestImpl.jsonDecode(input: { [string]: any }): RobloxCaptureFinalizeRequest
+		local self = _RobloxCaptureFinalizeRequestImpl.new()
+
+		if input.source ~= nil then
+			self.source = input.source
+		end
+
+		if input.output ~= nil then
+			self.output = input.output
+		end
+
+		if input.width ~= nil then
+			self.width = input.width
+		end
+
+		if input.height ~= nil then
+			self.height = input.height
+		end
+
+		return self
+	end
+
+	_RobloxCaptureFinalizeRequestImpl.descriptor = {
+		name = "RobloxCaptureFinalizeRequest",
+		fullName = "rodeo.runtime.RobloxCaptureFinalizeRequest",
+	}
+
+	messages.RobloxCaptureFinalizeRequest = _RobloxCaptureFinalizeRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxCaptureFinalizeRequest)
+end
+
+do
+	local _RobloxCaptureFinalizeResponseImpl = {}
+	_RobloxCaptureFinalizeResponseImpl.__index = _RobloxCaptureFinalizeResponseImpl
+
+	function _RobloxCaptureFinalizeResponseImpl.new(
+		data: _RobloxCaptureFinalizeResponsePartialFields?
+	): RobloxCaptureFinalizeResponse
+		return setmetatable({
+			width = if data == nil or data.width == nil then 0 else data.width,
+			height = if data == nil or data.height == nil then 0 else data.height,
+			sourceWidth = if data == nil or data.sourceWidth == nil then 0 else data.sourceWidth,
+			sourceHeight = if data == nil or data.sourceHeight == nil then 0 else data.sourceHeight,
+		}, _RobloxCaptureFinalizeResponseImpl :: _RobloxCaptureFinalizeResponseImpl)
+	end
+
+	function _RobloxCaptureFinalizeResponseImpl.encode(self: RobloxCaptureFinalizeResponse): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.width ~= nil and self.width ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.width)
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.height)
+		end
+
+		if self.sourceWidth ~= nil and self.sourceWidth ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.sourceWidth)
+		end
+
+		if self.sourceHeight ~= nil and self.sourceHeight ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.sourceHeight)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxCaptureFinalizeResponseImpl.decode(input: buffer): RobloxCaptureFinalizeResponse
+		local self = _RobloxCaptureFinalizeResponseImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 1 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.width = value
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.height = value
+					continue
+				elseif field == 3 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.sourceWidth = value
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.sourceHeight = value
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				-- No fields
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxCaptureFinalizeResponseImpl.jsonEncode(self: RobloxCaptureFinalizeResponse): any
+		local output = {}
+
+		if self.width ~= nil and self.width ~= 0 then
+			output.width = self.width
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output.height = self.height
+		end
+
+		if self.sourceWidth ~= nil and self.sourceWidth ~= 0 then
+			output.sourceWidth = self.sourceWidth
+		end
+
+		if self.sourceHeight ~= nil and self.sourceHeight ~= 0 then
+			output.sourceHeight = self.sourceHeight
+		end
+
+		return output
+	end
+
+	function _RobloxCaptureFinalizeResponseImpl.jsonDecode(input: { [string]: any }): RobloxCaptureFinalizeResponse
+		local self = _RobloxCaptureFinalizeResponseImpl.new()
+
+		if input.width ~= nil then
+			self.width = input.width
+		end
+
+		if input.height ~= nil then
+			self.height = input.height
+		end
+
+		if input.sourceWidth ~= nil then
+			self.sourceWidth = input.sourceWidth
+		end
+
+		if input.sourceHeight ~= nil then
+			self.sourceHeight = input.sourceHeight
+		end
+
+		return self
+	end
+
+	_RobloxCaptureFinalizeResponseImpl.descriptor = {
+		name = "RobloxCaptureFinalizeResponse",
+		fullName = "rodeo.runtime.RobloxCaptureFinalizeResponse",
+	}
+
+	messages.RobloxCaptureFinalizeResponse = _RobloxCaptureFinalizeResponseImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxCaptureFinalizeResponse)
 end
 
 do
@@ -6165,6 +6992,33 @@ do
 					and getmetatable((v :: any).value) == nil
 				then
 					return { type = (v :: any).type, value = messages.RobloxExportRequest.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "robloxSimulatorApply"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.RobloxSimulatorApplyRequest.new((v :: any).value),
+						} :: any
+				elseif
+					(v :: any).type == "robloxSimulatorRestore"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+						type = (v :: any).type,
+						value = messages.RobloxSimulatorRestoreRequest.new((v :: any).value),
+					} :: any
+				elseif
+					(v :: any).type == "robloxCaptureFinalize"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+						type = (v :: any).type,
+						value = messages.RobloxCaptureFinalizeRequest.new((v :: any).value),
+					} :: any
 				end
 				return v :: any
 			end)(),
@@ -6285,6 +7139,18 @@ do
 			elseif self.req.type == "robloxExport" then
 				local encoded = self.req.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 50, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxSimulatorApply" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 51, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxSimulatorRestore" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 52, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxCaptureFinalize" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 53, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -6443,6 +7309,26 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.req = { type = "robloxExport", value = messages.RobloxExportRequest.decode(value) }
 					continue
+				elseif field == 51 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req =
+						{ type = "robloxSimulatorApply", value = messages.RobloxSimulatorApplyRequest.decode(value) }
+					continue
+				elseif field == 52 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = {
+						type = "robloxSimulatorRestore",
+						value = messages.RobloxSimulatorRestoreRequest.decode(value),
+					}
+					continue
+				elseif field == 53 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req =
+						{ type = "robloxCaptureFinalize", value = messages.RobloxCaptureFinalizeRequest.decode(value) }
+					continue
 				end
 
 				local length
@@ -6529,6 +7415,12 @@ do
 				output.mcpCall = self.req.value:jsonEncode()
 			elseif self.req.type == "robloxExport" then
 				output.robloxExport = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxSimulatorApply" then
+				output.robloxSimulatorApply = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxSimulatorRestore" then
+				output.robloxSimulatorRestore = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxCaptureFinalize" then
+				output.robloxCaptureFinalize = self.req.value:jsonEncode()
 			end
 		end
 
@@ -6654,6 +7546,27 @@ do
 
 		if input.robloxExport ~= nil then
 			self.req = { type = "robloxExport", value = messages.RobloxExportRequest.jsonDecode(input.robloxExport) }
+		end
+
+		if input.robloxSimulatorApply ~= nil then
+			self.req = {
+				type = "robloxSimulatorApply",
+				value = messages.RobloxSimulatorApplyRequest.jsonDecode(input.robloxSimulatorApply),
+			}
+		end
+
+		if input.robloxSimulatorRestore ~= nil then
+			self.req = {
+				type = "robloxSimulatorRestore",
+				value = messages.RobloxSimulatorRestoreRequest.jsonDecode(input.robloxSimulatorRestore),
+			}
+		end
+
+		if input.robloxCaptureFinalize ~= nil then
+			self.req = {
+				type = "robloxCaptureFinalize",
+				value = messages.RobloxCaptureFinalizeRequest.jsonDecode(input.robloxCaptureFinalize),
+			}
 		end
 
 		return self
@@ -6850,6 +7763,30 @@ do
 					and getmetatable((v :: any).value) == nil
 				then
 					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "robloxSimulatorApply"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+						type = (v :: any).type,
+						value = messages.RobloxSimulatorApplyResponse.new((v :: any).value),
+					} :: any
+				elseif
+					(v :: any).type == "robloxSimulatorRestore"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "robloxCaptureFinalize"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+						type = (v :: any).type,
+						value = messages.RobloxCaptureFinalizeResponse.new((v :: any).value),
+					} :: any
 				end
 				return v :: any
 			end)(),
@@ -6973,6 +7910,18 @@ do
 			elseif self.res.type == "robloxExport" then
 				local encoded = self.res.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 50, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxSimulatorApply" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 51, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxSimulatorRestore" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 52, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxCaptureFinalize" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 53, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -7136,6 +8085,23 @@ do
 					value, cursor = proto.readBuffer(input, cursor)
 					self.res = { type = "robloxExport", value = messages.Ok.decode(value) }
 					continue
+				elseif field == 51 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res =
+						{ type = "robloxSimulatorApply", value = messages.RobloxSimulatorApplyResponse.decode(value) }
+					continue
+				elseif field == 52 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "robloxSimulatorRestore", value = messages.Ok.decode(value) }
+					continue
+				elseif field == 53 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res =
+						{ type = "robloxCaptureFinalize", value = messages.RobloxCaptureFinalizeResponse.decode(value) }
+					continue
 				end
 
 				local length
@@ -7224,6 +8190,12 @@ do
 				output.mcpCall = self.res.value:jsonEncode()
 			elseif self.res.type == "robloxExport" then
 				output.robloxExport = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxSimulatorApply" then
+				output.robloxSimulatorApply = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxSimulatorRestore" then
+				output.robloxSimulatorRestore = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxCaptureFinalize" then
+				output.robloxCaptureFinalize = self.res.value:jsonEncode()
 			end
 		end
 
@@ -7352,6 +8324,24 @@ do
 			self.res = { type = "robloxExport", value = messages.Ok.jsonDecode(input.robloxExport) }
 		end
 
+		if input.robloxSimulatorApply ~= nil then
+			self.res = {
+				type = "robloxSimulatorApply",
+				value = messages.RobloxSimulatorApplyResponse.jsonDecode(input.robloxSimulatorApply),
+			}
+		end
+
+		if input.robloxSimulatorRestore ~= nil then
+			self.res = { type = "robloxSimulatorRestore", value = messages.Ok.jsonDecode(input.robloxSimulatorRestore) }
+		end
+
+		if input.robloxCaptureFinalize ~= nil then
+			self.res = {
+				type = "robloxCaptureFinalize",
+				value = messages.RobloxCaptureFinalizeResponse.jsonDecode(input.robloxCaptureFinalize),
+			}
+		end
+
 		return self
 	end
 
@@ -7381,6 +8371,11 @@ return {
 	StreamWriteBytesRequest = messages.StreamWriteBytesRequest,
 	StreamCloseRequest = messages.StreamCloseRequest,
 	RobloxExportRequest = messages.RobloxExportRequest,
+	RobloxSimulatorApplyRequest = messages.RobloxSimulatorApplyRequest,
+	RobloxSimulatorApplyResponse = messages.RobloxSimulatorApplyResponse,
+	RobloxSimulatorRestoreRequest = messages.RobloxSimulatorRestoreRequest,
+	RobloxCaptureFinalizeRequest = messages.RobloxCaptureFinalizeRequest,
+	RobloxCaptureFinalizeResponse = messages.RobloxCaptureFinalizeResponse,
 	FsExistsRequest = messages.FsExistsRequest,
 	FsExistsResponse = messages.FsExistsResponse,
 	FsStatRequest = messages.FsStatRequest,

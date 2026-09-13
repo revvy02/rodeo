@@ -3,7 +3,8 @@
 // some DOM. No case names or script sources are modified from the lute version.
 
 import { it, expect } from "bun:test";
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import type { RunCodeOpts, RunResult } from "../../rodeo-client-ts/src/run.js";
 
 export type RunFn = (opts: RunCodeOpts) => Promise<RunResult>;
@@ -440,6 +441,160 @@ export function process(run: RunFn): void {
     });
     expect(result.ok).toBe(true);
     expect(result.output).toContain("true");
+  });
+}
+
+// ── capture (7 tests, plugin-only) ────────────────────────────────────────
+//
+// roblox.capture drives Studio's device simulator for `device` / `viewportSize`
+// (plugin-handled RPCs) and finalizes the engine's frame on the run client,
+// resampling it to exactly the capture's Camera.ViewportSize. These read the
+// written PNG's IHDR to check the pixel size independently of what the API
+// reports. Every test captures into its own file and removes it.
+
+function pngSize(path: string): { width: number; height: number } {
+  const bytes = readFileSync(path);
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
+
+function captureOut(name: string): string {
+  return `.rodeo/.temp/captures/test-${name}-${randomUUID()}.png`;
+}
+
+// Luau prelude: capture into `out` with `opts` and return everything the
+// assertions need. The viewport is read before the capture, so for the
+// window case it is the plain window size.
+function captureSource(out: string, opts: string): string {
+  return `local roblox = require("@rodeo/roblox")
+    local cam = workspace.CurrentCamera
+    local vp = cam.ViewportSize
+    local path, info = roblox.capture("${out}", ${opts})
+    return { path = path, width = info.width, height = info.height, vpX = vp.X, vpY = vp.Y }`;
+}
+
+export function capture(run: RunFn): void {
+  it("capture: default output is exactly the window viewport size", async () => {
+    const out = captureOut("window");
+    try {
+      const result = await run({ showReturn: true, source: captureSource(out, "{}") });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string; width: number; height: number; vpX: number; vpY: number };
+      expect(existsSync(r.path)).toBe(true);
+      const size = pngSize(r.path);
+      expect(size).toEqual({ width: Math.round(r.vpX), height: Math.round(r.vpY) });
+      expect({ width: r.width, height: r.height }).toEqual(size);
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: viewportSize yields an image of exactly that size", async () => {
+    const out = captureOut("viewport");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: captureSource(out, "{ viewportSize = Vector2.new(640, 360), settle = 1 }"),
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string; width: number; height: number };
+      expect(pngSize(r.path)).toEqual({ width: 640, height: 360 });
+      expect({ width: r.width, height: r.height }).toEqual({ width: 640, height: 360 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: device preset selects its viewport", async () => {
+    const out = captureOut("device");
+    try {
+      // hd_720 is a built-in desktop preset: 1280x720 with no insets.
+      const result = await run({
+        showReturn: true,
+        source: captureSource(out, '{ device = "hd_720", settle = 1 }'),
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string };
+      expect(pngSize(r.path)).toEqual({ width: 1280, height: 720 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: viewportSize overrides a device preset's resolution", async () => {
+    const out = captureOut("device-override");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: captureSource(out, '{ device = "hd_720", viewportSize = Vector2.new(800, 600), settle = 1 }'),
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string };
+      expect(pngSize(r.path)).toEqual({ width: 800, height: 600 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: viewportSize over 7680 wide errors before capturing", async () => {
+    const out = captureOut("too-wide");
+    try {
+      const result = await run({ source: captureSource(out, "{ viewportSize = Vector2.new(8000, 100) }") });
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain("7680");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: unknown device errors", async () => {
+    const out = captureOut("unknown-device");
+    try {
+      const result = await run({ source: captureSource(out, '{ device = "rodeo-no-such-device" }') });
+      expect(result.ok).toBe(false);
+      expect(result.output.toLowerCase()).toContain("device");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: simulator state is restored after the capture", async () => {
+    // Studio persists emulation across launches, so the prior state may be
+    // "off" or some user device: assert after == before, not after == off.
+    const out = captureOut("restore");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          local sim = game:GetService("StudioDeviceSimulatorService")
+          local function snapshot()
+            local active, res = pcall(function() return sim:GetResolutionAsync() end)
+            return {
+              device = sim:GetDeviceAsync(),
+              active = active,
+              resolution = active and (res.X .. "x" .. res.Y) or "off",
+              viewport = workspace.CurrentCamera.ViewportSize.X .. "x" .. workspace.CurrentCamera.ViewportSize.Y,
+            }
+          end
+          local before = snapshot()
+          roblox.capture("${out}", { viewportSize = Vector2.new(320, 180), settle = 1 })
+          task.wait(0.5)
+          local after = snapshot()
+          local leftovers = 0
+          for _, id in ipairs(sim:GetDeviceListAsync()) do
+            if string.sub(id, 1, 14) == "rodeo-capture-" then leftovers += 1 end
+          end
+          return { before = before, after = after, leftovers = leftovers }`,
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { before: Record<string, unknown>; after: Record<string, unknown>; leftovers: number };
+      expect(r.after).toEqual(r.before);
+      expect(r.leftovers).toBe(0);
+      expect(r.before.viewport).not.toBe("320x180");
+    } finally {
+      rmrf(out);
+    }
   });
 }
 
