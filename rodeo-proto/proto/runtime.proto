@@ -129,6 +129,30 @@ message RobloxCaptureFinalizeResponse {
   uint32 source_height = 4;
 }
 
+// roblox.exportEditableImage: the plugin streamed an EditableImage's RGBA8
+// pixels (ReadPixelsBuffer) into an open FileWriter on the output path; this
+// consumes the handle in place of stream_close and writes the file as PNG
+// (only .png is supported), atomically.
+message RobloxImageEncodeRequest {
+  string handle = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+}
+
+// roblox.importEditableImage: the host decodes the image file at `path`
+// (PNG or JPEG) to RGBA8 and registers `handle` (minted by the caller like
+// fs.open does) as a readable stream over those bytes, so the plugin pulls
+// them with the ordinary chunked stream_read_bytes and closes the handle.
+message RobloxImageDecodeRequest {
+  string path = 1;
+  string handle = 2;
+}
+
+message RobloxImageDecodeResponse {
+  uint32 width = 1;
+  uint32 height = 2;
+}
+
 // ---------------------------------------------------------------------------
 // Filesystem operations
 // ---------------------------------------------------------------------------
@@ -322,6 +346,8 @@ message ClientRpcCall {
     RobloxSimulatorApplyRequest    roblox_simulator_apply   = 51;
     RobloxSimulatorRestoreRequest  roblox_simulator_restore = 52;
     RobloxCaptureFinalizeRequest   roblox_capture_finalize  = 53;
+    RobloxImageEncodeRequest       roblox_image_encode      = 54;
+    RobloxImageDecodeRequest       roblox_image_decode      = 55;
   }
 }
 
@@ -372,5 +398,7 @@ message ClientRpcResponse {
     RobloxSimulatorApplyResponse   roblox_simulator_apply   = 51;
     Ok                             roblox_simulator_restore = 52;
     RobloxCaptureFinalizeResponse  roblox_capture_finalize  = 53;
+    Ok                             roblox_image_encode      = 54;
+    RobloxImageDecodeResponse      roblox_image_decode      = 55;
   }
 }

@@ -9,7 +9,7 @@ pub async fn stream_open(state: SharedRpcState, req: &rt::StreamOpenRequest) -> 
         "r" => {
             let file = std::fs::File::open(&req.path).map_err(|e| format!("open error: {e}"))?;
             StreamHandler::FileReader {
-                reader: std::io::BufReader::new(file),
+                reader: Box::new(std::io::BufReader::new(file)),
             }
         }
         "w" => StreamHandler::FileWriter {

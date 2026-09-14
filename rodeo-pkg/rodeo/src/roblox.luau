@@ -54,6 +54,22 @@ function roblox.bake(path: string, value: any)
 	(singleton :: any).roblox.bake(path, value)
 end
 
+--- Writes an `EditableImage`'s pixels to `path` as a PNG. Only `.png` is
+--- supported. Parent directories are created as needed. EditableImage has no
+--- file representation of its own (`export` writes an Object-backed image
+--- content as an empty reference), so this is how generated textures reach
+--- the source tree.
+function roblox.exportEditableImage(path: string, image: EditableImage)
+	(singleton :: any).roblox.exportEditableImage(path, image)
+end
+
+--- Loads the PNG or JPEG at `path` into a new `EditableImage` (RGBA8) and
+--- returns it. Relative paths resolve against the run client's cwd. Studio
+--- bounds EditableImage dimensions; an image it refuses errors with its size.
+function roblox.importEditableImage(path: string): EditableImage
+	return (singleton :: any).roblox.importEditableImage(path)
+end
+
 --- Captures a Studio screenshot and writes it to a stable path, returning
 --- that absolute path and the image size. `output` ending in `.png` is the
 --- exact file path; any other value is a directory the auto-named `.png` lands

@@ -27,6 +27,9 @@ type _Messages = {
 	RobloxSimulatorRestoreRequest: _RobloxSimulatorRestoreRequestMessage,
 	RobloxCaptureFinalizeRequest: _RobloxCaptureFinalizeRequestMessage,
 	RobloxCaptureFinalizeResponse: _RobloxCaptureFinalizeResponseMessage,
+	RobloxImageEncodeRequest: _RobloxImageEncodeRequestMessage,
+	RobloxImageDecodeRequest: _RobloxImageDecodeRequestMessage,
+	RobloxImageDecodeResponse: _RobloxImageDecodeResponseMessage,
 	FsExistsRequest: _FsExistsRequestMessage,
 	FsExistsResponse: _FsExistsResponseMessage,
 	FsStatRequest: _FsStatRequestMessage,
@@ -564,6 +567,89 @@ export type RobloxCaptureFinalizeResponse = typeof(setmetatable(
 type _RobloxCaptureFinalizeResponseMessage = proto.Message<
 	RobloxCaptureFinalizeResponse,
 	_RobloxCaptureFinalizeResponsePartialFields
+>
+
+type _RobloxImageEncodeRequestImpl = {
+	__index: _RobloxImageEncodeRequestImpl,
+	new: (fields: _RobloxImageEncodeRequestPartialFields?) -> RobloxImageEncodeRequest,
+	encode: (self: RobloxImageEncodeRequest) -> buffer,
+	decode: (input: buffer) -> RobloxImageEncodeRequest,
+	jsonEncode: (self: RobloxImageEncodeRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxImageEncodeRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxImageEncodeRequestFields = {
+	handle: string,
+	width: number,
+	height: number,
+}
+
+export type _RobloxImageEncodeRequestPartialFields = {
+	handle: string?,
+	width: number?,
+	height: number?,
+}
+
+export type RobloxImageEncodeRequest = typeof(setmetatable(
+	{} :: _RobloxImageEncodeRequestFields,
+	{} :: _RobloxImageEncodeRequestImpl
+))
+type _RobloxImageEncodeRequestMessage = proto.Message<RobloxImageEncodeRequest, _RobloxImageEncodeRequestPartialFields>
+
+type _RobloxImageDecodeRequestImpl = {
+	__index: _RobloxImageDecodeRequestImpl,
+	new: (fields: _RobloxImageDecodeRequestPartialFields?) -> RobloxImageDecodeRequest,
+	encode: (self: RobloxImageDecodeRequest) -> buffer,
+	decode: (input: buffer) -> RobloxImageDecodeRequest,
+	jsonEncode: (self: RobloxImageDecodeRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxImageDecodeRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxImageDecodeRequestFields = {
+	path: string,
+	handle: string,
+}
+
+export type _RobloxImageDecodeRequestPartialFields = {
+	path: string?,
+	handle: string?,
+}
+
+export type RobloxImageDecodeRequest = typeof(setmetatable(
+	{} :: _RobloxImageDecodeRequestFields,
+	{} :: _RobloxImageDecodeRequestImpl
+))
+type _RobloxImageDecodeRequestMessage = proto.Message<RobloxImageDecodeRequest, _RobloxImageDecodeRequestPartialFields>
+
+type _RobloxImageDecodeResponseImpl = {
+	__index: _RobloxImageDecodeResponseImpl,
+	new: (fields: _RobloxImageDecodeResponsePartialFields?) -> RobloxImageDecodeResponse,
+	encode: (self: RobloxImageDecodeResponse) -> buffer,
+	decode: (input: buffer) -> RobloxImageDecodeResponse,
+	jsonEncode: (self: RobloxImageDecodeResponse) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxImageDecodeResponse,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxImageDecodeResponseFields = {
+	width: number,
+	height: number,
+}
+
+export type _RobloxImageDecodeResponsePartialFields = {
+	width: number?,
+	height: number?,
+}
+
+export type RobloxImageDecodeResponse = typeof(setmetatable(
+	{} :: _RobloxImageDecodeResponseFields,
+	{} :: _RobloxImageDecodeResponseImpl
+))
+type _RobloxImageDecodeResponseMessage = proto.Message<
+	RobloxImageDecodeResponse,
+	_RobloxImageDecodeResponsePartialFields
 >
 
 type _FsExistsRequestImpl = {
@@ -1245,6 +1331,8 @@ type _ClientRpcCallFields = {
 		| { type: "robloxSimulatorApply", value: RobloxSimulatorApplyRequest }
 		| { type: "robloxSimulatorRestore", value: RobloxSimulatorRestoreRequest }
 		| { type: "robloxCaptureFinalize", value: RobloxCaptureFinalizeRequest }
+		| { type: "robloxImageEncode", value: RobloxImageEncodeRequest }
+		| { type: "robloxImageDecode", value: RobloxImageDecodeRequest }
 	)?,
 }
 
@@ -1289,6 +1377,8 @@ export type _ClientRpcCallPartialFields = {
 			type: "robloxCaptureFinalize",
 			value: RobloxCaptureFinalizeRequest | _RobloxCaptureFinalizeRequestPartialFields,
 		}
+		| { type: "robloxImageEncode", value: RobloxImageEncodeRequest | _RobloxImageEncodeRequestPartialFields }
+		| { type: "robloxImageDecode", value: RobloxImageDecodeRequest | _RobloxImageDecodeRequestPartialFields }
 	)?,
 }
 
@@ -1338,6 +1428,8 @@ type _ClientRpcResponseFields = {
 		| { type: "robloxSimulatorApply", value: RobloxSimulatorApplyResponse }
 		| { type: "robloxSimulatorRestore", value: Ok }
 		| { type: "robloxCaptureFinalize", value: RobloxCaptureFinalizeResponse }
+		| { type: "robloxImageEncode", value: Ok }
+		| { type: "robloxImageDecode", value: RobloxImageDecodeResponse }
 	)?,
 }
 
@@ -1380,6 +1472,8 @@ export type _ClientRpcResponsePartialFields = {
 			type: "robloxCaptureFinalize",
 			value: RobloxCaptureFinalizeResponse | _RobloxCaptureFinalizeResponsePartialFields,
 		}
+		| { type: "robloxImageEncode", value: Ok | _OkPartialFields }
+		| { type: "robloxImageDecode", value: RobloxImageDecodeResponse | _RobloxImageDecodeResponsePartialFields }
 	)?,
 }
 
@@ -3655,6 +3749,375 @@ do
 	messages.RobloxCaptureFinalizeResponse = _RobloxCaptureFinalizeResponseImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.RobloxCaptureFinalizeResponse)
+end
+
+do
+	local _RobloxImageEncodeRequestImpl = {}
+	_RobloxImageEncodeRequestImpl.__index = _RobloxImageEncodeRequestImpl
+
+	function _RobloxImageEncodeRequestImpl.new(data: _RobloxImageEncodeRequestPartialFields?): RobloxImageEncodeRequest
+		return setmetatable({
+			handle = if data == nil or data.handle == nil then "" else data.handle,
+			width = if data == nil or data.width == nil then 0 else data.width,
+			height = if data == nil or data.height == nil then 0 else data.height,
+		}, _RobloxImageEncodeRequestImpl :: _RobloxImageEncodeRequestImpl)
+	end
+
+	function _RobloxImageEncodeRequestImpl.encode(self: RobloxImageEncodeRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		if self.width ~= nil and self.width ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.width)
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.height)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxImageEncodeRequestImpl.decode(input: buffer): RobloxImageEncodeRequest
+		local self = _RobloxImageEncodeRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.width = value
+					continue
+				elseif field == 3 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.height = value
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.handle = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxImageEncodeRequestImpl.jsonEncode(self: RobloxImageEncodeRequest): any
+		local output = {}
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
+		end
+
+		if self.width ~= nil and self.width ~= 0 then
+			output.width = self.width
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output.height = self.height
+		end
+
+		return output
+	end
+
+	function _RobloxImageEncodeRequestImpl.jsonDecode(input: { [string]: any }): RobloxImageEncodeRequest
+		local self = _RobloxImageEncodeRequestImpl.new()
+
+		if input.handle ~= nil then
+			self.handle = input.handle
+		end
+
+		if input.width ~= nil then
+			self.width = input.width
+		end
+
+		if input.height ~= nil then
+			self.height = input.height
+		end
+
+		return self
+	end
+
+	_RobloxImageEncodeRequestImpl.descriptor = {
+		name = "RobloxImageEncodeRequest",
+		fullName = "rodeo.runtime.RobloxImageEncodeRequest",
+	}
+
+	messages.RobloxImageEncodeRequest = _RobloxImageEncodeRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxImageEncodeRequest)
+end
+
+do
+	local _RobloxImageDecodeRequestImpl = {}
+	_RobloxImageDecodeRequestImpl.__index = _RobloxImageDecodeRequestImpl
+
+	function _RobloxImageDecodeRequestImpl.new(data: _RobloxImageDecodeRequestPartialFields?): RobloxImageDecodeRequest
+		return setmetatable({
+			path = if data == nil or data.path == nil then "" else data.path,
+			handle = if data == nil or data.handle == nil then "" else data.handle,
+		}, _RobloxImageDecodeRequestImpl :: _RobloxImageDecodeRequestImpl)
+	end
+
+	function _RobloxImageDecodeRequestImpl.encode(self: RobloxImageDecodeRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.path ~= nil and self.path ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.path)
+		end
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxImageDecodeRequestImpl.decode(input: buffer): RobloxImageDecodeRequest
+		local self = _RobloxImageDecodeRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.path = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.handle = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxImageDecodeRequestImpl.jsonEncode(self: RobloxImageDecodeRequest): any
+		local output = {}
+
+		if self.path ~= nil and self.path ~= "" then
+			output.path = self.path
+		end
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
+		end
+
+		return output
+	end
+
+	function _RobloxImageDecodeRequestImpl.jsonDecode(input: { [string]: any }): RobloxImageDecodeRequest
+		local self = _RobloxImageDecodeRequestImpl.new()
+
+		if input.path ~= nil then
+			self.path = input.path
+		end
+
+		if input.handle ~= nil then
+			self.handle = input.handle
+		end
+
+		return self
+	end
+
+	_RobloxImageDecodeRequestImpl.descriptor = {
+		name = "RobloxImageDecodeRequest",
+		fullName = "rodeo.runtime.RobloxImageDecodeRequest",
+	}
+
+	messages.RobloxImageDecodeRequest = _RobloxImageDecodeRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxImageDecodeRequest)
+end
+
+do
+	local _RobloxImageDecodeResponseImpl = {}
+	_RobloxImageDecodeResponseImpl.__index = _RobloxImageDecodeResponseImpl
+
+	function _RobloxImageDecodeResponseImpl.new(
+		data: _RobloxImageDecodeResponsePartialFields?
+	): RobloxImageDecodeResponse
+		return setmetatable({
+			width = if data == nil or data.width == nil then 0 else data.width,
+			height = if data == nil or data.height == nil then 0 else data.height,
+		}, _RobloxImageDecodeResponseImpl :: _RobloxImageDecodeResponseImpl)
+	end
+
+	function _RobloxImageDecodeResponseImpl.encode(self: RobloxImageDecodeResponse): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.width ~= nil and self.width ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.width)
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.height)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxImageDecodeResponseImpl.decode(input: buffer): RobloxImageDecodeResponse
+		local self = _RobloxImageDecodeResponseImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				if field == 1 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.width = value
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.height = value
+					continue
+				end
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				-- No fields
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxImageDecodeResponseImpl.jsonEncode(self: RobloxImageDecodeResponse): any
+		local output = {}
+
+		if self.width ~= nil and self.width ~= 0 then
+			output.width = self.width
+		end
+
+		if self.height ~= nil and self.height ~= 0 then
+			output.height = self.height
+		end
+
+		return output
+	end
+
+	function _RobloxImageDecodeResponseImpl.jsonDecode(input: { [string]: any }): RobloxImageDecodeResponse
+		local self = _RobloxImageDecodeResponseImpl.new()
+
+		if input.width ~= nil then
+			self.width = input.width
+		end
+
+		if input.height ~= nil then
+			self.height = input.height
+		end
+
+		return self
+	end
+
+	_RobloxImageDecodeResponseImpl.descriptor = {
+		name = "RobloxImageDecodeResponse",
+		fullName = "rodeo.runtime.RobloxImageDecodeResponse",
+	}
+
+	messages.RobloxImageDecodeResponse = _RobloxImageDecodeResponseImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxImageDecodeResponse)
 end
 
 do
@@ -7040,6 +7503,24 @@ do
 						type = (v :: any).type,
 						value = messages.RobloxCaptureFinalizeRequest.new((v :: any).value),
 					} :: any
+				elseif
+					(v :: any).type == "robloxImageEncode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.RobloxImageEncodeRequest.new((v :: any).value),
+						} :: any
+				elseif
+					(v :: any).type == "robloxImageDecode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.RobloxImageDecodeRequest.new((v :: any).value),
+						} :: any
 				end
 				return v :: any
 			end)(),
@@ -7172,6 +7653,14 @@ do
 			elseif self.req.type == "robloxCaptureFinalize" then
 				local encoded = self.req.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 53, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxImageEncode" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 54, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxImageDecode" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 55, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -7350,6 +7839,16 @@ do
 					self.req =
 						{ type = "robloxCaptureFinalize", value = messages.RobloxCaptureFinalizeRequest.decode(value) }
 					continue
+				elseif field == 54 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = { type = "robloxImageEncode", value = messages.RobloxImageEncodeRequest.decode(value) }
+					continue
+				elseif field == 55 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = { type = "robloxImageDecode", value = messages.RobloxImageDecodeRequest.decode(value) }
+					continue
 				end
 
 				local length
@@ -7442,6 +7941,10 @@ do
 				output.robloxSimulatorRestore = self.req.value:jsonEncode()
 			elseif self.req.type == "robloxCaptureFinalize" then
 				output.robloxCaptureFinalize = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxImageEncode" then
+				output.robloxImageEncode = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxImageDecode" then
+				output.robloxImageDecode = self.req.value:jsonEncode()
 			end
 		end
 
@@ -7587,6 +8090,20 @@ do
 			self.req = {
 				type = "robloxCaptureFinalize",
 				value = messages.RobloxCaptureFinalizeRequest.jsonDecode(input.robloxCaptureFinalize),
+			}
+		end
+
+		if input.robloxImageEncode ~= nil then
+			self.req = {
+				type = "robloxImageEncode",
+				value = messages.RobloxImageEncodeRequest.jsonDecode(input.robloxImageEncode),
+			}
+		end
+
+		if input.robloxImageDecode ~= nil then
+			self.req = {
+				type = "robloxImageDecode",
+				value = messages.RobloxImageDecodeRequest.jsonDecode(input.robloxImageDecode),
 			}
 		end
 
@@ -7808,6 +8325,21 @@ do
 						type = (v :: any).type,
 						value = messages.RobloxCaptureFinalizeResponse.new((v :: any).value),
 					} :: any
+				elseif
+					(v :: any).type == "robloxImageEncode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "robloxImageDecode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.RobloxImageDecodeResponse.new((v :: any).value),
+						} :: any
 				end
 				return v :: any
 			end)(),
@@ -7943,6 +8475,14 @@ do
 			elseif self.res.type == "robloxCaptureFinalize" then
 				local encoded = self.res.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 53, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxImageEncode" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 54, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxImageDecode" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 55, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			end
 		end
@@ -8123,6 +8663,16 @@ do
 					self.res =
 						{ type = "robloxCaptureFinalize", value = messages.RobloxCaptureFinalizeResponse.decode(value) }
 					continue
+				elseif field == 54 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "robloxImageEncode", value = messages.Ok.decode(value) }
+					continue
+				elseif field == 55 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "robloxImageDecode", value = messages.RobloxImageDecodeResponse.decode(value) }
+					continue
 				end
 
 				local length
@@ -8217,6 +8767,10 @@ do
 				output.robloxSimulatorRestore = self.res.value:jsonEncode()
 			elseif self.res.type == "robloxCaptureFinalize" then
 				output.robloxCaptureFinalize = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxImageEncode" then
+				output.robloxImageEncode = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxImageDecode" then
+				output.robloxImageDecode = self.res.value:jsonEncode()
 			end
 		end
 
@@ -8363,6 +8917,17 @@ do
 			}
 		end
 
+		if input.robloxImageEncode ~= nil then
+			self.res = { type = "robloxImageEncode", value = messages.Ok.jsonDecode(input.robloxImageEncode) }
+		end
+
+		if input.robloxImageDecode ~= nil then
+			self.res = {
+				type = "robloxImageDecode",
+				value = messages.RobloxImageDecodeResponse.jsonDecode(input.robloxImageDecode),
+			}
+		end
+
 		return self
 	end
 
@@ -8397,6 +8962,9 @@ return {
 	RobloxSimulatorRestoreRequest = messages.RobloxSimulatorRestoreRequest,
 	RobloxCaptureFinalizeRequest = messages.RobloxCaptureFinalizeRequest,
 	RobloxCaptureFinalizeResponse = messages.RobloxCaptureFinalizeResponse,
+	RobloxImageEncodeRequest = messages.RobloxImageEncodeRequest,
+	RobloxImageDecodeRequest = messages.RobloxImageDecodeRequest,
+	RobloxImageDecodeResponse = messages.RobloxImageDecodeResponse,
 	FsExistsRequest = messages.FsExistsRequest,
 	FsExistsResponse = messages.FsExistsResponse,
 	FsStatRequest = messages.FsStatRequest,

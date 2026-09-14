@@ -63,8 +63,10 @@ pub fn check_policy(
 
 /// Stream handler operations. Client-internal state; not a wire type.
 pub enum StreamHandler {
+    // Boxed so a reader can also be an in-memory cursor (roblox.importEditableImage
+    // hands decoded pixels to the plugin through the ordinary chunked reads).
     FileReader {
-        reader: std::io::BufReader<std::fs::File>,
+        reader: Box<dyn std::io::BufRead + Send>,
     },
     FileWriter {
         path: String,
@@ -215,6 +217,8 @@ pub async fn dispatch_client(
         // roblox
         Some(Req::RobloxExport(r)) => async_arm("roblox.export", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
         Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(state.clone(), r), Res::RobloxCaptureFinalize).await,
+        Some(Req::RobloxImageEncode(r)) => async_arm("roblox.imageEncode", id, roblox::roblox_image_encode(state.clone(), r), Res::RobloxImageEncode).await,
+        Some(Req::RobloxImageDecode(r)) => async_arm("roblox.imageDecode", id, roblox::roblox_image_decode(state.clone(), r), Res::RobloxImageDecode).await,
         // Simulator sessions are handled inside the plugin (plugin identity);
         // one reaching the run client means the plugin predates them.
         Some(Req::RobloxSimulatorApply(_)) | Some(Req::RobloxSimulatorRestore(_)) => Some(Res::Error(

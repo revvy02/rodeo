@@ -312,6 +312,8 @@ roblox.import(path) -> { Instance }      -- load .rbxm/.rbxmx as Instances
 roblox.export(path, { instances })       -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
 roblox.bake(path, value)                 -- write a table/value as a Luau module
 roblox.capture(output?, options?) -> (string, { width, height })  -- screenshot Studio
+roblox.exportEditableImage(path, image)   -- write an EditableImage as .png
+roblox.importEditableImage(path) -> EditableImage  -- load a .png/.jpg as an EditableImage
 ```
 
 `bake` emits `return <value>` and writes Roblox types as constructors
@@ -321,6 +323,12 @@ parent directories as needed.
 
 `import` and `export` handle arbitrarily large models. The file extension
 selects XML or binary output.
+
+`exportEditableImage` and `importEditableImage` move pixels between PNG files
+and `EditableImage` objects, which `export` cannot serialize (an Object-backed
+image content is written as an empty reference). Export supports `.png` only;
+import reads PNG and JPEG. Studio bounds EditableImage dimensions and the
+import errors with the size if it refuses one.
 
 `capture` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to

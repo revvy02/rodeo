@@ -116,6 +116,30 @@ for splitting a bundled model into per-prefab files, snapshotting
 `KeyframeSequenceProvider:GetKeyframeSequenceAsync()` results, or committing a
 procedurally generated map.
 
+## Bake images
+
+`EditableImage` objects have no file representation: exporting an instance
+whose texture is an in-memory `EditableImage` writes an empty reference. Write
+the pixels out with
+[`roblox.exportEditableImage`](/rodeo/runtime/roblox/) instead, and load them
+back with `roblox.importEditableImage`.
+
+```luau
+-- @rodeo run --place
+
+local roblox = require("@rodeo/roblox")
+local AssetService = game:GetService("AssetService")
+
+local image = AssetService:CreateEditableImage({ Size = Vector2.new(256, 256) })
+-- ... draw into it with WritePixelsBuffer / DrawRectangle / DrawImage ...
+roblox.exportEditableImage("src/assets/generated/noise.png", image)
+```
+
+The PNG is an ordinary file in the source tree, ready for the upload tooling
+the project already uses. `importEditableImage("src/assets/generated/noise.png")`
+returns an `EditableImage` for previewing or processing inside Studio without
+an upload.
+
 ## Running bake scripts
 
 Bake scripts are ordinary rodeo scripts, so they lean on the usual conveniences:

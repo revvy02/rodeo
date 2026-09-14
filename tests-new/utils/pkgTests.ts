@@ -598,6 +598,85 @@ export function capture(run: RunFn): void {
   });
 }
 
+// ── images (4 tests, plugin-only) ─────────────────────────────────────────
+//
+// roblox.exportEditableImage / importEditableImage move RGBA8 pixels between
+// PNG files on the host and EditableImage objects in Studio.
+
+export function images(run: RunFn): void {
+  it("images: export then import round-trips pixels exactly", async () => {
+    const out = captureOut("img-roundtrip");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          local AssetService = game:GetService("AssetService")
+          local w, h = 8, 4
+          local src = AssetService:CreateEditableImage({ Size = Vector2.new(w, h) })
+          local pixels = buffer.create(w * h * 4)
+          for i = 0, w * h * 4 - 1 do buffer.writeu8(pixels, i, (i * 7) % 256) end
+          src:WritePixelsBuffer(Vector2.zero, src.Size, pixels)
+          roblox.exportEditableImage("${out}", src)
+          local back = roblox.importEditableImage("${out}")
+          local got = back:ReadPixelsBuffer(Vector2.zero, back.Size)
+          local equal = buffer.tostring(got) == buffer.tostring(pixels)
+          local size = back.Size
+          src:Destroy(); back:Destroy()
+          return { equal = equal, width = size.X, height = size.Y }`,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.return).toEqual({ equal: true, width: 8, height: 4 });
+      expect(pngSize(out)).toEqual({ width: 8, height: 4 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("images: import of a capture matches its viewport size", async () => {
+    const out = captureOut("img-capture");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          roblox.capture("${out}", { viewportSize = Vector2.new(100, 50), settle = 1 })
+          local img = roblox.importEditableImage("${out}")
+          local size = img.Size
+          img:Destroy()
+          return { width = size.X, height = size.Y }`,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.return).toEqual({ width: 100, height: 50 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("images: import of a missing file errors with the path", async () => {
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        roblox.importEditableImage("./rodeo-no-such-image-12345.png")`,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("rodeo-no-such-image-12345.png");
+  });
+
+  it("images: export to a non-png path errors", async () => {
+    const out = captureOut("img-jpg").replace(/\.png$/, ".jpg");
+    try {
+      const result = await run({
+        source: `local roblox = require("@rodeo/roblox")
+          local img = game:GetService("AssetService"):CreateEditableImage({ Size = Vector2.new(2, 2) })
+          roblox.exportEditableImage("${out}", img)`,
+      });
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain(".png");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      rmrf(out);
+    }
+  });
+}
+
 // ── roblox (9 tests, plugin-only) ─────────────────────────────────────────
 
 export function roblox(run: RunFn): void {

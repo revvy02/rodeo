@@ -36,5 +36,5 @@ rbx_xml = "3.0"
 # size, re-encode. `image` for the codec, fast_image_resize for a SIMD Lanczos
 # (image's own resize is single-threaded scalar and takes many seconds on the
 # 15360x8640 frames a 7680-wide capture produces on a 2x display).
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 fast_image_resize = "6"

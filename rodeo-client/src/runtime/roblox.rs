@@ -80,7 +80,6 @@ fn finalize_pixels(
 ) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
     use fast_image_resize::images::Image;
     use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
-    use image::ImageEncoder;
 
     if width == 0 || height == 0 {
         return Err(format!("capture finalize: invalid viewport {width}x{height}"));
@@ -120,14 +119,31 @@ fn finalize_pixels(
         dst.into_vec()
     };
 
+    write_png_atomic(&pixels, width, height, output)?;
+
+    Ok(rt::RobloxCaptureFinalizeResponse {
+        width,
+        height,
+        source_width,
+        source_height,
+        ..Default::default()
+    })
+}
+
+/// Encode `width` x `height` RGBA8 pixels as PNG and write them to `output`
+/// atomically (`.tmp` + rename), creating parent directories. Fast compression:
+/// these files are large and consumed locally.
+fn write_png_atomic(pixels: &[u8], width: u32, height: u32, output: &str) -> Result<(), String> {
+    use image::ImageEncoder;
+
     let mut png = Vec::new();
     image::codecs::png::PngEncoder::new_with_quality(
         &mut png,
         image::codecs::png::CompressionType::Fast,
         image::codecs::png::FilterType::Adaptive,
     )
-    .write_image(&pixels, width, height, image::ExtendedColorType::Rgba8)
-    .map_err(|e| format!("encode capture: {e}"))?;
+    .write_image(pixels, width, height, image::ExtendedColorType::Rgba8)
+    .map_err(|e| format!("encode png: {e}"))?;
 
     if let Some(parent) = std::path::Path::new(output).parent() {
         if !parent.as_os_str().is_empty() {
@@ -141,14 +157,97 @@ fn finalize_pixels(
         let _ = std::fs::remove_file(&tmp);
         format!("rename {tmp} -> {output}: {e}")
     })?;
+    Ok(())
+}
 
-    Ok(rt::RobloxCaptureFinalizeResponse {
-        width,
-        height,
-        source_width,
-        source_height,
-        ..Default::default()
-    })
+/// `roblox.exportEditableImage`: the plugin streamed an EditableImage's RGBA8
+/// pixels into a FileWriter on the output path; consume the handle and write
+/// the file as PNG. Only `.png` is supported (an EditableImage always carries
+/// alpha, and PNG is what the Roblox side round-trips losslessly).
+pub async fn roblox_image_encode(state: SharedRpcState, req: &rt::RobloxImageEncodeRequest) -> Result<rt::Ok, String> {
+    let (path, rgba) = stream::take_file_writer(&state, &req.handle).await?;
+    let (width, height) = (req.width, req.height);
+    if !path.to_lowercase().ends_with(".png") {
+        return Err(format!("exportEditableImage: only .png output is supported (got '{path}')"));
+    }
+    encode_rgba_to_png(rgba, width, height, &path)
+}
+
+fn encode_rgba_to_png(rgba: Vec<u8>, width: u32, height: u32, output: &str) -> Result<rt::Ok, String> {
+    let expected_len = width as usize * height as usize * 4;
+    if width == 0 || height == 0 || rgba.len() != expected_len {
+        return Err(format!(
+            "exportEditableImage: pixel buffer is {} bytes, expected {expected_len} for a {width}x{height} RGBA8 image",
+            rgba.len()
+        ));
+    }
+    write_png_atomic(&rgba, width, height, output)?;
+    Ok(rt::Ok::default())
+}
+
+/// `roblox.importEditableImage`: decode the image at `path` (PNG or JPEG) to
+/// RGBA8 and register the caller-minted `handle` as a reader over those bytes,
+/// so the plugin pulls them with ordinary chunked `stream.readBytes` (a single
+/// response could not carry a large image) and then closes the handle.
+pub async fn roblox_image_decode(
+    state: SharedRpcState,
+    req: &rt::RobloxImageDecodeRequest,
+) -> Result<rt::RobloxImageDecodeResponse, String> {
+    let path = req.path.clone();
+    let (rgba, width, height) = tokio::task::spawn_blocking(move || decode_image_file(&path))
+        .await
+        .map_err(|e| format!("image decode task failed: {e}"))??;
+
+    let mut guard = state.lock().await;
+    if guard.stream_handlers.contains_key(&req.handle) {
+        return Err(format!("handle already open: {}", req.handle));
+    }
+    guard.stream_handlers.insert(
+        req.handle.clone(),
+        super::StreamHandler::FileReader { reader: Box::new(std::io::Cursor::new(rgba)) },
+    );
+    Ok(rt::RobloxImageDecodeResponse { width, height, ..Default::default() })
+}
+
+fn decode_image_file(path: &str) -> Result<(Vec<u8>, u32, u32), String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("importEditableImage: read {path}: {e}"))?;
+    let decoded = image::load_from_memory(&bytes)
+        .map_err(|e| format!("importEditableImage: decode {path}: {e} (PNG and JPEG are supported)"))?;
+    let (width, height) = (decoded.width(), decoded.height());
+    Ok((decoded.into_rgba8().into_raw(), width, height))
+}
+
+#[cfg(test)]
+mod image_codec_tests {
+    use super::*;
+
+    fn pattern(w: u32, h: u32) -> Vec<u8> {
+        (0..(w * h * 4) as usize).map(|i| ((i * 7) % 256) as u8).collect()
+    }
+
+    #[test]
+    fn png_round_trips_pixels_exactly() {
+        let dir = std::env::temp_dir().join(format!("rodeo-image-codec-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let out = dir.join("nested").join("img.png");
+        let out_s = out.to_string_lossy().into_owned();
+        encode_rgba_to_png(pattern(8, 4), 8, 4, &out_s).expect("encode");
+        let (rgba, w, h) = decode_image_file(&out_s).expect("decode");
+        assert_eq!((w, h), (8, 4));
+        assert_eq!(rgba, pattern(8, 4));
+    }
+
+    #[test]
+    fn encode_rejects_a_short_buffer() {
+        let err = encode_rgba_to_png(vec![0; 10], 8, 4, "/nonexistent/x.png").expect_err("short");
+        assert!(err.contains("10 bytes") && err.contains("128"), "{err}");
+    }
+
+    #[test]
+    fn decode_reports_a_missing_file() {
+        let err = decode_image_file("/definitely/not/here.png").expect_err("missing");
+        assert!(err.contains("not/here.png"), "{err}");
+    }
 }
 
 #[cfg(test)]

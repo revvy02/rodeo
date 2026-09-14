@@ -41,6 +41,66 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		stream.close(h)
 	end
 
+	-- Editable image codecs. EditableImage/EditableMesh are runtime Objects
+	-- with no file representation (SerializationService writes an
+	-- Object-backed Content as an empty reference), so these move their pixels
+	-- between files and Studio directly: PNG on the host side, RGBA8 buffers
+	-- on the Studio side, streamed in chunks over the same fs/stream RPCs
+	-- export/import use.
+
+	local AssetService = game:GetService("AssetService")
+	local nextImageId = 0
+
+	function roblox.exportEditableImage(path: string, image: EditableImage)
+		local okClass, className = pcall(function()
+			return (image :: any).ClassName
+		end)
+		if not okClass or className ~= "EditableImage" then
+			error("exportEditableImage: expected an EditableImage", 2)
+		end
+		local size = image.Size
+		local width, height = size.X, size.Y
+		local pixels = image:ReadPixelsBuffer(Vector2.zero, size)
+		local expected = width * height * 4
+		if buffer.len(pixels) ~= expected then
+			error(`exportEditableImage: pixel buffer is {buffer.len(pixels)} bytes, expected {expected} for {width}x{height}`, 2)
+		end
+		local runtime = _G.__rodeo_runtime_proto
+		local h = fs.open(path, "w")
+		stream.writeBytes(h, pixels)
+		-- Finalize in place of stream.close: consumes the handle, encodes PNG.
+		rpc.call("roblox_image_encode", runtime.RobloxImageEncodeRequest.new({
+			handle = h.__handle,
+			width = width,
+			height = height,
+		}))
+	end
+
+	function roblox.importEditableImage(path: string): EditableImage
+		local runtime = _G.__rodeo_runtime_proto
+		nextImageId += 1
+		local handle = { __handle = `image:{nextImageId}:{path}` }
+		local res = rpc.call("roblox_image_decode", runtime.RobloxImageDecodeRequest.new({
+			path = path,
+			handle = handle.__handle,
+		}))
+		local pixels = stream.readBytes(handle)
+		stream.close(handle)
+		local width, height = res.width, res.height
+		local expected = width * height * 4
+		if buffer.len(pixels) ~= expected then
+			error(`importEditableImage: received {buffer.len(pixels)} bytes, expected {expected} for {width}x{height}`, 2)
+		end
+		local okCreate, image = pcall(function()
+			return AssetService:CreateEditableImage({ Size = Vector2.new(width, height) })
+		end)
+		if not okCreate or not image then
+			error(`importEditableImage: Studio refused an EditableImage of {width}x{height} ({path}): {tostring(image)}`, 2)
+		end
+		image:WritePixelsBuffer(Vector2.zero, image.Size, pixels)
+		return image
+	end
+
 	-- Internal plumbing for the roblox.capture shim (rodeo-pkg/rodeo/shims/
 	-- roblox.luau), which composes these with the fs/process API. Not part of
 	-- the typed public surface.
