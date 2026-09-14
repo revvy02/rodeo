@@ -308,10 +308,10 @@ stream.close(handle)
 ### `@rodeo/roblox` — models, data files, screenshots
 
 ```lua
-roblox.import(path) -> { Instance }      -- load .rbxm/.rbxmx as Instances
-roblox.export(path, { instances })       -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
+roblox.importInstances(path) -> { Instance }   -- load .rbxm/.rbxmx as Instances
+roblox.exportInstances(path, { instances })    -- write Instances to .rbxm/.rbxmx/.rbxl/.rbxlx
 roblox.bake(path, value)                 -- write a table/value as a Luau module
-roblox.capture(output?, options?) -> (string, { width, height })  -- screenshot Studio
+roblox.captureViewport(output?, options?) -> (string, { width, height })  -- screenshot the viewport
 roblox.exportEditableImage(path, image)   -- write an EditableImage as .png
 roblox.importEditableImage(path) -> EditableImage  -- load a .png/.jpg as an EditableImage
 roblox.exportEditableMesh(path, mesh)     -- write an EditableMesh as .glb/.gltf
@@ -323,11 +323,11 @@ roblox.importEditableMesh(path) -> EditableMesh    -- load a .glb/.gltf as an Ed
 into Studio. Instances and functions become their `tostring`. `bake` creates
 parent directories as needed.
 
-`import` and `export` handle arbitrarily large models. The file extension
+`importInstances` and `exportInstances` handle arbitrarily large models. The file extension
 selects XML or binary output.
 
 `exportEditableImage` and `importEditableImage` move pixels between PNG files
-and `EditableImage` objects, which `export` cannot serialize (an Object-backed
+and `EditableImage` objects, which `exportInstances` cannot serialize (an Object-backed
 image content is written as an empty reference). Export supports `.png` only;
 import reads PNG and JPEG. Studio bounds EditableImage dimensions and the
 import errors with the size if it refuses one.
@@ -341,7 +341,7 @@ merges all primitives into one mesh. glTF's conventions are Roblox's, so
 nothing is converted. Make a part with
 `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
 
-`capture` treats `output` as an exact file path when it ends in `.png`.
+`captureViewport` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to
 `.rodeo/.temp/captures/`. All `options` are optional: `cframe` (scripted camera
 for the shot, restored afterward), `fov`, `focus`, `settle` (seconds to wait
@@ -358,7 +358,7 @@ simulator for the shot and restore it afterward, like the camera fields; the
 second return value is `{ width, height }`. A frame captured before the new
 viewport rendered is reported as an error (raise `settle`), never retried.
 
-`capture` needs a viewport, so use plugin context, or client context in a
+`captureViewport` needs a viewport, so use plugin context, or client context in a
 running session. Server context errors. It reads the exact frame the engine
 captured (no shared temp directory), so concurrent Studios never mix up
 captures. Frames beyond roughly 16384 physical pixels never complete and
@@ -445,7 +445,7 @@ Patterns that pay off when you use rodeo to reproduce a bug and prove a fix:
 - **Rebuild before every run.** The place file is a snapshot. Run your build
   task after any source edit, before launching. Testing a stale build silently
   verifies old code.
-- **The server drives, the client observes.** `roblox.capture` needs a
+- **The server drives, the client observes.** `roblox.captureViewport` needs a
   viewport, so a `--context server` run cannot screenshot. Split the work: one
   `--context server` run mutates game state, a parallel `--context client` run
   waits and captures. Coordinate the stages through workspace attributes. The
@@ -476,3 +476,7 @@ Patterns that pay off when you use rodeo to reproduce a bug and prove a fix:
 - **`--place file.rbxl` without `--save` opens a temp COPY** (the WORKING_PATH in `rodeo state`) — in-Studio edits and manual Cmd+S land in the copy, which is deleted when the Studio closes. Persist with `rodeo save <studio-id>` (commits back to SOURCE_PATH) before closing, or launch with `--save` to open the source directly
 - `stream.read` on a file handle is a single read and fails on very large files (~16MiB); the run survives — use `fs.open` + `stream.readBytes`, which handles any size
 - A killed/disconnected run exits 2 with `rodeo: run disconnected: <reason>` on stderr; an explicit `rodeo kill` exits 1
+
+`roblox.import`, `roblox.export` and `roblox.capture` are deprecated aliases of
+`importInstances`, `exportInstances` and `captureViewport`. They still work,
+warn once per run, and will be removed in 2.0.

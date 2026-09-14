@@ -5,7 +5,7 @@ local singleton = require("./_internal/singleton")
 
 local roblox = {}
 
---- Camera and device options for `capture`. All fields optional.
+--- Camera and device options for `captureViewport`. All fields optional.
 --- `cframe` — scripted camera position for the shot (restored after).
 --- `fov` — field of view. `focus` — camera focus CFrame (defaults to 100 studs
 --- along `cframe`'s look vector when `cframe` is set). `settle` — seconds to
@@ -25,7 +25,7 @@ export type CaptureOptions = {
 	viewportSize: Vector2?,
 }
 
---- Size of the written image in pixels. Always the capture's
+--- Size of the image `captureViewport` wrote, in pixels. Always the capture's
 --- `Camera.ViewportSize`: the engine's frame is larger on high-DPI displays and
 --- is resampled down to it, so a capture is the same size on every machine and
 --- offset-based UI maps 1:1 onto pixels.
@@ -35,11 +35,29 @@ export type CaptureInfo = {
 }
 
 --- Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances.
+function roblox.importInstances(path: string): { Instance }
+	return (singleton :: any).roblox.importInstances(path)
+end
+
+--- Deprecated alias of `roblox.importInstances`.
+--- :::caution[Deprecated]
+--- Use `roblox.importInstances`. This alias warns once per run and will be
+--- removed in 2.0.
+--- :::
 function roblox.import(path: string): { Instance }
 	return (singleton :: any).roblox.import(path)
 end
 
 --- Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`.
+function roblox.exportInstances(path: string, instances: { Instance })
+	(singleton :: any).roblox.exportInstances(path, instances)
+end
+
+--- Deprecated alias of `roblox.exportInstances`.
+--- :::caution[Deprecated]
+--- Use `roblox.exportInstances`. This alias warns once per run and will be
+--- removed in 2.0.
+--- :::
 function roblox.export(path: string, instances: { Instance })
 	(singleton :: any).roblox.export(path, instances)
 end
@@ -102,6 +120,15 @@ end
 --- pixels never complete and fail after 10s, as does a minimized Studio on
 --- Windows (background launches are minimized there; launch focused or
 --- restore the window).
+function roblox.captureViewport(output: string?, options: CaptureOptions?): (string, CaptureInfo)
+	return (singleton :: any).roblox.captureViewport(output, options)
+end
+
+--- Deprecated alias of `roblox.captureViewport`.
+--- :::caution[Deprecated]
+--- Use `roblox.captureViewport`. This alias warns once per run and will be
+--- removed in 2.0.
+--- :::
 function roblox.capture(output: string?, options: CaptureOptions?): (string, CaptureInfo)
 	return (singleton :: any).roblox.capture(output, options)
 end

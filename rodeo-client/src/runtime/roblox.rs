@@ -1,7 +1,7 @@
 use super::{stream, SharedRpcState};
 use rodeo_proto::runtime_types as rt;
 
-/// Finalize a `roblox.export`. The plugin has streamed the binary bytes from
+/// Finalize a `roblox.exportInstances`. The plugin has streamed the binary bytes from
 /// `SerializeInstancesAsync` into a FileWriter via chunked
 /// `stream.writeBytes`; this consumes the handle in place of `stream_close`.
 /// If the destination ends in `.rbxmx`/`.rbxlx`, re-serialize the binary DOM
@@ -43,7 +43,7 @@ pub async fn roblox_export(state: SharedRpcState, req: &rt::RobloxExportRequest)
     Ok(rt::Ok::default())
 }
 
-/// Finalize a `roblox.capture`. The plugin loaded the exact frame the
+/// Finalize a `roblox.captureViewport`. The plugin loaded the exact frame the
 /// CaptureScreenshot callback named into an EditableImage, read its RGBA8
 /// pixels, and streamed them into a FileWriter on the output path (chunked
 /// `stream.writeBytes`); this consumes that handle in place of `stream_close`.

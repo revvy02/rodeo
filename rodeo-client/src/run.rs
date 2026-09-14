@@ -140,7 +140,7 @@ async fn run_inner(
             "bundled script is absurdly large: {:.1} MB exceeds the {} MB sanity ceiling (entrypoint: {entrypoint}). \
              This usually means the bundle swallowed something unintended. Large data doesn't belong in the \
              bundle regardless — bake it to files and read it at runtime (fs.open + stream.readBytes, or \
-             roblox.import for models)",
+             roblox.importInstances for models)",
             script_len as f64 / 1_048_576.0,
             rodeo_proto::MAX_SCRIPT_SIZE / 1_048_576,
         );

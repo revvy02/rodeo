@@ -13,16 +13,19 @@ These APIs are not finalized and may change in backwards incompatible ways.
 
 | Entry | Description |
 | :--- | :--- |
-| [CaptureInfo](#captureinfo) | Size of the written image in pixels. Always the capture's |
-| [CaptureOptions](#captureoptions) | Camera and device options for `capture`. All fields optional. |
+| [CaptureInfo](#captureinfo) | Size of the image `captureViewport` wrote, in pixels. Always the capture's |
+| [CaptureOptions](#captureoptions) | Camera and device options for `captureViewport`. All fields optional. |
 | [bake](#robloxbake) | Writes `value` to `path` as a Luau module (`return <value>`), so the data |
-| [capture](#robloxcapture) | Captures a Studio screenshot and writes it to a stable path, returning |
-| [export](#robloxexport) | Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`. |
+| [capture](#robloxcapture) | Deprecated alias of `roblox.captureViewport`. |
+| [captureViewport](#robloxcaptureviewport) | Captures a Studio screenshot and writes it to a stable path, returning |
+| [export](#robloxexport) | Deprecated alias of `roblox.exportInstances`. |
 | [exportEditableImage](#robloxexporteditableimage) | Writes an `EditableImage`'s pixels to `path` as a PNG. Only `.png` is |
 | [exportEditableMesh](#robloxexporteditablemesh) | Writes an `EditableMesh` to `path` as glTF 2.0: `.glb` (binary) or |
-| [import](#robloximport) | Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances. |
+| [exportInstances](#robloxexportinstances) | Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`. |
+| [import](#robloximport) | Deprecated alias of `roblox.importInstances`. |
 | [importEditableImage](#robloximporteditableimage) | Loads the PNG or JPEG at `path` into a new `EditableImage` (RGBA8) and |
 | [importEditableMesh](#robloximporteditablemesh) | Loads the `.glb` or `.gltf` at `path` into a new `EditableMesh` and returns |
+| [importInstances](#robloximportinstances) | Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances. |
 
 ---
 
@@ -30,7 +33,7 @@ These APIs are not finalized and may change in backwards incompatible ways.
 
 ### CaptureInfo
 
-Size of the written image in pixels. Always the capture's
+Size of the image `captureViewport` wrote, in pixels. Always the capture's
 
 `Camera.ViewportSize`: the engine's frame is larger on high-DPI displays and
 
@@ -49,7 +52,7 @@ type CaptureInfo = {
 
 ### CaptureOptions
 
-Camera and device options for `capture`. All fields optional.
+Camera and device options for `captureViewport`. All fields optional.
 
 `cframe` — scripted camera position for the shot (restored after).
 
@@ -108,6 +111,24 @@ Parent directories are created as needed. This is the same path
 
 ### roblox.capture
 
+Deprecated alias of `roblox.captureViewport`.
+
+:::caution[Deprecated]
+
+Use `roblox.captureViewport`. This alias warns once per run and will be
+
+removed in 2.0.
+
+:::
+
+```luau
+(output: string?, options: CaptureOptions?) -> (string, CaptureInfo)
+```
+
+---
+
+### roblox.captureViewport
+
 Captures a Studio screenshot and writes it to a stable path, returning
 
 that absolute path and the image size. `output` ending in `.png` is the
@@ -140,7 +161,15 @@ restore the window).
 
 ### roblox.export
 
-Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`.
+Deprecated alias of `roblox.exportInstances`.
+
+:::caution[Deprecated]
+
+Use `roblox.exportInstances`. This alias warns once per run and will be
+
+removed in 2.0.
+
+:::
 
 ```luau
 (path: string, instances: { Instance }) -> ()
@@ -186,9 +215,27 @@ nothing is converted: studs, Y-up, right-handed, UV origin top-left.
 
 ---
 
+### roblox.exportInstances
+
+Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`.
+
+```luau
+(path: string, instances: { Instance }) -> ()
+```
+
+---
+
 ### roblox.import
 
-Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances.
+Deprecated alias of `roblox.importInstances`.
+
+:::caution[Deprecated]
+
+Use `roblox.importInstances`. This alias warns once per run and will be
+
+removed in 2.0.
+
+:::
 
 ```luau
 (path: string) -> { Instance }
@@ -226,6 +273,16 @@ part with `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
 
 ```luau
 (path: string) -> EditableMesh
+```
+
+---
+
+### roblox.importInstances
+
+Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances.
+
+```luau
+(path: string) -> { Instance }
 ```
 
 ---

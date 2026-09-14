@@ -108,11 +108,11 @@ Pass `--reload-requires` for the opposite: rodeo re-evaluates the require tree s
 ```bash
 $ rodeo run --source '
 local roblox = require("@rodeo/roblox")
-roblox.export("map.rbxm", { workspace.Map })'
+roblox.exportInstances("map.rbxm", { workspace.Map })'
 
 $ rodeo run --source '
 local roblox = require("@rodeo/roblox")
-local roots = roblox.import("map.rbxm")
+local roots = roblox.importInstances("map.rbxm")
 print(roots[1].ClassName, roots[1].Name)'
 Model Map
 ```

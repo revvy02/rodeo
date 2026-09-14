@@ -1,5 +1,5 @@
 -- @rodeo/roblox shim. import/export come from the factory-built singleton
--- (transport tier); capture is implemented here in the shim (composition
+-- (transport tier); captureViewport is implemented here in the shim (composition
 -- tier) — it only needs the public fs/stream/process API plus engine services
 -- and the singleton's internal capture plumbing, so it rides the inlined
 -- bundle and works over any backend the singleton fronts.
@@ -52,19 +52,19 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 	local viewportSize = resolved.viewportSize
 	if viewportSize ~= nil then
 		if typeof(viewportSize) ~= "Vector2" then
-			error("roblox.capture: viewportSize must be a Vector2", 2)
+			error("roblox.captureViewport: viewportSize must be a Vector2", 2)
 		end
 		local w, h = math.floor(viewportSize.X + 0.5), math.floor(viewportSize.Y + 0.5)
 		if w < 1 or h < 1 then
-			error(`roblox.capture: viewportSize must be at least 1x1 (got {w}x{h})`, 2)
+			error(`roblox.captureViewport: viewportSize must be at least 1x1 (got {w}x{h})`, 2)
 		end
 		if w > MAX_VIEWPORT_WIDTH then
-			error(`roblox.capture: viewportSize width {w} exceeds the device simulator's limit of {MAX_VIEWPORT_WIDTH}`, 2)
+			error(`roblox.captureViewport: viewportSize width {w} exceeds the device simulator's limit of {MAX_VIEWPORT_WIDTH}`, 2)
 		end
 		viewportSize = Vector2.new(w, h)
 	end
 	if resolved.device ~= nil and type(resolved.device) ~= "string" then
-		error("roblox.capture: device must be a simulator preset id string", 2)
+		error("roblox.captureViewport: device must be a simulator preset id string", 2)
 	end
 	if output then
 		output = output:gsub("\\", "/")
@@ -72,7 +72,7 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 
 	local camera = workspace.CurrentCamera
 	if not camera then
-		error("roblox.capture: no viewport camera in this context (use plugin context, or client context in a running session)", 2)
+		error("roblox.captureViewport: no viewport camera in this context (use plugin context, or client context in a running session)", 2)
 	end
 
 	local AssetService = game:GetService("AssetService")
@@ -141,9 +141,9 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 		while not contentId do
 			if os.clock() > callbackDeadline then
 				if platform == "windows" then
-					error("roblox.capture: CaptureScreenshot callback never fired within 10s. A minimized Studio never renders its viewport on Windows, and background launches are minimized; launch with focus (focus = true / no background) or restore the Studio window and retry. A frame beyond roughly 16384 physical pixels also never completes; reduce viewportSize.")
+					error("roblox.captureViewport: CaptureScreenshot callback never fired within 10s. A minimized Studio never renders its viewport on Windows, and background launches are minimized; launch with focus (focus = true / no background) or restore the Studio window and retry. A frame beyond roughly 16384 physical pixels also never completes; reduce viewportSize.")
 				end
-				error("roblox.capture: CaptureScreenshot callback never fired within 10s. A frame beyond roughly 16384 physical pixels never completes; reduce viewportSize.")
+				error("roblox.captureViewport: CaptureScreenshot callback never fired within 10s. A frame beyond roughly 16384 physical pixels never completes; reduce viewportSize.")
 			end
 			task.wait()
 		end
@@ -153,7 +153,7 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			return AssetService:CreateEditableImageAsync(Content.fromUri(contentId :: string))
 		end)
 		if not okImage or not image then
-			error(`roblox.capture: could not load the captured frame ({contentId}): {tostring(image)}`)
+			error(`roblox.captureViewport: could not load the captured frame ({contentId}): {tostring(image)}`)
 		end
 		local frameSize = image.Size
 		local sourceWidth, sourceHeight = frameSize.X, frameSize.Y
@@ -161,7 +161,7 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 		image:Destroy()
 		local expectedBytes = sourceWidth * sourceHeight * 4
 		if buffer.len(pixels) ~= expectedBytes then
-			error(`roblox.capture: frame buffer is {buffer.len(pixels)} bytes, expected {expectedBytes} for {sourceWidth}x{sourceHeight}`)
+			error(`roblox.captureViewport: frame buffer is {buffer.len(pixels)} bytes, expected {expectedBytes} for {sourceWidth}x{sourceHeight}`)
 		end
 
 		local outputPath
@@ -208,6 +208,16 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 	return result, info
 end
 
-roblox.capture = capture
+roblox.captureViewport = capture
+
+-- Deprecated name; warns once per run, then forwards.
+local warnedCapture = false
+roblox.capture = function(output: string?, options: CaptureOptions?): (string, CaptureInfo)
+	if not warnedCapture then
+		warnedCapture = true
+		warn("[rodeo] roblox.capture is deprecated and will be removed in 2.0; use roblox.captureViewport")
+	end
+	return capture(output, options)
+end
 
 return roblox

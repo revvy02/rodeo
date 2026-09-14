@@ -216,7 +216,7 @@ pub async fn dispatch_client(
         Some(Req::McpCall(_)) => Some(Res::Error("mcp.call must be dispatched server-side".to_string())),
 
         // roblox
-        Some(Req::RobloxExport(r)) => async_arm("roblox.export", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
+        Some(Req::RobloxExport(r)) => async_arm("roblox.exportInstances", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
         Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(state.clone(), r), Res::RobloxCaptureFinalize).await,
         Some(Req::RobloxImageEncode(r)) => async_arm("roblox.imageEncode", id, roblox::roblox_image_encode(state.clone(), r), Res::RobloxImageEncode).await,
         Some(Req::RobloxImageDecode(r)) => async_arm("roblox.imageDecode", id, roblox::roblox_image_decode(state.clone(), r), Res::RobloxImageDecode).await,
@@ -225,7 +225,7 @@ pub async fn dispatch_client(
         // Simulator sessions are handled inside the plugin (plugin identity);
         // one reaching the run client means the plugin predates them.
         Some(Req::RobloxSimulatorApply(_)) | Some(Req::RobloxSimulatorRestore(_)) => Some(Res::Error(
-            "roblox.capture device/viewportSize need a rodeo plugin that handles simulator RPCs; restart serve so the plugin matches this rodeo".to_string(),
+            "roblox.captureViewport device/viewportSize need a rodeo plugin that handles simulator RPCs; restart serve so the plugin matches this rodeo".to_string(),
         )),
 
         None => Some(Res::Error("missing req".to_string())),

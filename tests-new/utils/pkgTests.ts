@@ -446,7 +446,7 @@ export function process(run: RunFn): void {
 
 // ── capture (7 tests, plugin-only) ────────────────────────────────────────
 //
-// roblox.capture drives Studio's device simulator for `device` / `viewportSize`
+// roblox.captureViewport drives Studio's device simulator for `device` / `viewportSize`
 // (plugin-handled RPCs) and finalizes the engine's frame on the run client,
 // resampling it to exactly the capture's Camera.ViewportSize. These read the
 // written PNG's IHDR to check the pixel size independently of what the API
@@ -468,7 +468,7 @@ function captureSource(out: string, opts: string): string {
   return `local roblox = require("@rodeo/roblox")
     local cam = workspace.CurrentCamera
     local vp = cam.ViewportSize
-    local path, info = roblox.capture("${out}", ${opts})
+    local path, info = roblox.captureViewport("${out}", ${opts})
     return { path = path, width = info.width, height = info.height, vpX = vp.X, vpY = vp.Y }`;
 }
 
@@ -578,7 +578,7 @@ export function capture(run: RunFn): void {
             }
           end
           local before = snapshot()
-          roblox.capture("${out}", { viewportSize = Vector2.new(320, 180), settle = 1 })
+          roblox.captureViewport("${out}", { viewportSize = Vector2.new(320, 180), settle = 1 })
           task.wait(0.5)
           local after = snapshot()
           local leftovers = 0
@@ -638,7 +638,7 @@ export function images(run: RunFn): void {
       const result = await run({
         showReturn: true,
         source: `local roblox = require("@rodeo/roblox")
-          roblox.capture("${out}", { viewportSize = Vector2.new(100, 50), settle = 1 })
+          roblox.captureViewport("${out}", { viewportSize = Vector2.new(100, 50), settle = 1 })
           local img = roblox.importEditableImage("${out}")
           local size = img.Size
           img:Destroy()
@@ -834,7 +834,7 @@ export function roblox(run: RunFn): void {
     const result = await run({
       showReturn: true,
       source: `local roblox = require("@rodeo/roblox")
-        local instances = roblox.import("./tests-new/fixtures/pkg/test-folder.rbxm")
+        local instances = roblox.importInstances("./tests-new/fixtures/pkg/test-folder.rbxm")
         instances[1].Parent = workspace
         local found = workspace:FindFirstChild(instances[1].Name) ~= nil
         instances[1]:Destroy()
@@ -848,7 +848,7 @@ export function roblox(run: RunFn): void {
     const result = await run({
       showReturn: true,
       source: `local roblox = require("@rodeo/roblox")
-        local instances = roblox.import("./tests-new/fixtures/pkg/test-folder.rbxm")
+        local instances = roblox.importInstances("./tests-new/fixtures/pkg/test-folder.rbxm")
         return { count = #instances, class = instances[1].ClassName }`,
     });
     expect(result.ok).toBe(true);
@@ -868,9 +868,9 @@ export function roblox(run: RunFn): void {
         part.Parent = folder
 
         local outPath = "rodeo-test-export.rbxm"
-        roblox.export(outPath, { folder })
+        roblox.exportInstances(outPath, { folder })
 
-        local imported = roblox.import(outPath)
+        local imported = roblox.importInstances(outPath)
         fs.remove(outPath)
 
         return {
@@ -889,10 +889,25 @@ export function roblox(run: RunFn): void {
     expect(result.output).toContain('"childClass":"Part"');
   });
 
+  it("roblox: deprecated import/export/capture aliases still work and warn once", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local roblox = require("@rodeo/roblox")
+        local a = roblox.import("./tests-new/fixtures/pkg/test-folder.rbxm")
+        local b = roblox.import("./tests-new/fixtures/pkg/test-folder.rbxm")
+        return { first = a[1].ClassName, second = b[1].ClassName }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.return).toEqual({ first: "Folder", second: "Folder" });
+    const warnings = result.output.split("\n").filter((l) => l.includes("roblox.import is deprecated"));
+    expect(warnings.length).toBe(1);
+    expect(result.output).toContain("roblox.importInstances");
+  });
+
   it("roblox: import nonexistent file errors", async () => {
     const result = await run({
       source: `local roblox = require("@rodeo/roblox")
-        roblox.import("./nonexistent-file-12345.rbxm")`,
+        roblox.importInstances("./nonexistent-file-12345.rbxm")`,
     });
     expect(result.ok).toBe(false);
   });
@@ -996,7 +1011,7 @@ export function roblox(run: RunFn): void {
     const result = await run({
       showReturn: true,
       source: `local roblox = require("@rodeo/roblox")
-        local instances = roblox.import("./tests-new/fixtures/pkg/test-folder.rbxmx")
+        local instances = roblox.importInstances("./tests-new/fixtures/pkg/test-folder.rbxmx")
         return { count = #instances, class = instances[1].ClassName }`,
     });
     expect(result.ok).toBe(true);
@@ -1015,7 +1030,7 @@ export function roblox(run: RunFn): void {
         folder.Name = "XmlExportTest"
 
         local path = "rodeo-test-xml-export.rbxmx"
-        roblox.export(path, { folder })
+        roblox.exportInstances(path, { folder })
 
         local r = fs.open(path, "r")
         local content = stream.read(r)
@@ -1044,9 +1059,9 @@ export function roblox(run: RunFn): void {
         part.Parent = folder
 
         local path = "rodeo-test-xml-roundtrip.rbxmx"
-        roblox.export(path, { folder })
+        roblox.exportInstances(path, { folder })
 
-        local imported = roblox.import(path)
+        local imported = roblox.importInstances(path)
         fs.remove(path)
 
         return {
@@ -1086,7 +1101,7 @@ export function roblox(run: RunFn): void {
 
         local folder = Instance.new("Folder")
         folder.Name = "NestedDirsTest"
-        roblox.export(path, { folder })
+        roblox.exportInstances(path, { folder })
 
         local existed = fs.exists(path)
 

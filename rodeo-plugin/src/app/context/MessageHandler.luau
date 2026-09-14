@@ -136,7 +136,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 					local typedCall = runtimeProto.ClientRpcCall.jsonDecode(msg.callJson)
 					local reqType = typedCall.req and typedCall.req.type
 					-- Plugin-handled RPCs: device-simulator sessions for
-					-- roblox.capture. The service is PluginSecurity, so the
+					-- roblox.captureViewport. The service is PluginSecurity, so the
 					-- run (LocalScript identity in client context) can't drive
 					-- it; this handler runs at plugin identity in the same DOM.
 					if reqType == "robloxSimulatorApply" then

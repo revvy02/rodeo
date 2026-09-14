@@ -1,6 +1,6 @@
 --!strict
 --[[
-	Device-simulator sessions for roblox.capture.
+	Device-simulator sessions for roblox.captureViewport.
 
 	StudioDeviceSimulatorService is PluginSecurity, so the capture shim (which
 	runs at the run's own identity, e.g. a LocalScript in client context) asks
@@ -41,7 +41,7 @@ local MAX_WIDTH = 7680
 local function service(): any
 	local ok, sim = pcall(game.GetService, game, "StudioDeviceSimulatorService")
 	if not ok or not sim then
-		error("roblox.capture: StudioDeviceSimulatorService is unavailable in this Studio (device/viewportSize need the device simulator)", 0)
+		error("roblox.captureViewport: StudioDeviceSimulatorService is unavailable in this Studio (device/viewportSize need the device simulator)", 0)
 	end
 	return sim
 end
@@ -97,10 +97,10 @@ end
 ]]
 function simulator.apply(executionId: string, device: string?, width: number?, height: number?): (number, number)
 	if not device and not (width and height) then
-		error("roblox.capture: a device or a viewportSize is required to drive the simulator", 0)
+		error("roblox.captureViewport: a device or a viewportSize is required to drive the simulator", 0)
 	end
 	if width and width > MAX_WIDTH then
-		error(`roblox.capture: viewportSize width {width} exceeds the device simulator's limit of {MAX_WIDTH}`, 0)
+		error(`roblox.captureViewport: viewportSize width {width} exceeds the device simulator's limit of {MAX_WIDTH}`, 0)
 	end
 
 	local sim = service()

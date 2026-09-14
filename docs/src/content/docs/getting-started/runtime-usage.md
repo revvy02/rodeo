@@ -153,18 +153,18 @@ print(result.stdout)
 
 ## Roblox models
 
-`roblox.import` reads a model file from disk and returns its root Instances:
+`roblox.importInstances` reads a model file from disk and returns its root Instances:
 
 ```luau
 local roblox = require("@rodeo/roblox")
 
-local roots = roblox.import("fixtures/test-rig.rbxm")
+local roots = roblox.importInstances("fixtures/test-rig.rbxm")
 for _, inst in roots do
     inst.Parent = workspace
 end
 ```
 
-`roblox.export` writes Instances back out as a `.rbxm` (binary) or `.rbxmx` (XML) model file. Extension picks the format:
+`roblox.exportInstances` writes Instances back out as a `.rbxm` (binary) or `.rbxmx` (XML) model file. Extension picks the format:
 
 ```luau
 local roblox = require("@rodeo/roblox")
@@ -173,8 +173,8 @@ local folder = Instance.new("Folder")
 folder.Name = "Snapshot"
 -- ...populate folder...
 
-roblox.export("out/snapshot.rbxm", { folder })
-roblox.export("out/snapshot.rbxmx", { folder })
+roblox.exportInstances("out/snapshot.rbxm", { folder })
+roblox.exportInstances("out/snapshot.rbxmx", { folder })
 ```
 
 Useful for staging test fixtures, snapshotting Studio state, or moving subtrees between sessions.

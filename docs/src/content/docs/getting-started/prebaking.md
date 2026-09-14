@@ -106,7 +106,7 @@ local roblox = require("@rodeo/roblox")
 local prefabs = game.ReplicatedStorage.prefabs
 for _, category in prefabs:GetChildren() do
     for _, prefab in category:GetChildren() do
-        roblox.export(`src/ReplicatedStorage/prefabs/{category.Name}/{prefab.Name}.rbxm`, { prefab })
+        roblox.exportInstances(`src/ReplicatedStorage/prefabs/{category.Name}/{prefab.Name}.rbxm`, { prefab })
     end
 end
 ```

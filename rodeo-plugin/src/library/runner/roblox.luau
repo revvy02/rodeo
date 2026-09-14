@@ -6,14 +6,24 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 	local roblox = {}
 	local SerializationService = game:GetService("SerializationService")
 
-	function roblox.import(path: string): { Instance }
+	-- Deprecated names warn once per run and forward to the new ones. This
+	-- factory is instantiated per execution, so the flag is per run.
+	local warnedDeprecated: { [string]: boolean } = {}
+	local function deprecated(old: string, new: string)
+		if not warnedDeprecated[old] then
+			warnedDeprecated[old] = true
+			warn(`[rodeo] roblox.{old} is deprecated and will be removed in 2.0; use roblox.{new}`)
+		end
+	end
+
+	function roblox.importInstances(path: string): { Instance }
 		local h = fs.open(path, "r")
 		local data = stream.readBytes(h)
 		stream.close(h)
 		return SerializationService:DeserializeInstancesAsync(data)
 	end
 
-	function roblox.export(path: string, instances: { Instance })
+	function roblox.exportInstances(path: string, instances: { Instance })
 		local buf = SerializationService:SerializeInstancesAsync(instances)
 		local h = fs.open(path, "w")
 		stream.writeBytes(h, buf)
@@ -21,6 +31,16 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		-- XML when the extension is .rbxmx/.rbxlx, writes atomically.
 		local runtime = _G.__rodeo_runtime_proto
 		rpc.call("roblox_export", runtime.RobloxExportRequest.new({ handle = h.__handle }))
+	end
+
+	function roblox.import(path: string): { Instance }
+		deprecated("import", "importInstances")
+		return roblox.importInstances(path)
+	end
+
+	function roblox.export(path: string, instances: { Instance })
+		deprecated("export", "exportInstances")
+		roblox.exportInstances(path, instances)
 	end
 
 	-- Write `value` to `path` as a Luau module (`return <value>`), so the data
@@ -410,7 +430,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		return mesh
 	end
 
-	-- Internal plumbing for the roblox.capture shim (rodeo-pkg/rodeo/shims/
+	-- Internal plumbing for the roblox.captureViewport shim (rodeo-pkg/rodeo/shims/
 	-- roblox.luau), which composes these with the fs/process API. Not part of
 	-- the typed public surface.
 
