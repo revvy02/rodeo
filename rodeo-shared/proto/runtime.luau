@@ -509,15 +509,17 @@ type _RobloxCaptureFinalizeRequestImpl = {
 }
 
 type _RobloxCaptureFinalizeRequestFields = {
-	source: string,
-	output: string,
+	handle: string,
+	sourceWidth: number,
+	sourceHeight: number,
 	width: number,
 	height: number,
 }
 
 export type _RobloxCaptureFinalizeRequestPartialFields = {
-	source: string?,
-	output: string?,
+	handle: string?,
+	sourceWidth: number?,
+	sourceHeight: number?,
 	width: number?,
 	height: number?,
 }
@@ -3332,8 +3334,9 @@ do
 		data: _RobloxCaptureFinalizeRequestPartialFields?
 	): RobloxCaptureFinalizeRequest
 		return setmetatable({
-			source = if data == nil or data.source == nil then "" else data.source,
-			output = if data == nil or data.output == nil then "" else data.output,
+			handle = if data == nil or data.handle == nil then "" else data.handle,
+			sourceWidth = if data == nil or data.sourceWidth == nil then 0 else data.sourceWidth,
+			sourceHeight = if data == nil or data.sourceHeight == nil then 0 else data.sourceHeight,
 			width = if data == nil or data.width == nil then 0 else data.width,
 			height = if data == nil or data.height == nil then 0 else data.height,
 		}, _RobloxCaptureFinalizeRequestImpl :: _RobloxCaptureFinalizeRequestImpl)
@@ -3343,23 +3346,28 @@ do
 		local output = buffer.create(0)
 		local cursor = 0
 
-		if self.source ~= nil and self.source ~= "" then
+		if self.handle ~= nil and self.handle ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.source)
+			output, cursor = proto.writeString(output, cursor, self.handle)
 		end
 
-		if self.output ~= nil and self.output ~= "" then
-			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
-			output, cursor = proto.writeString(output, cursor, self.output)
+		if self.sourceWidth ~= nil and self.sourceWidth ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.sourceWidth)
+		end
+
+		if self.sourceHeight ~= nil and self.sourceHeight ~= 0 then
+			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.sourceHeight)
 		end
 
 		if self.width ~= nil and self.width ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.varint)
 			output, cursor = proto.writeVarInt(output, cursor, self.width)
 		end
 
 		if self.height ~= nil and self.height ~= 0 then
-			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.varint)
+			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.varint)
 			output, cursor = proto.writeVarInt(output, cursor, self.height)
 		end
 
@@ -3377,12 +3385,22 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				if field == 3 then
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.sourceWidth = value
+					continue
+				elseif field == 3 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.sourceHeight = value
+					continue
+				elseif field == 4 then
 					local value
 					value, cursor = proto.readVarIntU32(input, cursor)
 					self.width = value
 					continue
-				elseif field == 4 then
+				elseif field == 5 then
 					local value
 					value, cursor = proto.readVarIntU32(input, cursor)
 					self.height = value
@@ -3395,12 +3413,7 @@ do
 				if field == 1 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.source = proto.decodeString(value)
-					continue
-				elseif field == 2 then
-					local value
-					value, cursor = proto.readBuffer(input, cursor)
-					self.output = proto.decodeString(value)
+					self.handle = proto.decodeString(value)
 					continue
 				end
 
@@ -3429,12 +3442,16 @@ do
 	function _RobloxCaptureFinalizeRequestImpl.jsonEncode(self: RobloxCaptureFinalizeRequest): any
 		local output = {}
 
-		if self.source ~= nil and self.source ~= "" then
-			output.source = self.source
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
 		end
 
-		if self.output ~= nil and self.output ~= "" then
-			output.output = self.output
+		if self.sourceWidth ~= nil and self.sourceWidth ~= 0 then
+			output.sourceWidth = self.sourceWidth
+		end
+
+		if self.sourceHeight ~= nil and self.sourceHeight ~= 0 then
+			output.sourceHeight = self.sourceHeight
 		end
 
 		if self.width ~= nil and self.width ~= 0 then
@@ -3451,12 +3468,16 @@ do
 	function _RobloxCaptureFinalizeRequestImpl.jsonDecode(input: { [string]: any }): RobloxCaptureFinalizeRequest
 		local self = _RobloxCaptureFinalizeRequestImpl.new()
 
-		if input.source ~= nil then
-			self.source = input.source
+		if input.handle ~= nil then
+			self.handle = input.handle
 		end
 
-		if input.output ~= nil then
-			self.output = input.output
+		if input.sourceWidth ~= nil then
+			self.sourceWidth = input.sourceWidth
+		end
+
+		if input.sourceHeight ~= nil then
+			self.sourceHeight = input.sourceHeight
 		end
 
 		if input.width ~= nil then

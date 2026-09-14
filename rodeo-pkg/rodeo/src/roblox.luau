@@ -62,11 +62,10 @@ end
 --- the capture's `Camera.ViewportSize` (the window's, or `viewportSize` /
 --- the `device` preset's). Camera and device-simulator state are restored
 --- after the capture, on error too. Requires a viewport (plugin context, or
---- client context in a running session). macOS and Windows only; other
---- platforms error. Frames beyond roughly 16384 physical pixels never
---- complete and fail after 10s, as does a minimized Studio on Windows
---- (background launches are minimized there; launch focused or restore the
---- window).
+--- client context in a running session). Frames beyond roughly 16384 physical
+--- pixels never complete and fail after 10s, as does a minimized Studio on
+--- Windows (background launches are minimized there; launch focused or
+--- restore the window).
 function roblox.capture(output: string?, options: CaptureOptions?): (string, CaptureInfo)
 	return (singleton :: any).roblox.capture(output, options)
 end

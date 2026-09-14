@@ -63,13 +63,17 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		rpc.call("roblox_simulator_restore", runtime.RobloxSimulatorRestoreRequest.new({}))
 	end
 
-	-- Host side of a capture: verify the engine's frame against the viewport,
-	-- resample to exactly width x height, write output, delete source.
-	function roblox._captureFinalize(source: string, output: string, width: number, height: number): (number, number)
+	-- Host side of a capture. `handle` is an open FileWriter on the output
+	-- path holding the frame's RGBA8 bytes (streamed via stream.writeBytes);
+	-- consumed here in place of stream.close: verify the frame is a whole
+	-- multiple of the viewport, resample to exactly width x height, encode
+	-- PNG, write atomically.
+	function roblox._captureFinalize(handle: string, sourceWidth: number, sourceHeight: number, width: number, height: number): (number, number)
 		local runtime = _G.__rodeo_runtime_proto
 		local res = rpc.call("roblox_capture_finalize", runtime.RobloxCaptureFinalizeRequest.new({
-			source = source,
-			output = output,
+			handle = handle,
+			sourceWidth = sourceWidth,
+			sourceHeight = sourceHeight,
 			width = width,
 			height = height,
 		}))

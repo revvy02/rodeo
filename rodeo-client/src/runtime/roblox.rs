@@ -43,38 +43,55 @@ pub async fn roblox_export(state: SharedRpcState, req: &rt::RobloxExportRequest)
     Ok(rt::Ok::default())
 }
 
-/// Finalize a `roblox.capture`. The engine wrote its frame as a PNG in its
-/// own temp directory; the plugin reports that path plus the
-/// `Camera.ViewportSize` at capture time. On a high-DPI display the frame is
-/// a whole multiple of the viewport (2x on Retina), and a frame from before a
-/// viewport change is not a multiple at all — that is the stale-frame case,
-/// reported as an error rather than retried. The image is resampled to
-/// exactly the viewport, so a capture has the same pixel size on every
-/// machine and offset-based UI maps 1:1 onto pixels, then written atomically
-/// and the engine's copy deleted.
+/// Finalize a `roblox.capture`. The plugin loaded the exact frame the
+/// CaptureScreenshot callback named into an EditableImage, read its RGBA8
+/// pixels, and streamed them into a FileWriter on the output path (chunked
+/// `stream.writeBytes`); this consumes that handle in place of `stream_close`.
+///
+/// On a high-DPI display the frame is a whole multiple of the reported
+/// `Camera.ViewportSize` (2x on Retina); a frame from before a viewport change
+/// is not a multiple at all — that is the stale-frame case, reported as an
+/// error rather than retried. The image is resampled to exactly the viewport,
+/// so a capture has the same pixel size on every machine and offset-based UI
+/// maps 1:1 onto pixels, then PNG-encoded and written atomically.
 pub async fn roblox_capture_finalize(
+    state: SharedRpcState,
     req: &rt::RobloxCaptureFinalizeRequest,
 ) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
+    let (path, rgba) = stream::take_file_writer(&state, &req.handle).await?;
     let req = req.clone();
-    tokio::task::spawn_blocking(move || finalize_capture(&req))
-        .await
-        .map_err(|e| format!("capture finalize task failed: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        finalize_pixels(rgba, req.source_width, req.source_height, req.width, req.height, &path)
+    })
+    .await
+    .map_err(|e| format!("capture finalize task failed: {e}"))?
 }
 
-fn finalize_capture(req: &rt::RobloxCaptureFinalizeRequest) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
+/// Pure core of the finalize step (see `roblox_capture_finalize`): `rgba` is
+/// the `source_width` x `source_height` RGBA8 frame, `(width, height)` the
+/// viewport it must be a whole multiple of and the size written to `output`.
+fn finalize_pixels(
+    rgba: Vec<u8>,
+    source_width: u32,
+    source_height: u32,
+    width: u32,
+    height: u32,
+    output: &str,
+) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
     use fast_image_resize::images::Image;
     use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
-    use image::{ImageEncoder, ImageFormat};
+    use image::ImageEncoder;
 
-    let (width, height) = (req.width, req.height);
     if width == 0 || height == 0 {
         return Err(format!("capture finalize: invalid viewport {width}x{height}"));
     }
-
-    let bytes = std::fs::read(&req.source).map_err(|e| format!("read capture {}: {e}", req.source))?;
-    let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
-        .map_err(|e| format!("decode capture {}: {e}", req.source))?;
-    let (source_width, source_height) = (decoded.width(), decoded.height());
+    let expected_len = source_width as usize * source_height as usize * 4;
+    if source_width == 0 || source_height == 0 || rgba.len() != expected_len {
+        return Err(format!(
+            "capture finalize: frame buffer is {} bytes, expected {expected_len} for a {source_width}x{source_height} RGBA8 frame",
+            rgba.len()
+        ));
+    }
 
     // A genuine frame is the viewport times one display scale on both axes.
     let rx = source_width as f64 / width as f64;
@@ -87,12 +104,10 @@ fn finalize_capture(req: &rt::RobloxCaptureFinalizeRequest) -> Result<rt::Roblox
         ));
     }
 
-    let output_bytes: Vec<u8> = if (source_width, source_height) == (width, height) {
-        // Already the viewport size (1x display): keep the engine's encoding.
-        bytes
+    let pixels: Vec<u8> = if (source_width, source_height) == (width, height) {
+        rgba
     } else {
-        let rgba = decoded.into_rgba8();
-        let src = Image::from_vec_u8(source_width, source_height, rgba.into_raw(), PixelType::U8x4)
+        let src = Image::from_vec_u8(source_width, source_height, rgba, PixelType::U8x4)
             .map_err(|e| format!("capture resize source: {e}"))?;
         let mut dst = Image::new(width, height, PixelType::U8x4);
         Resizer::new()
@@ -102,30 +117,30 @@ fn finalize_capture(req: &rt::RobloxCaptureFinalizeRequest) -> Result<rt::Roblox
                 &ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Lanczos3)),
             )
             .map_err(|e| format!("capture resize: {e}"))?;
-        let mut out = Vec::new();
-        image::codecs::png::PngEncoder::new_with_quality(
-            &mut out,
-            image::codecs::png::CompressionType::Fast,
-            image::codecs::png::FilterType::Adaptive,
-        )
-        .write_image(dst.buffer(), width, height, image::ExtendedColorType::Rgba8)
-        .map_err(|e| format!("encode capture: {e}"))?;
-        out
+        dst.into_vec()
     };
 
-    if let Some(parent) = std::path::Path::new(&req.output).parent() {
+    let mut png = Vec::new();
+    image::codecs::png::PngEncoder::new_with_quality(
+        &mut png,
+        image::codecs::png::CompressionType::Fast,
+        image::codecs::png::FilterType::Adaptive,
+    )
+    .write_image(&pixels, width, height, image::ExtendedColorType::Rgba8)
+    .map_err(|e| format!("encode capture: {e}"))?;
+
+    if let Some(parent) = std::path::Path::new(output).parent() {
         if !parent.as_os_str().is_empty() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("create parent dirs for {}: {e}", parent.display()))?;
         }
     }
-    let tmp = format!("{}.tmp", req.output);
-    std::fs::write(&tmp, &output_bytes).map_err(|e| format!("write {tmp}: {e}"))?;
-    std::fs::rename(&tmp, &req.output).map_err(|e| {
+    let tmp = format!("{output}.tmp");
+    std::fs::write(&tmp, &png).map_err(|e| format!("write {tmp}: {e}"))?;
+    std::fs::rename(&tmp, output).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
-        format!("rename {tmp} -> {}: {e}", req.output)
+        format!("rename {tmp} -> {output}: {e}")
     })?;
-    let _ = std::fs::remove_file(&req.source);
 
     Ok(rt::RobloxCaptureFinalizeResponse {
         width,
@@ -140,9 +155,14 @@ fn finalize_capture(req: &rt::RobloxCaptureFinalizeRequest) -> Result<rt::Roblox
 mod capture_finalize_tests {
     use super::*;
 
-    fn write_png(path: &std::path::Path, w: u32, h: u32) {
-        let img = image::RgbaImage::from_fn(w, h, |x, y| image::Rgba([(x % 256) as u8, (y % 256) as u8, 128, 255]));
-        img.save(path).unwrap();
+    fn frame(w: u32, h: u32) -> Vec<u8> {
+        let mut v = Vec::with_capacity((w * h * 4) as usize);
+        for y in 0..h {
+            for x in 0..w {
+                v.extend_from_slice(&[(x % 256) as u8, (y % 256) as u8, 128, 255]);
+            }
+        }
+        v
     }
 
     fn scratch(name: &str) -> std::path::PathBuf {
@@ -152,17 +172,9 @@ mod capture_finalize_tests {
         dir
     }
 
-    fn finalize(dir: &std::path::Path, src_w: u32, src_h: u32, w: u32, h: u32) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
-        let source = dir.join("source.png");
-        write_png(&source, src_w, src_h);
+    fn finalize(dir: &std::path::Path, sw: u32, sh: u32, w: u32, h: u32) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
         let output = dir.join("nested").join("out.png");
-        finalize_capture(&rt::RobloxCaptureFinalizeRequest {
-            source: source.to_string_lossy().into_owned(),
-            output: output.to_string_lossy().into_owned(),
-            width: w,
-            height: h,
-            ..Default::default()
-        })
+        finalize_pixels(frame(sw, sh), sw, sh, w, h, &output.to_string_lossy())
     }
 
     #[test]
@@ -172,16 +184,16 @@ mod capture_finalize_tests {
         assert_eq!((res.width, res.height, res.source_width, res.source_height), (200, 100, 400, 200));
         let out = image::open(dir.join("nested/out.png")).unwrap();
         assert_eq!((out.width(), out.height()), (200, 100));
-        assert!(!dir.join("source.png").exists(), "engine copy is deleted");
     }
 
     #[test]
-    fn exact_frame_is_written_as_is() {
+    fn exact_frame_is_encoded_as_is() {
         let dir = scratch("exact");
         let res = finalize(&dir, 200, 100, 200, 100).expect("1x frame finalizes");
         assert_eq!((res.width, res.height), (200, 100));
-        let out = image::open(dir.join("nested/out.png")).unwrap();
+        let out = image::open(dir.join("nested/out.png")).unwrap().into_rgba8();
         assert_eq!((out.width(), out.height()), (200, 100));
+        assert_eq!(out.into_raw(), frame(200, 100), "1x pixels round-trip untouched");
     }
 
     #[test]
@@ -197,5 +209,13 @@ mod capture_finalize_tests {
         let dir = scratch("small");
         let err = finalize(&dir, 100, 50, 200, 100).expect_err("upscaling is never silent");
         assert!(err.contains("100x50"), "{err}");
+    }
+
+    #[test]
+    fn buffer_length_must_match_the_frame() {
+        let dir = scratch("len");
+        let output = dir.join("out.png");
+        let err = finalize_pixels(vec![0; 100], 10, 10, 10, 10, &output.to_string_lossy()).expect_err("short buffer");
+        assert!(err.contains("100 bytes") && err.contains("400"), "{err}");
     }
 }

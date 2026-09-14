@@ -1,14 +1,15 @@
 -- @rodeo/roblox shim. import/export come from the factory-built singleton
 -- (transport tier); capture is implemented here in the shim (composition
--- tier) — it only needs the public fs/process API plus engine services and
--- the singleton's internal capture plumbing, so it rides the inlined bundle
--- and works over any backend the singleton fronts.
+-- tier) — it only needs the public fs/stream/process API plus engine services
+-- and the singleton's internal capture plumbing, so it rides the inlined
+-- bundle and works over any backend the singleton fronts.
 --
 -- NOTE: this file is inlined into user scripts as an IIFE with all comments
 -- stripped (see bundle.rs inline_shims). Do not put `--` inside string
 -- literals.
 local g = _G.__rodeo_procs[_G.__rodeo_eid]
 local fs = g.fs
+local stream = g.stream
 local process = g.process
 local roblox = g.roblox
 
@@ -34,13 +35,17 @@ local MAX_VIEWPORT_WIDTH = 7680
 -- the profiles and logs rodeo already keeps under .rodeo/.temp, which is the
 -- directory projects gitignore, rather than a new top-level directory).
 --
+-- The frame is read back from the exact content id the CaptureScreenshot
+-- callback names (EditableImage:ReadPixelsBuffer), never found by diffing the
+-- engine's per-user temp directory, so concurrent Studios cannot hand each
+-- other's captures out. The RGBA bytes stream to the run client, which
+-- verifies them against the viewport, resamples to exactly its size (the
+-- engine renders at the display scale, 2x on Retina) and writes the PNG.
+--
 -- `device` / `viewportSize` drive Studio's device simulator for the shot via
 -- plugin-handled RPCs (the service is PluginSecurity; the plugin acts in this
--- DOM at its own identity). The engine's frame is then finalized on the run
--- client: verified against the viewport and resampled to exactly its size,
--- so the image is the same size on every display scale. Camera and simulator
--- state are restored on every exit path. Returns the absolute output path and
--- the image size.
+-- DOM at its own identity). Camera and simulator state are restored on every
+-- exit path. Returns the absolute output path and the image size.
 local function capture(output: string?, options: CaptureOptions?): (string, CaptureInfo)
 	local resolved: CaptureOptions = options or {}
 
@@ -61,20 +66,6 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 	if resolved.device ~= nil and type(resolved.device) ~= "string" then
 		error("roblox.capture: device must be a simulator preset id string", 2)
 	end
-
-	-- The engine writes captures into a per-user directory it never reports to
-	-- Luau; the location is the platform-specific Roblox app-data root. Paths
-	-- are normalized to forward slashes (Rust std accepts them on Windows).
-	local platform = process.platform()
-	local homedir = (process.homedir():gsub("\\", "/"))
-	local captureDirectory
-	if platform == "macos" then
-		captureDirectory = homedir .. "/Library/Roblox/tmp-capture-storage"
-	elseif platform == "windows" then
-		captureDirectory = homedir .. "/AppData/Local/Roblox/tmp-capture-storage"
-	else
-		error(`roblox.capture is not yet supported on platform '{platform}' (the engine capture directory is not mapped there)`, 2)
-	end
 	if output then
 		output = output:gsub("\\", "/")
 	end
@@ -84,8 +75,11 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 		error("roblox.capture: no viewport camera in this context (use plugin context, or client context in a running session)", 2)
 	end
 
+	local AssetService = game:GetService("AssetService")
 	local CaptureService = game:GetService("CaptureService")
+	local HttpService = game:GetService("HttpService")
 	local RunService = game:GetService("RunService")
+	local platform = process.platform()
 
 	local savedType = camera.CameraType
 	local savedCFrame = camera.CFrame
@@ -134,15 +128,8 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 
 		task.wait(resolved.settle or 0)
 
-		local before: { [string]: boolean } = {}
-		if fs.exists(captureDirectory) then
-			for _, entry in fs.listdir(captureDirectory) do
-				before[entry.name] = true
-			end
-		end
-
 		-- The viewport the frame is rendered at; the finalize step verifies the
-		-- engine's frame against it and resamples to exactly this size.
+		-- frame against it and resamples to exactly this size.
 		local viewport = camera.ViewportSize
 		local width, height = math.floor(viewport.X + 0.5), math.floor(viewport.Y + 0.5)
 
@@ -161,44 +148,20 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			task.wait()
 		end
 
-		local newFile: string? = nil
-		local fileDeadline = os.clock() + 10
-		while os.clock() < fileDeadline do
-			if fs.exists(captureDirectory) then
-				for _, entry in fs.listdir(captureDirectory) do
-					if not before[entry.name] and entry.name:sub(1, 4) == "wob-" then
-						newFile = entry.name
-						break
-					end
-				end
-			end
-			if newFile then
-				break
-			end
-			task.wait(0.1)
+		-- Read the exact frame the callback named.
+		local okImage, image = pcall(function()
+			return AssetService:CreateEditableImageAsync(Content.fromUri(contentId :: string))
+		end)
+		if not okImage or not image then
+			error(`roblox.capture: could not load the captured frame ({contentId}): {tostring(image)}`)
 		end
-		if not newFile then
-			error("roblox.capture: no new screenshot file appeared in " .. captureDirectory)
-		end
-		local source = captureDirectory .. "/" .. newFile
-
-		-- The engine may still be writing when the file first appears; wait
-		-- until its size holds still so the finalize step never decodes a
-		-- partial PNG.
-		-- (FsStatResponse.size is an int64, which arrives as a string over
-		-- the proto JSON mapping; compare as numbers.)
-		local function fileSize(): number
-			return tonumber(fs.stat(source).size) or 0
-		end
-		local size = fileSize()
-		local stableDeadline = os.clock() + 5
-		while os.clock() < stableDeadline do
-			task.wait(0.1)
-			local next = fileSize()
-			if next == size and size > 0 then
-				break
-			end
-			size = next
+		local frameSize = image.Size
+		local sourceWidth, sourceHeight = frameSize.X, frameSize.Y
+		local pixels = image:ReadPixelsBuffer(Vector2.zero, frameSize)
+		image:Destroy()
+		local expectedBytes = sourceWidth * sourceHeight * 4
+		if buffer.len(pixels) ~= expectedBytes then
+			error(`roblox.capture: frame buffer is {buffer.len(pixels)} bytes, expected {expectedBytes} for {sourceWidth}x{sourceHeight}`)
 		end
 
 		local outputPath
@@ -209,7 +172,7 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			if directory:sub(-1) == "/" then
 				directory = directory:sub(1, -2)
 			end
-			outputPath = directory .. "/" .. newFile .. ".png"
+			outputPath = directory .. "/capture-" .. HttpService:GenerateGUID(false):lower() .. ".png"
 		end
 		if outputPath:sub(1, 1) ~= "/" and not outputPath:match("^%a:") then
 			local cwd = (process.cwd():gsub("\\", "/"))
@@ -219,7 +182,11 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			outputPath = cwd .. "/" .. outputPath
 		end
 
-		local outWidth, outHeight = roblox._captureFinalize(source, outputPath, width, height)
+		-- Stream the frame to the run client and finalize in place of
+		-- stream.close (the finalize RPC consumes the handle).
+		local h = fs.open(outputPath, "w")
+		stream.writeBytes(h, pixels)
+		local outWidth, outHeight = roblox._captureFinalize(h.__handle, sourceWidth, sourceHeight, width, height)
 		return outputPath, { width = outWidth, height = outHeight }
 	end
 

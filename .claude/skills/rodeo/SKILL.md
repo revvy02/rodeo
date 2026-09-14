@@ -340,10 +340,11 @@ second return value is `{ width, height }`. A frame captured before the new
 viewport rendered is reported as an error (raise `settle`), never retried.
 
 `capture` needs a viewport, so use plugin context, or client context in a
-running session. Server context errors. It runs on macOS and Windows only.
-Frames beyond roughly 16384 physical pixels never complete and fail after
-10s, as does a minimized Studio on Windows (background launches are
-minimized there; launch with `--focus` or restore the window first).
+running session. Server context errors. It reads the exact frame the engine
+captured (no shared temp directory), so concurrent Studios never mix up
+captures. Frames beyond roughly 16384 physical pixels never complete and
+fail after 10s, as does a minimized Studio on Windows (background launches
+are minimized there; launch with `--focus` or restore the window first).
 
 ### `@lune` adapters — run lune-flavored code unchanged
 

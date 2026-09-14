@@ -107,15 +107,19 @@ message RobloxSimulatorApplyResponse {
 
 message RobloxSimulatorRestoreRequest {}
 
-// Finalize a capture on the run client: decode the engine's PNG at `source`,
-// check it is a whole multiple of the viewport (a stale frame from before a
-// viewport change is not), resample it to exactly width x height, write it
-// atomically to `output`, delete `source`.
+// Finalize a capture on the run client. The plugin read the exact frame the
+// CaptureScreenshot callback named (EditableImage:ReadPixelsBuffer) and
+// streamed the RGBA8 bytes into an open FileWriter on the output path via
+// chunked stream_write_bytes; this consumes the handle in place of
+// stream_close: checks the frame is a whole multiple of the viewport (a stale
+// frame from before a viewport change is not), resamples to exactly width x
+// height, encodes PNG and writes atomically.
 message RobloxCaptureFinalizeRequest {
-  string source = 1;
-  string output = 2;
-  uint32 width = 3;             // Camera.ViewportSize at capture time
-  uint32 height = 4;
+  string handle = 1;            // FileWriter holding source_width*source_height*4 RGBA bytes
+  uint32 source_width = 2;      // frame size as read from the EditableImage
+  uint32 source_height = 3;
+  uint32 width = 4;             // Camera.ViewportSize at capture time = output size
+  uint32 height = 5;
 }
 
 message RobloxCaptureFinalizeResponse {

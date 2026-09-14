@@ -214,7 +214,7 @@ pub async fn dispatch_client(
 
         // roblox
         Some(Req::RobloxExport(r)) => async_arm("roblox.export", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
-        Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(r), Res::RobloxCaptureFinalize).await,
+        Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(state.clone(), r), Res::RobloxCaptureFinalize).await,
         // Simulator sessions are handled inside the plugin (plugin identity);
         // one reaching the run client means the plugin predates them.
         Some(Req::RobloxSimulatorApply(_)) | Some(Req::RobloxSimulatorRestore(_)) => Some(Res::Error(

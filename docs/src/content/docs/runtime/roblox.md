@@ -120,15 +120,13 @@ the `device` preset's). Camera and device-simulator state are restored
 
 after the capture, on error too. Requires a viewport (plugin context, or
 
-client context in a running session). macOS and Windows only; other
+client context in a running session). Frames beyond roughly 16384 physical
 
-platforms error. Frames beyond roughly 16384 physical pixels never
+pixels never complete and fail after 10s, as does a minimized Studio on
 
-complete and fail after 10s, as does a minimized Studio on Windows
+Windows (background launches are minimized there; launch focused or
 
-(background launches are minimized there; launch focused or restore the
-
-window).
+restore the window).
 
 ```luau
 (output: string?, options: CaptureOptions?) -> (string, CaptureInfo)
