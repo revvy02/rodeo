@@ -140,6 +140,28 @@ the project already uses. `importEditableImage("src/assets/generated/noise.png")
 returns an `EditableImage` for previewing or processing inside Studio without
 an upload.
 
+## Bake meshes
+
+`EditableMesh` has no file representation either. Write generated geometry out
+as glTF with [`roblox.exportEditableMesh`](/rodeo/runtime/roblox/) and load it
+back with `roblox.importEditableMesh`.
+
+```luau
+-- @rodeo run --place
+
+local roblox = require("@rodeo/roblox")
+local AssetService = game:GetService("AssetService")
+
+local mesh = AssetService:CreateEditableMesh()
+-- ... build it with BatchAdd / AddTriangle / SetFaceNormals ...
+roblox.exportEditableMesh("src/assets/generated/terrain-chunk.glb", mesh)
+```
+
+`.glb` is binary glTF; `.gltf` writes JSON with the buffer embedded. Geometry,
+per-corner normals, UVs, colors, and skinning are written. The file opens in
+Blender and in Roblox's mesh importer, and `importEditableMesh` returns an
+`EditableMesh` for `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), options)`.
+
 ## Running bake scripts
 
 Bake scripts are ordinary rodeo scripts, so they lean on the usual conveniences:

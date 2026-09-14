@@ -153,6 +153,28 @@ message RobloxImageDecodeResponse {
   uint32 height = 2;
 }
 
+// roblox.exportEditableMesh: the plugin streamed the mesh as rodeo's packed
+// interchange blob (see rodeo-client/src/runtime/mesh.rs, BLOB LAYOUT) into an
+// open FileWriter on the output path; this consumes the handle and writes the
+// file as glTF (.glb binary, or .gltf with an embedded buffer).
+message RobloxMeshEncodeRequest {
+  string handle = 1;
+}
+
+// roblox.importEditableMesh: the host reads the glTF at `path`, bakes node
+// transforms, merges primitives, and registers `handle` as a reader over the
+// packed blob for the plugin to pull with chunked stream_read_bytes.
+message RobloxMeshDecodeRequest {
+  string path = 1;
+  string handle = 2;
+}
+
+message RobloxMeshDecodeResponse {
+  uint32 vertex_count = 1;
+  uint32 face_count = 2;
+  uint32 bone_count = 3;
+}
+
 // ---------------------------------------------------------------------------
 // Filesystem operations
 // ---------------------------------------------------------------------------
@@ -348,6 +370,8 @@ message ClientRpcCall {
     RobloxCaptureFinalizeRequest   roblox_capture_finalize  = 53;
     RobloxImageEncodeRequest       roblox_image_encode      = 54;
     RobloxImageDecodeRequest       roblox_image_decode      = 55;
+    RobloxMeshEncodeRequest        roblox_mesh_encode       = 56;
+    RobloxMeshDecodeRequest        roblox_mesh_decode       = 57;
   }
 }
 
@@ -400,5 +424,7 @@ message ClientRpcResponse {
     RobloxCaptureFinalizeResponse  roblox_capture_finalize  = 53;
     Ok                             roblox_image_encode      = 54;
     RobloxImageDecodeResponse      roblox_image_decode      = 55;
+    Ok                             roblox_mesh_encode       = 56;
+    RobloxMeshDecodeResponse       roblox_mesh_decode       = 57;
   }
 }

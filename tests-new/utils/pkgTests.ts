@@ -677,6 +677,156 @@ export function images(run: RunFn): void {
   });
 }
 
+// ── meshes (4 tests, plugin-only) ─────────────────────────────────────────
+//
+// roblox.exportEditableMesh / importEditableMesh move geometry, per-corner
+// attributes and skinning between glTF files and EditableMesh objects.
+
+// Luau: a closed tetrahedron with normals, UVs and colors on every corner.
+const TETRA_LUAU = `
+  local AssetService = game:GetService("AssetService")
+  local mesh = AssetService:CreateEditableMesh()
+  local P = { Vector3.new(0, 0, 0), Vector3.new(4, 0, 0), Vector3.new(0, 4, 0), Vector3.new(0, 0, 4) }
+  local vIds = mesh:BatchAdd(Enum.MeshAttribute.Vertex, P)
+  local faces = { {1, 3, 2}, {1, 2, 4}, {1, 4, 3}, {2, 3, 4} }
+  local faceVerts, faceNormals, faceUVs, faceColors = {}, {}, {}, {}
+  for f, tri in faces do
+    local a, b, c = P[tri[1]], P[tri[2]], P[tri[3]]
+    local n = (b - a):Cross(c - a).Unit
+    local nIds = mesh:BatchAdd(Enum.MeshAttribute.Normal, { n, n, n })
+    local uIds = mesh:BatchAdd(Enum.MeshAttribute.UV, { Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1) })
+    local col = Color3.new(f / 4, 0.5, 1 - f / 4)
+    local cIds = mesh:BatchAdd(Enum.MeshAttribute.Color, { col, col, col }, { 1, 1, 0.5 })
+    faceVerts[f] = { vIds[tri[1]], vIds[tri[2]], vIds[tri[3]] }
+    faceNormals[f], faceUVs[f], faceColors[f] = nIds, uIds, cIds
+  end
+  local fIds = mesh:BatchAdd(Enum.MeshAttribute.Face, faceVerts)
+  mesh:BatchSetFaceAttributes(fIds, faceNormals)
+  mesh:BatchSetFaceAttributes(fIds, faceUVs)
+  mesh:BatchSetFaceAttributes(fIds, faceColors)
+`;
+
+function meshOut(name: string, ext: string): string {
+  return `.rodeo/.temp/captures/test-${name}-${randomUUID()}.${ext}`;
+}
+
+export function meshes(run: RunFn): void {
+  it("meshes: export then import round-trips geometry and attributes", async () => {
+    const glb = meshOut("mesh", "glb");
+    const gltf = meshOut("mesh", "gltf");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          ${TETRA_LUAU}
+          roblox.exportEditableMesh("${glb}", mesh)
+          roblox.exportEditableMesh("${gltf}", mesh)
+          local back = roblox.importEditableMesh("${glb}")
+          local faces = back:GetFaces()
+          local corners, normalsOk, uvsOk, colorsOk = 0, true, true, true
+          for _, f in faces do
+            local vs = back:GetFaceVertices(f)
+            local ns, us, cs = back:GetFaceNormals(f), back:GetFaceUVs(f), back:GetFaceColors(f)
+            for k = 1, 3 do
+              corners += 1
+              local a, b, c = back:GetPosition(vs[1]), back:GetPosition(vs[2]), back:GetPosition(vs[3])
+              local geo = (b - a):Cross(c - a).Unit
+              local n = back:GetNormal(ns[k])
+              if not n or (n - geo).Magnitude > 1e-3 then normalsOk = false end
+              if not back:GetUV(us[k]) then uvsOk = false end
+              if not back:GetColor(cs[k]) then colorsOk = false end
+            end
+          end
+          local part = AssetService:CreateMeshPartAsync(Content.fromObject(back), { CollisionFidelity = Enum.CollisionFidelity.Box })
+          local sizeOk = (part.Size - Vector3.new(4, 4, 4)).Magnitude < 1e-3
+          part:Destroy(); mesh:Destroy(); back:Destroy()
+          return { faces = #faces, corners = corners, normalsOk = normalsOk, uvsOk = uvsOk, colorsOk = colorsOk, sizeOk = sizeOk }`,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.return).toEqual({ faces: 4, corners: 12, normalsOk: true, uvsOk: true, colorsOk: true, sizeOk: true });
+      expect(readFileSync(glb).subarray(0, 4).toString("latin1")).toBe("glTF");
+      expect(readFileSync(gltf, "utf8").trimStart().startsWith("{")).toBe(true);
+    } finally {
+      rmrf(glb);
+      rmrf(gltf);
+    }
+  });
+
+  it("meshes: skinning round-trips bones, parents, bind poses and weights", async () => {
+    const glb = meshOut("skin", "glb");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          ${TETRA_LUAU}
+          local rootCF = CFrame.new(0, 0, 0)
+          local childCF = CFrame.new(0, 4, 0) * CFrame.Angles(0, math.rad(90), 0)
+          local root = mesh:AddBone({ Name = "Root", CFrame = rootCF, Virtual = false })
+          local child = mesh:AddBone({ Name = "Child", ParentId = root, CFrame = childCF, Virtual = false })
+          for i, v in vIds do
+            if i == 3 then
+              mesh:SetVertexBones(v, { root, child }); mesh:SetVertexBoneWeights(v, { 0.25, 0.75 })
+            else
+              mesh:SetVertexBones(v, { root }); mesh:SetVertexBoneWeights(v, { 1 })
+            end
+          end
+          roblox.exportEditableMesh("${glb}", mesh)
+          local back = roblox.importEditableMesh("${glb}")
+          local bones = back:GetBones()
+          local names = {}
+          for _, b in bones do names[back:GetBoneName(b)] = b end
+          local childBack = names["Child"]
+          local parentOk = back:GetBoneParent(childBack) == names["Root"]
+          local cf = back:GetBoneCFrame(childBack)
+          local cfOk = (cf.Position - childCF.Position).Magnitude < 1e-3 and (cf.LookVector - childCF.LookVector).Magnitude < 1e-3
+          -- the vertex at (0, 4, 0) carried the split weights. Roblox stores
+          -- bone weights at 8-bit precision (0.25 reads back as 64/255), so
+          -- compare with that tolerance.
+          local weightsOk = false
+          for _, v in back:GetVertices() do
+            if (back:GetPosition(v) - Vector3.new(0, 4, 0)).Magnitude < 1e-3 then
+              local bs, ws = back:GetVertexBones(v), back:GetVertexBoneWeights(v)
+              local byName = {}
+              for k, b in bs do byName[back:GetBoneName(b)] = ws[k] end
+              weightsOk = byName["Root"] ~= nil and math.abs(byName["Root"] - 0.25) < 1 / 128 and byName["Child"] ~= nil and math.abs(byName["Child"] - 0.75) < 1 / 128
+            end
+          end
+          mesh:Destroy(); back:Destroy()
+          return { bones = #bones, parentOk = parentOk, cfOk = cfOk, weightsOk = weightsOk }`,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.return).toEqual({ bones: 2, parentOk: true, cfOk: true, weightsOk: true });
+    } finally {
+      rmrf(glb);
+    }
+  });
+
+  it("meshes: import of a missing file errors with the path", async () => {
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        roblox.importEditableMesh("./rodeo-no-such-mesh-12345.glb")`,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("rodeo-no-such-mesh-12345.glb");
+  });
+
+  it("meshes: export to a non-glTF path errors", async () => {
+    const out = meshOut("obj", "obj");
+    try {
+      const result = await run({
+        source: `local roblox = require("@rodeo/roblox")
+          ${TETRA_LUAU}
+          roblox.exportEditableMesh("${out}", mesh)`,
+      });
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain(".glb");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      rmrf(out);
+    }
+  });
+}
+
 // ── roblox (9 tests, plugin-only) ─────────────────────────────────────────
 
 export function roblox(run: RunFn): void {

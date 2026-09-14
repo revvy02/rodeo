@@ -38,3 +38,9 @@ rbx_xml = "3.0"
 # 15360x8640 frames a 7680-wide capture produces on a 2x display).
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 fast_image_resize = "6"
+
+# roblox.exportEditableMesh / importEditableMesh: glTF 2.0 reader (`utils` for
+# typed accessor readers, `names` for node names; no `import` so no texture
+# decoding), base64 for data-URI buffers. Writing is hand-rolled JSON + GLB.
+gltf = { version = "1.4", default-features = false, features = ["utils", "names"] }
+base64 = "0.22"

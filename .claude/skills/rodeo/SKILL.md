@@ -314,6 +314,8 @@ roblox.bake(path, value)                 -- write a table/value as a Luau module
 roblox.capture(output?, options?) -> (string, { width, height })  -- screenshot Studio
 roblox.exportEditableImage(path, image)   -- write an EditableImage as .png
 roblox.importEditableImage(path) -> EditableImage  -- load a .png/.jpg as an EditableImage
+roblox.exportEditableMesh(path, mesh)     -- write an EditableMesh as .glb/.gltf
+roblox.importEditableMesh(path) -> EditableMesh    -- load a .glb/.gltf as an EditableMesh
 ```
 
 `bake` emits `return <value>` and writes Roblox types as constructors
@@ -329,6 +331,15 @@ and `EditableImage` objects, which `export` cannot serialize (an Object-backed
 image content is written as an empty reference). Export supports `.png` only;
 import reads PNG and JPEG. Studio bounds EditableImage dimensions and the
 import errors with the size if it refuses one.
+
+`exportEditableMesh` and `importEditableMesh` do the same for `EditableMesh`
+with glTF 2.0 (`.glb` binary, or `.gltf` with an embedded buffer). Geometry,
+per-corner normals/UVs/colors and skinning (bones with bind poses, up to four
+influences per vertex) round-trip; FACS poses do not. Faces must be triangles
+(`mesh:Triangulate()`). Import bakes node transforms into the geometry and
+merges all primitives into one mesh. glTF's conventions are Roblox's, so
+nothing is converted. Make a part with
+`AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
 
 `capture` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to

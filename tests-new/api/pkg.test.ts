@@ -1,5 +1,5 @@
 import { describe, beforeAll, afterAll } from "bun:test";
-import { smoke, fs, io, process as processTests, roblox, capture, images } from "../utils/pkgTests.js";
+import { smoke, fs, io, process as processTests, roblox, capture, images, meshes } from "../utils/pkgTests.js";
 import { studioHandle } from "./helpers.js";
 
 describe("rodeo pkg", () => {
@@ -16,4 +16,5 @@ describe("rodeo pkg", () => {
   describe("rodeo.roblox", () => roblox(run));
   describe("rodeo.capture", () => capture(run));
   describe("rodeo.images", () => images(run));
+  describe("rodeo.meshes", () => meshes(run));
 });

@@ -101,6 +101,315 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		return image
 	end
 
+	-- Editable mesh codecs: glTF on the host, EditableMesh here, joined by the
+	-- packed little-endian blob documented in rodeo-client/src/runtime/mesh.rs
+	-- (BLOB LAYOUT). Vertices in the blob are glTF-style (every attribute per
+	-- vertex, faces index vertices); EditableMesh attributes are per face
+	-- corner, so export splits corners into unique (vertex, normal, uv, color)
+	-- tuples and import binds each corner to its vertex's attribute ids.
+
+	local MESH_MAGIC = 0x4853_4D52
+	local MESH_VERSION = 1
+	local MESH_F_NORMALS, MESH_F_UVS, MESH_F_COLORS, MESH_F_SKIN = 1, 2, 4, 8
+	local MESH_NONE = 0xFFFFFFFF
+	local nextMeshId = 0
+
+	type MeshBlob = {
+		positions: { Vector3 },
+		normals: { Vector3 }?,
+		uvs: { Vector2 }?,
+		colors: { Color3 }?,
+		alphas: { number }?,
+		joints: { { number } }?,
+		weights: { { number } }?,
+		indices: { number },
+		bones: { { name: string, parent: number?, cframe: CFrame, virtual: boolean } },
+	}
+
+	local function writeMeshBlob(data: MeshBlob): buffer
+		local vcount, icount = #data.positions, #data.indices
+		local flags = 0
+		if data.normals then flags += MESH_F_NORMALS end
+		if data.uvs then flags += MESH_F_UVS end
+		if data.colors then flags += MESH_F_COLORS end
+		if data.joints and data.weights then flags += MESH_F_SKIN end
+		local size = 24 + vcount * 12 + icount * 4
+		if data.normals then size += vcount * 12 end
+		if data.uvs then size += vcount * 8 end
+		if data.colors then size += vcount * 16 end
+		if data.joints and data.weights then size += vcount * 32 end
+		for _, b in ipairs(data.bones) do
+			size += 8 + 48 + 4 + math.ceil(#b.name / 4) * 4
+		end
+		local buf = buffer.create(size)
+		local o = 0
+		local function u32(v: number) buffer.writeu32(buf, o, v); o += 4 end
+		local function f32(v: number) buffer.writef32(buf, o, v); o += 4 end
+		u32(MESH_MAGIC); u32(MESH_VERSION); u32(vcount); u32(icount); u32(flags); u32(#data.bones)
+		for _, p in ipairs(data.positions) do f32(p.X); f32(p.Y); f32(p.Z) end
+		if data.normals then for _, n in ipairs(data.normals) do f32(n.X); f32(n.Y); f32(n.Z) end end
+		if data.uvs then for _, uv in ipairs(data.uvs) do f32(uv.X); f32(uv.Y) end end
+		if data.colors then
+			for i, c in ipairs(data.colors) do f32(c.R); f32(c.G); f32(c.B); f32((data.alphas :: { number })[i]) end
+		end
+		if data.joints and data.weights then
+			for _, j in ipairs(data.joints) do for k = 1, 4 do u32(j[k]) end end
+			for _, w in ipairs(data.weights) do for k = 1, 4 do f32(w[k]) end end
+		end
+		for _, i in ipairs(data.indices) do u32(i) end
+		for _, b in ipairs(data.bones) do
+			u32(if b.parent then b.parent else MESH_NONE)
+			buffer.writeu8(buf, o, if b.virtual then 1 else 0); o += 4
+			local comps = { b.cframe:GetComponents() }
+			for k = 1, 12 do f32(comps[k]) end
+			u32(#b.name)
+			buffer.writestring(buf, o, b.name); o += math.ceil(#b.name / 4) * 4
+		end
+		return buf
+	end
+
+	local function readMeshBlob(buf: buffer): MeshBlob
+		local o = 0
+		local function u32(): number local v = buffer.readu32(buf, o); o += 4; return v end
+		local function f32(): number local v = buffer.readf32(buf, o); o += 4; return v end
+		if u32() ~= MESH_MAGIC then error("not a rodeo mesh blob", 0) end
+		local version = u32()
+		if version ~= MESH_VERSION then error(`unsupported mesh blob version {version}`, 0) end
+		local vcount, icount, flags, bcount = u32(), u32(), u32(), u32()
+		local data: MeshBlob = { positions = table.create(vcount), indices = table.create(icount), bones = table.create(bcount) }
+		for i = 1, vcount do data.positions[i] = Vector3.new(f32(), f32(), f32()) end
+		if bit32.band(flags, MESH_F_NORMALS) ~= 0 then
+			local t = table.create(vcount); for i = 1, vcount do t[i] = Vector3.new(f32(), f32(), f32()) end; data.normals = t
+		end
+		if bit32.band(flags, MESH_F_UVS) ~= 0 then
+			local t = table.create(vcount); for i = 1, vcount do t[i] = Vector2.new(f32(), f32()) end; data.uvs = t
+		end
+		if bit32.band(flags, MESH_F_COLORS) ~= 0 then
+			local cs, as = table.create(vcount), table.create(vcount)
+			for i = 1, vcount do cs[i] = Color3.new(f32(), f32(), f32()); as[i] = f32() end
+			data.colors, data.alphas = cs, as
+		end
+		if bit32.band(flags, MESH_F_SKIN) ~= 0 then
+			local js, ws = table.create(vcount), table.create(vcount)
+			for i = 1, vcount do js[i] = { u32(), u32(), u32(), u32() } end
+			for i = 1, vcount do ws[i] = { f32(), f32(), f32(), f32() } end
+			data.joints, data.weights = js, ws
+		end
+		for i = 1, icount do data.indices[i] = u32() end
+		for i = 1, bcount do
+			local parent = u32()
+			local virtual = buffer.readu8(buf, o) ~= 0; o += 4
+			local c = table.create(12); for k = 1, 12 do c[k] = f32() end
+			local nameLen = u32()
+			local name = buffer.readstring(buf, o, nameLen); o += math.ceil(nameLen / 4) * 4
+			data.bones[i] = {
+				name = name,
+				parent = if parent == MESH_NONE then nil else parent,
+				cframe = CFrame.new(c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11], c[12]),
+				virtual = virtual,
+			}
+		end
+		return data
+	end
+
+	-- Writes an EditableMesh to `path` as glTF (.glb or .gltf). Geometry,
+	-- per-corner normals/UVs/colors, and skinning (bones with bind poses, up to
+	-- four influences per vertex) are written; FACS poses are not.
+	function roblox.exportEditableMesh(path: string, mesh: EditableMesh)
+		local okClass, className = pcall(function()
+			return (mesh :: any).ClassName
+		end)
+		if not okClass or className ~= "EditableMesh" then
+			error("exportEditableMesh: expected an EditableMesh", 2)
+		end
+
+		-- Split face corners into unique (vertex, normal, uv, color) tuples.
+		local tuples: { [string]: number } = {}
+		local positions, normals, uvs, colors, alphas = {}, {}, {}, {}, {}
+		local vertexOfTuple: { number } = {}
+		local indices: { number } = {}
+		local hasNormals, hasUVs, hasColors = true, true, true
+		local count = 0
+		for _, faceId in ipairs(mesh:GetFaces()) do
+			local vs = mesh:GetFaceVertices(faceId)
+			if #vs ~= 3 then
+				error(`exportEditableMesh: face {faceId} has {#vs} vertices; call mesh:Triangulate() first`, 2)
+			end
+			local ns = mesh:GetFaceNormals(faceId) or {}
+			local us = mesh:GetFaceUVs(faceId) or {}
+			local cs = mesh:GetFaceColors(faceId) or {}
+			for k = 1, 3 do
+				local v, n, u, c = vs[k], ns[k], us[k], cs[k]
+				local nv = if n and n ~= 0 then mesh:GetNormal(n) else nil
+				local uv = if u and u ~= 0 then mesh:GetUV(u) else nil
+				local cv = if c and c ~= 0 then mesh:GetColor(c) else nil
+				if not nv then hasNormals = false end
+				if not uv then hasUVs = false end
+				if not cv then hasColors = false end
+				local key = `{v}|{n or 0}|{u or 0}|{c or 0}`
+				local idx = tuples[key]
+				if not idx then
+					count += 1
+					idx = count
+					tuples[key] = idx
+					positions[idx] = mesh:GetPosition(v)
+					normals[idx] = nv
+					uvs[idx] = uv
+					colors[idx] = cv
+					alphas[idx] = if cv then (mesh:GetColorAlpha(c) or 1) else 1
+					vertexOfTuple[idx] = v
+				end
+				indices[#indices + 1] = idx - 1
+			end
+		end
+		if count == 0 then
+			error("exportEditableMesh: mesh has no faces", 2)
+		end
+
+		-- Bones, parents before children, remapped to 0-based blob indices.
+		local bones = {}
+		local boneIndex: { [number]: number } = {}
+		local boneIds = mesh:GetBones()
+		if #boneIds > 0 then
+			local isBone: { [number]: boolean } = {}
+			for _, id in ipairs(boneIds) do isBone[id] = true end
+			local placed: { [number]: boolean } = {}
+			local remaining = #boneIds
+			while remaining > 0 do
+				local progressed = false
+				for _, id in ipairs(boneIds) do
+					if not placed[id] then
+						local p = mesh:GetBoneParent(id)
+						local parent = if p and isBone[p] then p else nil
+						if parent == nil or placed[parent] then
+							placed[id] = true
+							remaining -= 1
+							progressed = true
+							boneIndex[id] = #bones
+							bones[#bones + 1] = {
+								name = mesh:GetBoneName(id),
+								parent = if parent then boneIndex[parent] else nil,
+								cframe = mesh:GetBoneCFrame(id),
+								virtual = mesh:GetBoneIsVirtual(id),
+							}
+						end
+					end
+				end
+				if not progressed then
+					error("exportEditableMesh: bone hierarchy contains a cycle", 2)
+				end
+			end
+		end
+		local joints, weights = nil, nil
+		if #bones > 0 then
+			local any = false
+			local js, ws = table.create(count), table.create(count)
+			for idx = 1, count do
+				local v = vertexOfTuple[idx]
+				local bs = mesh:GetVertexBones(v) or {}
+				local bw = mesh:GetVertexBoneWeights(v) or {}
+				if #bs > 4 then
+					error(`exportEditableMesh: a vertex has {#bs} bone influences; glTF export supports at most 4`, 2)
+				end
+				local j, w = { MESH_NONE, MESH_NONE, MESH_NONE, MESH_NONE }, { 0, 0, 0, 0 }
+				for k = 1, #bs do
+					local bi = boneIndex[bs[k]]
+					if bi ~= nil and (bw[k] or 0) > 0 then
+						j[k] = bi
+						w[k] = bw[k]
+						any = true
+					end
+				end
+				js[idx] = j
+				ws[idx] = w
+			end
+			if any then joints, weights = js, ws end
+		end
+
+		local blob = writeMeshBlob({
+			positions = positions,
+			normals = if hasNormals then normals else nil,
+			uvs = if hasUVs then uvs else nil,
+			colors = if hasColors then colors else nil,
+			alphas = if hasColors then alphas else nil,
+			joints = joints,
+			weights = weights,
+			indices = indices,
+			bones = bones,
+		})
+		local runtime = _G.__rodeo_runtime_proto
+		local h = fs.open(path, "w")
+		stream.writeBytes(h, blob)
+		-- Finalize in place of stream.close: consumes the handle, writes glTF.
+		rpc.call("roblox_mesh_encode", runtime.RobloxMeshEncodeRequest.new({ handle = h.__handle }))
+	end
+
+	-- Reads a .glb or .gltf into a new EditableMesh. Node transforms are baked
+	-- into the geometry and all primitives merge into one mesh.
+	function roblox.importEditableMesh(path: string): EditableMesh
+		local runtime = _G.__rodeo_runtime_proto
+		nextMeshId += 1
+		local handle = { __handle = `mesh:{nextMeshId}:{path}` }
+		rpc.call("roblox_mesh_decode", runtime.RobloxMeshDecodeRequest.new({
+			path = path,
+			handle = handle.__handle,
+		}))
+		local blob = stream.readBytes(handle)
+		stream.close(handle)
+		local data = readMeshBlob(blob)
+
+		local mesh = AssetService:CreateEditableMesh()
+		local ok, err = pcall(function()
+			local vIds = mesh:BatchAdd(Enum.MeshAttribute.Vertex, data.positions)
+			local nIds = if data.normals then mesh:BatchAdd(Enum.MeshAttribute.Normal, data.normals) else nil
+			local uIds = if data.uvs then mesh:BatchAdd(Enum.MeshAttribute.UV, data.uvs) else nil
+			local cIds = if data.colors then mesh:BatchAdd(Enum.MeshAttribute.Color, data.colors, data.alphas) else nil
+			local faceCount = #data.indices // 3
+			local function perFace(ids: { number }): { { number } }
+				local out = table.create(faceCount)
+				for f = 1, faceCount do
+					local b = (f - 1) * 3
+					out[f] = { ids[data.indices[b + 1] + 1], ids[data.indices[b + 2] + 1], ids[data.indices[b + 3] + 1] }
+				end
+				return out
+			end
+			local fIds = mesh:BatchAdd(Enum.MeshAttribute.Face, perFace(vIds))
+			if nIds then mesh:BatchSetFaceAttributes(fIds, perFace(nIds)) end
+			if uIds then mesh:BatchSetFaceAttributes(fIds, perFace(uIds)) end
+			if cIds then mesh:BatchSetFaceAttributes(fIds, perFace(cIds)) end
+
+			local boneIds: { number } = {}
+			for i, b in ipairs(data.bones) do
+				local props: { [string]: any } = { Name = b.name, CFrame = b.cframe, Virtual = b.virtual }
+				if b.parent ~= nil then
+					props.ParentId = boneIds[b.parent + 1]
+				end
+				boneIds[i] = mesh:AddBone(props)
+			end
+			if data.joints and data.weights then
+				for i = 1, #vIds do
+					local ids, ws = {}, {}
+					for k = 1, 4 do
+						local j, w = data.joints[i][k], data.weights[i][k]
+						if j ~= MESH_NONE and w > 0 then
+							ids[#ids + 1] = boneIds[j + 1]
+							ws[#ws + 1] = w
+						end
+					end
+					if #ids > 0 then
+						mesh:SetVertexBones(vIds[i], ids)
+						mesh:SetVertexBoneWeights(vIds[i], ws)
+					end
+				end
+			end
+		end)
+		if not ok then
+			mesh:Destroy()
+			error(`importEditableMesh: {path}: {tostring(err)}`, 2)
+		end
+		return mesh
+	end
+
 	-- Internal plumbing for the roblox.capture shim (rodeo-pkg/rodeo/shims/
 	-- roblox.luau), which composes these with the fs/process API. Not part of
 	-- the typed public surface.

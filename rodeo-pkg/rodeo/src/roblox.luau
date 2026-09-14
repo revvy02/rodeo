@@ -70,6 +70,26 @@ function roblox.importEditableImage(path: string): EditableImage
 	return (singleton :: any).roblox.importEditableImage(path)
 end
 
+--- Writes an `EditableMesh` to `path` as glTF 2.0: `.glb` (binary) or
+--- `.gltf` (JSON with an embedded buffer). Positions, faces, per-corner
+--- normals, UVs and colors, and skinning (bones with bind poses, up to four
+--- influences per vertex) are written; FACS poses are not. Faces must be
+--- triangles (`mesh:Triangulate()` first). glTF's conventions are Roblox's, so
+--- nothing is converted: studs, Y-up, right-handed, UV origin top-left.
+function roblox.exportEditableMesh(path: string, mesh: EditableMesh)
+	(singleton :: any).roblox.exportEditableMesh(path, mesh)
+end
+
+--- Loads the `.glb` or `.gltf` at `path` into a new `EditableMesh` and returns
+--- it. Node transforms are baked into the geometry, all primitives merge into
+--- one mesh, and a skin becomes bones plus vertex weights. An attribute
+--- (normals, UVs, colors) is kept only when every primitive carries it.
+--- Relative paths resolve against the run client's cwd. Turn the result into a
+--- part with `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
+function roblox.importEditableMesh(path: string): EditableMesh
+	return (singleton :: any).roblox.importEditableMesh(path)
+end
+
 --- Captures a Studio screenshot and writes it to a stable path, returning
 --- that absolute path and the image size. `output` ending in `.png` is the
 --- exact file path; any other value is a directory the auto-named `.png` lands

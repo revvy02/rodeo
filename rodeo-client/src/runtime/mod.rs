@@ -1,6 +1,7 @@
 pub mod fs;
 pub mod process;
 pub mod roblox;
+pub mod mesh;
 pub mod stream;
 
 use rodeo_proto::runtime_types as rt;
@@ -219,6 +220,8 @@ pub async fn dispatch_client(
         Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(state.clone(), r), Res::RobloxCaptureFinalize).await,
         Some(Req::RobloxImageEncode(r)) => async_arm("roblox.imageEncode", id, roblox::roblox_image_encode(state.clone(), r), Res::RobloxImageEncode).await,
         Some(Req::RobloxImageDecode(r)) => async_arm("roblox.imageDecode", id, roblox::roblox_image_decode(state.clone(), r), Res::RobloxImageDecode).await,
+        Some(Req::RobloxMeshEncode(r)) => async_arm("roblox.meshEncode", id, mesh::roblox_mesh_encode(state.clone(), r), Res::RobloxMeshEncode).await,
+        Some(Req::RobloxMeshDecode(r)) => async_arm("roblox.meshDecode", id, mesh::roblox_mesh_decode(state.clone(), r), Res::RobloxMeshDecode).await,
         // Simulator sessions are handled inside the plugin (plugin identity);
         // one reaching the run client means the plugin predates them.
         Some(Req::RobloxSimulatorApply(_)) | Some(Req::RobloxSimulatorRestore(_)) => Some(Res::Error(

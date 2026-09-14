@@ -19,8 +19,10 @@ These APIs are not finalized and may change in backwards incompatible ways.
 | [capture](#robloxcapture) | Captures a Studio screenshot and writes it to a stable path, returning |
 | [export](#robloxexport) | Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`. |
 | [exportEditableImage](#robloxexporteditableimage) | Writes an `EditableImage`'s pixels to `path` as a PNG. Only `.png` is |
+| [exportEditableMesh](#robloxexporteditablemesh) | Writes an `EditableMesh` to `path` as glTF 2.0: `.glb` (binary) or |
 | [import](#robloximport) | Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances. |
 | [importEditableImage](#robloximporteditableimage) | Loads the PNG or JPEG at `path` into a new `EditableImage` (RGBA8) and |
+| [importEditableMesh](#robloximporteditablemesh) | Loads the `.glb` or `.gltf` at `path` into a new `EditableMesh` and returns |
 
 ---
 
@@ -164,6 +166,26 @@ the source tree.
 
 ---
 
+### roblox.exportEditableMesh
+
+Writes an `EditableMesh` to `path` as glTF 2.0: `.glb` (binary) or
+
+`.gltf` (JSON with an embedded buffer). Positions, faces, per-corner
+
+normals, UVs and colors, and skinning (bones with bind poses, up to four
+
+influences per vertex) are written; FACS poses are not. Faces must be
+
+triangles (`mesh:Triangulate()` first). glTF's conventions are Roblox's, so
+
+nothing is converted: studs, Y-up, right-handed, UV origin top-left.
+
+```luau
+(path: string, mesh: EditableMesh) -> ()
+```
+
+---
+
 ### roblox.import
 
 Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances.
@@ -184,6 +206,26 @@ bounds EditableImage dimensions; an image it refuses errors with its size.
 
 ```luau
 (path: string) -> EditableImage
+```
+
+---
+
+### roblox.importEditableMesh
+
+Loads the `.glb` or `.gltf` at `path` into a new `EditableMesh` and returns
+
+it. Node transforms are baked into the geometry, all primitives merge into
+
+one mesh, and a skin becomes bones plus vertex weights. An attribute
+
+(normals, UVs, colors) is kept only when every primitive carries it.
+
+Relative paths resolve against the run client's cwd. Turn the result into a
+
+part with `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
+
+```luau
+(path: string) -> EditableMesh
 ```
 
 ---
