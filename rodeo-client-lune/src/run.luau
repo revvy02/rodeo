@@ -14,7 +14,7 @@ export type DomRunCodeOpts = {
 	source: string?,
 	file: string?,
 	sourcemap: string?,
-	context: ("plugin" | "server" | "client" | "elevated")?,
+	context: ("plugin" | "server" | "client" | "elevated" | "cmdbar")?,
 	showReturn: boolean?,
 	reloadRequires: boolean?,
 	verbose: boolean?,

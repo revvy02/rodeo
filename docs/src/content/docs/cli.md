@@ -69,9 +69,9 @@ Run a script in Studio
 
   Possible values: `edit`, `server`, `client`
 
-* `--context <CONTEXT>` — Identity level the code executes at: plugin, server (server-runtime identity), client (client-runtime identity), or elevated (command bar). Each context is its own Luau VM on the DOM
+* `--context <CONTEXT>` — Identity level the code executes at: plugin, server (server-runtime identity), client (client-runtime identity), elevated (command bar via StudioMCP), or cmdbar (command bar via the launch bootstrap's bridge — edit DOM of a rodeo-launched Studio, no StudioMCP needed)
 
-  Possible values: `plugin`, `server`, `client`, `elevated`
+  Possible values: `plugin`, `server`, `client`, `elevated`, `cmdbar`
 
 * `--studio-id <STUDIO_ID>` — Scope routing to one studio by id (from `rodeo state`; unique prefix ok)
 * `--no-warn` — Disable warning output

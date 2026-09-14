@@ -14,7 +14,7 @@ pub enum DomKindArg { Edit, Server, Client }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
 #[value(rename_all = "lowercase")]
-pub enum ContextArg { Plugin, Server, Client, Elevated }
+pub enum ContextArg { Plugin, Server, Client, Elevated, Cmdbar }
 
 impl ModeArg {
     pub fn as_str(self) -> &'static str {
@@ -28,7 +28,7 @@ impl DomKindArg {
 }
 impl ContextArg {
     pub fn as_str(self) -> &'static str {
-        match self { Self::Plugin => "plugin", Self::Server => "server", Self::Client => "client", Self::Elevated => "elevated" }
+        match self { Self::Plugin => "plugin", Self::Server => "server", Self::Client => "client", Self::Elevated => "elevated", Self::Cmdbar => "cmdbar" }
     }
 }
 
@@ -118,8 +118,9 @@ pub enum Commands {
         dom_kind: Option<DomKindArg>,
 
         /// Identity level the code executes at: plugin, server (server-runtime
-        /// identity), client (client-runtime identity), or elevated (command
-        /// bar). Each context is its own Luau VM on the DOM.
+        /// identity), client (client-runtime identity), elevated (command bar
+        /// via StudioMCP), or cmdbar (command bar via the launch bootstrap's
+        /// bridge — edit DOM of a rodeo-launched Studio, no StudioMCP needed).
         #[arg(long, value_enum, help_heading = "Targeting")]
         context: Option<ContextArg>,
 

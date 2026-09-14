@@ -121,6 +121,35 @@ local success, result = xpcall(function()
 			end
 		end
 		return r.result
+	elseif context == "cmdbar" then
+		-- Command-bar identity without StudioMCP. The launch bootstrap (a
+		-- `-runScriptFile`, itself run at command-bar identity) parents a
+		-- BindableFunction under CoreGui whose OnInvoke keeps that identity
+		-- when this plugin thread invokes it — so only rodeo-launched Studios
+		-- have one. The edit DOM's identities share this Luau VM, so the bridge
+		-- hands the raw result back through _G rather than the Bindable return
+		-- (which deep-copies tables and rejects functions): return values
+		-- behave exactly like the plugin context's.
+		local bridge = game:GetService("CoreGui"):FindFirstChild("rodeoCmdbar")
+		if not bridge then
+			error(
+				"cmdbar context needs a rodeo-launched Studio: the launch bootstrap installs the "
+					.. "command-bar bridge, and this Studio has none (opened by hand, or launched by an "
+					.. "older rodeo). Use --context elevated instead.",
+				0
+			)
+		end
+		bridge:Invoke(module, executionId)
+		local slots = _G.__rodeo_cmdbar
+		local slot = slots and slots[executionId]
+		if not slot then
+			error("cmdbar bridge returned no result for this run", 0)
+		end
+		slots[executionId] = nil
+		if not slot.ok then
+			error(slot.result, 0)
+		end
+		return slot.result
 	end
 	return require(module)
 end, debug.traceback)

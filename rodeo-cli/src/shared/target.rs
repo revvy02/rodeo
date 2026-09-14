@@ -5,8 +5,9 @@
 //! DataModel the run lands on — the communication boundary: same-DOM contexts
 //! share instances, cross-DOM needs remotes), and the `context` (the *identity
 //! level* the code runs at, each an independent Luau VM on the DOM — cf.
-//! Roblox's `Script.RunContext` Server/Client/Plugin, plus `elevated` for the
-//! command bar; NOT a script class).
+//! Roblox's `Script.RunContext` Server/Client/Plugin, plus two command-bar
+//! identities: `elevated` (via StudioMCP, any DOM) and `cmdbar` (via the
+//! launch bootstrap's bridge, edit DOM only); NOT a script class).
 //! `resolve()` applies the defaults table and validates the combination; the
 //! master calls it at submit time, the CLI/MCP call it early for fast errors.
 
@@ -19,6 +20,7 @@ pub enum RunContext {
     Server,
     Client,
     Elevated,
+    Cmdbar,
 }
 
 impl RunContext {
@@ -28,6 +30,7 @@ impl RunContext {
             Self::Server => "server",
             Self::Client => "client",
             Self::Elevated => "elevated",
+            Self::Cmdbar => "cmdbar",
         }
     }
 
@@ -37,7 +40,8 @@ impl RunContext {
             "server" => Ok(Self::Server),
             "client" => Ok(Self::Client),
             "elevated" => Ok(Self::Elevated),
-            _ => bail!("unknown context '{s}' — expected plugin, server, client, or elevated"),
+            "cmdbar" => Ok(Self::Cmdbar),
+            _ => bail!("unknown context '{s}' — expected plugin, server, client, elevated, or cmdbar"),
         }
     }
 }
@@ -153,8 +157,9 @@ impl RouteSpec {
     ///
     /// Defaults:
     /// - `mode` omitted: `edit`.
-    /// - `dom_kind` omitted: from `context` (server→server, client→client);
-    ///   for plugin/elevated (or none) by mode: edit→edit, run/test/play→server.
+    /// - `dom_kind` omitted: from `context` (server→server, client→client,
+    ///   cmdbar→edit); for plugin/elevated (or none) by mode: edit→edit,
+    ///   run/test/play→server.
     /// - `context` omitted: the native context of the resolved dom kind
     ///   (edit→plugin, server→server, client→client).
     pub fn resolve(&self) -> Result<Resolved> {
@@ -167,6 +172,8 @@ impl RouteSpec {
         let dom_kind = self.dom_kind.unwrap_or(match self.context {
             Some(C::Server) => K::Server,
             Some(C::Client) => K::Client,
+            // cmdbar lives only on the edit DOM (its bridge is installed there)
+            Some(C::Cmdbar) => K::Edit,
             // plugin / elevated / unspecified: the mode's primary DOM
             _ => match mode {
                 M::Edit => K::Edit,
@@ -197,13 +204,18 @@ impl RouteSpec {
         }
 
         let ok_context = match dom_kind {
-            K::Edit => matches!(context, C::Plugin | C::Elevated),
+            K::Edit => matches!(context, C::Plugin | C::Elevated | C::Cmdbar),
             K::Server => matches!(context, C::Server | C::Plugin | C::Elevated),
             K::Client => matches!(context, C::Client | C::Plugin | C::Elevated),
         };
         if !ok_context {
+            let hint = if context == C::Cmdbar {
+                " — cmdbar's bridge lives only on the edit DOM; use --dom edit, or --context elevated"
+            } else {
+                ""
+            };
             bail!(
-                "context {} cannot run on the {} DOM",
+                "context {} cannot run on the {} DOM{hint}",
                 context.as_str(),
                 dom_kind.as_str()
             );
@@ -249,6 +261,10 @@ mod tests {
             (spec(Some(M::Test), Some(K::Edit), None), (M::Test, K::Edit, C::Plugin)),
             (spec(Some(M::Play), Some(K::Edit), None), (M::Play, K::Edit, C::Plugin)),
             (spec(Some(M::Test), Some(K::Edit), Some(C::Elevated)), (M::Test, K::Edit, C::Elevated)),
+            // cmdbar implies the edit DOM in every mode (its bridge lives there)
+            (spec(None, None, Some(C::Cmdbar)), (M::Edit, K::Edit, C::Cmdbar)),
+            (spec(Some(M::Test), None, Some(C::Cmdbar)), (M::Test, K::Edit, C::Cmdbar)),
+            (spec(Some(M::Play), Some(K::Edit), Some(C::Cmdbar)), (M::Play, K::Edit, C::Cmdbar)),
             // mode alone → primary DOM + native context
             (spec(Some(M::Run), None, None), (M::Run, K::Server, C::Server)),
             (spec(Some(M::Test), None, None), (M::Test, K::Server, C::Server)),
@@ -293,6 +309,9 @@ mod tests {
             // edit DOM hosts only plugin/elevated — not server/client contexts
             spec(Some(M::Test), Some(K::Edit), Some(C::Server)),
             spec(Some(M::Test), Some(K::Edit), Some(C::Client)),
+            // cmdbar never runs on a server/client DOM
+            spec(Some(M::Test), Some(K::Server), Some(C::Cmdbar)),
+            spec(Some(M::Play), Some(K::Client), Some(C::Cmdbar)),
         ];
         for input in cases {
             assert!(input.resolve().is_err(), "{input:?} should be invalid");
@@ -312,6 +331,10 @@ mod tests {
         assert_eq!(
             RouteSpec::from_strings(None, Some("edit"), None).unwrap(),
             spec(None, Some(K::Edit), None)
+        );
+        assert_eq!(
+            RouteSpec::from_strings(None, None, Some("cmdbar")).unwrap(),
+            spec(None, None, Some(C::Cmdbar))
         );
         // unknown words error
         assert!(RouteSpec::from_strings(Some("editt"), None, None).is_err());

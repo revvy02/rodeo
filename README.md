@@ -62,12 +62,13 @@ hello, frank
 ### Run code on any DOM, at any identity, in any Studio mode
 - `--mode edit|run|test|play`
 - `--dom edit|server|client`
-- `--context plugin|server|client|elevated`
+- `--context plugin|server|client|elevated|cmdbar`
 
 | Flags | Runs (mode, DOM, identity) |
 |-------|----------------------------|
 | *(none)* | edit DOM, plugin identity (default) |
-| `--context elevated` | edit DOM, command-bar identity |
+| `--context elevated` | edit DOM, command-bar identity (via StudioMCP) |
+| `--context cmdbar` | edit DOM, command-bar identity (via the launch bootstrap; rodeo-launched Studios only, no StudioMCP) |
 | `--mode run --context server` | run mode, server DOM, server identity |
 | `--mode test --context server` | play test, server DOM, server identity |
 | `--mode test --context client` | play test, client DOM, client identity |
