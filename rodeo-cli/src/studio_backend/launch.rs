@@ -153,6 +153,8 @@ impl Studio {
             }
         };
 
+        settle_plugin_file(opts.port);
+
         tracing::info!(session_guid = sg_short, "spawn: calling rbx_control Studio::spawn");
         let inner = rbx_control::studio::launch::Studio::spawn(
             prepared_target,
@@ -278,6 +280,35 @@ pub(crate) fn install_plugin(port: u16) -> Result<PathBuf> {
     }
     plugin_embed::write_plugin(&path, rodeo_proto::BUILD_ID, port)?;
     Ok(path)
+}
+
+/// How long after writing a plugin file it is safe to launch a Studio that
+/// will load it. macOS delivers the file-system "add" event roughly 1.2 s
+/// after the write; a Studio spawned inside that window starts watching the
+/// plugins folder just in time to receive it, and hot-reloads the plugin
+/// while its edit DataModel is still initializing. In testing that reload
+/// crashed Studio in roughly one fresh launch in eight, and every crash was
+/// a launch that had it. Waiting out the window lets the event land before
+/// the Studio exists.
+const PLUGIN_SETTLE: std::time::Duration = std::time::Duration::from_millis(2500);
+
+/// Block until this backend's plugin file is at least [`PLUGIN_SETTLE`] old.
+/// A no-op except right after a fresh install — the first launch of a new
+/// serve — so it costs at most ~2.5 s once. Runs on the launch's blocking
+/// thread.
+fn settle_plugin_file(port: u16) {
+    let Ok(path) = plugin_path(port) else { return };
+    let age = std::fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok());
+    if let Some(age) = age {
+        if age < PLUGIN_SETTLE {
+            let wait = PLUGIN_SETTLE - age;
+            tracing::info!(wait_ms = wait.as_millis() as u64, "spawn: plugin file is fresh; letting its file-system event land before Studio starts");
+            std::thread::sleep(wait);
+        }
+    }
 }
 
 /// Remove this backend's plugin file. Studio unloads a plugin the moment its
