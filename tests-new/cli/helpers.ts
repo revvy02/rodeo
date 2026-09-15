@@ -6,7 +6,7 @@
 
 import type { Subprocess } from "bun";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { RodeoClient } from "../../rodeo-client-ts/src/index.js";
@@ -70,7 +70,9 @@ export function processMatches(pattern: string): boolean {
   return Bun.spawnSync(["pgrep", "-f", pattern]).exitCode === 0;
 }
 
-/** Force-kill every process whose command line matches `pattern`. */
+/** Force-kill every process whose command line matches `pattern`. SIGKILL on
+ *  Unix: Studio ignores SIGTERM, so a plain `pkill` left the Studios this is
+ *  meant to reap alive. */
 export function killMatching(pattern: string): void {
   if (IS_WINDOWS) {
     Bun.spawnSync([
@@ -80,7 +82,7 @@ export function killMatching(pattern: string): void {
     ]);
     return;
   }
-  Bun.spawnSync(["pkill", "-f", pattern]);
+  Bun.spawnSync(["pkill", "-9", "-f", pattern]);
 }
 
 /** PIDs of processes whose command line matches `pattern`. */
@@ -153,6 +155,39 @@ export function spawnBackground(args: string[]): BackgroundProcess {
   };
 }
 
+// Studio's local plugins folder, where each studio backend installs its own
+// `rodeo-<build>-<port>.rbxm` (port = the backend's WebSocket port, master + 1).
+export function pluginsDir(): string {
+  if (IS_WINDOWS) return join(process.env.LOCALAPPDATA ?? "", "Roblox", "Plugins");
+  return join(homedir(), "Documents", "Roblox", "Plugins");
+}
+
+// Build id of the `rodeo` on PATH (`rodeo --version` → "rodeo <build>").
+export function cliBuildId(): string {
+  return runRodeo(["--version"]).stdout.trim().replace(/^rodeo\s+/, "");
+}
+
+// The plugin file a serve on `masterPort` installs.
+export function pluginFileFor(masterPort: number): string {
+  return join(pluginsDir(), `rodeo-${cliBuildId()}-${masterPort + 1}.rbxm`);
+}
+
+// Polls `pred` until it holds or `timeoutMs` passes.
+export async function waitUntil(pred: () => boolean, timeoutMs: number, what: string): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (pred()) return;
+    await Bun.sleep(250);
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+// Waits until a master answers on `port`, then disconnects.
+export async function waitForHealthy(port: number): Promise<void> {
+  const client = await RodeoClient.connect(`http://localhost:${port}`);
+  await client.close();
+}
+
 // Polls the master for a process in the requested state (e.g. "running",
 // "done"). Returns the first matching run ID, or null on timeout.
 // Replaces tests/utils/waitForProcess.luau.
@@ -197,13 +232,37 @@ export async function waitForDom(port: number, timeoutMs = 60_000): Promise<void
   }
 }
 
+// The Studio this port's serve launched, when there is exactly one. Every
+// running backend's plugin connects to every hand-opened Studio, so a harness
+// backend can see Studios it did not launch — and an unpinned run picks any
+// eligible DOM, including one in the developer's own open Studio. Callers
+// that launch several Studios on one port manage targeting themselves.
+async function ownedStudioId(port: number): Promise<string | undefined> {
+  let client: RodeoClient | undefined;
+  try {
+    client = await RodeoClient.connect(`http://localhost:${port}`);
+    const state = await client.getState();
+    const owned = (state.studios ?? []).filter((s) => s.sessionId);
+    return owned.length === 1 ? owned[0].studioId : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    await client?.close();
+  }
+}
+
 // Builds a RunFn backed by `rodeo run` subprocess. Lets the shared factories
 // in tests-new/utils/executionTests.ts run end-to-end against the CLI binary.
+// Runs are pinned with `--studio-id` to the Studio this port launched (see
+// ownedStudioId), resolved once on first use.
 export function makeCliRunFn(
   port: number,
 ): (opts: RunCodeOpts) => Promise<RunResult> {
+  let pinned: string | undefined | null = null; // null = not yet resolved
   return async (opts: RunCodeOpts): Promise<RunResult> => {
+    if (pinned === null) pinned = await ownedStudioId(port);
     const args: string[] = ["run", "--port", String(port)];
+    if (pinned) args.push("--studio-id", pinned);
 
     if (opts.source !== undefined) args.push("--source", opts.source);
     if (opts.sourcemap !== undefined) args.push("--sourcemap", opts.sourcemap);
@@ -290,6 +349,13 @@ export function makeCliRunFn(
         parsedReturn = undefined;
       }
       try { unlinkSync(autoReturnFile); } catch {}
+    }
+
+    // RODEO_TEST_DEBUG=1 dumps a failing run's command and merged output, so
+    // a red `expect(result.ok)` in a shared factory can be diagnosed from the
+    // test log alone.
+    if (proc.exitCode !== 0 && process.env.RODEO_TEST_DEBUG) {
+      console.error(`[makeCliRunFn] rodeo ${[...globalArgs, ...args].join(" ")} -> exit ${proc.exitCode}\n${output}`);
     }
 
     return {

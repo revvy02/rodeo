@@ -1,0 +1,10 @@
+# Cross-version fixture: the previous published rodeo release, pinned the way a
+# project pins it. tests-new/cli/operations/crossVersion.test.ts resolves the
+# binary with `mise -C <this dir> which rodeo`. Bump when a newer release ships.
+[tools]
+"ubi:revvy02/rodeo" = "1.4.0-rc.4"
+
+# Pre-1.5 builds ignore RODEO_PORT; the test passes --port explicitly. Kept so
+# the fixture reads like a real project.
+[env]
+RODEO_PORT = "46790"

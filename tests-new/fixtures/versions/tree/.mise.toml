@@ -1,0 +1,5 @@
+# Cross-version fixture: the working tree's rodeo. The repo's own mise.toml already
+# puts bin/ on PATH for every directory under it, so `rodeo` here is the tree
+# build; this file only pins the port, resolved through RODEO_PORT.
+[env]
+RODEO_PORT = "46800"

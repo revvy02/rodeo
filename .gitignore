@@ -38,3 +38,7 @@ node_modules
 /rodeo-cli/target
 
 .testlogs/
+
+# Per-project rodeo scratch dirs anywhere in the tree (test fixtures run rodeo
+# from their own directories).
+**/.rodeo/.temp/
