@@ -9,6 +9,7 @@
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 
+local constants = require(script.Parent.constants)
 local createLogger = require(script.Parent.log)
 local createRpc = require(script.Parent.Parent.Parent.shared.rpc)
 local utils = require(script.Parent.utils)
@@ -98,6 +99,14 @@ local function executeInContext(ctx: utils.ExecutionContext, context: RunContext
 	ctx.runner:SetAttribute("outputFile", params.outputFile or "")
 	ctx.runner:SetAttribute("logFilter", HttpService:JSONEncode(params.logFilter or {}))
 	ctx.runner:SetAttribute("context", context)
+	ctx.runner:SetAttribute("pluginBuild", constants.BUILD_ID)
+	-- The inlined @rodeo/* shims find their run through this attribute on the
+	-- module they live in (`script`), falling back to the shared
+	-- _G.__rodeo_eid slot — which another rodeo plugin's runner in this same
+	-- VM can overwrite between a run's start and a late require.
+	if ctx.module then
+		ctx.module:SetAttribute("rodeoExecutionId", params.executionId)
+	end
 
 	-- Profiler label injection: stamp each frame with execution_id so dumps can be matched
 	local profileConnection: RBXScriptConnection? = nil

@@ -18,6 +18,8 @@
 
 local RunService = game:GetService("RunService")
 
+local constants = require(script.Parent.constants)
+
 local simulator = {}
 
 type Prior = {
@@ -35,7 +37,11 @@ type Session = {
 
 local sessions: { [string]: Session } = {}
 
-local DEVICE_PREFIX = "rodeo-capture-"
+-- Per-backend prefix: several rodeo plugins can share a Studio and each
+-- sweeps the devices it left behind, so the prefix is unique to this plugin.
+-- It also must not start with `rodeo-capture-`, which pre-1.5 plugins sweep
+-- wholesale on every connection.
+local DEVICE_PREFIX = `rodeoCapture-{constants.PORT}-`
 local MAX_WIDTH = 7680
 
 local function service(): any

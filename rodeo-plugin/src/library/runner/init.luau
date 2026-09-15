@@ -53,7 +53,7 @@ local apis = {
 	io = require(ref("io"))(rpc),
 	process = processApi,
 	stream = streamApi,
-	roblox = require(ref("roblox"))(rpc, fsApi, streamApi, normalize, serializeToLuau),
+	roblox = require(ref("roblox"))(rpc, fsApi, streamApi, normalize, serializeToLuau, runtime),
 }
 
 -- Publish to _G so require("@rodeo/fs") etc. can find them
@@ -136,6 +136,18 @@ local success, result = xpcall(function()
 				"cmdbar context needs a rodeo-launched Studio: the launch bootstrap installs the "
 					.. "command-bar bridge, and this Studio has none (opened by hand, or launched by an "
 					.. "older rodeo). Use --context elevated instead.",
+				0
+			)
+		end
+		-- The bridge belongs to the backend that launched this Studio. Only that
+		-- backend's plugin is active here, so this holds unless a stale plugin
+		-- file of another build is dialing this port.
+		local bridgeBuild = bridge:GetAttribute("rodeoBuild")
+		local pluginBuild = script:GetAttribute("pluginBuild")
+		if bridgeBuild ~= nil and pluginBuild ~= nil and bridgeBuild ~= pluginBuild then
+			error(
+				`cmdbar bridge belongs to rodeo build {bridgeBuild}, this plugin is {pluginBuild}: `
+					.. "the Studio was launched by another rodeo serve — run against that serve's port.",
 				0
 			)
 		end

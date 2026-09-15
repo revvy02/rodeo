@@ -1,8 +1,11 @@
 -- @rodeo/roblox API: import / export model files via SerializationService,
 -- plus bake (Luau-source data files).
--- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau) -> roblox module.
+-- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau, runtime) -> roblox module.
+-- `runtime` is the runner's proto module, captured here rather than read from
+-- _G.__rodeo_runtime_proto at call time: several rodeo plugins can share this
+-- VM, and that global holds whichever build's runner set it last.
 
-return function(rpc, fs, stream, normalize, serializeToLuau)
+return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 	local roblox = {}
 	local SerializationService = game:GetService("SerializationService")
 
@@ -29,7 +32,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		stream.writeBytes(h, buf)
 		-- Finalize in place of stream.close: consumes the handle, converts to
 		-- XML when the extension is .rbxmx/.rbxlx, writes atomically.
-		local runtime = _G.__rodeo_runtime_proto
 		rpc.call("roblox_export", runtime.RobloxExportRequest.new({ handle = h.__handle }))
 	end
 
@@ -85,7 +87,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 		if buffer.len(pixels) ~= expected then
 			error(`exportEditableImage: pixel buffer is {buffer.len(pixels)} bytes, expected {expected} for {width}x{height}`, 2)
 		end
-		local runtime = _G.__rodeo_runtime_proto
 		local h = fs.open(path, "w")
 		stream.writeBytes(h, pixels)
 		-- Finalize in place of stream.close: consumes the handle, encodes PNG.
@@ -97,7 +98,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 	end
 
 	function roblox.importEditableImage(path: string): EditableImage
-		local runtime = _G.__rodeo_runtime_proto
 		nextImageId += 1
 		local handle = { __handle = `image:{nextImageId}:{path}` }
 		local res = rpc.call("roblox_image_decode", runtime.RobloxImageDecodeRequest.new({
@@ -357,7 +357,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 			indices = indices,
 			bones = bones,
 		})
-		local runtime = _G.__rodeo_runtime_proto
 		local h = fs.open(path, "w")
 		stream.writeBytes(h, blob)
 		-- Finalize in place of stream.close: consumes the handle, writes glTF.
@@ -367,7 +366,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 	-- Reads a .glb or .gltf into a new EditableMesh. Node transforms are baked
 	-- into the geometry and all primitives merge into one mesh.
 	function roblox.importEditableMesh(path: string): EditableMesh
-		local runtime = _G.__rodeo_runtime_proto
 		nextMeshId += 1
 		local handle = { __handle = `mesh:{nextMeshId}:{path}` }
 		rpc.call("roblox_mesh_decode", runtime.RobloxMeshDecodeRequest.new({
@@ -438,7 +436,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 	-- at width x height for this execution. Returns the resulting
 	-- Camera.ViewportSize.
 	function roblox._simulatorApply(device: string?, width: number?, height: number?): (number, number)
-		local runtime = _G.__rodeo_runtime_proto
 		local res = rpc.call("roblox_simulator_apply", runtime.RobloxSimulatorApplyRequest.new({
 			device = device,
 			width = width,
@@ -448,7 +445,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 	end
 
 	function roblox._simulatorRestore()
-		local runtime = _G.__rodeo_runtime_proto
 		rpc.call("roblox_simulator_restore", runtime.RobloxSimulatorRestoreRequest.new({}))
 	end
 
@@ -458,7 +454,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau)
 	-- multiple of the viewport, resample to exactly width x height, encode
 	-- PNG, write atomically.
 	function roblox._captureFinalize(handle: string, sourceWidth: number, sourceHeight: number, width: number, height: number): (number, number)
-		local runtime = _G.__rodeo_runtime_proto
 		local res = rpc.call("roblox_capture_finalize", runtime.RobloxCaptureFinalizeRequest.new({
 			handle = handle,
 			sourceWidth = sourceWidth,

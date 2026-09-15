@@ -7,7 +7,7 @@
 -- NOTE: this file is inlined into user scripts as an IIFE with all comments
 -- stripped (see bundle.rs inline_shims). Do not put `--` inside string
 -- literals.
-local g = _G.__rodeo_procs[_G.__rodeo_eid]
+local g = _G.__rodeo_procs[(script and script:GetAttribute("rodeoExecutionId")) or _G.__rodeo_eid]
 local fs = g.fs
 local stream = g.stream
 local process = g.process

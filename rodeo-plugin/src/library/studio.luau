@@ -11,6 +11,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StudioTestService = game:GetService("StudioTestService")
 
+local constants = require(script.Parent.constants)
+
 -- Static (never change for this VM's lifetime)
 local isServer = RunService:IsServer()
 local isClient = RunService:IsClient()
@@ -74,7 +76,11 @@ local domId = require(RODEO_UNIFIER_MODULE)
 -- inherit and reuse it. This is the stable studio identity — independent of
 -- the launch `session_guid` (only owned/launched studios have one) and of
 -- StudioMCP's flaky id.
-local RODEO_STUDIO_ID_ATTR = "rodeoStudioId"
+-- Keyed by this plugin's backend port: several rodeo plugins can share a
+-- Studio, and each edit-DOM plugin mints its own id at load. One shared
+-- attribute would hold whichever plugin wrote last, and the play clones would
+-- inherit that — one Studio reporting two ids to one backend.
+local RODEO_STUDIO_ID_ATTR = `rodeoStudioId_{constants.PORT}`
 local studioId: string = ""
 do
 	local ws = game:GetService("Workspace")
