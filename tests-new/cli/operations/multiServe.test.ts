@@ -6,6 +6,14 @@ import { cliStudioHandle, pluginFileFor, runRodeo, waitUntil } from "../helpers.
 // studio backend installs its own `rodeo-<build>-<port>.rbxm`, owns only the
 // Studios it launched, and removes its file when it exits. The same
 // mechanics let two different builds coexist (crossVersion.test.ts).
+//
+// Note on timing: installing or removing a file in Studio's shared plugins
+// folder can make an already-open Studio re-scan and briefly reload its own
+// plugin (a macOS directory-change coalesce), which drops and re-dials that
+// plugin's socket within ~1s. A persistent Studio recovers on its own; only a
+// one-shot run in flight at that exact moment would be disconnected. So this
+// suite brings both serves fully up first, then runs — it does not assert that
+// a run spanning the other serve's startup survives.
 const PORT_A = 46296;
 const PORT_B = 46298;
 
@@ -33,20 +41,20 @@ describe("two serves side by side (CLI)", () => {
     await a.spawn();
     expect(existsSync(pluginFileFor(PORT_A))).toBe(true);
 
-    // A long run on A stays live while B comes up alongside it.
-    const longRun = a.runFn({ source: "task.wait(15) return 'a-done'" });
-
     await b.spawn();
     expect(existsSync(pluginFileFor(PORT_B))).toBe(true);
     // B's start-time sweep probed A's master, found the same build alive, and
     // left A's file alone.
     expect(existsSync(pluginFileFor(PORT_A))).toBe(true);
 
+    // Both serves up: a run on each lands in that serve's own Studio. (A brief
+    // reload from B's startup, if any, has settled by now — the plugin
+    // reconnects on its own.)
     const bRun = await b.runFn({ source: "return 'b-done'" });
     expect(bRun.ok).toBe(true);
     expect(bRun.return).toBe("b-done");
 
-    const aRun = await longRun;
+    const aRun = await a.runFn({ source: "return 'a-done'" });
     expect(aRun.ok).toBe(true);
     expect(aRun.return).toBe("a-done");
 
