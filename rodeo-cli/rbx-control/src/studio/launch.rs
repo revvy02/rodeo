@@ -142,7 +142,22 @@ impl Studio {
         // the parent-death behavior.
         #[cfg(target_os = "windows")]
         let parent_args: Vec<String> = Vec::new();
-        #[cfg(not(target_os = "windows"))]
+        // macOS also passes AppKit's per-process user-defaults override that
+        // skips window-state restoration. When Studio dies within its first
+        // seconds — a crash, or a kill while it is still "reopening windows" —
+        // macOS greets the NEXT launch with a modal alert ("unexpectedly quit
+        // while reopening windows. Reopen?") before Studio has started
+        // logging. A background launch can never dismiss it, so every launch
+        // hangs until a human clicks. Measured on macOS 27 / Studio 0.738: the
+        // flag is accepted and bypasses the prompt even while it is armed.
+        #[cfg(target_os = "macos")]
+        let parent_args: Vec<String> = vec![
+            "-parentPid".to_string(),
+            std::process::id().to_string(),
+            "-ApplePersistenceIgnoreState".to_string(),
+            "YES".to_string(),
+        ];
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         let parent_args: Vec<String> =
             vec!["-parentPid".to_string(), std::process::id().to_string()];
 
