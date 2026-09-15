@@ -32,13 +32,16 @@ export class Daemon {
   private stdoutBuf = "";
   private writeEncoder = new TextEncoder();
 
-  constructor(private host: string, private port: number) {
+  constructor(private host: string, private port?: number) {
     this.start();
   }
 
   private start() {
+    // Without --port the daemon resolves the port itself (RODEO_PORT, then 44872).
+    const cmd = ["rodeo", "__spawn_canonical_client", "--host", this.host];
+    if (this.port !== undefined) cmd.push("--port", String(this.port));
     this.proc = spawn({
-      cmd: ["rodeo", "__spawn_canonical_client", "--host", this.host, "--port", String(this.port)],
+      cmd,
       stdin: "pipe",
       stdout: "pipe",
       stderr: "inherit",

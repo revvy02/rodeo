@@ -1,11 +1,13 @@
-/// Default port for the `rodeo` master (the long-running process; the
-/// installed plugin auto-connects to its studio backend).
+/// Default port for the `rodeo` master (the long-running process).
 ///
-/// A serve is a master on `SERVE_PORT` plus a studio backend at
-/// `SERVE_PORT + 1` (44873) for plugin WebSocket connections. There is one
-/// device-level serve: `rodeo run` reuses a serve already on this port and
-/// only starts one here when none is running, so every studio shares it.
-/// The port is stable so plugin configs can hard-code it.
+/// Every command that talks to a master resolves its port the same way:
+/// `--port`, then the `RODEO_PORT` environment variable (a project pins it in
+/// `.mise.toml` or `.env`, next to its rodeo version), then this constant. A
+/// serve is a master on that port plus a studio backend on port + 1 for
+/// plugin WebSocket connections. `rodeo run` reuses a healthy serve on the
+/// resolved port and starts one only when none is running, so projects that
+/// resolve to the same port share a serve, and projects on different ports
+/// run independently — including different rodeo builds side by side.
 pub const SERVE_PORT: u16 = 44872;
 
 

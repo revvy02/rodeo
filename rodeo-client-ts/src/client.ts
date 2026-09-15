@@ -214,18 +214,27 @@ export class RodeoClient {
    *  since `connect` refuses a mismatch. */
   serverVersion = "";
 
-  private constructor(url: string) {
-    const { host, port } = parseUrl(url);
-    this.daemon = new Daemon(host, port);
+  private constructor(url?: string) {
+    if (url === undefined) {
+      // No port: the daemon resolves it itself (RODEO_PORT, then 44872).
+      this.daemon = new Daemon("localhost", undefined);
+    } else {
+      const { host, port } = parseUrl(url);
+      this.daemon = new Daemon(host, port);
+    }
   }
 
   /** Connect to a running `rodeo serve` and block until it's healthy.
+   *  Omit `url` to use the CLI's own port resolution: the `RODEO_PORT`
+   *  environment variable, then 44872 — the same serve `rodeo run` would use
+   *  from this directory.
    *  Throws after `readyTimeoutMs` (default 30s) if the server never responds,
    *  and immediately if the master is a different rodeo build than the
    *  `rodeo` binary on PATH (set RODEO_SKIP_VERSION_CHECK=1 to override). */
-  static async connect(url: string, opts: ConnectOpts = {}): Promise<RodeoClient> {
+  static async connect(url?: string, opts: ConnectOpts = {}): Promise<RodeoClient> {
     const timeoutMs = opts.readyTimeoutMs ?? 30_000;
     const pollMs = opts.readyPollMs ?? 200;
+    const where = url ?? "the default port (RODEO_PORT, else 44872)";
     const client = new RodeoClient(url);
     const deadline = Date.now() + timeoutMs;
     let healthy = false;
@@ -240,7 +249,7 @@ export class RodeoClient {
     }
     if (!healthy) {
       await client.daemon.shutdown().catch(() => {});
-      throw new Error(`RodeoClient.connect: timed out after ${timeoutMs}ms waiting for rodeo at ${url}`);
+      throw new Error(`RodeoClient.connect: timed out after ${timeoutMs}ms waiting for rodeo at ${where}`);
     }
     const check = await client.daemon.request<VersionCheck>("client.checkVersion");
     if (!check.ok) {

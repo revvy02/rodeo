@@ -41,7 +41,8 @@ type StateSnapshot = {
 
 export type ConnectOpts = {
 	host: string?,
-	port: number,
+	-- Omit to use the CLI's own resolution: RODEO_PORT, then 44872.
+	port: number?,
 	rodeoBin: string?,
 	-- Max time to wait for the server to come up. Default 30000ms.
 	readyTimeoutMs: number?,
@@ -159,7 +160,10 @@ local function connect(opts: ConnectOpts): RodeoClient
 	end
 	if not healthy then
 		pcall(daemon.shutdown)
-		error(`rodeo.connect: timed out after {timeoutMs}ms waiting for rodeo at {opts.host or "localhost"}:{opts.port}`)
+		local where = if opts.port
+			then `{opts.host or "localhost"}:{opts.port}`
+			else "the default port (RODEO_PORT, else 44872)"
+		error(`rodeo.connect: timed out after {timeoutMs}ms waiting for rodeo at {where}`)
 	end
 
 	-- Version handshake: the master must be the same rodeo build as the

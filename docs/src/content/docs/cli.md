@@ -32,13 +32,13 @@ Start persistent server (no Studio launch — use `run --place` for that)
 
 ###### **Options:**
 
-* `--port <PORT>` — Port number for server
+* `--port <PORT>` — Master port. Resolution: this flag, then RODEO_PORT, then 44872. The studio backend listens on port + 1
 * `--master` — Run as master only (central orchestrator)
 * `--studio` — Run as studio backend only (connects to master)
 * `--master-host <MASTER_HOST>` — Master host to connect to (for --studio)
 
   Default value: `localhost`
-* `--master-port <MASTER_PORT>` — Master port to connect to (for --studio)
+* `--master-port <MASTER_PORT>` — Master port to connect to (for --studio). Resolution: this flag, then RODEO_PORT, then 44872
 * `--ppid <PPID>` — Parent PID — exit when this process dies
 
 
@@ -84,7 +84,7 @@ Run a script in Studio
 * `--host <HOST>` — Host of running server
 
   Default value: `localhost`
-* `--port <PORT>` — Port number of running server
+* `--port <PORT>` — Master port of the running server. Resolution: this flag, then RODEO_PORT, then 44872
 
   Default value: `44872`
 * `--place <PLACE>` — Launch Studio: empty (no value), place ID (number), or file path (.rbxl/.rbxlx)
@@ -112,7 +112,7 @@ Show the canonical rodeo state: studios, their DOMs, and runs
 * `--host <HOST>` — Host of running server
 
   Default value: `localhost`
-* `--port <PORT>` — Port number of running server
+* `--port <PORT>` — Master port of the running server. Resolution: this flag, then RODEO_PORT, then 44872
 
   Default value: `44872`
 
@@ -133,7 +133,7 @@ Kill a run or close a Studio by id
 * `--host <HOST>` — Host of running server
 
   Default value: `localhost`
-* `--port <PORT>` — Port number of running server
+* `--port <PORT>` — Master port of the running server. Resolution: this flag, then RODEO_PORT, then 44872
 
   Default value: `44872`
 
@@ -155,7 +155,7 @@ Save the Studio place
 * `--host <HOST>` — Host of running server
 
   Default value: `localhost`
-* `--port <PORT>` — Port number of running server
+* `--port <PORT>` — Master port of the running server. Resolution: this flag, then RODEO_PORT, then 44872
 
   Default value: `44872`
 

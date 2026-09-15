@@ -308,7 +308,7 @@ pub async fn run() {
                 .map_err(|e| { eprintln!("{e}"); e })
         }
         Commands::SpawnCanonicalClient { host, port } => {
-            commands::spawn_canonical_client::main(host, port).await
+            commands::spawn_canonical_client::main(host, port.unwrap_or(config::SERVE_PORT)).await
         }
     };
 

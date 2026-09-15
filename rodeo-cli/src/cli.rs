@@ -54,8 +54,9 @@ pub struct Cli {
 pub enum Commands {
     /// Start persistent server (no Studio launch — use `run --place` for that)
     Serve {
-        /// Port number for server
-        #[arg(long)]
+        /// Master port. Resolution: this flag, then RODEO_PORT, then 44872.
+        /// The studio backend listens on port + 1.
+        #[arg(long, env = "RODEO_PORT")]
         port: Option<u16>,
 
         /// Run as master only (central orchestrator)
@@ -70,8 +71,9 @@ pub enum Commands {
         #[arg(long = "master-host", default_value = "localhost")]
         master_host: String,
 
-        /// Master port to connect to (for --studio)
-        #[arg(long = "master-port")]
+        /// Master port to connect to (for --studio). Resolution: this flag,
+        /// then RODEO_PORT, then 44872.
+        #[arg(long = "master-port", env = "RODEO_PORT")]
         master_port: Option<u16>,
 
         /// Parent PID — exit when this process dies
@@ -265,9 +267,9 @@ pub enum Commands {
         /// Master host
         #[arg(long, default_value = "localhost")]
         host: String,
-        /// Master port
-        #[arg(long)]
-        port: u16,
+        /// Master port. Resolution: this flag, then RODEO_PORT, then 44872.
+        #[arg(long, env = "RODEO_PORT")]
+        port: Option<u16>,
     },
 }
 
@@ -278,8 +280,9 @@ pub struct ServerArgs {
     #[arg(long, default_value = "localhost")]
     pub host: String,
 
-    /// Port number of running server
-    #[arg(long, default_value_t = config::SERVE_PORT)]
+    /// Master port of the running server. Resolution: this flag, then
+    /// RODEO_PORT, then 44872.
+    #[arg(long, env = "RODEO_PORT", default_value_t = config::SERVE_PORT)]
     pub port: u16,
 }
 
@@ -366,4 +369,44 @@ pub struct FflagArgs {
     /// Load FFlag overrides from a JSON file
     #[arg(long = "fflag.file", value_name = "PATH", help_heading = "FFlags")]
     pub fflag_file: Option<String>,
+}
+
+#[cfg(test)]
+mod port_resolution_tests {
+    use super::*;
+
+    // One test body: RODEO_PORT is process-global, so the cases must not
+    // interleave with each other.
+    #[test]
+    fn port_resolves_flag_then_env_then_default() {
+        std::env::remove_var("RODEO_PORT");
+        match Cli::try_parse_from(["rodeo", "state"]).unwrap().command {
+            Commands::State { server, .. } => assert_eq!(server.port, config::SERVE_PORT),
+            _ => unreachable!(),
+        }
+
+        std::env::set_var("RODEO_PORT", "46123");
+        match Cli::try_parse_from(["rodeo", "state"]).unwrap().command {
+            Commands::State { server, .. } => assert_eq!(server.port, 46123),
+            _ => unreachable!(),
+        }
+        match Cli::try_parse_from(["rodeo", "serve"]).unwrap().command {
+            Commands::Serve { port, master_port, .. } => {
+                assert_eq!(port, Some(46123));
+                assert_eq!(master_port, Some(46123));
+            }
+            _ => unreachable!(),
+        }
+        match Cli::try_parse_from(["rodeo", "__spawn_canonical_client"]).unwrap().command {
+            Commands::SpawnCanonicalClient { port, .. } => assert_eq!(port, Some(46123)),
+            _ => unreachable!(),
+        }
+
+        // The flag wins over the env var.
+        match Cli::try_parse_from(["rodeo", "state", "--port", "46200"]).unwrap().command {
+            Commands::State { server, .. } => assert_eq!(server.port, 46200),
+            _ => unreachable!(),
+        }
+        std::env::remove_var("RODEO_PORT");
+    }
 }

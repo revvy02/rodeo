@@ -23,7 +23,7 @@ rbx-control = { path = "./rbx-control" }
 launch-control = { path = "../submodules/launch-control", features = ["tokio"] }
 
 # CLI
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 dotenvy = "0.15"
 
 # Async runtime

@@ -15,13 +15,15 @@ export type Daemon = {
 	shutdown: () -> (),
 }
 
-local function spawn(opts: { host: string, port: number, rodeoBin: string? }): Daemon
+local function spawn(opts: { host: string, port: number?, rodeoBin: string? }): Daemon
 	local bin = opts.rodeoBin or "rodeo"
-	local child = process.create(bin, {
-		"__spawn_canonical_client",
-		"--host", opts.host,
-		"--port", tostring(opts.port),
-	})
+	-- Without --port the daemon resolves the port itself (RODEO_PORT, then 44872).
+	local args = { "__spawn_canonical_client", "--host", opts.host }
+	if opts.port then
+		table.insert(args, "--port")
+		table.insert(args, tostring(opts.port))
+	end
+	local child = process.create(bin, args)
 
 	local nextId = 0
 	local pending: { [number]: (msg: any) -> () } = {}

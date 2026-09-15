@@ -16,6 +16,8 @@ Requires the `rodeo` CLI on `PATH` (the client spawns / connects to it).
 local rodeo = require("@pkg/rodeo")
 
 -- Blocks until rodeo serve is reachable (default 30s timeout).
+-- `port` is optional: omit it to use RODEO_PORT, then 44872 — the same
+-- serve `rodeo run` would use from this directory.
 local client = rodeo.connect({ port = 44899 })
 
 local studio = client.getLocalStudio().open({ background = true })
