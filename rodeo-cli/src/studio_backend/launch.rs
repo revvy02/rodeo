@@ -1,10 +1,10 @@
 //! Rodeo-specific Studio launch wrappers.
 //!
 //! Composes [`rbx_control::studio::launch::Studio`] with rodeo orchestration:
-//! installs the static rodeo plugin, generates the RunScript bootstrap that
-//! stamps `rodeoSession`/`rodeoPort` onto the Workspace at launch (so the
-//! plugin routes to this launch), and binds the log scanner. No place-file
-//! mutation: the original file opens unchanged.
+//! installs this backend's rodeo plugin file, generates the RunScript
+//! bootstrap that stamps `rodeoSession`/`rodeoPort` onto the Workspace at
+//! launch (so the plugin routes to this launch), and binds the log scanner.
+//! No place-file mutation: the original file opens unchanged.
 
 use anyhow::{bail, Context, Result};
 use rbx_dom_weak::{InstanceBuilder, WeakDom};
@@ -161,7 +161,7 @@ impl Studio {
                 save: opts.save,
                 fflags: opts.fflags,
                 detached: opts.detached,
-                show_widgets: opts.show_widgets.clone(),
+                show_widgets: opts.show_widgets.as_deref().map(|s| expand_show_widgets(s, opts.port)),
                 run_script_file: Some(bootstrap),
             },
         )?;
@@ -233,20 +233,89 @@ impl Drop for Studio {
 // Rodeo-specific helpers: static plugin install, RunScript bootstrap, place prep
 // ---------------------------------------------------------------------------
 
-/// Ensure the static rodeo plugin is installed in the Studio plugins directory.
-///
-/// The plugin carries no launch-specific config — config arrives at runtime via
-/// the `rodeoPort`/`rodeoSession` Workspace attributes the RunScript bootstrap
-/// sets — so this writes the same `rodeo.rbxm` the manual `rodeo plugin` command
-/// does. One shared static plugin per machine: never deleted on cleanup, and
-/// overwriting keeps the installed plugin in lockstep with the running CLI.
-pub(crate) fn install_static_plugin() -> Result<()> {
+/// Studio's local plugins directory (`~/Documents/Roblox/Plugins` on macOS).
+pub(crate) fn plugins_dir() -> Result<PathBuf> {
     let studio = roblox_install::RobloxStudio::locate()
         .context("failed to locate Roblox Studio install")?;
-    let plugins_dir = studio.plugins_path();
-    std::fs::create_dir_all(plugins_dir).context("failed to create plugins directory")?;
-    let plugin_path = plugins_dir.join("rodeo.rbxm");
-    plugin_embed::write_embedded_plugin(&plugin_path.to_string_lossy())
+    Ok(studio.plugins_path().to_path_buf())
+}
+
+/// File name of the plugin a studio backend on `port` installs.
+///
+/// One file per running backend, named by build and port, so serves of
+/// different builds or ports never overwrite each other's plugin (issue #12).
+/// The build id is verbatim (`1.4.0-rc.4+b493edb`, dashes included), so the
+/// name parses from the right: the port is the last `-` segment.
+pub(crate) fn plugin_file_name(build: &str, port: u16) -> String {
+    format!("rodeo-{build}-{port}.rbxm")
+}
+
+/// Inverse of [`plugin_file_name`]. `None` for anything else in the plugins
+/// directory — including the legacy `rodeo.rbxm` that pre-1.5 versions write,
+/// which nothing in this build reads, writes, or removes.
+pub(crate) fn parse_plugin_file_name(name: &str) -> Option<(String, u16)> {
+    let stem = name.strip_prefix("rodeo-")?.strip_suffix(".rbxm")?;
+    let (build, port) = stem.rsplit_once('-')?;
+    if build.is_empty() {
+        return None;
+    }
+    Some((build.to_string(), port.parse().ok()?))
+}
+
+/// Where this build's plugin for a backend on `port` lives.
+pub(crate) fn plugin_path(port: u16) -> Result<PathBuf> {
+    Ok(plugins_dir()?.join(plugin_file_name(rodeo_proto::BUILD_ID, port)))
+}
+
+/// Install this backend's plugin file, with the build id and `port` baked in
+/// so the plugin knows which backend is its own. Call it only once the
+/// backend has bound `port`: the file must never describe a backend that
+/// failed to start. Byte-idempotent (see `plugin_embed::write_plugin`).
+pub(crate) fn install_plugin(port: u16) -> Result<PathBuf> {
+    let path = plugin_path(port)?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).context("failed to create plugins directory")?;
+    }
+    plugin_embed::write_plugin(&path, rodeo_proto::BUILD_ID, port)?;
+    Ok(path)
+}
+
+/// Remove this backend's plugin file. Studio unloads a plugin the moment its
+/// file disappears, so this must not run while a Studio still needs it: the
+/// backend skips it when it launched `--detach` Studios and leaves the file
+/// to a later start-time sweep (`plugin_sweep`).
+pub(crate) fn remove_plugin(port: u16) -> Result<()> {
+    let path = plugin_path(port)?;
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).with_context(|| format!("failed to remove plugin {}", path.display())),
+    }
+}
+
+/// The Qtitan dock-panel id Studio assigns this backend's plugin widget, for
+/// `--show-widgets`. Studio derives it from the plugin file name and the id
+/// the plugin passes to `CreateDockWidgetPluginGui` (`Rodeo-<port>`), both of
+/// which now vary per backend — hence the `rodeo` alias below.
+pub(crate) fn plugin_panel_id(port: u16) -> String {
+    format!("edit_user_{}_Rodeo-{}", plugin_file_name(rodeo_proto::BUILD_ID, port), port)
+}
+
+/// Expand the `rodeo` alias in a `--show-widgets` list to this backend's own
+/// dock-panel id. Everything else passes through to rbx-control's parser.
+fn expand_show_widgets(spec: &str, port: u16) -> String {
+    spec.split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(|item| {
+            if item.eq_ignore_ascii_case("rodeo") {
+                plugin_panel_id(port)
+            } else {
+                item.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Write the per-launch RunScript bootstrap to the temp dir. Run by Studio at
@@ -266,7 +335,7 @@ fn write_bootstrap_script(session_guid: &str, port: u16) -> Result<PathBuf> {
     let path = temp_dir.join(format!("rodeo-bootstrap-{session_guid}.luau"));
     // session_guid is a master-minted UUID (no quotes/backslashes), so embedding
     // it in a string literal is safe.
-    std::fs::write(&path, bootstrap_source(session_guid, port))
+    std::fs::write(&path, bootstrap_source(session_guid, port, rodeo_proto::BUILD_ID))
         .context("failed to write bootstrap script")?;
     Ok(path)
 }
@@ -287,7 +356,7 @@ const CMDBAR_BRIDGE_NAME: &str = "rodeoCmdbar";
 ///    result is handed back through `_G` rather than the Bindable return
 ///    (which deep-copies tables and rejects functions). `Archivable = false`
 ///    under CoreGui keeps it out of saves and out of play-mode clones.
-fn bootstrap_source(session_guid: &str, port: u16) -> String {
+pub(crate) fn bootstrap_source(session_guid: &str, port: u16, build: &str) -> String {
     format!(
         r#"local ws = game:GetService("Workspace")
 ws:SetAttribute("rodeoSession", "{session_guid}")
@@ -297,6 +366,7 @@ local bridge = Instance.new("BindableFunction")
 bridge.Name = "{bridge}"
 bridge.Archivable = false
 bridge:SetAttribute("rodeoSession", "{session_guid}")
+bridge:SetAttribute("rodeoBuild", "{build}")
 bridge.OnInvoke = function(module, executionId)
 	local ok, result = xpcall(require, function(err)
 		return tostring(err) .. "\n" .. debug.traceback(nil, 2)
@@ -317,10 +387,11 @@ mod bootstrap_tests {
 
     #[test]
     fn bootstrap_stamps_attributes_and_installs_cmdbar_bridge() {
-        let src = bootstrap_source("abc-123", 44901);
+        let src = bootstrap_source("abc-123", 44901, "1.2.3+abcdef0");
         assert!(src.contains(r#"ws:SetAttribute("rodeoSession", "abc-123")"#), "{src}");
         assert!(src.contains(r#"ws:SetAttribute("rodeoPort", 44901)"#), "{src}");
         assert!(src.contains(r#"bridge.Name = "rodeoCmdbar""#), "{src}");
+        assert!(src.contains(r#"bridge:SetAttribute("rodeoBuild", "1.2.3+abcdef0")"#), "{src}");
         assert!(src.contains("bridge.Archivable = false"), "{src}");
         assert!(src.contains(r#"bridge.Parent = game:GetService("CoreGui")"#), "{src}");
         // The Luau source must carry a real "\n" escape, not a raw newline.
@@ -429,6 +500,36 @@ fn prepare_place(place: Option<&str>, save: &SaveMode) -> Result<PathBuf> {
             }
             Ok(out_path)
         }
+    }
+}
+
+#[cfg(test)]
+mod plugin_file_tests {
+    use super::*;
+
+    #[test]
+    fn plugin_file_name_round_trips_builds_with_dashes_and_plus() {
+        for (build, port) in [("1.4.0-rc.4+b493edb", 44873u16), ("2.0.0", 46001), ("1.5.0-rc.1+abc-def", 1)] {
+            let name = plugin_file_name(build, port);
+            assert_eq!(parse_plugin_file_name(&name), Some((build.to_string(), port)), "{name}");
+        }
+    }
+
+    #[test]
+    fn parse_ignores_everything_else_in_the_plugins_directory() {
+        for name in ["rodeo.rbxm", "rodeo-44881.lock", "RojoManagedPlugin.rbxm", "rodeo-.rbxm", "rodeo-1.2.3-notaport.rbxm", "rodeo-1.2.3-44873.rbxmx", ".DS_Store"] {
+            assert_eq!(parse_plugin_file_name(name), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn show_widgets_rodeo_alias_expands_to_this_backends_panel() {
+        let expanded = expand_show_widgets("output, Rodeo ,commandbar", 46001);
+        assert_eq!(expanded, format!("output,{},commandbar", plugin_panel_id(46001)));
+        assert!(plugin_panel_id(46001).starts_with("edit_user_rodeo-"), "{}", plugin_panel_id(46001));
+        assert!(plugin_panel_id(46001).ends_with("-46001.rbxm_Rodeo-46001"), "{}", plugin_panel_id(46001));
+        // Untouched when the alias is absent.
+        assert_eq!(expand_show_widgets("output,explorer", 46001), "output,explorer");
     }
 }
 

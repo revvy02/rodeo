@@ -12,7 +12,9 @@
 //!
 //! Names are friendly aliases (see [`resolve_alias`]), the specials `ribbon`
 //! and `commandbar`, or a raw Qtitan panel ID (e.g.
-//! `edit_user_rodeo.rbxm_Rodeo-44873`) for anything unmapped.
+//! `edit_user_rodeo-1.4.0-rc.4+b493edb-44873.rbxm_Rodeo-44873`) for anything
+//! unmapped. rodeo's own widget id varies per backend (plugin file name and
+//! port), so rodeo expands a `rodeo` alias to it before the list gets here.
 //!
 //! # Where this lives in the plist
 //!
@@ -528,9 +530,9 @@ mod tests {
 
     #[test]
     fn parse_maps_aliases_specials_and_raw_ids() {
-        let keep = KeepSpec::parse("output, ribbon, edit_user_rodeo.rbxm_Rodeo-44873, commandbar");
+        let keep = KeepSpec::parse("output, ribbon, edit_user_rodeo-1.4.0-rc.4+b493edb-44873.rbxm_Rodeo-44873, commandbar");
         assert!(keep.panel_ids.contains("outputWidgetPanel"));
-        assert!(keep.panel_ids.contains("edit_user_rodeo.rbxm_Rodeo-44873"));
+        assert!(keep.panel_ids.contains("edit_user_rodeo-1.4.0-rc.4+b493edb-44873.rbxm_Rodeo-44873"));
         assert!(keep.keep_ribbon);
         assert!(keep.keep_commandbar);
 

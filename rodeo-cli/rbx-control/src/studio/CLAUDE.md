@@ -51,7 +51,9 @@ Naming patterns: built-in singletons (`outputWidgetPanel`), Studio built-in
 plugins (`rplg_sabuiltin_<Name>.rbxm_<Widget>`), user plugins
 (`edit_user_<file>.rbxm_<widgetId>`, **mode-prefixed** `edit_`/`play_`), cloud
 plugins (`edit_cloud_<id>_<name>`). rodeo's own widget is
-`edit_user_rodeo.rbxm_Rodeo-<port>`.
+`edit_user_rodeo-<build>-<port>.rbxm_Rodeo-<port>` — one plugin file per
+running studio backend, so the id varies; `--show-widgets rodeo` expands to
+the launching backend's id in rodeo-cli (`launch::plugin_panel_id`).
 
 A **custom plugin widget's** live visibility is the plugin's own
 `DockWidgetPluginGui.Enabled`, independent of the plist. The plist governs

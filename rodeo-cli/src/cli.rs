@@ -315,7 +315,7 @@ pub struct PlaceArgs {
     /// Allow-list of Studio dock widgets to keep visible; everything else
     /// (panels, ribbon, command bar) is hidden. `none` hides all; a comma list
     /// keeps those (aliases: output, explorer, properties, editor, toolbox,
-    /// assistant, ribbon, commandbar; or a raw panel ID). Restored on exit.
+    /// assistant, ribbon, commandbar, rodeo (this serve's own panel); or a raw panel ID). Restored on exit.
     #[arg(long = "show-widgets", value_name = "WIDGETS", help_heading = "Launch")]
     pub show_widgets: Option<String>,
 

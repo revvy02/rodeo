@@ -92,7 +92,7 @@ Run a script in Studio
 * `--place.universe <UNIVERSE_ID>` — Universe ID (resolved from place ID if omitted)
 * `--focus` — Bring Studio to the front on launch (default: background). Studio only takes keyboard focus when it opens on the display you are working on; on another display it is raised there and your focus stays put
 * `--detach` — Keep Studio/Player running after rodeo exits
-* `--show-widgets <WIDGETS>` — Allow-list of Studio dock widgets to keep visible; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
+* `--show-widgets <WIDGETS>` — Allow-list of Studio dock widgets to keep visible; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar, rodeo (this serve's own panel); or a raw panel ID). Restored on exit
 * `--profile <PROFILE>` — Enable microprofiler auto-capture and collect dumps (optional: output directory)
 * `--save <SAVE>` — Save Studio place on exit, optionally to a specific path
 * `--fflag.override <KEY=VALUE>` — Set FFlag override (Key=Value, repeatable)

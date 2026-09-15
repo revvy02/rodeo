@@ -167,20 +167,27 @@ pub async fn handle_studio_client<S, R>(
     );
 
     // Version gate. The plugin reports its build id on the first message; a
-    // DOM running another build is refused here rather than routed to, since
-    // its RunCommand/RPC shapes may not match ours. The welcome goes out first
-    // so the plugin can show the mismatch in its widget, then the socket
-    // closes. The plugin keeps retrying on its normal cadence, so it connects
-    // once the plugin file is rewritten (next serve start) or the matching
-    // serve comes up on this port.
+    // DOM running another build is never registered or routed to, since its
+    // RunCommand/RPC shapes may not match ours. The welcome goes out so the
+    // plugin can show the mismatch in its widget — and then the socket is
+    // parked open rather than closed. A plugin whose socket closes reconnects
+    // at once (pre-1.5 plugins with no back-off, immediately in play DOMs, and
+    // re-running their per-connection setup each time), which against a
+    // backend that will never accept it is a hot loop. Held open, it sits
+    // quietly and reconnects only when this backend exits — which is exactly
+    // when the port can change hands to a backend that does match.
     let plugin_version = initial_state.as_ref().map(|s| s.plugin_version.as_str()).unwrap_or("");
     if let Err(msg) = proto::check_peer_version("this Studio's rodeo plugin", plugin_version) {
         if proto::version_check_skipped() {
             tracing::warn!("{msg} ({} set, accepting)", proto::SKIP_VERSION_CHECK_ENV);
         } else {
-            tracing::error!("{msg}; refusing DOM until the plugin matches");
+            tracing::warn!("{msg}; parking this connection unregistered (the plugin shows the mismatch and reconnects when this backend exits)");
             let _ = ws_tx.send(Message::Text(serde_json::to_string(&welcome_msg()).unwrap().into())).await;
-            let _ = ws_tx.send(Message::Close(None)).await;
+            while let Some(Ok(msg)) = ws_rx.next().await {
+                if matches!(msg, Message::Close(_)) {
+                    break;
+                }
+            }
             return;
         }
     }

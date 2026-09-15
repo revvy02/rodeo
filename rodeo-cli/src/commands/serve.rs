@@ -129,15 +129,6 @@ pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) 
         tracing::warn!("layout stale-lock sweep failed: {e}");
     }
 
-    // Ensure the static `rodeo.rbxm` plugin is installed and current before we
-    // accept connections — so every serve (not just a launch) keeps the plugin
-    // in lockstep with this CLI, and a manually-opened Studio finds it. The
-    // write is byte-idempotent: it's a no-op unless missing or a different
-    // version, so repeated serve starts don't churn or trigger a plugin reload.
-    if let Err(e) = crate::studio_backend::launch::install_static_plugin() {
-        tracing::warn!("failed to install rodeo plugin: {e}");
-    }
-
     // Two backends on the same port are already prevented by the socket bind.
 
     let state = Arc::new(Mutex::new(BackendState::new()));
@@ -154,6 +145,19 @@ pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) 
     let listener = TcpListener::bind(&addr)
         .await
         .context(format!("failed to bind to {addr}"))?;
+
+    // Bound: this port is ours. Sweep plugin files left behind by dead
+    // backends, then install this backend's own — one file per running
+    // backend, named by build and port, so serves of different builds or
+    // ports never overwrite each other's plugin (issue #12). Installing only
+    // after the bind means the file never describes a backend that failed to
+    // start. The write is byte-idempotent, so a same-build serve returning to
+    // this port leaves Studios that still hold the plugin untouched.
+    crate::studio_backend::plugin_sweep::sweep().await;
+    match crate::studio_backend::launch::install_plugin(port) {
+        Ok(path) => tracing::info!(path = %path.display(), "installed rodeo plugin"),
+        Err(e) => tracing::warn!("failed to install rodeo plugin: {e}"),
+    }
 
     let accept_state = state.clone();
     tokio::spawn(async move {
@@ -209,9 +213,11 @@ pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) 
         let mut guard = state.lock().await;
         let count = guard.studio_instances.len();
         tracing::info!("cleaning up {count} studio instance(s)...");
+        let mut any_detached = false;
         for (id, inst) in guard.studio_instances.drain() {
             if let Some(studio) = inst.studio {
                 if studio.detached() {
+                    any_detached = true;
                     tracing::info!(studio_id = id.as_str(), "studio is detached, skipping kill (process will survive)");
                     // Arc drop runs rodeo::Studio::Drop → rbx_control::Studio::Drop,
                     // both respect `detached` and only restore fflags/layout.
@@ -219,6 +225,19 @@ pub async fn run_studio_backend(port: u16, master_host: &str, master_port: u16) 
                 }
                 tracing::info!(studio_id = id.as_str(), "killing Studio");
                 studio.kill();
+            }
+        }
+
+        // This backend's plugin file goes with it — unless a detached Studio
+        // still runs the plugin. Deleting the file would unload it from that
+        // Studio at once, so leave it for the sweep a later backend runs once
+        // the Studio is gone.
+        if any_detached {
+            tracing::info!("leaving plugin file installed: a detached Studio still uses it");
+        } else {
+            match crate::studio_backend::launch::remove_plugin(port) {
+                Ok(()) => tracing::info!("removed this backend's plugin file"),
+                Err(e) => tracing::warn!("failed to remove plugin file: {e}"),
             }
         }
     }
