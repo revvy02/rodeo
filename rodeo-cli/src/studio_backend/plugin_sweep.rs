@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use rodeo_client::RodeoClient;
 
-use super::launch::{parse_plugin_file_name, plugins_dir};
+use super::launch::{parse_plugin_file_name, plugins_dir, remove_plugin_file, sweep_orphaned_ide_state};
 
 /// Files younger than this are skipped: a sibling backend may be mid-start,
 /// its file written but its master not yet answering.
@@ -156,6 +156,10 @@ pub async fn sweep() {
     }
     let entries = scan(&dir);
     if entries.is_empty() {
+        let orphaned = sweep_orphaned_ide_state(&dir);
+        if orphaned > 0 {
+            tracing::info!(count = orphaned, "removed Studio IDE-state files for plugin files that no longer exist");
+        }
         return;
     }
 
@@ -169,10 +173,18 @@ pub async fn sweep() {
     let live = tokio::task::spawn_blocking(live_ports).await.unwrap_or_default();
 
     for path in sweep_decisions(&entries, &probes, &live) {
-        match std::fs::remove_file(&path) {
+        match remove_plugin_file(&path) {
             Ok(()) => tracing::info!(path = %path.display(), "removed stale plugin file (its backend is gone and no Studio uses it)"),
             Err(e) => tracing::warn!(path = %path.display(), "failed to remove stale plugin file: {e}"),
         }
+    }
+
+    // Studio's per-plugin IDE-state files outlive a plugin file when the
+    // backend crashed (or predate this cleanup); drop the ones whose plugin
+    // file is gone.
+    let orphaned = sweep_orphaned_ide_state(&dir);
+    if orphaned > 0 {
+        tracing::info!(count = orphaned, "removed Studio IDE-state files for plugin files that no longer exist");
     }
 }
 

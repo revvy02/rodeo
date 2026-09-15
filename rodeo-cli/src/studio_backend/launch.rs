@@ -317,11 +317,89 @@ fn settle_plugin_file(port: u16) {
 /// to a later start-time sweep (`plugin_sweep`).
 pub(crate) fn remove_plugin(port: u16) -> Result<()> {
     let path = plugin_path(port)?;
-    match std::fs::remove_file(&path) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e).with_context(|| format!("failed to remove plugin {}", path.display())),
+    remove_plugin_file(&path).with_context(|| format!("failed to remove plugin {}", path.display()))
+}
+
+/// Remove a per-backend plugin file together with the IDE-state files Studio
+/// keeps for it. Missing files are not an error.
+pub(crate) fn remove_plugin_file(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
     }
+    if let (Some(dir), Some(name)) = (plugin_ide_state_dir(), path.file_name().and_then(|n| n.to_str())) {
+        remove_ide_state_in(&dir, name);
+    }
+    Ok(())
+}
+
+/// Studio's per-plugin IDE-state directory.
+///
+/// For every local plugin file Studio writes `pluginIDEState_user_<file>_<n>.xml`
+/// (which of the plugin's scripts are open in the script editor) and
+/// `pluginIDEState_user_<file>_<n>_DebuggerData.xml` (breakpoints set in
+/// them) when the plugin unloads, and restores them when it loads, so a
+/// plugin developer keeps tabs and breakpoints across reloads. rodeo's plugin
+/// scripts are never opened, so for us the pair is two empty shells — but
+/// Studio writes one pair per plugin *file name*, and per-backend names would
+/// accumulate them forever, so they go when the plugin file goes.
+fn plugin_ide_state_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library/Roblox/pluginIDEState"))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("LOCALAPPDATA").map(|p| PathBuf::from(p).join("Roblox").join("pluginIDEState"))
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        None
+    }
+}
+
+/// The per-backend plugin file an IDE-state file belongs to:
+/// `pluginIDEState_user_rodeo-<build>-<port>.rbxm_0_DebuggerData.xml` →
+/// `rodeo-<build>-<port>.rbxm`. `None` for anything else, including the
+/// legacy `rodeo.rbxm`'s files, which stay Studio's business.
+pub(crate) fn plugin_file_of_ide_state(name: &str) -> Option<String> {
+    let rest = name.strip_prefix("pluginIDEState_user_")?;
+    let end = rest.find(".rbxm_")? + ".rbxm".len();
+    let file = &rest[..end];
+    parse_plugin_file_name(file)?;
+    Some(file.to_string())
+}
+
+/// Remove the IDE-state files Studio wrote for `plugin_file_name`. Returns
+/// how many were removed.
+fn remove_ide_state_in(dir: &Path, plugin_file_name: &str) -> usize {
+    let prefix = format!("pluginIDEState_user_{plugin_file_name}_");
+    let Ok(read) = std::fs::read_dir(dir) else { return 0 };
+    read.flatten()
+        .filter(|e| e.file_name().to_str().is_some_and(|n| n.starts_with(&prefix)))
+        .filter(|e| std::fs::remove_file(e.path()).is_ok())
+        .count()
+}
+
+/// Remove IDE-state files for per-backend plugin files that no longer exist
+/// in `plugins_dir` — left by a crashed backend, or from before this cleanup
+/// existed. Returns how many were removed.
+pub(crate) fn sweep_orphaned_ide_state(plugins_dir: &Path) -> usize {
+    plugin_ide_state_dir().map_or(0, |dir| sweep_orphaned_ide_state_in(&dir, plugins_dir))
+}
+
+fn sweep_orphaned_ide_state_in(ide_dir: &Path, plugins_dir: &Path) -> usize {
+    let Ok(read) = std::fs::read_dir(ide_dir) else { return 0 };
+    read.flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .and_then(plugin_file_of_ide_state)
+                .is_some_and(|file| !plugins_dir.join(file).exists())
+        })
+        .filter(|e| std::fs::remove_file(e.path()).is_ok())
+        .count()
 }
 
 /// The Qtitan dock-panel id Studio assigns this backend's plugin widget, for
@@ -551,6 +629,59 @@ mod plugin_file_tests {
         for name in ["rodeo.rbxm", "rodeo-44881.lock", "RojoManagedPlugin.rbxm", "rodeo-.rbxm", "rodeo-1.2.3-notaport.rbxm", "rodeo-1.2.3-44873.rbxmx", ".DS_Store"] {
             assert_eq!(parse_plugin_file_name(name), None, "{name}");
         }
+    }
+
+    #[test]
+    fn ide_state_files_map_back_to_our_plugin_files_only() {
+        assert_eq!(
+            plugin_file_of_ide_state("pluginIDEState_user_rodeo-1.4.0-rc.4+05b88e1-46299.rbxm_0.xml").as_deref(),
+            Some("rodeo-1.4.0-rc.4+05b88e1-46299.rbxm")
+        );
+        assert_eq!(
+            plugin_file_of_ide_state("pluginIDEState_user_rodeo-1.4.0-rc.4+05b88e1-46299.rbxm_0_DebuggerData.xml").as_deref(),
+            Some("rodeo-1.4.0-rc.4+05b88e1-46299.rbxm")
+        );
+        for other in [
+            "pluginIDEState_user_rodeo.rbxm_0.xml",            // legacy shared plugin: Studio's business
+            "pluginIDEState_user_RojoManagedPlugin.rbxm_0.xml", // someone else's plugin
+            "pluginIDEState_cloud_12345_0.xml",
+            ".DS_Store",
+        ] {
+            assert_eq!(plugin_file_of_ide_state(other), None, "{other}");
+        }
+    }
+
+    #[test]
+    fn ide_state_cleanup_removes_only_the_named_plugins_files() {
+        let base = std::env::temp_dir().join(format!("rodeo-ide-state-test-{}", std::process::id()));
+        let ide = base.join("pluginIDEState");
+        let plugins = base.join("Plugins");
+        std::fs::create_dir_all(&ide).unwrap();
+        std::fs::create_dir_all(&plugins).unwrap();
+        let touch = |dir: &Path, name: &str| std::fs::write(dir.join(name), b"x").unwrap();
+        touch(&ide, "pluginIDEState_user_rodeo-1.2.3+abc-46001.rbxm_0.xml");
+        touch(&ide, "pluginIDEState_user_rodeo-1.2.3+abc-46001.rbxm_0_DebuggerData.xml");
+        touch(&ide, "pluginIDEState_user_rodeo-1.2.3+abc-46003.rbxm_0.xml");
+        touch(&ide, "pluginIDEState_user_rodeo-1.2.3+abc-46003.rbxm_0_DebuggerData.xml");
+        touch(&ide, "pluginIDEState_user_rodeo.rbxm_0.xml");
+        touch(&ide, "pluginIDEState_user_RojoManagedPlugin.rbxm_0.xml");
+
+        // Removing one plugin's state leaves every other file alone.
+        assert_eq!(remove_ide_state_in(&ide, "rodeo-1.2.3+abc-46001.rbxm"), 2);
+        assert_eq!(std::fs::read_dir(&ide).unwrap().count(), 4);
+
+        // The orphan sweep removes state only for our plugin files that are
+        // gone: 46003 has no plugin file, so its pair goes; the legacy and
+        // foreign files stay regardless.
+        touch(&plugins, "rodeo-1.2.3+abc-46005.rbxm");
+        touch(&ide, "pluginIDEState_user_rodeo-1.2.3+abc-46005.rbxm_0.xml");
+        assert_eq!(sweep_orphaned_ide_state_in(&ide, &plugins), 2);
+        let left: Vec<String> = std::fs::read_dir(&ide).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        assert_eq!(left.len(), 3, "{left:?}");
+        assert!(left.iter().any(|n| n.contains("46005")), "{left:?}");
+        assert!(left.iter().any(|n| n == "pluginIDEState_user_rodeo.rbxm_0.xml"), "{left:?}");
+        assert!(left.iter().any(|n| n.contains("RojoManagedPlugin")), "{left:?}");
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
