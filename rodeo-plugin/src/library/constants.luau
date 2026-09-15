@@ -1,3 +1,14 @@
+-- The studio backend that installed this plugin file bakes its WebSocket
+-- port onto the rbxm root (`rodeo_plugin`, this script's great-grandparent).
+-- One plugin file per running backend, so each plugin knows which backend is
+-- its own. A rojo-served dev plugin has no attribute and takes the default.
+local pluginRoot = script.Parent.Parent.Parent
+local bakedPort = pluginRoot:GetAttribute("rodeoPort")
+
+-- Default studio-backend WebSocket port (= rodeo-cli's SERVE_PORT + 1; keep in
+-- sync with rodeo-cli/src/util/config.rs::SERVE_PORT).
+local DEFAULT_PORT = 44873
+
 return {
 	-- Suffix used to rename modules during uncacheable require traversal
 	IGNORE_SUFFIX = ".rodeo.ignore.",
@@ -9,13 +20,15 @@ return {
 	-- whose id differs from its own, and reports its own in WelcomeMsg.version.
 	BUILD_ID = RODEO_BUILD_ID,
 
-	-- Default connection settings. The static plugin auto-connects to the
-	-- studio backend's WebSocket on this port (= rodeo-cli's SERVE_PORT + 1;
-	-- keep in sync with rodeo-cli/src/util/config.rs::SERVE_PORT). A rodeo
-	-- launch overrides the port via the `rodeoPort` workspace attribute (set
-	-- by the RunScript bootstrap) and supplies its session via `rodeoSession`.
 	DEFAULT_HOST = "localhost",
-	DEFAULT_PORT = 44873,
+	DEFAULT_PORT = DEFAULT_PORT,
+	-- This plugin's own studio-backend port: baked into the plugin file by the
+	-- backend that installed it, else the default. The plugin dials only this
+	-- port. A rodeo launch's bootstrap stamps the launching backend's port as
+	-- the `rodeoPort` Workspace attribute; a plugin whose PORT differs stays
+	-- dormant in that Studio (see AppContext), and `rodeoSession` names the
+	-- launch on the handshake.
+	PORT = (if type(bakedPort) == "number" then bakedPort else DEFAULT_PORT) :: number,
 	VERBOSE = false,
 
 	-- Bit positions for context bitset

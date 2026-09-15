@@ -54,6 +54,8 @@ export type AppProviderProps = {
 	initialSettings: {
 		port: number,
 	},
+	-- Called once, on the first successful connection to the backend.
+	onConnected: (() -> ())?,
 	children: any,
 }
 
@@ -91,9 +93,10 @@ end
 
 -- Provider component
 local function AppProvider(props: AppProviderProps)
-	-- Connection defaults (host is fixed; port falls back to the launch attribute).
-	local defaultHost = constants.DEFAULT_HOST
-	local defaultPort = tostring(props.initialSettings.port or constants.DEFAULT_PORT)
+	-- This plugin's own backend: the port the installing backend baked into
+	-- the plugin file (constants.PORT). The plugin never dials any other port.
+	local host = constants.DEFAULT_HOST
+	local myPort: number = props.initialSettings.port or constants.PORT
 
 	local verbose, setVerbose = React.useState(constants.VERBOSE)
 
@@ -102,6 +105,17 @@ local function AppProvider(props: AppProviderProps)
 	local connected, setConnected = React.useState(false)
 	-- Backend build id from the welcome message; nil until received.
 	local serverVersion, setServerVersion = React.useState(nil :: string?)
+	-- Mirrors serverVersion for the socket callbacks, whose closures predate
+	-- the welcome. Set through noteServerVersion below.
+	local serverVersionRef = React.useRef(nil :: string?)
+	local function noteServerVersion(version: string?)
+		serverVersionRef.current = version
+		setServerVersion(version)
+	end
+	-- Seconds to wait before the next dial, set by the close/error handlers
+	-- and consumed by the auto-connect effect. nil = first attempt.
+	local retryDelayRef = React.useRef(nil :: number?)
+	local announcedRef = React.useRef(false)
 
 	-- Execution state
 	local isExecuting, setIsExecuting = React.useState(false)
@@ -157,6 +171,12 @@ local function AppProvider(props: AppProviderProps)
 
 		newClient.Opened:Connect(function()
 			setConnected(true)
+			if not announcedRef.current then
+				announcedRef.current = true
+				if props.onConnected then
+					task.spawn(props.onConnected)
+				end
+			end
 
 			-- Send state on connect and on every change
 			local function sendState()
@@ -196,18 +216,31 @@ local function AppProvider(props: AppProviderProps)
 			disconnectStudioStateListener = studio.listen(sendState)
 		end)
 
+		-- Back-off before the next dial. A backend of another build closes the
+		-- socket (pre-1.5) or parks it (1.5+); redialing every second at a
+		-- backend that will never take this plugin is pure churn, so wait 30 s.
+		-- Otherwise: 1 s in the edit DOM (as before); 5 s in server/client DOMs,
+		-- which used to redial with no delay at all.
+		local function scheduleRetry()
+			local seen = serverVersionRef.current
+			local mismatch = seen ~= nil and seen ~= constants.BUILD_ID
+			retryDelayRef.current = if mismatch then 30 elseif RunService:IsEdit() then 1 else 5
+		end
+
 		newClient.Error:Connect(function(code: string, message: string)
 			-- warn("[rodeo] Socket error:", code, message)
+			scheduleRetry()
 			setWsUrl(nil)
 		end)
 
 		newClient.Closed:Connect(function()
+			scheduleRetry()
 			setConnected(false)
 			setWsUrl(nil)
 			setClient(nil)
 			setActiveProcesses({})
-			-- Keep serverVersion: a mismatch closes the socket immediately and
-			-- the status should stay readable while the plugin retries.
+			-- Keep serverVersion: a mismatch closes or parks the socket and the
+			-- status should stay readable while the plugin waits to retry.
 		end)
 
 		setClient(newClient)
@@ -231,7 +264,7 @@ local function AppProvider(props: AppProviderProps)
 			verbose = verbose,
 			setIsExecuting = setIsExecuting,
 			setActiveProcesses = setActiveProcesses,
-			setServerVersion = setServerVersion,
+			setServerVersion = noteServerVersion,
 		})
 
 		return cleanup
@@ -242,42 +275,57 @@ local function AppProvider(props: AppProviderProps)
 		setVerbose(newVerbose)
 	end
 
-	-- Auto-connect: always on, retries every 1s while disconnected. No manual
-	-- host/port — the host is the default and the port comes from the launch's
-	-- `rodeoPort` attribute (falling back to the default).
+	-- Auto-connect: always on. Dials this plugin's own backend and no other,
+	-- behind two gates:
+	--  * Ownership. A rodeo launch's RunScript bootstrap stamps the launching
+	--    backend's port as the `rodeoPort` Workspace attribute. If it names a
+	--    different port, this Studio belongs to another backend and this
+	--    plugin stays dormant here: no socket, no UI. No attribute means a
+	--    hand-opened Studio, which every running backend's plugin connects to.
+	--    Before the bootstrap lands every installed plugin sees no attribute,
+	--    so the check runs at dial time and again whenever the attribute
+	--    changes.
+	--  * Back-off, set by the close/error handlers (retryDelayRef).
 	React.useEffect(function()
 		-- Skip if already connected or a connection is in progress.
 		if connected or wsUrl then
 			return
 		end
 
+		local ws = game:GetService("Workspace")
 		local shouldReconnect = true
 		local function doConnect()
 			if not shouldReconnect then
 				return
 			end
-			local bootstrapPort = game:GetService("Workspace"):GetAttribute("rodeoPort")
-			local portNum = bootstrapPort or tonumber(defaultPort)
-			setWsUrl(`ws://{defaultHost}:{portNum}`)
+			local launchPort = ws:GetAttribute("rodeoPort")
+			if launchPort ~= nil and launchPort ~= myPort then
+				return
+			end
+			setWsUrl(`ws://{host}:{myPort}`)
 		end
 
 		-- Only the edit DOM races the RunScript bootstrap that stamps the launch
 		-- attributes — `rodeoSession` (which launch/run this studio belongs to,
-		-- sent on the WS handshake) and `rodeoPort` (the backend to dial) — worst
-		-- case ~200ms after the plugin mounts, so wait there before reading them.
-		-- Server/client DOMs are clones of the edit DataModel and inherit both, so
-		-- they connect immediately — one plugin connects per DOM, and this is on
-		-- each DOM's launch→connect critical path.
-		if RunService:IsEdit() then
-			task.delay(1, doConnect)
+		-- sent on the WS handshake) and `rodeoPort` — worst case ~200ms after the
+		-- plugin mounts, so its first attempt waits 1 s. Server/client DOMs are
+		-- clones of the edit DataModel and inherit both, so they dial at once —
+		-- one plugin connects per DOM, and this is on each DOM's launch→connect
+		-- critical path. Retries use the back-off the last close chose.
+		local delay = retryDelayRef.current or (if RunService:IsEdit() then 1 else 0)
+		retryDelayRef.current = nil
+		if delay > 0 then
+			task.delay(delay, doConnect)
 		else
 			doConnect()
 		end
+		local attrConn = ws:GetAttributeChangedSignal("rodeoPort"):Connect(doConnect)
 
 		return function()
 			shouldReconnect = false
+			attrConn:Disconnect()
 		end
-	end, { connected, wsUrl, defaultHost, defaultPort })
+	end, { connected, wsUrl, myPort })
 
 	-- Build context value (memoized)
 	local contextValue = React.useMemo(function()

@@ -2,12 +2,16 @@
 	Rodeo Plugin Entry Point
 
 	Bootstraps the React UI. All connection and execution logic lives in
-	AppProvider, which auto-connects on load (no manual host/port/autoConnect —
-	the port comes from the launch's rodeoPort attribute, else the default).
+	AppProvider, which auto-connects on load to this plugin's own studio
+	backend — the port the installing backend baked into the plugin file
+	(constants.PORT). One plugin file per running backend, so several rodeo
+	plugins can be loaded in one Studio; AppProvider decides whether this one
+	is active here (see its auto-connect effect).
 
 	The app is always mounted (the widget is the mount point) so the WebSocket
 	runs; the panel itself just shows connection status, active runs, and a
-	verbose toggle.
+	verbose toggle. The toolbar button appears on the first connection, so a
+	plugin with no backend shows nothing.
 ]]
 
 local App = require(script.app.widget)
@@ -28,28 +32,34 @@ local WIDGET_INFO = DockWidgetPluginGuiInfo.new(
 	350 -- Minimum height
 )
 
--- Create widget
-local widgetId = "Rodeo-" .. tostring(constants.DEFAULT_PORT)
+-- Create widget. Id and title carry this plugin's port and version: two
+-- rodeo plugins can be loaded at once, and Studio keys dock state by id.
+local widgetId = "Rodeo-" .. tostring(constants.PORT)
 local widget = plugin:CreateDockWidgetPluginGui(widgetId, WIDGET_INFO)
-widget.Title = "Rodeo"
+widget.Title = `Rodeo v{constants.VERSION}`
 
--- Toolbar toggle for the settings panel. The widget starts disabled, so a
--- rodeo-launched Studio just carries a dormant button until the user opens it.
-local toolbar = plugin:CreateToolbar("rodeo")
-local toggleButton = toolbar:CreateButton("Rodeo", "Toggle Rodeo Plugin UI", assets.rodeo)
-
-toggleButton.Click:Connect(function()
-	widget.Enabled = not widget.Enabled
-end)
+-- Toolbar toggle for the panel, created on the first successful connection
+-- so a plugin with no backend — its serve is gone, or this Studio belongs to
+-- another backend — shows nothing. The widget itself starts disabled.
+local toggleButton: PluginToolbarButton? = nil
+local function ensureToolbar()
+	if toggleButton then
+		return
+	end
+	local toolbar = plugin:CreateToolbar(`Rodeo v{constants.VERSION}`)
+	local button = toolbar:CreateButton("Rodeo", "Toggle Rodeo Plugin UI", assets.rodeo)
+	button.Click:Connect(function()
+		widget.Enabled = not widget.Enabled
+	end)
+	button:SetActive(widget.Enabled)
+	toggleButton = button
+end
 
 widget:GetPropertyChangedSignal("Enabled"):Connect(function()
-	toggleButton:SetActive(widget.Enabled)
+	if toggleButton then
+		toggleButton:SetActive(widget.Enabled)
+	end
 end)
-
--- No activation gates: this is a single static plugin, so the only instance in
--- a given Studio is the right one. A rodeo launch routes this plugin via the
--- `rodeoPort`/`rodeoSession` workspace attributes its RunScript bootstrap sets;
--- a manual Studio just connects on the defaults.
 
 -- Create React root and render (always, for WebSocket to work)
 local root = ReactRoblox.createRoot(widget)
@@ -57,8 +67,9 @@ local root = ReactRoblox.createRoot(widget)
 root:render(e(App, {
 	plugin = plugin,
 	initialSettings = {
-		port = constants.DEFAULT_PORT,
+		port = constants.PORT,
 	},
+	onConnected = ensureToolbar,
 }))
 
 -- Cleanup on plugin unload

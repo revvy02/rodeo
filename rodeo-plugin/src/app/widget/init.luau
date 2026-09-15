@@ -21,6 +21,8 @@ export type Props = {
 	initialSettings: {
 		port: number,
 	},
+	-- Called once, on the first successful connection to the backend.
+	onConnected: (() -> ())?,
 }
 
 -- Color for process state
@@ -123,6 +125,7 @@ local function App(props: Props)
 		Content = e(AppProvider, {
 			plugin = props.plugin,
 			initialSettings = props.initialSettings,
+			onConnected = props.onConnected,
 		}, e(AppContent)),
 	})
 end
