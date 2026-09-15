@@ -596,16 +596,23 @@ impl MasterState {
             return;
         }
 
-        // Collect session_guids that pending runs are targeting with a non-empty session.
+        // Collect the studio filters pending runs carry: a launch session_guid
+        // (`run --place`) or a canonical studio_id (`--studio-id`).
         let targeted_sessions: std::collections::HashSet<String> = self.pending_runs.iter()
             .filter_map(|r| r.session.clone())
             .filter(|s| !s.is_empty())
             .collect();
 
         for scope_session in targeted_sessions {
+            // Alive = some connected DOM matches the filter either way — the
+            // same test routing applies (`matches_studio`). Checking only the
+            // session_guid killed every `--studio-id` run that had to wait for
+            // a mode transition, silently, on the next notify tick.
             let alive = self.backends.values().any(|b| {
                 b.state_rx.borrow().doms.iter().any(|v| {
-                    v.connected && v.session_guid.as_deref() == Some(scope_session.as_str())
+                    v.connected
+                        && (v.session_guid.as_deref() == Some(scope_session.as_str())
+                            || v.studio_id.as_deref() == Some(scope_session.as_str()))
                 })
             });
             if alive {
