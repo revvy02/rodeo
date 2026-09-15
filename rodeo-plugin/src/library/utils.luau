@@ -116,11 +116,6 @@ local function createExecutionContext(source: string, context: RunContext, execu
 	-- Clone and nil-parent each dependency module with @rodeo/ names for clean stack traces
 	local sharedRoot = script.Parent.Parent.Parent.shared
 
-	-- Set proto types globally so nil-parented factories can access them
-	if not _G.__rodeo_runtime_proto then
-		_G.__rodeo_runtime_proto = require(sharedRoot.proto.runtime)
-	end
-
 	local depModules = {}
 	local function cloneDep(template: ModuleScript, name: string): ModuleScript
 		local m = template:Clone()

@@ -462,9 +462,11 @@ const CMDBAR_BRIDGE_NAME: &str = "rodeoCmdbar";
 ///    keeps its creator's identity when the plugin (identity 5) invokes it, so
 ///    `--context cmdbar` runs the user module at command-bar identity with no
 ///    StudioMCP hop. The edit DOM's identities share one Luau VM, so the
-///    result is handed back through `_G` rather than the Bindable return
-///    (which deep-copies tables and rejects functions). `Archivable = false`
-///    under CoreGui keeps it out of saves and out of play-mode clones.
+///    result is handed back through the plugin's namespace in `_G`
+///    (`_G.__rodeo_plugins[<build>-<port>].cmdbar`) rather than the Bindable
+///    return (which deep-copies tables and rejects functions).
+///    `Archivable = false` under CoreGui keeps it out of saves and out of
+///    play-mode clones.
 pub(crate) fn bootstrap_source(session_guid: &str, port: u16, build: &str) -> String {
     format!(
         r#"local ws = game:GetService("Workspace")
@@ -480,14 +482,25 @@ bridge.OnInvoke = function(module, executionId)
 	local ok, result = xpcall(require, function(err)
 		return tostring(err) .. "\n" .. debug.traceback(nil, 2)
 	end, module)
-	_G.__rodeo_cmdbar = _G.__rodeo_cmdbar or {{}}
-	_G.__rodeo_cmdbar[executionId] = {{ ok = ok, result = result }}
+	local plugins = _G.__rodeo_plugins or {{}}
+	_G.__rodeo_plugins = plugins
+	local ns = plugins["{key}"] or {{ procs = {{}}, cmdbar = {{}} }}
+	plugins["{key}"] = ns
+	ns.cmdbar[executionId] = {{ ok = ok, result = result }}
 	return ok
 end
 bridge.Parent = game:GetService("CoreGui")
 "#,
         bridge = CMDBAR_BRIDGE_NAME,
+        key = plugin_key(build, port),
     )
+}
+
+/// The plugin instance's key in the edit VM's `_G.__rodeo_plugins`, which
+/// the bootstrap's bridge uses to hand cmdbar results to the right plugin.
+/// Must match `constants.PLUGIN_KEY` in the plugin: `<build>-<port>`.
+fn plugin_key(build: &str, port: u16) -> String {
+    format!("{build}-{port}")
 }
 
 #[cfg(test)]
@@ -501,6 +514,9 @@ mod bootstrap_tests {
         assert!(src.contains(r#"ws:SetAttribute("rodeoPort", 44901)"#), "{src}");
         assert!(src.contains(r#"bridge.Name = "rodeoCmdbar""#), "{src}");
         assert!(src.contains(r#"bridge:SetAttribute("rodeoBuild", "1.2.3+abcdef0")"#), "{src}");
+        // The bridge hands results to the plugin instance's namespace, keyed
+        // exactly as constants.PLUGIN_KEY builds it.
+        assert!(src.contains(r#"plugins["1.2.3+abcdef0-44901"]"#), "{src}");
         assert!(src.contains("bridge.Archivable = false"), "{src}");
         assert!(src.contains(r#"bridge.Parent = game:GetService("CoreGui")"#), "{src}");
         // The Luau source must carry a real "\n" escape, not a raw newline.

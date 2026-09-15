@@ -8,6 +8,13 @@ local bakedPort = pluginRoot:GetAttribute("rodeoPort")
 -- Default studio-backend WebSocket port (= rodeo-cli's SERVE_PORT + 1; keep in
 -- sync with rodeo-cli/src/util/config.rs::SERVE_PORT).
 local DEFAULT_PORT = 44873
+local PORT: number = if type(bakedPort) == "number" then bakedPort else DEFAULT_PORT
+
+-- This plugin instance's key in `_G.__rodeo_plugins`. Every plugin in a DOM
+-- shares one Luau VM and one _G, so per-plugin state lives in a table keyed
+-- by build and port instead of flat globals. The launch bootstrap computes the
+-- same key in Rust (`plugin_key` in launch.rs) to hand cmdbar results back.
+local PLUGIN_KEY = `{RODEO_BUILD_ID}-{PORT}`
 
 return {
 	-- Suffix used to rename modules during uncacheable require traversal
@@ -28,7 +35,8 @@ return {
 	-- the `rodeoPort` Workspace attribute; a plugin whose PORT differs stays
 	-- dormant in that Studio (see AppContext), and `rodeoSession` names the
 	-- launch on the handshake.
-	PORT = (if type(bakedPort) == "number" then bakedPort else DEFAULT_PORT) :: number,
+	PORT = PORT,
+	PLUGIN_KEY = PLUGIN_KEY,
 	VERBOSE = false,
 
 	-- Bit positions for context bitset

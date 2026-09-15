@@ -54,10 +54,10 @@ local function run(rpc: Rpc, params: RunParams, execute: (apis: any) -> (boolean
 
 	-- 2. Build API factories
 	local apis = {
-		fs = createFs(rpc),
-		stream = createStream(rpc),
-		io = createIo(rpc),
-		process = createProcess(rpc, params.scriptArgs or {}, hostInfo),
+		fs = createFs(rpc, runtime),
+		stream = createStream(rpc, runtime),
+		io = createIo(rpc, runtime),
+		process = createProcess(rpc, params.scriptArgs or {}, hostInfo, runtime),
 	}
 
 	-- 3. Register in _G so require("@rodeo/fs") etc. works

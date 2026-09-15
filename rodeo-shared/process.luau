@@ -1,5 +1,7 @@
 -- @rodeo/process API over typed RPC.
-local runtime = _G.__rodeo_runtime_proto
+-- Factory: (rpc, scriptArgs, hostInfo, runtime) -> process. `runtime` is the
+-- caller's proto module, passed in rather than read from _G: several rodeo
+-- plugins can share one VM. (Type annotations below name it for readers only.)
 
 -- Apply proto3 defaults: absent fields = zero values
 local function applyRunDefaults(resp: runtime.ProcessRunResponse): runtime.ProcessRunResponse
@@ -11,7 +13,8 @@ local function applyRunDefaults(resp: runtime.ProcessRunResponse): runtime.Proce
 	}
 end
 
-return function(rpc, scriptArgs, hostInfo: runtime.ProcessGetInfoResponse)
+return function(rpc, scriptArgs, hostInfo, runtime)
+	runtime = runtime or _G.__rodeo_runtime_proto -- standalone hosts (rodeo-shared/run.luau)
 
 	local process = {}
 

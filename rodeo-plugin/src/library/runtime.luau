@@ -100,11 +100,14 @@ local function executeInContext(ctx: utils.ExecutionContext, context: RunContext
 	ctx.runner:SetAttribute("logFilter", HttpService:JSONEncode(params.logFilter or {}))
 	ctx.runner:SetAttribute("context", context)
 	ctx.runner:SetAttribute("pluginBuild", constants.BUILD_ID)
-	-- The inlined @rodeo/* shims find their run through this attribute on the
-	-- module they live in (`script`), falling back to the shared
-	-- _G.__rodeo_eid slot — which another rodeo plugin's runner in this same
-	-- VM can overwrite between a run's start and a late require.
+	ctx.runner:SetAttribute("pluginKey", constants.PLUGIN_KEY)
+	-- The inlined @rodeo/* shims find their plugin's namespace and their run
+	-- through these two attributes on the module they live in (`script`). Both
+	-- have to come from the module: every plugin in a DOM shares one _G, and
+	-- one plugin runs several runs at once, so a shared "current run" slot
+	-- would be overwritten between a run's start and a late require.
 	if ctx.module then
+		ctx.module:SetAttribute("rodeoPlugin", constants.PLUGIN_KEY)
 		ctx.module:SetAttribute("rodeoExecutionId", params.executionId)
 	end
 

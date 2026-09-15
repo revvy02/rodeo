@@ -32,31 +32,50 @@ incomingEvent.Event:Connect(function(msg)
 	end
 end)
 
--- Runtime proto module — required directly via ref (works across VM boundaries for run:server/client).
--- Also published to _G so the cloned rodeo-shared factories (stream/fs/process/io) can pick it up.
+-- Runtime proto module — required directly via ref (works across VM boundaries
+-- for run:server/client) and handed to every factory explicitly.
 local runtime = require(ref("runtimeProto"))
-_G.__rodeo_runtime_proto = runtime
+
+-- This plugin instance's namespace in _G. Every plugin in a DOM's VM shares
+-- one _G, and this runner may be in a VM the plugin itself never touched (a
+-- play DOM's game VM for run:server/client), so the runner creates the table
+-- when needed. Per-plugin state lives here: `procs` (run id → the run's API
+-- tables, read by the inlined @rodeo/* shims) and `cmdbar` (results the launch
+-- bootstrap's bridge hands back). Never a "current run": one plugin runs
+-- several runs at once, so per-run identity comes from the attributes the
+-- runtime stamps on each run's module.
+local pluginKey = script:GetAttribute("pluginKey") or ""
+_G.__rodeo_plugins = _G.__rodeo_plugins or {}
+local ns = _G.__rodeo_plugins[pluginKey]
+if not ns then
+	ns = { procs = {}, cmdbar = {} }
+	_G.__rodeo_plugins[pluginKey] = ns
+end
 
 -- Fetch host info once, share across factories
 local hostInfo = rpc.call("process_get_info", runtime.ProcessGetInfoRequest.new({}))
 
 -- Create RPC-backed API implementations via factories
-local processApi = require(ref("process"))(rpc, scriptArgs, hostInfo)
-local streamApi = require(ref("stream"))(rpc)
-local fsApi = require(ref("fs"))(rpc)
+local processApi = require(ref("process"))(rpc, scriptArgs, hostInfo, runtime)
+local streamApi = require(ref("stream"))(rpc, runtime)
+local fsApi = require(ref("fs"))(rpc, runtime)
 -- Required before `apis` so roblox.bake can close over them (the return-value
 -- handling below uses the same pair directly for its JSON form).
 local normalize = require(ref("normalize"))
 local serializeToLuau = require(ref("serialize"))
 local apis = {
 	fs = fsApi,
-	io = require(ref("io"))(rpc),
+	io = require(ref("io"))(rpc, runtime),
 	process = processApi,
 	stream = streamApi,
 	roblox = require(ref("roblox"))(rpc, fsApi, streamApi, normalize, serializeToLuau, runtime),
 }
 
--- Publish to _G so require("@rodeo/fs") etc. can find them
+-- Publish for the inlined @rodeo/* shims: they read ns.procs[run id] through
+-- the attributes on their module. The flat `_G.__rodeo_procs` / `__rodeo_eid`
+-- pair stays as a compatibility mirror for projects that vendor rodeo-pkg —
+-- its singleton reads them and has no way to learn this plugin's key.
+ns.procs[executionId] = apis
 _G.__rodeo_procs = _G.__rodeo_procs or {}
 _G.__rodeo_procs[executionId] = apis
 _G.__rodeo_eid = executionId
@@ -127,9 +146,9 @@ local success, result = xpcall(function()
 		-- BindableFunction under CoreGui whose OnInvoke keeps that identity
 		-- when this plugin thread invokes it — so only rodeo-launched Studios
 		-- have one. The edit DOM's identities share this Luau VM, so the bridge
-		-- hands the raw result back through _G rather than the Bindable return
-		-- (which deep-copies tables and rejects functions): return values
-		-- behave exactly like the plugin context's.
+		-- hands the raw result back through this plugin's namespace in _G
+		-- rather than the Bindable return (which deep-copies tables and rejects
+		-- functions): return values behave exactly like the plugin context's.
 		local bridge = game:GetService("CoreGui"):FindFirstChild("rodeoCmdbar")
 		if not bridge then
 			error(
@@ -152,12 +171,11 @@ local success, result = xpcall(function()
 			)
 		end
 		bridge:Invoke(module, executionId)
-		local slots = _G.__rodeo_cmdbar
-		local slot = slots and slots[executionId]
+		local slot = ns.cmdbar[executionId]
 		if not slot then
 			error("cmdbar bridge returned no result for this run", 0)
 		end
-		slots[executionId] = nil
+		ns.cmdbar[executionId] = nil
 		if not slot.ok then
 			error(slot.result, 0)
 		end
@@ -237,6 +255,7 @@ if success and result ~= nil then
 end
 
 -- Clean up process-scoped _G entry
+ns.procs[executionId] = nil
 _G.__rodeo_eid = nil
 _G.__rodeo_procs[executionId] = nil
 

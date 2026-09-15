@@ -1,9 +1,10 @@
 -- @rodeo/stream API over typed RPC.
 -- Public surface: read, write, close. The split (readChunk/readLine/readAll) lives at
 -- the RPC layer only — `read` dispatches based on handle kind.
-local runtime = _G.__rodeo_runtime_proto
-
-return function(rpc)
+-- Factory: (rpc, runtime) -> stream. `runtime` is the caller's proto module,
+-- passed in rather than read from _G: several rodeo plugins can share one VM.
+return function(rpc, runtime)
+	runtime = runtime or _G.__rodeo_runtime_proto -- standalone hosts (rodeo-shared/run.luau)
 	local stream = {}
 
 	local function readChunk(handle, size: number?): runtime.StreamReadChunkResponse
