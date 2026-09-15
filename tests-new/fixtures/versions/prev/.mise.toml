@@ -1,6 +1,8 @@
-# Cross-version fixture: the previous published rodeo release, pinned the way a
-# project pins it. tests-new/cli/operations/crossVersion.test.ts resolves the
-# binary with `mise -C <this dir> which rodeo`. Bump when a newer release ships.
+# Cross-version fixture: a pre-1.5 rodeo release (one that still writes the
+# shared rodeo.rbxm), pinned the way a project pins it. The test proves that
+# this tree coexists with such a build, so keep this a pre-1.5 version.
+# tests-new/cli/operations/crossVersion.test.ts resolves the binary with
+# `mise -C <this dir> which rodeo`.
 [tools]
 "ubi:revvy02/rodeo" = "1.4.0-rc.4"
 
