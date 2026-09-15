@@ -53,8 +53,13 @@ at the same time:
 - `rodeo kill <studio-id>` closes Studios that the current serve launched. For
   a leftover Studio from an earlier serve, kill its pid instead. Studio ignores
   SIGTERM, so send SIGKILL.
-- **Give each harness its own port** (`rodeo serve --port <n>`). Two agents on
-  one port route runs into each other's sessions.
+- **Give each harness its own port** (`rodeo serve --port <n>`, or `RODEO_PORT`
+  in the project's `.mise.toml`/`.env`). Two agents on one port route runs into
+  each other's sessions. Serves on different ports are fully independent —
+  each installs its own `rodeo-<build>-<port>.rbxm` plugin file — so different
+  rodeo versions can run side by side.
+- A Studio the user opened by hand connects to every running serve and shows
+  up in each `rodeo state`; Studios a serve launched belong to that serve only.
 - When a serve restarts, Studios from earlier runs reconnect to it. If
   `rodeo state` lists more than one Studio, pin every run with `--studio-id`.
 
@@ -64,7 +69,7 @@ at the same time:
 
 Start a persistent server. Does NOT launch Studio — use `run --place` for that.
 
-- `--port <n>` — port number (default: 44872)
+- `--port <n>` — master port (resolution: the flag, then `RODEO_PORT`, then 44872)
 - `--master` / `--studio` / `--master-host` / `--master-port` — process-split internals; rarely needed directly
 - `--ppid <pid>` — exit when this process dies
 
@@ -88,11 +93,11 @@ Run a script in Studio.
 - `--detach` — keep Studio running after rodeo exits
 - `--focus` — bring Studio to the front on launch (default: background). Studio takes keyboard focus only if it opens on the display you're working on; on another display it's raised there and your focus stays where it is
 - Without `--focus`, Studio stays in the background on every display: it opens without activating, and when it activates itself (Studio does this as a test session starts or ends) rodeo hands focus straight back to the app you were in — unless you switched to Studio yourself (click or ⌘-Tab)
-- `--show-widgets <spec>` — allow-list of Studio dock widgets to keep; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar; or a raw panel ID). Restored on exit
+- `--show-widgets <spec>` — allow-list of Studio dock widgets to keep; everything else (panels, ribbon, command bar) is hidden. `none` hides all; a comma list keeps those (aliases: output, explorer, properties, editor, toolbox, assistant, ribbon, commandbar, rodeo — this serve's own panel; or a raw panel ID). Restored on exit
 - `--save [path]` — save the place after the run; a missed save is a nonzero exit, never silent. Bare `--save` opens the source file directly and saves into it; `--save <path>` saves to that path. With `--detach`, saves at run end and leaves Studio open
 - `--profile [dir]` — enable microprofiler auto-capture and collect dumps (optional output directory)
 - `--sourcemap <path>` — path to sourcemap.json for instance resolution
-- `--host <host>` / `--port <port>` — server address (default: localhost:44872)
+- `--host <host>` / `--port <port>` — server address (port resolution: the flag, then `RODEO_PORT`, then 44872)
 - `--no-output` — suppress all output
 - `--no-print` / `--no-warn` / `--no-error` / `--no-info` — suppress specific log levels
 - `--fflag.override <KEY=VALUE>` (repeatable) / `--fflag.file <path>` — FFlag overrides at launch

@@ -170,6 +170,8 @@ RUNS
 
 Scope a run to a studio with `--studio-id <id>`. `rodeo kill <id>` takes either a run id or a studio id, and `rodeo save <studio-id>` commits a Studio's place back to its source file. Ids change each launch, so read them from `rodeo state` rather than hardcoding. Add `--json` for the raw snapshot.
 
+Every command resolves its port as `--port`, then `RODEO_PORT`, then 44872. Serves on different ports are independent — each installs its own plugin file — so projects can pin a rodeo version and a port together in `.mise.toml` and run different versions side by side.
+
 ## Docs
 
 **[revvy02.github.io/rodeo](https://revvy02.github.io/rodeo/)**

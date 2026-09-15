@@ -12,7 +12,24 @@ In one terminal:
 rodeo serve
 ```
 
-This starts the rodeo server on `localhost:44872` and waits for Studio to connect. Open Studio (any place) and the installed plugin connects automatically.
+This starts the rodeo server and waits for Studio to connect. Open Studio (any place) and the installed plugin connects automatically.
+
+## Port
+
+Every command that talks to the server resolves its port the same way: `--port`, then the `RODEO_PORT` environment variable, then `44872`. The plugin's WebSocket is on the next port up.
+
+A project pins its port next to its rodeo version, so projects on different ports run independently, including different rodeo versions:
+
+```toml
+# .mise.toml
+[tools]
+"ubi:revvy02/rodeo" = "1.5.0"
+
+[env]
+RODEO_PORT = "46800"
+```
+
+A `.env` file in the project works too. Projects that resolve to the same port share one serve, as before.
 
 ## Run a one-shot script
 

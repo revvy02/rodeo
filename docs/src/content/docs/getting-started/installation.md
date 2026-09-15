@@ -18,7 +18,7 @@ rodeo --version
 
 ## Studio plugin
 
-There is no separate install step. The plugin is embedded in the CLI and written to Studio's local plugins folder as `rodeo.rbxm` whenever a serve starts:
+There is no separate install step. The plugin is embedded in the CLI. Each serve writes its own copy to Studio's local plugins folder when it starts, named `rodeo-<build>-<port>.rbxm` after the build and the port it listens on, and removes it when it stops:
 
 ```bash
 rodeo serve
@@ -26,9 +26,11 @@ rodeo serve
 rodeo run --place
 ```
 
-The file is rewritten only when it differs from the running CLI's embedded plugin, so upgrading rodeo updates the plugin on the next serve start. Studio reloads a local plugin when its file changes, including in Studios that are already open.
+One plugin file per running serve means two serves never overwrite each other's plugin, so different rodeo versions can run side by side on one machine, each on its own port (see [Port](/getting-started/cli-usage/#port)). A serve that stops leaves its file in place while a `--detach` Studio still uses it; the next serve to start removes files whose serve is gone and that no Studio needs.
 
-Launched Studios connect to the serve that launched them. A Studio you open manually connects to the serve on the default port.
+Launched Studios connect only to the serve that launched them. A Studio you open manually connects to every running serve and appears in each one's `rodeo state`.
+
+Versions before 1.5 write a single shared `rodeo.rbxm`. This build never touches that file, so an older rodeo keeps working alongside; delete `rodeo.rbxm` by hand once no older version remains.
 
 ## Generate type definitions
 
