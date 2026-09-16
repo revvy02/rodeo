@@ -115,11 +115,15 @@ end
 --- paths resolve against the run client's cwd. The image is always exactly
 --- the capture's `Camera.ViewportSize` (the window's, or `viewportSize` /
 --- the `device` preset's). Camera and device-simulator state are restored
---- after the capture, on error too. Requires a viewport (plugin context, or
---- client context in a running session). Frames beyond roughly 16384 physical
---- pixels never complete and fail after 10s, as does a minimized Studio on
---- Windows (background launches are minimized there; launch focused or
---- restore the window).
+--- after the capture, on error too. Requires a viewport: plugin context, or
+--- the client DOM of a running session. In a session the frame is taken from
+--- the file the engine writes for every capture (the engine refuses the
+--- direct readback there), and a frame the engine did not render is refused
+--- rather than written: a solo play-test session (`--mode test`) captures
+--- black on macOS, so capture from a multiplayer session (`--mode play`) or
+--- in edit mode. Frames beyond roughly 16384 physical pixels never complete
+--- and fail after 10s, as does a minimized Studio on Windows (background
+--- launches are minimized there; launch focused or restore the window).
 function roblox.captureViewport(output: string?, options: CaptureOptions?): (string, CaptureInfo)
 	return (singleton :: any).roblox.captureViewport(output, options)
 end

@@ -30,3 +30,16 @@ within about a second. A persistent Studio recovers on its own; the only thing
 this disturbs is a one-shot run in flight at the exact moment another serve
 starts or stops. This is transient and self-healing, unlike the permanent
 corruption a single shared plugin file caused (issue #12).
+
+## Captures in a running session
+
+In the edit DOM a capture is read back by the exact content id the engine
+hands the callback, so two Studios can never swap frames. In a session's
+server or client DOM the engine refuses that readback, and reading the id
+from the edit DOM instead yields zeros or an unrelated texture. What the
+engine does provide is the PNG it writes for every capture into a per-user
+directory shared by all Studio processes. Rodeo snapshots that directory
+before the capture and accepts exactly one complete PNG that appears
+afterwards at the viewport's size. Two candidates at once is an error to
+retry, never a guess, and a frame that is entirely black is refused rather
+than written: in a solo play-test session Studio captures black on macOS.

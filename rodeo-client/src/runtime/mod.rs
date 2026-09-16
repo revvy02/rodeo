@@ -115,6 +115,10 @@ pub struct RpcState {
     pub next_pid: u32,
     /// Where `stream.write("stdout" | "stderr", ...)` bytes go.
     pub captured_output_tx: CapturedOutputSender,
+    /// Engine capture-directory snapshots taken by `roblox.captureBegin`,
+    /// keyed by token, consumed by the matching `roblox.captureCollect`.
+    pub capture_snapshots: HashMap<String, roblox::CaptureSnapshot>,
+    pub next_capture_token: u64,
 }
 
 impl RpcState {
@@ -126,6 +130,8 @@ impl RpcState {
             exit_requested: false,
             next_pid: 0,
             captured_output_tx,
+            capture_snapshots: HashMap::new(),
+            next_capture_token: 0,
         };
         state.stream_handlers.insert("stdout".to_string(), StreamHandler::Stdout);
         state.stream_handlers.insert("stderr".to_string(), StreamHandler::Stderr);
@@ -218,6 +224,8 @@ pub async fn dispatch_client(
         // roblox
         Some(Req::RobloxExport(r)) => async_arm("roblox.exportInstances", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
         Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(state.clone(), r), Res::RobloxCaptureFinalize).await,
+        Some(Req::RobloxCaptureBegin(r)) => async_arm("roblox.captureBegin", id, roblox::roblox_capture_begin(state.clone(), r), Res::RobloxCaptureBegin).await,
+        Some(Req::RobloxCaptureCollect(r)) => async_arm("roblox.captureCollect", id, roblox::roblox_capture_collect(state.clone(), r), Res::RobloxCaptureCollect).await,
         Some(Req::RobloxImageEncode(r)) => async_arm("roblox.imageEncode", id, roblox::roblox_image_encode(state.clone(), r), Res::RobloxImageEncode).await,
         Some(Req::RobloxImageDecode(r)) => async_arm("roblox.imageDecode", id, roblox::roblox_image_decode(state.clone(), r), Res::RobloxImageDecode).await,
         Some(Req::RobloxMeshEncode(r)) => async_arm("roblox.meshEncode", id, mesh::roblox_mesh_encode(state.clone(), r), Res::RobloxMeshEncode).await,

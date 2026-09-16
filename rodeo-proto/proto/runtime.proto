@@ -129,6 +129,30 @@ message RobloxCaptureFinalizeResponse {
   uint32 source_height = 4;
 }
 
+// roblox.captureViewport from a running session (server/client DOM). There the
+// engine refuses to promote a capture's temporary texture id into an
+// EditableImage, so the frame is taken from the file the engine writes for
+// every capture in the per-user capture directory (macOS
+// ~/Library/Roblox/tmp-capture-storage, Windows %LOCALAPPDATA%\Roblox\
+// tmp-capture-storage), named wob-<pid><counter>. Begin snapshots that
+// directory before CaptureScreenshot; collect waits for exactly one complete
+// PNG that appeared since and matches the viewport at the display scale, then
+// finalizes it like roblox_capture_finalize (which also rejects an all-black
+// frame: a solo play-test session captures black). Several new matching files
+// at once (another Studio capturing concurrently) is an error, never a guess.
+message RobloxCaptureBeginRequest {}
+
+message RobloxCaptureBeginResponse {
+  string token = 1;             // names the snapshot for the matching collect
+}
+
+message RobloxCaptureCollectRequest {
+  string token = 1;             // from roblox_capture_begin
+  string output = 2;            // absolute output .png path
+  uint32 width = 3;             // Camera.ViewportSize at capture time = output size
+  uint32 height = 4;
+}
+
 // roblox.exportEditableImage: the plugin streamed an EditableImage's RGBA8
 // pixels (ReadPixelsBuffer) into an open FileWriter on the output path; this
 // consumes the handle in place of stream_close and writes the file as PNG
@@ -372,6 +396,8 @@ message ClientRpcCall {
     RobloxImageDecodeRequest       roblox_image_decode      = 55;
     RobloxMeshEncodeRequest        roblox_mesh_encode       = 56;
     RobloxMeshDecodeRequest        roblox_mesh_decode       = 57;
+    RobloxCaptureBeginRequest      roblox_capture_begin     = 58;
+    RobloxCaptureCollectRequest    roblox_capture_collect   = 59;
   }
 }
 
@@ -426,5 +452,7 @@ message ClientRpcResponse {
     RobloxImageDecodeResponse      roblox_image_decode      = 55;
     Ok                             roblox_mesh_encode       = 56;
     RobloxMeshDecodeResponse       roblox_mesh_decode       = 57;
+    RobloxCaptureBeginResponse     roblox_capture_begin     = 58;
+    RobloxCaptureFinalizeResponse  roblox_capture_collect   = 59;
   }
 }

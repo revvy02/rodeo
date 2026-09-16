@@ -464,5 +464,25 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 		return res.width, res.height
 	end
 
+	-- Running-session captures (server/client DOM): the engine refuses to
+	-- promote a capture's temporary texture there, so the run client snapshots
+	-- the engine's capture directory before CaptureScreenshot (`begin`) and
+	-- collects the frame the engine writes after the callback (`collect`),
+	-- finalizing it like `_captureFinalize`. See RobloxCaptureBeginRequest.
+	function roblox._captureBegin(): string
+		local res = rpc.call("roblox_capture_begin", runtime.RobloxCaptureBeginRequest.new({}))
+		return res.token
+	end
+
+	function roblox._captureCollect(token: string, output: string, width: number, height: number): (number, number)
+		local res = rpc.call("roblox_capture_collect", runtime.RobloxCaptureCollectRequest.new({
+			token = token,
+			output = output,
+			width = width,
+			height = height,
+		}))
+		return res.width, res.height
+	end
+
 	return roblox
 end

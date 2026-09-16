@@ -1,5 +1,8 @@
 use super::{stream, SharedRpcState};
 use rodeo_proto::runtime_types as rt;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 /// Finalize a `roblox.exportInstances`. The plugin has streamed the binary bytes from
 /// `SerializeInstancesAsync` into a FileWriter via chunked
@@ -103,6 +106,18 @@ fn finalize_pixels(
         ));
     }
 
+    // The engine reports success for a frame it never rendered: a solo
+    // play-test session's captures come out all zero (issue #17), and v1.3.0
+    // wrote those as PNGs that read as "my scene is black". Refuse them.
+    if rgba.chunks_exact(4).all(|p| p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return Err(
+            "captured frame is entirely black: Studio did not render this capture. In a solo play-test \
+             session (--mode test) Studio's captures come out black (rodeo issue #17); capture from a \
+             multiplayer session (--mode play) or in edit mode. Nothing was written."
+                .to_string(),
+        );
+    }
+
     let pixels: Vec<u8> = if (source_width, source_height) == (width, height) {
         rgba
     } else {
@@ -128,6 +143,269 @@ fn finalize_pixels(
         source_height,
         ..Default::default()
     })
+}
+
+// ---------------------------------------------------------------------------
+// Running-session captures: the frame from the engine's capture directory.
+//
+// In a server or client DOM the engine refuses to promote a capture's
+// temporary texture id into an EditableImage ("cannot currently create
+// editable image from temporary texture id"), and promoting it from the edit
+// DOM instead returns zeros (solo play-test) or an unrelated texture
+// (multiplayer: temp ids are per process). What does exist is the PNG the
+// engine writes for every capture to a per-user directory, named
+// `wob-<pid><6-digit counter>` after the capturing process. Files there
+// outlive the process, so a frame is identified by a snapshot taken before the
+// capture, not by "newest file": exactly one complete PNG that appeared or
+// changed since, sized like the viewport at one display scale. Two such files
+// (another Studio or run capturing at the same moment) is reported, never
+// guessed at. Measured on Studio 0.739: the file lands within ~2s of the
+// callback.
+// ---------------------------------------------------------------------------
+
+/// What the capture directory held when a capture began: file name ->
+/// (length, mtime). This capture's frame is a file not in here, or whose
+/// length or mtime differs.
+#[derive(Debug, Clone, Default)]
+pub struct CaptureSnapshot {
+    pub dir: PathBuf,
+    pub files: HashMap<String, (u64, SystemTime)>,
+}
+
+/// How long to wait for the engine to write the frame after the callback.
+const CAPTURE_FILE_TIMEOUT: Duration = Duration::from_secs(8);
+
+/// The engine's per-user capture directory. `RODEO_CAPTURE_DIR` overrides it
+/// (tests, unusual installs).
+pub fn capture_dir() -> Result<PathBuf, String> {
+    if let Ok(dir) = std::env::var("RODEO_CAPTURE_DIR") {
+        if !dir.is_empty() {
+            return Ok(PathBuf::from(dir));
+        }
+    }
+    if cfg!(target_os = "macos") {
+        let home = std::env::var("HOME").map_err(|_| "capture: HOME is not set".to_string())?;
+        Ok(Path::new(&home).join("Library").join("Roblox").join("tmp-capture-storage"))
+    } else if cfg!(target_os = "windows") {
+        let local = std::env::var("LOCALAPPDATA").map_err(|_| "capture: LOCALAPPDATA is not set".to_string())?;
+        Ok(Path::new(&local).join("Roblox").join("tmp-capture-storage"))
+    } else {
+        Err("roblox.captureViewport in a running session reads the engine's capture directory, \
+             which rodeo knows only on macOS and Windows"
+            .to_string())
+    }
+}
+
+fn list_dir(dir: &Path) -> HashMap<String, (u64, SystemTime)> {
+    let mut out = HashMap::new();
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    for entry in read_dir.flatten() {
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        if !meta.is_file() {
+            continue;
+        }
+        let mtime = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+        out.insert(entry.file_name().to_string_lossy().into_owned(), (meta.len(), mtime));
+    }
+    out
+}
+
+/// `roblox.captureBegin`: snapshot the capture directory before the plugin
+/// calls CaptureScreenshot, so the matching collect can tell this capture's
+/// file from everything that was already there.
+pub async fn roblox_capture_begin(
+    state: SharedRpcState,
+    _req: &rt::RobloxCaptureBeginRequest,
+) -> Result<rt::RobloxCaptureBeginResponse, String> {
+    let dir = capture_dir()?;
+    let files = {
+        let dir = dir.clone();
+        tokio::task::spawn_blocking(move || list_dir(&dir))
+            .await
+            .map_err(|e| format!("capture begin task failed: {e}"))?
+    };
+    let mut guard = state.lock().await;
+    guard.next_capture_token += 1;
+    let token = format!("capture-{}", guard.next_capture_token);
+    guard.capture_snapshots.insert(token.clone(), CaptureSnapshot { dir, files });
+    Ok(rt::RobloxCaptureBeginResponse { token, ..Default::default() })
+}
+
+/// `roblox.captureCollect`: wait for this capture's frame to appear in the
+/// snapshotted directory, then finalize it exactly like the edit-DOM path
+/// (scale check, all-black rejection, resample to the viewport, PNG).
+pub async fn roblox_capture_collect(
+    state: SharedRpcState,
+    req: &rt::RobloxCaptureCollectRequest,
+) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
+    let snapshot = state
+        .lock()
+        .await
+        .capture_snapshots
+        .remove(&req.token)
+        .ok_or_else(|| format!("capture collect: unknown capture token {}", req.token))?;
+    let (width, height, output) = (req.width, req.height, req.output.clone());
+    let deadline = tokio::time::Instant::now() + CAPTURE_FILE_TIMEOUT;
+    loop {
+        let snap = snapshot.clone();
+        let scanned = tokio::task::spawn_blocking(move || scan_for_frame(&snap, width, height))
+            .await
+            .map_err(|e| format!("capture collect task failed: {e}"))?;
+        match scanned {
+            Err(e) => return Err(e),
+            Ok(Some(frame)) => {
+                let out = output.clone();
+                return tokio::task::spawn_blocking(move || {
+                    finalize_pixels(frame.rgba, frame.width, frame.height, width, height, &out)
+                })
+                .await
+                .map_err(|e| format!("capture finalize task failed: {e}"))?;
+            }
+            Ok(None) => {}
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(format!(
+                "roblox.captureViewport: the capture callback fired but no new frame appeared in {} within {}s \
+                 (expected a PNG about {width}x{height} at the display scale). In a running session rodeo \
+                 reads the frame Studio writes to that directory; make sure the Studio window is rendering.",
+                snapshot.dir.display(),
+                CAPTURE_FILE_TIMEOUT.as_secs()
+            ));
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// A decoded frame from the capture directory.
+#[derive(Debug)]
+struct Frame {
+    rgba: Vec<u8>,
+    width: u32,
+    height: u32,
+}
+
+/// A file in the capture directory as seen while collecting. `png_size` is
+/// the IHDR size when the file starts like a PNG.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CaptureEntry {
+    pub name: String,
+    pub len: u64,
+    pub mtime: SystemTime,
+    pub png_size: Option<(u32, u32)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Selection {
+    None,
+    One(String),
+    Ambiguous(Vec<String>),
+}
+
+/// Which of `entries` is this capture's frame: not in `snapshot` (or changed
+/// since), a PNG, and sized like the `width` x `height` viewport at one
+/// display scale. Pure, so the rule is unit-tested without a Studio.
+pub fn select_capture_file(
+    snapshot: &HashMap<String, (u64, SystemTime)>,
+    entries: &[CaptureEntry],
+    width: u32,
+    height: u32,
+) -> Selection {
+    let mut names: Vec<String> = entries
+        .iter()
+        .filter(|e| {
+            let is_new = match snapshot.get(&e.name) {
+                None => true,
+                Some(&(len, mtime)) => len != e.len || mtime != e.mtime,
+            };
+            is_new && e.png_size.is_some_and(|(fw, fh)| frame_matches_viewport(fw, fh, width, height))
+        })
+        .map(|e| e.name.clone())
+        .collect();
+    names.sort();
+    match names.len() {
+        0 => Selection::None,
+        1 => Selection::One(names.remove(0)),
+        _ => Selection::Ambiguous(names),
+    }
+}
+
+/// A genuine frame is the viewport times one display scale on both axes (2x on
+/// Retina); the same tolerance `finalize_pixels` applies.
+fn frame_matches_viewport(frame_width: u32, frame_height: u32, width: u32, height: u32) -> bool {
+    if width == 0 || height == 0 {
+        return false;
+    }
+    let rx = frame_width as f64 / width as f64;
+    let ry = frame_height as f64 / height as f64;
+    rx >= 0.995 && ry >= 0.995 && (rx - ry).abs() <= 0.02
+}
+
+const PNG_SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+/// A complete PNG ends with its IEND chunk: zero length, "IEND", fixed CRC.
+const PNG_IEND: [u8; 12] = [0, 0, 0, 0, b'I', b'E', b'N', b'D', 0xAE, 0x42, 0x60, 0x82];
+
+/// Width and height from a PNG's IHDR, when `bytes` start like a PNG.
+pub fn png_ihdr_size(bytes: &[u8]) -> Option<(u32, u32)> {
+    if bytes.len() < 24 || bytes[..8] != PNG_SIGNATURE || &bytes[12..16] != b"IHDR" {
+        return None;
+    }
+    let width = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+    let height = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
+    Some((width, height))
+}
+
+fn read_ihdr(path: &Path) -> Option<(u32, u32)> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut head = [0u8; 33];
+    let n = file.read(&mut head).ok()?;
+    png_ihdr_size(&head[..n])
+}
+
+/// One pass over the capture directory. `Ok(Some(frame))` when exactly one new
+/// matching PNG is present and complete; `Ok(None)` when none has appeared yet
+/// or the one candidate is still being written; `Err` when several appeared.
+fn scan_for_frame(snapshot: &CaptureSnapshot, width: u32, height: u32) -> Result<Option<Frame>, String> {
+    let entries: Vec<CaptureEntry> = list_dir(&snapshot.dir)
+        .into_iter()
+        .map(|(name, (len, mtime))| {
+            // Only files new since the snapshot are worth opening.
+            let unchanged = snapshot.files.get(&name) == Some(&(len, mtime));
+            let png_size = if unchanged { None } else { read_ihdr(&snapshot.dir.join(&name)) };
+            CaptureEntry { name, len, mtime, png_size }
+        })
+        .collect();
+    match select_capture_file(&snapshot.files, &entries, width, height) {
+        Selection::None => Ok(None),
+        Selection::Ambiguous(names) => Err(format!(
+            "roblox.captureViewport: {} captures appeared in {} at the same time ({}); another Studio or run \
+             captured concurrently, so this run's frame cannot be told apart. Retry the capture.",
+            names.len(),
+            snapshot.dir.display(),
+            names.join(", ")
+        )),
+        Selection::One(name) => {
+            let path = snapshot.dir.join(&name);
+            let Ok(bytes) = std::fs::read(&path) else {
+                return Ok(None);
+            };
+            // Still being written: no IEND yet, or the decoder rejects it. Try again.
+            if !bytes.ends_with(&PNG_IEND) {
+                return Ok(None);
+            }
+            match image::load_from_memory(&bytes) {
+                Ok(decoded) => {
+                    let (width, height) = (decoded.width(), decoded.height());
+                    Ok(Some(Frame { rgba: decoded.into_rgba8().into_raw(), width, height }))
+                }
+                Err(_) => Ok(None),
+            }
+        }
+    }
 }
 
 /// Encode `width` x `height` RGBA8 pixels as PNG and write them to `output`
@@ -316,5 +594,123 @@ mod capture_finalize_tests {
         let output = dir.join("out.png");
         let err = finalize_pixels(vec![0; 100], 10, 10, 10, 10, &output.to_string_lossy()).expect_err("short buffer");
         assert!(err.contains("100 bytes") && err.contains("400"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod capture_collect_tests {
+    use super::*;
+
+    fn entry(name: &str, len: u64, secs: u64, size: Option<(u32, u32)>) -> CaptureEntry {
+        CaptureEntry {
+            name: name.to_string(),
+            len,
+            mtime: SystemTime::UNIX_EPOCH + Duration::from_secs(secs),
+            png_size: size,
+        }
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("rodeo-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn ihdr_size_is_read_from_a_png_header() {
+        let mut bytes = PNG_SIGNATURE.to_vec();
+        bytes.extend_from_slice(&13u32.to_be_bytes());
+        bytes.extend_from_slice(b"IHDR");
+        bytes.extend_from_slice(&2860u32.to_be_bytes());
+        bytes.extend_from_slice(&1686u32.to_be_bytes());
+        bytes.extend_from_slice(&[8, 2, 0, 0, 0]);
+        assert_eq!(png_ihdr_size(&bytes), Some((2860, 1686)));
+        assert_eq!(png_ihdr_size(&bytes[..20]), None);
+        assert_eq!(png_ihdr_size(b"not a png at all, definitely not one"), None);
+    }
+
+    #[test]
+    fn a_new_file_at_the_viewport_scale_is_selected() {
+        let snapshot = HashMap::from([("wob-1000".to_string(), (10u64, SystemTime::UNIX_EPOCH))]);
+        let entries = vec![
+            entry("wob-1000", 10, 0, Some((2860, 1686))),
+            entry("wob-1001", 20, 5, Some((2860, 1686))),
+        ];
+        assert_eq!(select_capture_file(&snapshot, &entries, 1430, 843), Selection::One("wob-1001".into()));
+    }
+
+    #[test]
+    fn snapshot_files_other_sizes_and_non_pngs_are_ignored() {
+        let snapshot = HashMap::from([("wob-1000".to_string(), (10u64, SystemTime::UNIX_EPOCH))]);
+        let entries = vec![
+            entry("wob-1000", 10, 0, Some((2860, 1686))),
+            entry("wob-2000", 30, 5, Some((2548, 1464))),
+            entry("notes.txt", 3, 5, None),
+        ];
+        assert_eq!(select_capture_file(&snapshot, &entries, 1430, 843), Selection::None);
+    }
+
+    #[test]
+    fn a_snapshot_file_rewritten_since_counts_as_new() {
+        let snapshot = HashMap::from([("wob-1000".to_string(), (10u64, SystemTime::UNIX_EPOCH))]);
+        let entries = vec![entry("wob-1000", 10, 7, Some((1430, 843)))];
+        assert_eq!(select_capture_file(&snapshot, &entries, 1430, 843), Selection::One("wob-1000".into()));
+    }
+
+    #[test]
+    fn two_new_matching_files_are_ambiguous_not_guessed() {
+        let entries = vec![
+            entry("wob-2000", 20, 5, Some((2860, 1686))),
+            entry("wob-1001", 20, 5, Some((2860, 1686))),
+        ];
+        assert_eq!(
+            select_capture_file(&HashMap::new(), &entries, 1430, 843),
+            Selection::Ambiguous(vec!["wob-1001".into(), "wob-2000".into()])
+        );
+    }
+
+    #[test]
+    fn scan_waits_on_a_partial_png_and_decodes_a_complete_one() {
+        let dir = scratch("capture-scan");
+        let snapshot = CaptureSnapshot { dir: dir.clone(), files: list_dir(&dir) };
+        assert!(scan_for_frame(&snapshot, 4, 2).unwrap().is_none(), "empty directory");
+
+        // An 8x4 frame for a 4x2 viewport (2x scale) with one red pixel.
+        let mut rgba = vec![0u8; 8 * 4 * 4];
+        rgba[0] = 255;
+        rgba[3] = 255;
+        let path = dir.join("wob-4200000000");
+        write_png_atomic(&rgba, 8, 4, path.to_str().unwrap()).unwrap();
+        let png = std::fs::read(&path).unwrap();
+
+        std::fs::write(&path, &png[..png.len() - 6]).unwrap();
+        assert!(scan_for_frame(&snapshot, 4, 2).unwrap().is_none(), "still being written");
+
+        std::fs::write(&path, &png).unwrap();
+        let frame = scan_for_frame(&snapshot, 4, 2).unwrap().expect("complete frame");
+        assert_eq!((frame.width, frame.height), (8, 4));
+        assert_eq!(&frame.rgba[..4], &[255, 0, 0, 255]);
+
+        // A second new frame of the same size is a concurrent capture: an error.
+        std::fs::write(dir.join("wob-4300000000"), &png).unwrap();
+        let err = scan_for_frame(&snapshot, 4, 2).expect_err("ambiguous");
+        assert!(err.contains("2 captures appeared"), "{err}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn finalize_refuses_an_all_black_frame_and_writes_nothing() {
+        let dir = scratch("capture-black");
+        let out = dir.join("black.png");
+        let err = finalize_pixels(vec![0u8; 4 * 2 * 4], 4, 2, 4, 2, out.to_str().unwrap()).expect_err("black frame");
+        assert!(err.contains("entirely black"), "{err}");
+        assert!(!out.exists(), "nothing written for a black frame");
+
+        let mut rgba = vec![0u8; 4 * 2 * 4];
+        rgba[5] = 1;
+        finalize_pixels(rgba, 4, 2, 4, 2, out.to_str().unwrap()).expect("one lit pixel is a frame");
+        assert!(out.exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
