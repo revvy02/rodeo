@@ -4,6 +4,7 @@
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
+local serde = require("@lune/serde")
 
 -- Exec a subprocess, abort the build if it exits non-zero. The historical
 -- bug: `process.exec` returns a result whose `.ok` is false on failure, but
@@ -29,9 +30,38 @@ local function ensureDir(path: string)
 	end
 end
 
+-- The rodeo skill (.claude/skills/rodeo/SKILL.md) gets hand-copied into other
+-- projects, so it carries the rodeo version it documents: `metadata.version`
+-- in the frontmatter and the "This skill describes rodeo **x**" line under the
+-- title. Both must equal the crate version, otherwise a release bump that
+-- forgot the skill would ship a mislabeled one. Fail the build instead.
+local function checkSkillVersion()
+	local cargoToml = serde.decode("toml", fs.readFile("rodeo-cli/Cargo.toml"))
+	local version = cargoToml.package.version
+	local skillPath = ".claude/skills/rodeo/SKILL.md"
+	local skill = fs.readFile(skillPath)
+	local frontmatter = skill:match("^%-%-%-\n(.-)\n%-%-%-\n") or ""
+	local stamped = frontmatter:match("\n  version:%s*(%S+)")
+	local described = skill:match("This skill describes rodeo %*%*([^*]+)%*%*")
+	if stamped ~= version or described ~= version then
+		error(
+			string.format(
+				"%s is stamped for rodeo %s (frontmatter) / %s (body) but rodeo-cli/Cargo.toml is %s; "
+					.. "update `metadata.version` and the \"This skill describes rodeo\" line to match",
+				skillPath,
+				tostring(stamped),
+				tostring(described),
+				version
+			),
+			0
+		)
+	end
+end
+
 local function main()
 	local isDev = table.find(process.args, "--dev") ~= nil
 
+	checkSkillVersion()
 	ensureDir("build")
 
 	-- Generate proto bindings (each language owned by its consumer subproject)

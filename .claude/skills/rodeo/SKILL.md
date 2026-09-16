@@ -1,9 +1,15 @@
 ---
 name: rodeo
 description: CLI tool for Roblox Studio that lets you create studio instances, and run code in any studio environment. Includes commands, flags, DOM targeting, directives, return values, and @rodeo APIs. Use when writing rodeo commands, scripts, or working with Roblox Studio.
+metadata:
+  version: 1.5.0-rc.2
 ---
 
 # rodeo
+
+This skill describes rodeo **1.5.0-rc.2**. Projects pin their own rodeo version, so
+check `rodeo --version` in the project: if it differs, this copy of the skill may
+document flags or APIs that binary does not have (or lack ones it does).
 
 CLI that executes Luau code inside Roblox Studio. Studio is the runtime. rodeo connects to it over a WebSocket, sends scripts, and streams output back. Use it like a conventional language runtime.
 
