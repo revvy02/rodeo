@@ -13,7 +13,7 @@ local roblox = {}
 --- `device` — a Studio device-simulator preset id to capture as (for example
 --- `"iphone_13"` or `"hd_1080"`); layout, insets and orientation come from the
 --- preset. `viewportSize` — the `Camera.ViewportSize` to capture at, as a
---- custom desktop device (width at most 7680); with `device`, overrides the
+--- custom desktop device (at most 7680 by 4320); with `device`, overrides the
 --- preset's resolution. Either drives Studio's device simulator for the shot
 --- and restores it afterward, the way the camera fields are restored.
 export type CaptureOptions = {
@@ -121,9 +121,13 @@ end
 --- direct readback there), and a frame the engine did not render is refused
 --- rather than written: a solo play-test session (`--mode test`) captures
 --- black on macOS, so capture from a multiplayer session (`--mode play`) or
---- in edit mode. Frames beyond roughly 16384 physical pixels never complete
---- and fail after 10s, as does a minimized Studio on Windows (background
---- launches are minimized there; launch focused or restore the window).
+--- in edit mode. Limits are Studio's own and surface as errors: the device
+--- simulator accepts at most 7680 by 4320. The capture then waits for the
+--- engine with no deadline, since a large frame or a slow GPU can take well
+--- over 10s. Two cases never complete and wait until the run is killed: a
+--- frame beyond roughly 16384 physical pixels, and a minimized Studio on
+--- Windows (background launches are minimized there; launch focused or
+--- restore the window).
 function roblox.captureViewport(output: string?, options: CaptureOptions?): (string, CaptureInfo)
 	return (singleton :: any).roblox.captureViewport(output, options)
 end

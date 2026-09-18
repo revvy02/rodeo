@@ -361,7 +361,7 @@ for the shot, restored afterward), `fov`, `focus`, `settle` (seconds to wait
 before capturing), `device` (a Studio device-simulator preset id such as
 `"iphone_13"` or `"hd_1080"`; layout, insets and orientation come from the
 preset), and `viewportSize` (a `Vector2`, the `Camera.ViewportSize` to capture
-at, width at most 7680; with `device` it overrides the preset's resolution).
+at, at most 7680 by 4320; with `device` it overrides the preset's resolution).
 
 The written image is always exactly the capture's `Camera.ViewportSize`, so
 UI offsets map 1:1 onto pixels and the size is the same on every machine;
@@ -379,8 +379,11 @@ the engine writes for every capture, snapshotting the directory first and
 erroring on ambiguity rather than guessing. A frame the engine did not render
 is refused: a solo play-test session (`--mode test`) captures black on macOS
 (issue #17), so capture from a multiplayer session (`--mode play`) or in edit
-mode. Frames beyond roughly 16384 physical pixels never complete and fail
-after 10s, as does a minimized Studio on Windows (background launches are
+mode. Limits are Studio's own and surface as errors: the device simulator
+accepts at most 7680 by 4320. The capture then waits for the engine with no
+deadline (a large frame or a slow GPU can take well over 10s). Two cases never
+complete and wait until the run is killed: a frame beyond roughly 16384
+physical pixels, and a minimized Studio on Windows (background launches are
 minimized there; launch with `--focus` or restore the window first).
 
 ### `@lune` adapters — run lune-flavored code unchanged

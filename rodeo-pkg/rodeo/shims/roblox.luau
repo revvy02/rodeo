@@ -29,7 +29,6 @@ type CaptureInfo = {
 	height: number,
 }
 
-local MAX_VIEWPORT_WIDTH = 7680
 
 -- Capture a Studio screenshot and write it to a stable path. `output` ending
 -- in .png is the exact file path; any other value is a directory the
@@ -54,6 +53,12 @@ local MAX_VIEWPORT_WIDTH = 7680
 -- plugin-handled RPCs (the service is PluginSecurity; the plugin acts in this
 -- DOM at its own identity). Camera and simulator state are restored on every
 -- exit path. Returns the absolute output path and the image size.
+-- An error raised inside the plugin reaches the shim as "RPC error [<method>]:
+-- <message>"; the message is the engine's own and is what the caller should see.
+local function engineMessage(err: unknown): string
+	return (tostring(err):gsub("^RPC error %[[%w_]+%]: ", ""))
+end
+
 local function capture(output: string?, options: CaptureOptions?): (string, CaptureInfo)
 	local resolved: CaptureOptions = options or {}
 
@@ -65,9 +70,6 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 		local w, h = math.floor(viewportSize.X + 0.5), math.floor(viewportSize.Y + 0.5)
 		if w < 1 or h < 1 then
 			error(`roblox.captureViewport: viewportSize must be at least 1x1 (got {w}x{h})`, 2)
-		end
-		if w > MAX_VIEWPORT_WIDTH then
-			error(`roblox.captureViewport: viewportSize width {w} exceeds the device simulator's limit of {MAX_VIEWPORT_WIDTH}`, 2)
 		end
 		viewportSize = Vector2.new(w, h)
 	end
@@ -98,12 +100,19 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 
 	local function captureAndWrite(): (string, CaptureInfo)
 		if resolved.device or viewportSize then
-			roblox._simulatorApply(
+			-- Limits (width 7680, height 4320, unknown preset) are the engine's:
+			-- its message propagates as this call's error, minus the rpc
+			-- layer's prefix. The plugin has already put the simulator back.
+			simulatorApplied = true
+			local okSim, simErr = pcall(
+				roblox._simulatorApply,
 				resolved.device,
 				viewportSize and viewportSize.X,
 				viewportSize and viewportSize.Y
 			)
-			simulatorApplied = true
+			if not okSim then
+				error(`roblox.captureViewport: {engineMessage(simErr)}`, 0)
+			end
 		end
 
 		local cframe = resolved.cframe
@@ -167,18 +176,22 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 		local inSession = RunService:IsRunning()
 		local captureToken: string? = if inSession then roblox._captureBegin() else nil
 
+		-- The wait for the callback has no deadline: a large frame or a slow
+		-- GPU can take well over 10s, and a timer here only invented failures.
+		-- The engine raises its own errors for what cannot work (limits, the
+		-- server DOM), and those propagate. The cases that never complete, a
+		-- frame beyond roughly 16384 physical pixels and a minimized Studio on
+		-- Windows, are documented; killing the run abandons one.
 		local contentId: string? = nil
-		CaptureService:CaptureScreenshot(function(id: string)
-			contentId = id
+		local okShot, shotErr = pcall(function()
+			CaptureService:CaptureScreenshot(function(id: string)
+				contentId = id
+			end)
 		end)
-		local callbackDeadline = os.clock() + 10
+		if not okShot then
+			error(`roblox.captureViewport: {engineMessage(shotErr)}`, 0)
+		end
 		while not contentId do
-			if os.clock() > callbackDeadline then
-				if platform == "windows" then
-					error("roblox.captureViewport: CaptureScreenshot callback never fired within 10s. A minimized Studio never renders its viewport on Windows, and background launches are minimized; launch with focus (focus = true / no background) or restore the Studio window and retry. A frame beyond roughly 16384 physical pixels also never completes; reduce viewportSize.")
-				end
-				error("roblox.captureViewport: CaptureScreenshot callback never fired within 10s. A frame beyond roughly 16384 physical pixels never completes; reduce viewportSize.")
-			end
 			task.wait()
 		end
 

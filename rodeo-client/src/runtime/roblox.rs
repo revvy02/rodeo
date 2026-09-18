@@ -173,7 +173,11 @@ pub struct CaptureSnapshot {
 }
 
 /// How long to wait for the engine to write the frame after the callback.
-const CAPTURE_FILE_TIMEOUT: Duration = Duration::from_secs(8);
+/// Measured at ~2s for a window-sized frame; a 15360x8640 frame on a slow
+/// disk or GPU can take far longer to encode, so this is generous. It only
+/// fires when the callback ran and no file ever came, which is not a case
+/// the engine has shown.
+const CAPTURE_FILE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// The engine's per-user capture directory. `RODEO_CAPTURE_DIR` overrides it
 /// (tests, unusual installs).

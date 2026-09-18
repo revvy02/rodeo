@@ -12,8 +12,11 @@
 	Measured behaviour this relies on (Studio 0.738): a custom device needs
 	DeviceForm Desktop for exact dimensions (other forms lose height to a
 	status bar), SetResolutionAsync needs an active device and caps width at
-	7680, GetResolutionAsync errors when no device is active, GetDeviceAsync
-	returns "default" then, and the viewport takes a few frames to follow.
+	7680 and height at 4320 (Studio 0.739; CreateDeviceAsync caps Width the
+	same way) — those engine errors propagate to the caller unchanged, so this
+	module does no limit checks of its own. GetResolutionAsync errors when no
+	device is active, GetDeviceAsync returns "default" then, and the viewport
+	takes a few frames to follow.
 ]]
 
 local RunService = game:GetService("RunService")
@@ -42,7 +45,6 @@ local sessions: { [string]: Session } = {}
 -- It also must not start with `rodeo-capture-`, which pre-1.5 plugins sweep
 -- wholesale on every connection.
 local DEVICE_PREFIX = `rodeoCapture-{constants.PORT}-`
-local MAX_WIDTH = 7680
 
 local function service(): any
 	local ok, sim = pcall(game.GetService, game, "StudioDeviceSimulatorService")
@@ -104,9 +106,6 @@ end
 function simulator.apply(executionId: string, device: string?, width: number?, height: number?): (number, number)
 	if not device and not (width and height) then
 		error("roblox.captureViewport: a device or a viewportSize is required to drive the simulator", 0)
-	end
-	if width and width > MAX_WIDTH then
-		error(`roblox.captureViewport: viewportSize width {width} exceeds the device simulator's limit of {MAX_WIDTH}`, 0)
 	end
 
 	local sim = service()
