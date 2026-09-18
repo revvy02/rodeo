@@ -7,13 +7,12 @@ import { cliStudioHandle, pluginFileFor, runRodeo, waitUntil } from "../helpers.
 // Studios it launched, and removes its file when it exits. The same
 // mechanics let two different builds coexist (crossVersion.test.ts).
 //
-// Note on timing: installing or removing a file in Studio's shared plugins
-// folder can make an already-open Studio re-scan and briefly reload its own
-// plugin (a macOS directory-change coalesce), which drops and re-dials that
-// plugin's socket within ~1s. A persistent Studio recovers on its own; only a
-// one-shot run in flight at that exact moment would be disconnected. So this
-// suite brings both serves fully up first, then runs — it does not assert that
-// a run spanning the other serve's startup survives.
+// Note on ordering: this suite brings both serves fully up first, then runs.
+// An early version raced a run against B's startup and flaked once, which was
+// read at the time as Studio reloading A's plugin on B's file install. That
+// was later measured not to happen (pluginFolderChurn.test.ts: a run survives
+// another serve starting/stopping with no reconnect); the ordering here simply
+// keeps this suite about ownership, not timing.
 const PORT_A = 46296;
 const PORT_B = 46298;
 

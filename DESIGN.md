@@ -23,13 +23,14 @@ Studios a serve launched belong to that serve only. Studios opened by hand
 belong to nobody and connect to every running serve. `rodeo state` is per
 serve: its own Studios plus the hand-opened ones.
 
-Studio watches the one shared plugins folder, so a serve installing or removing
-its own plugin file there can make another serve's already-open Studio re-scan
-and briefly reload its plugin, dropping and re-dialing that plugin's socket
-within about a second. A persistent Studio recovers on its own; the only thing
-this disturbs is a one-shot run in flight at the exact moment another serve
-starts or stops. This is transient and self-healing, unlike the permanent
-corruption a single shared plugin file caused (issue #12).
+Studio watches the one shared plugins folder and hot-loads a new plugin file
+into every open Studio, which is how hand-opened Studios join a serve. That
+does not disturb the plugin another serve already has loaded: a run in one
+serve's Studio survives another serve starting and stopping, another project's
+one-shot `rodeo run --place`, and unrelated files appearing in the folder, with
+no reconnect (tests-new/cli/operations/pluginFolderChurn.test.ts). What the
+per-backend file removed is the permanent corruption a single shared plugin
+file caused when a different build overwrote it (issue #12).
 
 ## Captures in a running session
 
