@@ -46,33 +46,16 @@ pub async fn roblox_export(state: SharedRpcState, req: &rt::RobloxExportRequest)
     Ok(rt::Ok::default())
 }
 
-/// Finalize a `roblox.captureViewport`. The plugin loaded the exact frame the
-/// CaptureScreenshot callback named into an EditableImage, read its RGBA8
-/// pixels, and streamed them into a FileWriter on the output path (chunked
-/// `stream.writeBytes`); this consumes that handle in place of `stream_close`.
-///
-/// On a high-DPI display the frame is a whole multiple of the reported
-/// `Camera.ViewportSize` (2x on Retina); a frame from before a viewport change
-/// is not a multiple at all — that is the stale-frame case, reported as an
-/// error rather than retried. The image is resampled to exactly the viewport,
-/// so a capture has the same pixel size on every machine and offset-based UI
-/// maps 1:1 onto pixels, then PNG-encoded and written atomically.
-pub async fn roblox_capture_finalize(
-    state: SharedRpcState,
-    req: &rt::RobloxCaptureFinalizeRequest,
-) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
-    let (path, rgba) = stream::take_file_writer(&state, &req.handle).await?;
-    let req = req.clone();
-    tokio::task::spawn_blocking(move || {
-        finalize_pixels(rgba, req.source_width, req.source_height, req.width, req.height, &path)
-    })
-    .await
-    .map_err(|e| format!("capture finalize task failed: {e}"))?
-}
-
-/// Pure core of the finalize step (see `roblox_capture_finalize`): `rgba` is
-/// the `source_width` x `source_height` RGBA8 frame, `(width, height)` the
+/// Finalize a capture: `rgba` is the `source_width` x `source_height` RGBA8
+/// frame decoded from the engine's capture file, `(width, height)` the
 /// viewport it must be a whole multiple of and the size written to `output`.
+///
+/// On a high-DPI display the frame is the viewport times the display scale
+/// (2x on Retina); a frame from before a viewport change is not a multiple at
+/// all — the stale-frame case, an error rather than a retry. The image is
+/// resampled to exactly the viewport, so a capture has the same pixel size on
+/// every machine and offset-based UI maps 1:1 onto pixels, then PNG-encoded
+/// and written atomically.
 fn finalize_pixels(
     rgba: Vec<u8>,
     source_width: u32,
@@ -80,7 +63,7 @@ fn finalize_pixels(
     width: u32,
     height: u32,
     output: &str,
-) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
+) -> Result<rt::RobloxCaptureCollectResponse, String> {
     use fast_image_resize::images::Image;
     use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 
@@ -136,7 +119,7 @@ fn finalize_pixels(
 
     write_png_atomic(&pixels, width, height, output)?;
 
-    Ok(rt::RobloxCaptureFinalizeResponse {
+    Ok(rt::RobloxCaptureCollectResponse {
         width,
         height,
         source_width,
@@ -146,21 +129,21 @@ fn finalize_pixels(
 }
 
 // ---------------------------------------------------------------------------
-// Running-session captures: the frame from the engine's capture directory.
+// Captures: the frame from the engine's capture directory.
 //
-// In a server or client DOM the engine refuses to promote a capture's
-// temporary texture id into an EditableImage ("cannot currently create
-// editable image from temporary texture id"), and promoting it from the edit
-// DOM instead returns zeros (solo play-test) or an unrelated texture
-// (multiplayer: temp ids are per process). What does exist is the PNG the
-// engine writes for every capture to a per-user directory, named
-// `wob-<pid><6-digit counter>` after the capturing process. Files there
-// outlive the process, so a frame is identified by a snapshot taken before the
-// capture, not by "newest file": exactly one complete PNG that appeared or
-// changed since, sized like the viewport at one display scale. Two such files
-// (another Studio or run capturing at the same moment) is reported, never
-// guessed at. Measured on Studio 0.739: the file lands within ~2s of the
-// callback.
+// The engine writes every CaptureService capture as a PNG to a per-user
+// directory, named `wob-<pid><6-digit counter>` after the capturing process.
+// That file is the frame for every capture, in every DOM: promoting the
+// capture's temporary texture into an EditableImage is refused in play DOMs
+// ("cannot currently create editable image from temporary texture id"), is
+// capped at 8192 pixels a side everywhere (a 2x display's 8K frame is 15360
+// wide), and would read the whole RGBA frame through Luau. Files there
+// outlive the process, so a frame is identified by a snapshot taken before
+// the capture, not by "newest file": exactly one complete PNG that appeared
+// or changed since, sized like the viewport at one display scale. Two such
+// files (another Studio or run capturing at the same moment) is reported,
+// never guessed at. Measured on Studio 0.739: a window-sized frame lands
+// within ~2s of the callback, the simulator's largest (23466x13200) in ~7s.
 // ---------------------------------------------------------------------------
 
 /// What the capture directory held when a capture began: file name ->
@@ -240,12 +223,12 @@ pub async fn roblox_capture_begin(
 }
 
 /// `roblox.captureCollect`: wait for this capture's frame to appear in the
-/// snapshotted directory, then finalize it exactly like the edit-DOM path
-/// (scale check, all-black rejection, resample to the viewport, PNG).
+/// snapshotted directory, then finalize it (scale check, all-black rejection,
+/// resample to the viewport, PNG).
 pub async fn roblox_capture_collect(
     state: SharedRpcState,
     req: &rt::RobloxCaptureCollectRequest,
-) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
+) -> Result<rt::RobloxCaptureCollectResponse, String> {
     let snapshot = state
         .lock()
         .await
@@ -553,7 +536,7 @@ mod capture_finalize_tests {
         dir
     }
 
-    fn finalize(dir: &std::path::Path, sw: u32, sh: u32, w: u32, h: u32) -> Result<rt::RobloxCaptureFinalizeResponse, String> {
+    fn finalize(dir: &std::path::Path, sw: u32, sh: u32, w: u32, h: u32) -> Result<rt::RobloxCaptureCollectResponse, String> {
         let output = dir.join("nested").join("out.png");
         finalize_pixels(frame(sw, sh), sw, sh, w, h, &output.to_string_lossy())
     }

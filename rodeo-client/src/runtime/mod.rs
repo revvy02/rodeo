@@ -223,7 +223,6 @@ pub async fn dispatch_client(
 
         // roblox
         Some(Req::RobloxExport(r)) => async_arm("roblox.exportInstances", id, roblox::roblox_export(state.clone(), r), Res::RobloxExport).await,
-        Some(Req::RobloxCaptureFinalize(r)) => async_arm("roblox.captureFinalize", id, roblox::roblox_capture_finalize(state.clone(), r), Res::RobloxCaptureFinalize).await,
         Some(Req::RobloxCaptureBegin(r)) => async_arm("roblox.captureBegin", id, roblox::roblox_capture_begin(state.clone(), r), Res::RobloxCaptureBegin).await,
         Some(Req::RobloxCaptureCollect(r)) => async_arm("roblox.captureCollect", id, roblox::roblox_capture_collect(state.clone(), r), Res::RobloxCaptureCollect).await,
         Some(Req::RobloxImageEncode(r)) => async_arm("roblox.imageEncode", id, roblox::roblox_image_encode(state.clone(), r), Res::RobloxImageEncode).await,

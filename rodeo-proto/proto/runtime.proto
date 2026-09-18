@@ -107,39 +107,25 @@ message RobloxSimulatorApplyResponse {
 
 message RobloxSimulatorRestoreRequest {}
 
-// Finalize a capture on the run client. The plugin read the exact frame the
-// CaptureScreenshot callback named (EditableImage:ReadPixelsBuffer) and
-// streamed the RGBA8 bytes into an open FileWriter on the output path via
-// chunked stream_write_bytes; this consumes the handle in place of
-// stream_close: checks the frame is a whole multiple of the viewport (a stale
-// frame from before a viewport change is not), resamples to exactly width x
-// height, encodes PNG and writes atomically.
-message RobloxCaptureFinalizeRequest {
-  string handle = 1;            // FileWriter holding source_width*source_height*4 RGBA bytes
-  uint32 source_width = 2;      // frame size as read from the EditableImage
-  uint32 source_height = 3;
-  uint32 width = 4;             // Camera.ViewportSize at capture time = output size
-  uint32 height = 5;
-}
-
-message RobloxCaptureFinalizeResponse {
+message RobloxCaptureCollectResponse {
   uint32 width = 1;             // written image size (== request)
   uint32 height = 2;
   uint32 source_width = 3;      // engine frame size before resampling
   uint32 source_height = 4;
 }
 
-// roblox.captureViewport from a running session (server/client DOM). There the
-// engine refuses to promote a capture's temporary texture id into an
-// EditableImage, so the frame is taken from the file the engine writes for
-// every capture in the per-user capture directory (macOS
+// roblox.captureViewport, every DOM. The frame is the file the engine writes
+// for every capture in the per-user capture directory (macOS
 // ~/Library/Roblox/tmp-capture-storage, Windows %LOCALAPPDATA%\Roblox\
-// tmp-capture-storage), named wob-<pid><counter>. Begin snapshots that
-// directory before CaptureScreenshot; collect waits for exactly one complete
-// PNG that appeared since and matches the viewport at the display scale, then
-// finalizes it like roblox_capture_finalize (which also rejects an all-black
-// frame: a solo play-test session captures black). Several new matching files
-// at once (another Studio capturing concurrently) is an error, never a guess.
+// tmp-capture-storage), named wob-<pid><counter>, never an EditableImage:
+// promoting the temporary texture is refused in play DOMs and capped at 8192
+// pixels a side everywhere. Begin snapshots that directory before
+// CaptureScreenshot; collect waits for exactly one complete PNG that appeared
+// since and matches the viewport at the display scale, then finalizes it:
+// scale check, all-black rejection (a solo play-test session captures black),
+// resample to exactly width x height, PNG written atomically. Several new
+// matching files at once (another Studio capturing concurrently) is an error,
+// never a guess.
 message RobloxCaptureBeginRequest {}
 
 message RobloxCaptureBeginResponse {
@@ -351,6 +337,7 @@ message McpCallResponse {
 // ---------------------------------------------------------------------------
 
 message ClientRpcCall {
+  reserved 53; // roblox_capture_finalize: captures read the engine's file now
   string id = 1;
   string execution_id = 2;
   oneof req {
@@ -391,7 +378,6 @@ message ClientRpcCall {
     // 51-52 are plugin-handled (see RobloxSimulatorApplyRequest).
     RobloxSimulatorApplyRequest    roblox_simulator_apply   = 51;
     RobloxSimulatorRestoreRequest  roblox_simulator_restore = 52;
-    RobloxCaptureFinalizeRequest   roblox_capture_finalize  = 53;
     RobloxImageEncodeRequest       roblox_image_encode      = 54;
     RobloxImageDecodeRequest       roblox_image_decode      = 55;
     RobloxMeshEncodeRequest        roblox_mesh_encode       = 56;
@@ -402,6 +388,7 @@ message ClientRpcCall {
 }
 
 message ClientRpcResponse {
+  reserved 53; // roblox_capture_finalize
   string id = 1;
   string execution_id = 2;
   oneof res {
@@ -447,12 +434,11 @@ message ClientRpcResponse {
     Ok                             roblox_export            = 50;
     RobloxSimulatorApplyResponse   roblox_simulator_apply   = 51;
     Ok                             roblox_simulator_restore = 52;
-    RobloxCaptureFinalizeResponse  roblox_capture_finalize  = 53;
     Ok                             roblox_image_encode      = 54;
     RobloxImageDecodeResponse      roblox_image_decode      = 55;
     Ok                             roblox_mesh_encode       = 56;
     RobloxMeshDecodeResponse       roblox_mesh_decode       = 57;
     RobloxCaptureBeginResponse     roblox_capture_begin     = 58;
-    RobloxCaptureFinalizeResponse  roblox_capture_collect   = 59;
+    RobloxCaptureCollectResponse   roblox_capture_collect   = 59;
   }
 }

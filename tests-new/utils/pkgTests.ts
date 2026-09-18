@@ -444,7 +444,7 @@ export function process(run: RunFn): void {
   });
 }
 
-// ── capture (7 tests, plugin-only) ────────────────────────────────────────
+// ── capture (9 tests, plugin-only) ────────────────────────────────────────
 //
 // roblox.captureViewport drives Studio's device simulator for `device` / `viewportSize`
 // (plugin-handled RPCs) and finalizes the engine's frame on the run client,
@@ -530,6 +530,37 @@ export function capture(run: RunFn): void {
       expect(result.ok).toBe(true);
       const r = result.return as { path: string };
       expect(pngSize(r.path)).toEqual({ width: 800, height: 600 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: the simulator's maximum, 7680x4320, writes an image of exactly that size", async () => {
+    // The frame comes from the engine's capture file, so a 2x display's
+    // 15360x8640 frame is fine; the EditableImage route this replaced was
+    // capped at 8192 pixels a side and failed here.
+    const out = captureOut("8k");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: captureSource(out, "{ viewportSize = Vector2.new(7680, 4320), settle = 1 }"),
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string; width: number; height: number };
+      expect(pngSize(r.path)).toEqual({ width: 7680, height: 4320 });
+      expect({ width: r.width, height: r.height }).toEqual({ width: 7680, height: 4320 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: viewportSize over 4320 tall errors before capturing", async () => {
+    const out = captureOut("too-tall");
+    try {
+      const result = await run({ source: captureSource(out, "{ viewportSize = Vector2.new(100, 5000) }") });
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain("4320");
+      expect(existsSync(out)).toBe(false);
     } finally {
       rmrf(out);
     }

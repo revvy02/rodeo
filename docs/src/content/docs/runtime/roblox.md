@@ -145,11 +145,11 @@ the `device` preset's). Camera and device-simulator state are restored
 
 after the capture, on error too. Requires a viewport: plugin context, or
 
-the client DOM of a running session. In a session the frame is taken from
+the client DOM of a running session. The frame is taken from the file the
 
-the file the engine writes for every capture (the engine refuses the
+engine writes for every capture, so the simulator's full 7680 by 4320
 
-direct readback there), and a frame the engine did not render is refused
+works on every display; a frame the engine did not render is refused
 
 rather than written: a solo play-test session (`--mode test`) captures
 
@@ -161,13 +161,11 @@ simulator accepts at most 7680 by 4320. The capture then waits for the
 
 engine with no deadline, since a large frame or a slow GPU can take well
 
-over 10s. Two cases never complete and wait until the run is killed: a
+over 10s (the largest frame takes about 7s). One case never completes and
 
-frame beyond roughly 16384 physical pixels, and a minimized Studio on
+waits until the run is killed: a minimized Studio on Windows (background
 
-Windows (background launches are minimized there; launch focused or
-
-restore the window).
+launches are minimized there; launch focused or restore the window).
 
 ```luau
 (output: string?, options: CaptureOptions?) -> (string, CaptureInfo)

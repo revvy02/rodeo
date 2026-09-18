@@ -372,19 +372,18 @@ second return value is `{ width, height }`. A frame captured before the new
 viewport rendered is reported as an error (raise `settle`), never retried.
 
 `captureViewport` needs a viewport, so use plugin context, or client context in a
-running session. Server context errors. In edit mode it reads the exact frame
-the engine captured by id, so concurrent Studios never mix up captures. In a
-session the engine refuses that readback, so the frame is taken from the file
-the engine writes for every capture, snapshotting the directory first and
-erroring on ambiguity rather than guessing. A frame the engine did not render
-is refused: a solo play-test session (`--mode test`) captures black on macOS
-(issue #17), so capture from a multiplayer session (`--mode play`) or in edit
-mode. Limits are Studio's own and surface as errors: the device simulator
-accepts at most 7680 by 4320. The capture then waits for the engine with no
-deadline (a large frame or a slow GPU can take well over 10s). Two cases never
-complete and wait until the run is killed: a frame beyond roughly 16384
-physical pixels, and a minimized Studio on Windows (background launches are
-minimized there; launch with `--focus` or restore the window first).
+running session. Server context errors. The frame is taken from the file the
+engine writes for every capture, snapshotting the directory first and erroring
+on ambiguity rather than guessing, so the simulator's full 7680 by 4320 works
+on every display. A frame the engine did not render is refused: a solo
+play-test session (`--mode test`) captures black on macOS (issue #17), so
+capture from a multiplayer session (`--mode play`) or in edit mode. Limits are
+Studio's own and surface as errors: the device simulator accepts at most 7680
+by 4320. The capture then waits for the engine with no deadline (a large frame
+or a slow GPU can take well over 10s; the largest frame takes about 7s). One
+case never completes and waits until the run is killed: a minimized Studio on
+Windows (background launches are minimized there; launch with `--focus` or
+restore the window first).
 
 ### `@lune` adapters — run lune-flavored code unchanged
 

@@ -32,15 +32,16 @@ no reconnect (tests-new/cli/operations/pluginFolderChurn.test.ts). What the
 per-backend file removed is the permanent corruption a single shared plugin
 file caused when a different build overwrote it (issue #12).
 
-## Captures in a running session
+## Captures
 
-In the edit DOM a capture is read back by the exact content id the engine
-hands the callback, so two Studios can never swap frames. In a session's
-server or client DOM the engine refuses that readback, and reading the id
-from the edit DOM instead yields zeros or an unrelated texture. What the
-engine does provide is the PNG it writes for every capture into a per-user
-directory shared by all Studio processes. Rodeo snapshots that directory
-before the capture and accepts exactly one complete PNG that appears
+Every capture, in every DOM, is read from the file the engine writes for it in
+Studio's per-user capture directory, never from an EditableImage. Promoting the
+capture's temporary texture into one is refused in a session's DOMs and capped
+at 8192 pixels a side everywhere, which on a 2x display rules out anything past
+a 4096 viewport, and it means reading the whole RGBA frame through Luau; the
+file has neither problem and the simulator's full 7680 by 4320 works on every
+display. That directory is shared by all Studio processes, so rodeo snapshots
+it before the capture and accepts exactly one complete PNG that appears
 afterwards at the viewport's size. Two candidates at once is an error to
 retry, never a guess, and a frame that is entirely black is refused rather
 than written: in a solo play-test session Studio captures black on macOS.

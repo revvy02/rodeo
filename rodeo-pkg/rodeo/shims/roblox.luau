@@ -10,8 +10,6 @@
 local plugins, key = _G.__rodeo_plugins, script and script:GetAttribute("rodeoPlugin")
 local ns = plugins and key and plugins[key]
 local g = if ns then ns.procs[script:GetAttribute("rodeoExecutionId")] else _G.__rodeo_procs[_G.__rodeo_eid]
-local fs = g.fs
-local stream = g.stream
 local process = g.process
 local roblox = g.roblox
 
@@ -36,18 +34,17 @@ type CaptureInfo = {
 -- the profiles and logs rodeo already keeps under .rodeo/.temp, which is the
 -- directory projects gitignore, rather than a new top-level directory).
 --
--- In the edit DOM the frame is read back from the exact content id the
--- CaptureScreenshot callback names (EditableImage:ReadPixelsBuffer), so
--- concurrent Studios cannot hand each other's captures out; the RGBA bytes
--- stream to the run client. In a running session (server/client DOM) the
--- engine refuses that readback, so the run client instead takes the frame
--- from the file the engine writes for every capture: it snapshots the
--- engine's capture directory before the capture and accepts exactly one
--- complete PNG that appears afterwards at the viewport's size, erroring on
--- ambiguity rather than guessing. Either way the run client verifies the
--- frame against the viewport, refuses an all-black frame (a solo play-test
--- session captures black, issue #17), resamples to exactly the viewport (the
--- engine renders at the display scale, 2x on Retina) and writes the PNG.
+-- The frame comes from the file the engine writes for every capture into
+-- its per-user capture directory, never from an EditableImage: promoting the
+-- capture's temporary texture is refused in play DOMs and capped at 8192
+-- pixels a side everywhere, which on a 2x display rules out anything past a
+-- 4096 viewport, and it means reading the whole RGBA frame through Luau. The
+-- run client snapshots that directory before the capture and accepts exactly
+-- one complete PNG that appears afterwards at the viewport's size, erroring
+-- on ambiguity rather than guessing. It then verifies the frame against the
+-- viewport, refuses an all-black frame (a solo play-test session captures
+-- black, issue #17), resamples to exactly the viewport (the engine renders at
+-- the display scale, 2x on Retina) and writes the PNG.
 --
 -- `device` / `viewportSize` drive Studio's device simulator for the shot via
 -- plugin-handled RPCs (the service is PluginSecurity; the plugin acts in this
@@ -85,7 +82,6 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 		error("roblox.captureViewport: no viewport camera in this context (use plugin context, or client context in a running session)", 2)
 	end
 
-	local AssetService = game:GetService("AssetService")
 	local CaptureService = game:GetService("CaptureService")
 	local HttpService = game:GetService("HttpService")
 	local RunService = game:GetService("RunService")
@@ -168,20 +164,17 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			outputPath = cwd .. "/" .. outputPath
 		end
 
-		-- In a running session the frame comes from the engine's capture
-		-- directory (see the header); the run client snapshots it now so the
-		-- file that appears after the callback is unmistakably this capture's.
-		-- IsRunning (not IsEdit, which needs the Plugin capability the client
-		-- identity lacks) is false in the edit DOM even while a session runs.
-		local inSession = RunService:IsRunning()
-		local captureToken: string? = if inSession then roblox._captureBegin() else nil
+		-- The frame comes from the engine's capture file (see the header): the
+		-- run client snapshots the capture directory now, so the file that
+		-- appears after the callback is unmistakably this capture's.
+		local captureToken = roblox._captureBegin()
 
 		-- The wait for the callback has no deadline: a large frame or a slow
-		-- GPU can take well over 10s, and a timer here only invented failures.
-		-- The engine raises its own errors for what cannot work (limits, the
-		-- server DOM), and those propagate. The cases that never complete, a
-		-- frame beyond roughly 16384 physical pixels and a minimized Studio on
-		-- Windows, are documented; killing the run abandons one.
+		-- GPU can take well over 10s (the simulator's largest frame takes about
+		-- 7s here), and a timer only invented failures. The engine raises its
+		-- own errors for what cannot work (limits, the server DOM), and those
+		-- propagate. The one case that never completes, a minimized Studio on
+		-- Windows, is documented; killing the run abandons it.
 		local contentId: string? = nil
 		local okShot, shotErr = pcall(function()
 			CaptureService:CaptureScreenshot(function(id: string)
@@ -195,32 +188,7 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			task.wait()
 		end
 
-		if inSession then
-			local outWidth, outHeight = roblox._captureCollect(captureToken :: string, outputPath, width, height)
-			return outputPath, { width = outWidth, height = outHeight }
-		end
-
-		-- Edit DOM: read the exact frame the callback named.
-		local okImage, image = pcall(function()
-			return AssetService:CreateEditableImageAsync(Content.fromUri(contentId :: string))
-		end)
-		if not okImage or not image then
-			error(`roblox.captureViewport: could not load the captured frame ({contentId}): {tostring(image)}`)
-		end
-		local frameSize = image.Size
-		local sourceWidth, sourceHeight = frameSize.X, frameSize.Y
-		local pixels = image:ReadPixelsBuffer(Vector2.zero, frameSize)
-		image:Destroy()
-		local expectedBytes = sourceWidth * sourceHeight * 4
-		if buffer.len(pixels) ~= expectedBytes then
-			error(`roblox.captureViewport: frame buffer is {buffer.len(pixels)} bytes, expected {expectedBytes} for {sourceWidth}x{sourceHeight}`)
-		end
-
-		-- Stream the frame to the run client and finalize in place of
-		-- stream.close (the finalize RPC consumes the handle).
-		local h = fs.open(outputPath, "w")
-		stream.writeBytes(h, pixels)
-		local outWidth, outHeight = roblox._captureFinalize(h.__handle, sourceWidth, sourceHeight, width, height)
+		local outWidth, outHeight = roblox._captureCollect(captureToken, outputPath, width, height)
 		return outputPath, { width = outWidth, height = outHeight }
 	end
 

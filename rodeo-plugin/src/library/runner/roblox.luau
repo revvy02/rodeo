@@ -448,27 +448,10 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 		rpc.call("roblox_simulator_restore", runtime.RobloxSimulatorRestoreRequest.new({}))
 	end
 
-	-- Host side of a capture. `handle` is an open FileWriter on the output
-	-- path holding the frame's RGBA8 bytes (streamed via stream.writeBytes);
-	-- consumed here in place of stream.close: verify the frame is a whole
-	-- multiple of the viewport, resample to exactly width x height, encode
-	-- PNG, write atomically.
-	function roblox._captureFinalize(handle: string, sourceWidth: number, sourceHeight: number, width: number, height: number): (number, number)
-		local res = rpc.call("roblox_capture_finalize", runtime.RobloxCaptureFinalizeRequest.new({
-			handle = handle,
-			sourceWidth = sourceWidth,
-			sourceHeight = sourceHeight,
-			width = width,
-			height = height,
-		}))
-		return res.width, res.height
-	end
-
-	-- Running-session captures (server/client DOM): the engine refuses to
-	-- promote a capture's temporary texture there, so the run client snapshots
-	-- the engine's capture directory before CaptureScreenshot (`begin`) and
-	-- collects the frame the engine writes after the callback (`collect`),
-	-- finalizing it like `_captureFinalize`. See RobloxCaptureBeginRequest.
+	-- Every capture: the run client snapshots the engine's capture directory
+	-- before CaptureScreenshot (`begin`) and collects the frame the engine
+	-- writes after the callback (`collect`): scale check, all-black refusal,
+	-- resample to the viewport, PNG. See RobloxCaptureBeginRequest.
 	function roblox._captureBegin(): string
 		local res = rpc.call("roblox_capture_begin", runtime.RobloxCaptureBeginRequest.new({}))
 		return res.token
