@@ -1,6 +1,8 @@
 //! Scene codecs. The wire packet is u32 JSON length + JSON, then one
 //! length-prefixed RMSH blob per mesh and one RGBA8 blob per image. It travels
 //! through ordinary chunked streams so scene size never sets the RPC size.
+//! TODO(#25): replace the JSON descriptor with the shared protobuf schema,
+//! making it the source of truth rather than adding a second parallel model.
 use super::{
     mesh::{self, Mat4, MeshData, IDENTITY},
     stream, SharedRpcState, StreamHandler,
@@ -16,6 +18,8 @@ mod motion;
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Scene {
+    #[serde(default)]
+    pub name: String,
     pub nodes: Vec<Node>,
     pub roots: Vec<usize>,
     pub meshes: Vec<MeshInfo>,
@@ -28,6 +32,8 @@ pub(super) struct Scene {
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Node {
+    #[serde(default)]
+    pub class_name: Option<String>,
     pub name: String,
     pub transform: [f32; 12],
     #[serde(default)]
@@ -81,8 +87,18 @@ pub(super) struct Material {
     pub color: [f32; 4],
     pub double_sided: bool,
     pub alpha_mode: String,
+    #[serde(default = "one")]
+    pub roughness: f32,
+    #[serde(default)]
+    pub metalness: f32,
+    #[serde(default)]
+    pub native_material: Option<String>,
     #[serde(default)]
     pub maps: HashMap<String, usize>,
+}
+
+fn one() -> f32 {
+    1.
 }
 
 pub async fn decode(
@@ -299,7 +315,10 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
         .default_scene()
         .or_else(|| gltf.scenes().next())
         .ok_or("glTF has no scene")?;
-    let mut scene = Scene::default();
+    let mut scene = Scene {
+        name: selected.name().unwrap_or("Scene").into(),
+        ..Default::default()
+    };
     let mut meshes = Vec::new();
     let mut pixels = Vec::new();
     if gltf.scenes().len() > 1 {
@@ -345,7 +364,33 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
     for node in selected.nodes() {
         visit(node, IDENTITY, &mut worlds, &mut order)?;
     }
-    let node_ids: HashMap<_, _> = order.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+    // Geometry-only children emitted by this codec separate mesh size from the
+    // source node frame. Fold only explicitly marked children, never guess
+    // semantics from an arbitrary external empty/mesh node's shape.
+    let mut geometry_children = HashMap::new();
+    for &source in &order {
+        if let Some(child) = raw["nodes"][source]["extras"]["rodeo"]["geometryChild"].as_u64() {
+            let child = child as usize;
+            let node = gltf.nodes().nth(source).unwrap();
+            let geometry = gltf
+                .nodes()
+                .nth(child)
+                .ok_or("invalid Rodeo geometry child")?;
+            if node.mesh().is_some()
+                || !node.children().any(|n| n.index() == child)
+                || geometry.mesh().is_none()
+                || geometry.children().len() != 0
+            {
+                return Err("invalid Rodeo geometry child".into());
+            }
+            geometry_children.insert(source, child);
+        }
+    }
+    order.retain(|id| !geometry_children.values().any(|child| child == id));
+    let mut node_ids: HashMap<_, _> = order.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+    for (&parent, &child) in &geometry_children {
+        node_ids.insert(child, node_ids[&parent]);
+    }
     scene.roots = selected.nodes().map(|n| node_ids[&n.index()]).collect();
     let mut geometries = HashMap::new();
     let mut materials = HashMap::new();
@@ -353,13 +398,20 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
     let mut source_images: HashMap<usize, image::RgbaImage> = HashMap::new();
     for source in order {
         let node = gltf.nodes().nth(source).unwrap();
-        let (rigid, scale) = decompose(worlds[&source])
+        let (rigid, _) = decompose(worlds[&source])
             .map_err(|e| format!("node {source} ({}): {e}", node.name().unwrap_or("unnamed")))?;
         let mut out = Node {
             name: node.name().unwrap_or("Node").to_string(),
+            class_name: raw["nodes"][source]["extras"]["rodeo"]["class"]
+                .as_str()
+                .map(str::to_owned),
             source_index: Some(source),
             transform: mesh::cframe_from_mat(&rigid),
-            children: node.children().map(|n| node_ids[&n.index()]).collect(),
+            children: node
+                .children()
+                .filter(|n| geometry_children.get(&source) != Some(&n.index()))
+                .map(|n| node_ids[&n.index()])
+                .collect(),
             parts: vec![],
             world: Some(worlds[&source]),
             local_scale: Some(node.transform().decomposed().2),
@@ -370,14 +422,17 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                 .warnings
                 .push(format!("node {source}: camera is unsupported"));
         }
-        if let Some(gmesh) = node.mesh() {
+        let geometry_source = geometry_children.get(&source).copied().unwrap_or(source);
+        let geometry_node = gltf.nodes().nth(geometry_source).unwrap();
+        let (geometry_rigid, scale) = decompose(worlds[&geometry_source])?;
+        if let Some(gmesh) = geometry_node.mesh() {
             for primitive in gmesh.primitives() {
-                let skin = node.skin();
+                let skin = geometry_node.skin();
                 if skin.is_some() && scale.iter().any(|s| (*s - 1.).abs() > 1e-4) {
                     return Err(format!("node {source}: scaled skins are unsupported; apply scale to the rig before importing"));
                 }
                 let reflected = scale[0] < 0.;
-                let weights = node
+                let weights = geometry_node
                     .weights()
                     .or_else(|| gmesh.weights())
                     .map(|w| w.to_vec())
@@ -387,7 +442,6 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                     primitive.index(),
                     skin.as_ref().map(|s| s.index()),
                     reflected,
-                    weights.iter().map(|w| w.to_bits()).collect::<Vec<_>>(),
                 );
                 let mesh_id = if let Some(id) = geometries.get(&key) {
                     *id
@@ -396,7 +450,7 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                         &gltf,
                         &buffers,
                         &[mesh::MeshInstance {
-                            node: source,
+                            node: geometry_source,
                             world: IDENTITY,
                         }],
                         &parents,
@@ -487,10 +541,25 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                         color: pbr.base_color_factor(),
                         double_sided: mat.double_sided(),
                         alpha_mode: format!("{:?}", mat.alpha_mode()).to_uppercase(),
+                        roughness: pbr.roughness_factor(),
+                        metalness: pbr.metallic_factor(),
+                        native_material: mat.index().and_then(|id| {
+                            raw["materials"][id]["extras"]["rodeo"]["material"]
+                                .as_str()
+                                .map(str::to_owned)
+                        }),
                         maps: HashMap::new(),
                     };
                     if mat.alpha_mode() == gltf::material::AlphaMode::Opaque {
                         record.color[3] = 1.;
+                    } else if mat.alpha_mode() == gltf::material::AlphaMode::Mask
+                        && pbr.base_color_texture().is_none()
+                    {
+                        record.color[3] = if record.color[3] >= mat.alpha_cutoff().unwrap_or(0.5) {
+                            1.
+                        } else {
+                            0.
+                        };
                     }
                     let label = format!("material {:?}", mat.index());
                     let mut add_image = |texture: Option<gltf::Texture>,
@@ -598,10 +667,6 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                         record
                             .maps
                             .insert("color".into(), add_image(Some(t.texture()), "color", 1.)?);
-                    } else if mat.alpha_mode() == gltf::material::AlphaMode::Mask {
-                        record
-                            .maps
-                            .insert("color".into(), add_image(None, "color", 1.)?);
                     }
                     if let Some(t) = mat.normal_texture() {
                         if t.tex_coord() != 0 {
@@ -620,22 +685,27 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                             "{label}: metallic/roughness requires unsupported UV set"
                         ));
                     }
-                    record.maps.insert(
-                        "roughness".into(),
-                        add_image(
-                            mr.as_ref().map(|t| t.texture()),
-                            "roughness",
-                            pbr.roughness_factor(),
-                        )?,
-                    );
-                    record.maps.insert(
-                        "metalness".into(),
-                        add_image(
-                            mr.as_ref().map(|t| t.texture()),
-                            "metalness",
-                            pbr.metallic_factor(),
-                        )?,
-                    );
+                    if mr.is_some() || !record.maps.is_empty() {
+                        record.maps.insert(
+                            "roughness".into(),
+                            add_image(
+                                mr.as_ref().map(|t| t.texture()),
+                                "roughness",
+                                pbr.roughness_factor(),
+                            )?,
+                        );
+                        record.maps.insert(
+                            "metalness".into(),
+                            add_image(
+                                mr.as_ref().map(|t| t.texture()),
+                                "metalness",
+                                pbr.metallic_factor(),
+                            )?,
+                        );
+                        // The generated channels already contain the scalar factors.
+                        record.roughness = 1.;
+                        record.metalness = 1.;
+                    }
                     if mat.normal_texture().is_some_and(|t| t.scale() != 1.) {
                         scene
                             .warnings
@@ -661,10 +731,13 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                     materials.insert(mat_key, id);
                     id
                 };
-                let mut matrix = IDENTITY;
+                let mut geometry_world = geometry_rigid;
                 for k in 0..3 {
-                    matrix[k][k] = scale[k].abs();
+                    for row in 0..3 {
+                        geometry_world[k][row] *= scale[k].abs();
+                    }
                 }
+                let matrix = mesh::mat_mul(&mesh::mat_inverse(&rigid).unwrap(), &geometry_world);
                 let poses = scene.meshes[mesh_id]
                     .joint_nodes
                     .iter()
@@ -705,7 +778,7 @@ pub(super) fn write_scene(
 ) -> Result<(), String> {
     extension(path)?;
     motion::validate(scene, meshes)?;
-    let mut root = json!({"asset":{"version":"2.0","generator":"rodeo"},"scene":0,"scenes":[{"nodes":scene.roots}],"nodes":[],"meshes":[],"materials":[],"textures":[],"images":[],"samplers":[{"wrapS":10497,"wrapT":10497}],"accessors":[],"bufferViews":[],"skins":[]});
+    let mut root = json!({"asset":{"version":"2.0","generator":"rodeo"},"scene":0,"scenes":[{"name":scene.name,"nodes":scene.roots}],"nodes":[],"meshes":[],"materials":[],"textures":[],"images":[],"samplers":[{"wrapS":10497,"wrapT":10497}],"accessors":[],"bufferViews":[],"skins":[]});
     let mut binary = Vec::new();
     let mut pieces = Vec::new();
     for (mesh_index, mesh) in meshes.iter().enumerate() {
@@ -751,7 +824,10 @@ pub(super) fn write_scene(
     }
     let mut image_ids = HashMap::new();
     for material in &scene.materials {
-        let mut out = json!({"name":material.name,"pbrMetallicRoughness":{"baseColorFactor":material.color,"metallicFactor":0,"roughnessFactor":1},"doubleSided":material.double_sided,"alphaMode":material.alpha_mode});
+        let mut out = json!({"name":material.name,"pbrMetallicRoughness":{"baseColorFactor":material.color,"metallicFactor":material.metalness,"roughnessFactor":material.roughness},"doubleSided":material.double_sided,"alphaMode":material.alpha_mode});
+        if let Some(native) = &material.native_material {
+            out["extras"] = json!({"rodeo":{"material":native}});
+        }
         for channel in ["color", "normal"] {
             if let Some(id) = material.maps.get(channel) {
                 let texture = if let Some(t) = image_ids.get(id) {
@@ -809,7 +885,6 @@ pub(super) fn write_scene(
             }
             let t = embed_image(&mut root, &mut binary, size.0, size.1, &combined.into_raw())?;
             out["pbrMetallicRoughness"]["metallicRoughnessTexture"] = json!({"index":t});
-            out["pbrMetallicRoughness"]["metallicFactor"] = json!(1);
         }
         root["materials"].as_array_mut().unwrap().push(out);
     }
@@ -823,7 +898,8 @@ pub(super) fn write_scene(
     }
     // A single primitive lives directly on its node. Compute child-local
     // transforms against that node's full affine transform, so mesh scale and
-    // centering do not move attachments or introduce wrappers on every round trip.
+    // centering do not move attachments. Nodes with children keep a rigid frame;
+    // geometry scale lives on a marked geometry child and cannot shear siblings.
     let worlds: Vec<Mat4> = scene
         .nodes
         .iter()
@@ -832,7 +908,7 @@ pub(super) fn write_scene(
                 return world;
             }
             let world = mesh::mat_from_cframe(&node.transform);
-            if node.parts.len() == 1 {
+            if node.parts.len() == 1 && node.children.is_empty() {
                 mesh::mat_mul(&world, &node.parts[0].matrix)
             } else {
                 world
@@ -849,6 +925,9 @@ pub(super) fn write_scene(
             worlds[i]
         };
         let mut output = json!({"name":node.name,"children":node.children});
+        if let Some(class) = &node.class_name {
+            output["extras"] = json!({"rodeo":{"class":class}});
+        }
         if scene.animations.iter().any(|a| {
             a.channels
                 .iter()
@@ -896,14 +975,16 @@ pub(super) fn write_scene(
                 &mesh::mat_inverse(&worlds[i]).ok_or("singular node frame")?,
                 &geometry_world,
             );
-            let on_node =
-                node.parts.len() == 1 && (node.world.is_none() || motion::is_identity(&relative));
+            let on_node = node.parts.len() == 1 && motion::is_identity(&relative);
             let geometry_id = if on_node {
                 root["nodes"][i]["mesh"] = json!(mesh_id);
                 i
             } else {
                 let id = root["nodes"].as_array().unwrap().len();
                 root["nodes"].as_array_mut().unwrap().push(json!({"name":"Geometry","mesh":mesh_id,"matrix":relative.iter().flatten().copied().collect::<Vec<_>>(),"children":[]}));
+                if node.parts.len() == 1 && part["skins"].as_array().is_none_or(Vec::is_empty) {
+                    root["nodes"][i]["extras"]["rodeo"]["geometryChild"] = json!(id);
+                }
                 root["nodes"][i]["children"]
                     .as_array_mut()
                     .unwrap()
@@ -1137,6 +1218,9 @@ mod tests {
                 color: [0.2, 0.4, 0.8, 0.5],
                 double_sided: true,
                 alpha_mode: "BLEND".into(),
+                roughness: 1.,
+                metalness: 0.,
+                native_material: None,
                 maps: HashMap::from([("color".into(), 0)]),
             }],
             warnings: vec![],

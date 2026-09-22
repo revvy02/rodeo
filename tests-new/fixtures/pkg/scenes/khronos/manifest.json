@@ -1,0 +1,47 @@
+{
+  "revision": "c6a6bd13ab2b3c685c7903d03561b8a9392f38b8",
+  "assets": [
+    {
+      "name": "Box",
+      "file": "Box.glb",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/c6a6bd13ab2b3c685c7903d03561b8a9392f38b8/Models/Box/glTF-Binary/Box.glb",
+      "sha256": "ed52f7192b8311d700ac0ce80644e3852cd01537e4d62241b9acba023da3d54e"
+    },
+    {
+      "name": "BoxTextured",
+      "file": "BoxTextured.glb",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/c6a6bd13ab2b3c685c7903d03561b8a9392f38b8/Models/BoxTextured/glTF-Binary/BoxTextured.glb",
+      "sha256": "b510eca2e2ef33f62f9ed57d6e7ce2d10ebb2bdebc4a8e59d347719ba81abdf4"
+    },
+    {
+      "name": "RiggedSimple",
+      "file": "RiggedSimple.glb",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/c6a6bd13ab2b3c685c7903d03561b8a9392f38b8/Models/RiggedSimple/glTF-Binary/RiggedSimple.glb",
+      "sha256": "3a79dabb67bb0cd598a18d08b954d9d357c27c30672f82ef5d3f4e7fe6ca3401"
+    },
+    {
+      "name": "CesiumMan",
+      "file": "CesiumMan.glb",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/c6a6bd13ab2b3c685c7903d03561b8a9392f38b8/Models/CesiumMan/glTF-Binary/CesiumMan.glb",
+      "sha256": "b7001eaeea8254bd44773bcd247e78696d94169388fbb2a1800fc69434e777d9"
+    },
+    {
+      "name": "AnimatedMorphCube",
+      "file": "AnimatedMorphCube.glb",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/c6a6bd13ab2b3c685c7903d03561b8a9392f38b8/Models/AnimatedMorphCube/glTF-Binary/AnimatedMorphCube.glb",
+      "sha256": "214ee56160a50dbf22543a1d66dbf860986e87f0efac3d89feac1359d0e6aeab"
+    },
+    {
+      "name": "InterpolationTest",
+      "file": "InterpolationTest.glb",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/c6a6bd13ab2b3c685c7903d03561b8a9392f38b8/Models/InterpolationTest/glTF-Binary/InterpolationTest.glb",
+      "sha256": "a86eb331b4a083715e75fe19a1f747eac5692d5b9ff120f1eaa457c23ba72bca"
+    },
+    {
+      "name": "BoxAnimated",
+      "file": "BoxAnimated.glb",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/c6a6bd13ab2b3c685c7903d03561b8a9392f38b8/Models/BoxAnimated/glTF-Binary/BoxAnimated.glb",
+      "sha256": "ad0d18d9a21df0d7c2bd3890e60ce69d60d39a55d9b82bacea7e77ac9e583839"
+    }
+  ]
+}

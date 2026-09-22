@@ -313,6 +313,7 @@ pub async fn stream_write_bytes(state: SharedRpcState, req: &rt::StreamWriteByte
 pub async fn stream_close(state: SharedRpcState, req: &rt::StreamCloseRequest) -> Result<rt::Ok, String> {
     let mut guard = state.lock().await;
     if let Some(handler) = guard.stream_handlers.remove(&req.handle) {
+        if req.discard { return Ok(rt::Ok::default()); }
         match handler {
             StreamHandler::FileWriter { path, buffer } => {
                 std::fs::write(&path, &buffer).map_err(|e| format!("write error: {e}"))?;
@@ -378,5 +379,31 @@ async fn read_line_async<R: tokio::io::AsyncRead + Unpin>(reader: &mut R) -> Res
             }
             Err(e) => return Err(format!("read error: {e}")),
         }
+    }
+}
+
+#[cfg(test)]
+mod close_tests {
+    use super::*;
+    use crate::runtime::RpcState;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    #[tokio::test]
+    async fn discard_releases_writer_without_committing_partial_codec_payload() {
+        let path = std::env::temp_dir().join(format!("rodeo-abort-{}", uuid::Uuid::new_v4()));
+        std::fs::write(&path, b"original destination").unwrap();
+        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        let state = Arc::new(Mutex::new(RpcState::new(tx)));
+        state.lock().await.stream_handlers.insert("codec".into(), StreamHandler::FileWriter {
+            path: path.to_string_lossy().into_owned(), buffer: b"incomplete transport packet".to_vec(),
+        });
+        let request = rt::StreamCloseRequest { handle: "codec".into(), discard: true, ..Default::default() };
+        stream_close(state.clone(), &request).await.unwrap();
+        assert!(!state.lock().await.stream_handlers.contains_key("codec"));
+        assert_eq!(std::fs::read(&path).unwrap(), b"original destination");
+        // The encoder may already have consumed the handle before cleanup.
+        stream_close(state.clone(), &request).await.unwrap();
+        std::fs::remove_file(path).unwrap();
     }
 }

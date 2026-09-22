@@ -396,10 +396,12 @@ type _StreamCloseRequestImpl = {
 
 type _StreamCloseRequestFields = {
 	handle: string,
+	discard: boolean,
 }
 
 export type _StreamCloseRequestPartialFields = {
 	handle: string?,
+	discard: boolean?,
 }
 
 export type StreamCloseRequest = typeof(setmetatable({} :: _StreamCloseRequestFields, {} :: _StreamCloseRequestImpl))
@@ -3137,6 +3139,7 @@ do
 	function _StreamCloseRequestImpl.new(data: _StreamCloseRequestPartialFields?): StreamCloseRequest
 		return setmetatable({
 			handle = if data == nil or data.handle == nil then "" else data.handle,
+			discard = if data == nil or data.discard == nil then false else data.discard,
 		}, _StreamCloseRequestImpl :: _StreamCloseRequestImpl)
 	end
 
@@ -3147,6 +3150,11 @@ do
 		if self.handle ~= nil and self.handle ~= "" then
 			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
 			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		if self.discard then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.discard then 1 else 0)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -3163,7 +3171,12 @@ do
 			field, wireType, cursor = proto.readTag(input, cursor)
 
 			if wireType == proto.wireTypes.varint then
-				-- No fields
+				if field == 2 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.discard = value ~= 0
+					continue
+				end
 
 				local _
 				_, cursor = proto.readVarInt(input, cursor)
@@ -3204,6 +3217,10 @@ do
 			output.handle = self.handle
 		end
 
+		if self.discard then
+			output.discard = self.discard
+		end
+
 		return output
 	end
 
@@ -3212,6 +3229,10 @@ do
 
 		if input.handle ~= nil then
 			self.handle = input.handle
+		end
+
+		if input.discard ~= nil then
+			self.discard = input.discard
 		end
 
 		return self

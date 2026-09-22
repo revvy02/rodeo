@@ -4,13 +4,14 @@
   "workspaces": {
     "": {
       "dependencies": {
-        "@bufbuild/protobuf": "2",
+        "@bufbuild/protobuf": "^2.12.1",
       },
       "devDependencies": {
-        "@bufbuild/protoc-gen-es": "2",
-        "@connectrpc/connect": "2",
-        "@connectrpc/connect-node": "2",
-        "@connectrpc/protoc-gen-connect-es": "1",
+        "@bufbuild/protoc-gen-es": "^2.12.1",
+        "@connectrpc/connect": "^2.1.2",
+        "@connectrpc/connect-node": "^2.1.2",
+        "@connectrpc/protoc-gen-connect-es": "^1.7.0",
+        "gltf-validator": "^2.0.0-dev.3.10",
       },
     },
   },
@@ -30,6 +31,8 @@
     "@typescript/vfs": ["@typescript/vfs@1.6.4", "", { "dependencies": { "debug": "^4.4.3" }, "peerDependencies": { "typescript": "*" } }, "sha512-PJFXFS4ZJKiJ9Qiuix6Dz/OwEIqHD7Dme1UwZhTK11vR+5dqW2ACbdndWQexBzCx+CPuMe5WBYQWCsFyGlQLlQ=="],
 
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
+
+    "gltf-validator": ["gltf-validator@2.0.0-dev.3.10", "", {}, "sha512-odJ4k0tRkGXiDGn78yDBg+fBbAIvBnXxh3RwAta0emSxGtyagFE8B4xELB1oYe3S5RD8Ci3uZAsZaascH2LAEQ=="],
 
     "ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
 

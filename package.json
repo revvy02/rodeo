@@ -6,6 +6,7 @@
     "@bufbuild/protoc-gen-es": "^2.12.1",
     "@connectrpc/connect": "^2.1.2",
     "@connectrpc/connect-node": "^2.1.2",
-    "@connectrpc/protoc-gen-connect-es": "^1.7.0"
+    "@connectrpc/protoc-gen-connect-es": "^1.7.0",
+    "gltf-validator": "^2.0.0-dev.3.10"
   }
 }

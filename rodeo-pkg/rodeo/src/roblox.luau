@@ -176,7 +176,7 @@ export type SceneJoint = {
 export type SceneSourceMap = {
     nodes: { [number]: Instance },
     primitives: { ScenePrimitive },
-    materials: { [number]: { SurfaceAppearance } },
+    materials: { [number]: { SurfaceAppearance | MeshPart } },
     images: { [number]: { EditableImage } },
     joints: { [number]: { SceneJoint } },
 }
@@ -192,13 +192,15 @@ export type SceneAnimationChannel = {
     values: { number },
 }
 
---- Channels are authoritative for export. The optional native sequence is a
---- sampled Roblox preview, with a Studio-only registered Animation ID.
+--- Channels are authoritative for export. The native CurveAnimation has a
+--- Studio-only registered Animation ID. Quaternion cubic/composed curves may
+--- require an adaptive approximation; native key times use Studio's clock.
+--- Any approximation or timestamp quantization is reported in warnings.
 export type SceneAnimation = {
     name: string,
     sourceIndex: number?,
     channels: { SceneAnimationChannel },
-    sequence: KeyframeSequence?,
+    clip: CurveAnimation?,
     animation: Animation?,
 }
 
@@ -225,12 +227,15 @@ export type SceneMorphWeights = {
 }
 
 export type ImportEditableSceneOptions = {
-    animationRig: boolean?, -- default true; false imports portable curves only
-    animationSampleRate: number?, -- default 60 Hz; greater than 0, at most 240
+    strict: boolean?, -- abort on any approximation/unsupported-feature warning
 }
 
 --- Procedural scenes can supply portable motion along with their roots.
 --- The full import result is also accepted and retains source coordinate frames.
+export type ExportEditableSceneOptions = {
+    strict: boolean?, -- abort before writing on any warning
+}
+
 export type EditableSceneExport = {
     roots: { Instance },
     animations: { SceneAnimation }?,
@@ -242,7 +247,7 @@ export type EditableSceneExport = {
 --- meshes, and images when finished. Destroying a root does not destroy the
 --- editable resources it references; meshes/images can be shared by parts.
 export type EditableScene = {
-    roots: { Instance },
+    roots: { Model }, -- one container for the selected glTF scene
     meshes: { EditableMesh },
     images: { EditableImage },
     sourceMap: SceneSourceMap,
@@ -254,8 +259,8 @@ export type EditableScene = {
     animator: Animator?,
 }
 
---- Imports the default (or first) glTF/GLB scene as Models and anchored
---- MeshParts, preserving hierarchy, node poses, separate primitives, shared
+--- Imports the default (or first) glTF/GLB scene into one named Model,
+--- preserving hierarchy, node poses, separate primitives, shared
 --- meshes, UVs/colors/normals, PBR base color/normal/metallic/roughness maps,
 --- and supported skins with Bone instances and their initial poses.
 --- PNG/JPEG textures can be embedded or external. Resources remain live and
@@ -264,17 +269,24 @@ export type EditableScene = {
 --- Sheared world transforms and scaled skins error; reflected static meshes
 --- are supported. Animation curves (STEP/LINEAR/CUBICSPLINE), morph position/
 --- normal/tangent deltas, names, and per-instance weights are preserved as
---- editable data. Initial morph weights are rendered; differently weighted
---- instances get independent editable meshes. Update delta maps after topology
---- edits. Changing weight/delta data takes effect on the next import, not by
---- automatically recomputing the current preview.
---- By default scenes with translation/rotation clips get an anchored Model rig, Motor6Ds, Animator,
---- and sampled KeyframeSequences with registered Studio-only Animation IDs.
---- Parent the root to workspace before Animator:LoadAnimation. Native playback
---- supports translation/rotation; scale/weight channels remain portable data
---- and warn. Unrepresentable sampled poses warn and omit the native clip.
---- Pass { animationRig = false } for data-only import. Cameras, material
---- extensions, emissive/occlusion maps and sampler differences warn.
+--- editable data. Meshes contain the unposed base geometry and remain shared
+--- across instances with different morph weights. Initial weights are data;
+--- Roblox playback does not apply generic vertex morphs. Update delta maps
+--- after topology edits that create vertex/normal IDs.
+--- Translation/rotation clips create a rig inside the scene Model, with an
+--- anchored root, driven unanchored parts, Motor6Ds, Animator and CurveAnimations.
+--- Compatible STEP/LINEAR and translation CUBICSPLINE keys remain exact.
+--- Quaternion cubic/composed transforms use adaptive linear curves and warn.
+--- Studio may quantize key times; collisions omit the native clip and warn.
+--- Parent the scene Model to workspace before Animator:LoadAnimation.
+--- Scale/weight channels remain portable data and warn. Unrepresentable poses
+--- and Attachment-targeted animation warn and omit the native clip.
+--- Cameras, material extensions, emissive/
+--- occlusion maps and sampler differences warn. Untextured materials have no
+--- SurfaceAppearance/images: factors are preserved as attributes, with an
+--- explicitly reported native-material preview approximation. Native material
+--- identity is restored only from Rodeo metadata, never guessed from factors.
+--- strict=true fails on warnings and destroys all temporary objects.
 --- Required extensions and unreadable geometry/images error. On failure all
 --- partially created objects are destroyed. No assets are uploaded.
 function roblox.importEditableScene(path: string, options: ImportEditableSceneOptions?): EditableScene
@@ -286,21 +298,23 @@ end
 --- procedurally created roots; no import result or source map is required.
 --- Models/Folders, MeshParts, block Parts, Attachments and skins are supported.
 --- Other instance behavior is reported in warnings; unsupported part geometry
---- and unreadable assets error. Native materials and absent roughness maps
---- use approximate glTF PBR values with warnings. Mesh centering, size, hierarchy and current
+--- and unreadable assets error. Native materials use documented scalar PBR
+--- approximations; emissive/transmission behavior warns. Mesh centering, size, hierarchy and current
 --- Bone poses are preserved. Publishing and RBXM serialization are separate.
 --- Returns warnings for unsupported features. The destination is replaced
 --- only after successful scene encoding; caller-owned objects are untouched.
 --- Pass the full EditableScene to preserve edited animation channels, morph
---- data and original animation coordinate frames. Live position edits modify
---- the morph base geometry; the applied initial deformation is removed during
---- export. Edited normals become new base normals. Generated playback helpers
---- are omitted. Editing native KeyframeSequences does not edit portable channels.
+--- data and original animation coordinate frames. Mesh edits modify base
+--- geometry directly; no remembered morph offsets are subtracted. Generated
+--- playback helpers are omitted. Editing CurveAnimations does not edit portable
+--- channels. Source scale metadata is stored in RodeoScene* attributes and
+--- survives Instance:Clone(); callers must retarget channels/morph bindings to
+--- cloned instances. Scene containers become glTF scenes, not extra nodes.
 --- Roots-only export captures the current static pose and warns when imported
 --- motion data is omitted. Removed animation targets and incomplete morph maps
 --- error instead of silently corrupting motion. No animations are published.
-function roblox.exportEditableScene(path: string, sceneOrRoots: EditableSceneExport | { Instance }): { string }
-    return (singleton :: any).roblox.exportEditableScene(path, sceneOrRoots)
+function roblox.exportEditableScene(path: string, sceneOrRoots: EditableSceneExport | { Instance }, options: ExportEditableSceneOptions?): { string }
+    return (singleton :: any).roblox.exportEditableScene(path, sceneOrRoots, options)
 end
 
 --- Captures a Studio screenshot and writes it to a stable path, returning

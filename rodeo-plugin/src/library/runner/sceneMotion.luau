@@ -12,8 +12,8 @@ local function vectorMap(values, ids)
 	return result
 end
 
-function motion.importMorph(mesh, attributes, info, weights)
-	local result = { mesh = mesh, targets = {}, _offsets = {}, _normals = {}, _posedNormals = {} }
+function motion.importMorph(mesh, attributes, info)
+	local result = { mesh = mesh, targets = {} }
 	if info.tangents then
 		result.tangents = {}
 		for i, value in info.tangents do
@@ -28,45 +28,8 @@ function motion.importMorph(mesh, attributes, info, weights)
 			tangents = vectorMap(target.tangents, attributes.vertices),
 		})
 	end
-	-- Render the node's initial morph pose. Export subtracts only this applied
-	-- offset, so subsequent live position edits still change the base geometry.
-	for i, target in result.targets do
-		local weight = weights[i]
-		for id, delta in target.positions or {} do
-			result._offsets[id] = (result._offsets[id] or Vector3.zero) + delta * weight
-		end
-	end
-	for id, offset in result._offsets do
-		mesh:SetPosition(id, mesh:GetPosition(id) + offset)
-	end
-	for _, id in attributes.normals do
-		local base = mesh:GetNormal(id)
-		local normal = base
-		for i, target in result.targets do
-			normal += ((target.normals and target.normals[id]) or Vector3.zero) * weights[i]
-		end
-		if normal.Magnitude > 1e-8 then
-			normal = normal.Unit
-		end
-		result._normals[id], result._posedNormals[id] = base, normal
-		mesh:SetNormal(id, normal)
-	end
-	return result
-end
-
-function motion.baseOverrides(morph)
-	local result = { positions = {}, normals = {} }
-	for _, id in morph.mesh:GetVertices() do
-		result.positions[id] = morph.mesh:GetPosition(id) - ((morph._offsets and morph._offsets[id]) or Vector3.zero)
-	end
-	for _, id in morph.mesh:GetNormals() do
-		-- Keep the authored normal when the preview is unchanged. An explicitly
-		-- edited normal becomes the new base normal (normalization is not invertible).
-		local current = morph.mesh:GetNormal(id)
-		if morph._posedNormals and current == morph._posedNormals[id] then
-			result.normals[id] = morph._normals[id]
-		end
-	end
+	-- Geometry remains the shared, editable base. Weights and deltas are
+	-- authoritative data; export never has to undo a remembered preview pose.
 	return result
 end
 
@@ -256,11 +219,7 @@ local function rigid(m)
 	return CFrame.fromMatrix(Vector3.new(unpack(m[4])), x, y, z)
 end
 
-function motion.buildRig(scene, document, nodes, own, sampleRate)
-	assert(
-		type(sampleRate) == "number" and sampleRate > 0 and sampleRate <= 240,
-		"animationSampleRate must be between 0 and 240"
-	)
+function motion.buildRig(scene, document, nodes, own)
 	local hasTransforms = false
 	for _, clip in scene.animations do
 		local unsupported = {}
@@ -301,9 +260,7 @@ function motion.buildRig(scene, document, nodes, own, sampleRate)
 		instance:SetAttribute("RodeoSceneHelper", true)
 		return instance
 	end
-	local rig = own(Instance.new("Model"))
-	rig.Name = "Scene"
-	rig:SetAttribute("RodeoSceneRig", true)
+	local rig = scene.roots[1]
 	local function anchor(name, frame, parent)
 		local part = helper("Part", name, parent)
 		part.Size, part.CFrame = Vector3.one, frame
@@ -336,7 +293,7 @@ function motion.buildRig(scene, document, nodes, own, sampleRate)
 		part.Anchored = false
 	end
 	for i, node in nodes do
-		local frame = node:GetPivot()
+		local frame = if node:IsA("Attachment") then node.WorldCFrame else node:GetPivot()
 		-- Keep generated names distinct from arbitrary imported mesh names.
 		local name = unique("__RodeoNode" .. i)
 		anchors[i] = anchor(name, frame, if node:IsA("Model") then node else rig)
@@ -354,10 +311,6 @@ function motion.buildRig(scene, document, nodes, own, sampleRate)
 		partNodes[part] = i
 		joint(part, anchors[i])
 	end
-	for _, root in scene.roots do
-		root.Parent = rig
-	end
-	scene.roots = { rig }
 	scene.animationRig, scene.animator = rig, animator
 	local boneSources = {}
 	for source, bindings in scene.sourceMap.joints do
@@ -365,11 +318,24 @@ function motion.buildRig(scene, document, nodes, own, sampleRate)
 			boneSources[binding.bone] = indexOf[scene.sourceMap.nodes[source]]
 		end
 	end
+	local function uniformAncestors(index)
+		while index do
+			local s = document.nodes[index].rest.scale
+			if s[1] <= 0 or math.abs(s[1] - s[2]) > 1e-6 or math.abs(s[1] - s[3]) > 1e-6 then
+				return false
+			end
+			index = parentOf[index]
+		end
+		return true
+	end
 	for _, clip in scene.animations do
-		local animated = {}
+		local animated, channels = {}, {}
 		for _, channel in clip.channels do
 			if channel.path == "translation" or channel.path == "rotation" then
-				animated[indexOf[channel.node]] = true
+				local index = indexOf[channel.node]
+				animated[index] = true
+				channels[index] = channels[index] or {}
+				channels[index][channel.path] = channel
 			end
 		end
 		if next(animated) == nil then
@@ -384,104 +350,341 @@ function motion.buildRig(scene, document, nodes, own, sampleRate)
 			end
 			return false
 		end
-		local sequence = own(Instance.new("KeyframeSequence"))
-		sequence.Name, sequence.Loop = clip.name, false
-		local duration, times = 0, { [0] = true }
-		for _, channel in clip.channels do
-			duration = math.max(duration, channel.times[#channel.times])
-			for _, t in channel.times do
-				times[t] = true
-				if channel.interpolation == "STEP" and t > 0 then
-					times[math.max(0, t - 0.00001)] = true
-				end
+		local function relativeStatic(a, b)
+			local ancestors = {}
+			local index = a
+			while index do
+				ancestors[index] = true
+				index = parentOf[index]
 			end
+			index = b
+			while index and not ancestors[index] do
+				if animated[index] then
+					return false
+				end
+				index = parentOf[index]
+			end
+			local common = index
+			index = a
+			while index ~= common do
+				if animated[index] then
+					return false
+				end
+				index = parentOf[index]
+			end
+			return true
 		end
-		for step = 0, math.ceil(duration * sampleRate) do
-			times[math.min(duration, step / sampleRate)] = true
-		end
-		local ordered = {}
-		for time in times do
-			table.insert(ordered, time)
-		end
-		table.sort(ordered)
-		local ok, err = pcall(function()
-			for _, time in ordered do
+
+		local native = own(Instance.new("CurveAnimation"))
+		native.Name, native.Loop = clip.name, false
+		local approximated, quantized = false, false
+		local ok, err = xpcall(function()
+			for index in animated do
+				assert(not nodes[index]:IsA("Attachment"), "Attachment-targeted animation is not supported by Animator")
+			end
+			local function framesAt(time, override, value)
 				local localTrs, worlds, frames = {}, {}, {}
 				for i, node in document.nodes do
 					localTrs[i] = table.clone(node.rest)
 				end
-				for _, channel in clip.channels do
-					-- Native Animator cannot scale parts or drive arbitrary vertex
-					-- deltas. Keep those channels exact in clip.channels and warn.
-					if channel.path == "translation" or channel.path == "rotation" then
-						localTrs[indexOf[channel.node]][channel.path] =
-							motion.sample(channel, time, if channel.path == "rotation" then 4 else 3)
+				if time ~= nil then
+					for _, channel in clip.channels do
+						if channel.path == "translation" or channel.path == "rotation" then
+							localTrs[indexOf[channel.node]][channel.path] =
+								motion.sample(channel, time, if channel.path == "rotation" then 4 else 3)
+						end
 					end
 				end
-				-- Document order is parent-first, established by the host traversal.
+				if override then
+					localTrs[indexOf[override.node]][override.path] = value
+				end
 				for i, trs in localTrs do
 					worlds[i] = multiply(if parentOf[i] then worlds[parentOf[i]] else identity, trsMatrix(trs))
 					frames[i] = rigid(worlds[i])
 				end
-				local key = Instance.new("Keyframe")
-				key.Time = time
-				key.Parent = sequence
-				local poses = {}
-				local function poseOf(instance)
-					if poses[instance] then
-						return poses[instance]
-					end
-					local pose = Instance.new("Pose")
-					pose.Name = instance.Name
-					pose.Weight = 0
-					pose.EasingStyle = Enum.PoseEasingStyle.Linear
-					poses[instance] = pose
-					pose.Parent = if instance == rootPart
-						then key
-						elseif instance:IsA("Bone") then poseOf(instance.Parent)
-						else poseOf(motors[instance].Part0)
-					return pose
+				return frames
+			end
+			local function poseFrame(instance, source, frames)
+				if not instance:IsA("Bone") then
+					local parentFrame = if parentOf[source] then frames[parentOf[source]] else CFrame.identity
+					return motors[instance].C0:ToObjectSpace(parentFrame:ToObjectSpace(frames[source]))
 				end
-				for i, part in anchors do
-					-- Unrelated channels must remain unweighted so independent clips
-					-- can play together without resetting each other's joints.
-					if not animated[i] then
-						continue
-					end
-					local parentFrame = if parentOf[i] then frames[parentOf[i]] else CFrame.identity
-					local pose = poseOf(part)
-					pose.CFrame = motors[part].C0:ToObjectSpace(parentFrame:ToObjectSpace(frames[i]))
-					pose.Weight = 1
+				local parent = instance.Parent
+				local parentFrame = if parent:IsA("Bone")
+					then frames[boneSources[parent]]
+					else frames[partNodes[parent]] * partOffsets[parent]
+				return instance.CFrame:ToObjectSpace(parentFrame:ToObjectSpace(frames[source]))
+			end
+			local folders = {}
+			local function folderOf(instance)
+				if folders[instance] then
+					return folders[instance]
 				end
-				for bone, source in boneSources do
-					local meshPart = bone:FindFirstAncestorWhichIsA("MeshPart")
-					if not affected(source) and not affected(partNodes[meshPart]) then
-						continue
+				local folder = Instance.new("Folder")
+				folder.Name = instance.Name
+				folders[instance] = folder
+				folder.Parent = if instance == rootPart
+					then native
+					elseif instance:IsA("Bone") then folderOf(instance.Parent)
+					else folderOf(motors[instance].Part0)
+				return folder
+			end
+			local modes = {
+				STEP = Enum.KeyInterpolationMode.Constant,
+				LINEAR = Enum.KeyInterpolationMode.Linear,
+				CUBICSPLINE = Enum.KeyInterpolationMode.Cubic,
+			}
+			local function checkKeys(expected, actual)
+				assert(#actual == #expected, "native key times collide at Studio's clock resolution")
+				for i, key in actual do
+					if math.abs(key.Time - expected[i].Time) > 1e-6 then
+						quantized = true
 					end
-					local parent = bone.Parent
-					local parentFrame = if parent:IsA("Bone")
-						then frames[boneSources[parent]]
-						else frames[partNodes[parent]] * partOffsets[parent]
-					local pose = poseOf(bone)
-					pose.CFrame = bone.CFrame:ToObjectSpace(parentFrame:ToObjectSpace(frames[source]))
-					pose.Weight = 1
 				end
 			end
+
+			local function vectorCurve(parent, keys)
+				local curve = Instance.new("Vector3Curve")
+				curve.Name, curve.Parent = "Position", parent
+				for axis, floatCurve in { curve:X(), curve:Y(), curve:Z() } do
+					floatCurve:SetKeys(keys[axis])
+					checkKeys(keys[axis], floatCurve:GetKeys())
+				end
+			end
+			local function rotationCurve(parent, keys)
+				local curve = Instance.new("RotationCurve")
+				curve.Name, curve.Parent = "Rotation", parent
+				-- Studio currently rejects RotationCurveKey arrays in SetKeys
+				-- (Variant cast failed); InsertKey accepts the same keys.
+				for _, key in keys do
+					curve:InsertKey(key)
+				end
+				checkKeys(keys, curve:GetKeys())
+			end
+			local function exactCurve(instance, source, channel)
+				local rotation = channel.path == "rotation"
+				local count = if rotation then 4 else 3
+				local cubic = channel.interpolation == "CUBICSPLINE"
+				local stride = count * (if cubic then 3 else 1)
+				local function values(key, section)
+					local out = {}
+					for i = 1, count do
+						out[i] = channel.values[(key - 1) * stride + (if cubic then section * count else 0) + i]
+					end
+					return out
+				end
+				local function transform(value)
+					return poseFrame(instance, source, framesAt(nil, channel, value))
+				end
+				local keys = if rotation then {} else { {}, {}, {} }
+				for i, time in channel.times do
+					local value = values(i, 1)
+					local frame = transform(value)
+					if rotation then
+						table.insert(keys, RotationCurveKey.new(time, frame, modes[channel.interpolation]))
+					else
+						local left, right
+						if cubic then
+							local a, b = values(i, 0), values(i, 2)
+							for j = 1, 3 do
+								a[j] += value[j]
+								b[j] += value[j]
+							end
+							-- Translation is affine under a fixed joint frame. Its
+							-- linear part maps glTF tangents in units per second.
+							left = transform(a).Position - frame.Position
+							right = transform(b).Position - frame.Position
+						end
+						for axis, component in { "X", "Y", "Z" } do
+							local key = FloatCurveKey.new(time, frame.Position[component], modes[channel.interpolation])
+							if cubic then
+								key.LeftTangent = left[component]
+								key.RightTangent = right[component]
+							end
+							table.insert(keys[axis], key)
+						end
+					end
+				end
+				if rotation then
+					rotationCurve(folderOf(instance), keys)
+				else
+					vectorCurve(folderOf(instance), keys)
+				end
+			end
+			local function adaptiveCurves(instance, source, position, rotation)
+				approximated = true
+				local function sample(time)
+					return poseFrame(instance, source, framesAt(time))
+				end
+				local times, steps = { [0] = true }, {}
+				for _, channel in clip.channels do
+					if channel.path == "translation" or channel.path == "rotation" then
+						for _, time in channel.times do
+							times[time] = true
+							if channel.interpolation == "STEP" and time > 0 then
+								times[math.max(0, time - 1 / 1200)] = true
+								steps[time] = true
+							end
+						end
+					end
+				end
+				local ordered = {}
+				for time in times do
+					table.insert(ordered, time)
+				end
+				table.sort(ordered)
+				local samples = { { time = ordered[1], frame = sample(ordered[1]) } }
+				local function refine(a, b, fa, fb, depth)
+					-- Native keys use a 1/2400-second clock. An epsilon key
+					-- would merge with the jump and turn STEP into a ramp.
+					if steps[b] and b - a <= 1 / 1200 + 1e-7 then
+						samples[#samples].step = true
+						table.insert(samples, { time = b, frame = fb })
+						return
+					end
+					local accurate = true
+					for _, t in { 0.25, 0.5, 0.75 } do
+						local expected = sample(a + (b - a) * t)
+						local actual = fa:Lerp(fb, t)
+						local _, angle = actual:ToObjectSpace(expected):ToAxisAngle()
+						if
+							(position and (actual.Position - expected.Position).Magnitude > 1e-4)
+							or (rotation and math.abs(angle) > 1e-4)
+						then
+							accurate = false
+							break
+						end
+					end
+					if accurate or b - a <= 1e-6 then
+						table.insert(samples, { time = b, frame = fb })
+						return
+					end
+					assert(depth < 14, "native curve approximation exceeded its refinement limit")
+					local m = math.round((a + b) * 0.5 * 2400) / 2400
+					if m <= a or m >= b then
+						quantized = true
+						table.insert(samples, { time = b, frame = fb })
+						return
+					end
+					local fm = sample(m)
+					refine(a, m, fa, fm, depth + 1)
+					refine(m, b, fm, fb, depth + 1)
+				end
+				for i = 2, #ordered do
+					refine(ordered[i - 1], ordered[i], samples[#samples].frame, sample(ordered[i]), 0)
+				end
+				-- Evaluate at the engine's actual key times. Adaptive samples
+				-- closer than one clock tick cannot be distinct native keys.
+				local clockSamples = {}
+				for _, record in samples do
+					local time = math.round(record.time * 2400) / 2400
+					if math.abs(time - record.time) > 1e-6 then
+						quantized = true
+					end
+					local last = clockSamples[#clockSamples]
+					local entry = { time = time, frame = sample(time), step = record.step }
+					if last and last.time == time then
+						entry.step = entry.step or last.step
+						clockSamples[#clockSamples] = entry
+					else
+						table.insert(clockSamples, entry)
+					end
+				end
+				samples = clockSamples
+
+				local positions, rotations = { {}, {}, {} }, {}
+				for _, record in samples do
+					if position then
+						for axis, component in { "X", "Y", "Z" } do
+							table.insert(
+								positions[axis],
+								FloatCurveKey.new(
+									record.time,
+									record.frame.Position[component],
+									if record.step
+										then Enum.KeyInterpolationMode.Constant
+										else Enum.KeyInterpolationMode.Linear
+								)
+							)
+						end
+					end
+					if rotation then
+						table.insert(
+							rotations,
+							RotationCurveKey.new(
+								record.time,
+								record.frame,
+								if record.step
+									then Enum.KeyInterpolationMode.Constant
+									else Enum.KeyInterpolationMode.Linear
+							)
+						)
+					end
+				end
+				if position then
+					vectorCurve(folderOf(instance), positions)
+				end
+				if rotation then
+					rotationCurve(folderOf(instance), rotations)
+				end
+			end
+			local function convert(instance, source, direct)
+				local sourceChannels = channels[source] or {}
+				if direct and uniformAncestors(source) then
+					if sourceChannels.translation then
+						exactCurve(instance, source, sourceChannels.translation)
+					end
+					local rotation = sourceChannels.rotation
+					if rotation then
+						if rotation.interpolation == "CUBICSPLINE" then
+							adaptiveCurves(instance, source, false, true)
+						else
+							exactCurve(instance, source, rotation)
+						end
+					end
+				else
+					adaptiveCurves(instance, source, true, true)
+				end
+			end
+			for i, part in anchors do
+				if animated[i] then
+					convert(part, i, true)
+				end
+			end
+			for bone, source in boneSources do
+				local meshPart = bone:FindFirstAncestorWhichIsA("MeshPart")
+				if affected(source) or affected(partNodes[meshPart]) then
+					local parent = bone.Parent
+					local parentSource = if parent:IsA("Bone") then boneSources[parent] else partNodes[parent]
+					convert(
+						bone,
+						source,
+						relativeStatic(parentOf[source], parentSource) and uniformAncestors(parentSource)
+					)
+				end
+			end
+			local animationId = game:GetService("AnimationClipProvider"):RegisterAnimationClip(native)
 			local animation = helper("Animation", clip.name, clips)
-			animation.AnimationId = game:GetService("AnimationClipProvider"):RegisterAnimationClip(sequence)
-			sequence.Parent = animation
-			clip.sequence, clip.animation = sequence, animation
-		end)
+			animation.AnimationId = animationId
+			native.Parent = animation
+			clip.clip, clip.animation = native, animation
+		end, debug.traceback)
 		if not ok then
-			sequence:Destroy()
+			native:Destroy()
 			table.insert(
 				scene.warnings,
-				`animation {clip.name}: native preview unavailable: {tostring(err)}; original channels retained`
+				`animation {clip.name}: native playback unavailable: {tostring(err)}; original channels retained`
 			)
-		else
+		elseif approximated then
 			table.insert(
 				scene.warnings,
-				`animation {clip.name}: Roblox preview sampled at {sampleRate} Hz; original interpolation retained for export`
+				"native playback approximates quaternion cubic or composed transforms with adaptive linear curves; original interpolation retained for export"
+			)
+		end
+		if ok and quantized then
+			table.insert(
+				scene.warnings,
+				"native playback key times were quantized to Studio's clock; original timestamps retained for export"
 			)
 		end
 	end

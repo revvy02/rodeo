@@ -9,6 +9,63 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		roughness = "RoughnessMapContent",
 		metalness = "MetalnessMapContent",
 	}
+	-- Scalar factors survive export even when Roblox previews an untextured
+	-- material without allocating images or suppressing vertex colors.
+	local materialPbr = {
+		Plastic = { 0.55, 0 },
+		SmoothPlastic = { 0.30, 0 },
+		Glass = { 0.05, 0 },
+		ForceField = { 0.10, 0 },
+		Metal = { 0.35, 1 },
+		DiamondPlate = { 0.45, 1 },
+		CorrodedMetal = { 0.75, 1 },
+		Foil = { 0.30, 1 },
+		Wood = { 0.80, 0 },
+		WoodPlanks = { 0.80, 0 },
+		Fabric = { 0.90, 0 },
+		Sand = { 0.95, 0 },
+		Concrete = { 0.90, 0 },
+		Brick = { 0.90, 0 },
+		Cobblestone = { 0.90, 0 },
+		Granite = { 0.75, 0 },
+		Marble = { 0.40, 0 },
+		Slate = { 0.85, 0 },
+		Pebble = { 0.90, 0 },
+		Rock = { 0.85, 0 },
+		Basalt = { 0.85, 0 },
+		Grass = { 0.95, 0 },
+		LeafyGrass = { 0.95, 0 },
+		Ground = { 0.95, 0 },
+		Mud = { 0.90, 0 },
+		Snow = { 0.85, 0 },
+		Ice = { 0.15, 0 },
+		Glacier = { 0.20, 0 },
+		Salt = { 0.90, 0 },
+		Limestone = { 0.85, 0 },
+		Pavement = { 0.90, 0 },
+		Cardboard = { 0.90, 0 },
+		Carpet = { 0.95, 0 },
+		Leather = { 0.60, 0 },
+		Asphalt = { 0.90, 0 },
+		Neon = { 0.70, 0 },
+	}
+	local function warnings(messages)
+		local grouped, order = {}, {}
+		for _, message in messages do
+			local feature = message:match("^node %d+: (.*)") or message:match("^material [^:]+: (.*)") or message
+			if not grouped[feature] then
+				grouped[feature] = 0
+				table.insert(order, feature)
+			end
+			grouped[feature] += 1
+		end
+		local result = {}
+		for _, feature in order do
+			local count = grouped[feature]
+			table.insert(result, if count > 1 then `{feature} ({count} occurrences)` else feature)
+		end
+		return result
+	end
 	local nextId = 0
 	local function cframe(values)
 		return CFrame.new(unpack(values))
@@ -49,11 +106,18 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 
 	function roblox.importEditableScene(path, options)
 		checkPath(path)
+		if options then
+			assert(options.animationRig == nil, "animationRig was removed; scene rigs are imported automatically")
+			assert(options.animationSampleRate == nil, "animationSampleRate was removed; scene playback uses curves")
+		end
 		nextId += 1
 		local handle = { __handle = `scene:{nextId}:{path}` }
 		rpc.call("roblox_scene_decode", runtime.RobloxSceneDecodeRequest.new({ path = path, handle = handle.__handle }))
-		local bytes = stream.readBytes(handle)
+		local readOk, bytes = pcall(stream.readBytes, handle)
 		stream.close(handle)
+		if not readOk then
+			error(bytes, 2)
+		end
 		local offset = 0
 		local function chunk()
 			local size = buffer.readu32(bytes, offset)
@@ -64,6 +128,9 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			return result
 		end
 		local document = HttpService:JSONDecode(buffer.tostring(chunk()))
+		if options and options.strict and #document.warnings > 0 then
+			error(document.warnings[1], 2)
+		end
 		local scene = {
 			roots = {},
 			meshes = {},
@@ -72,7 +139,6 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			animations = {},
 			morphs = {},
 			morphWeights = {},
-			_nodeFrames = {},
 			sourceMap = { nodes = {}, primitives = {}, materials = {}, images = {}, joints = {} },
 		}
 		local owned = {}
@@ -82,17 +148,11 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		end
 		local ok, result = pcall(function()
 			local boneIds = {}
-			local defaultWeights = {}
-			for _, node in document.nodes do
-				for _, binding in node.parts do
-					defaultWeights[binding.mesh + 1] = binding.weights
-				end
-			end
 			for i, info in document.meshes do
 				local mesh, ids, attributes = meshFromBlob(chunk(), path)
 				scene.meshes[i], boneIds[i] = own(mesh), ids
 				if #info.morph.targets > 0 or info.morph.tangents then
-					table.insert(scene.morphs, motion.importMorph(mesh, attributes, info.morph, defaultWeights[i]))
+					table.insert(scene.morphs, motion.importMorph(mesh, attributes, info.morph))
 				end
 			end
 			for i, info in document.images do
@@ -118,7 +178,11 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			for i, node in document.nodes do
 				local nodeFrame = cframe(node.transform)
 				local nodeInstance
-				if #node.parts ~= 1 then
+				if node.className == "Attachment" then
+					assert(#node.parts == 0, "Attachment node cannot carry geometry")
+					nodeInstance = own(Instance.new("Attachment"))
+					nodeInstance.CFrame = nodeFrame
+				elseif #node.parts ~= 1 then
 					nodeInstance = own(Instance.new("Model"))
 					nodeInstance.WorldPivot = nodeFrame
 				end
@@ -152,15 +216,37 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 						part.Color = color
 						part.Transparency = 1 - material.color[4]
 						part.DoubleSided = material.doubleSided
-						local appearance = own(Instance.new("SurfaceAppearance"))
-						appearance.Name = material.name
-						appearance.Color = color
-						appearance.AlphaMode = Enum.AlphaMode.Transparency
-						for channel, imageIndex in material.maps do
-							appearance[mapProperties[channel]] = Content.fromObject(scene.images[imageIndex + 1])
+						local owner = part
+						if next(material.maps) then
+							local appearance = own(Instance.new("SurfaceAppearance"))
+							appearance.Name, appearance.Color = material.name, color
+							appearance.AlphaMode = Enum.AlphaMode.Transparency
+							for channel, imageIndex in material.maps do
+								appearance[mapProperties[channel]] = Content.fromObject(scene.images[imageIndex + 1])
+							end
+							appearance.Parent = part
+							owner = appearance
+						else
+							-- Restore native identity only when the exporter supplied it.
+							-- Roughness/metalness alone cannot distinguish wood from planks,
+							-- or concrete from brick; never guess a textured native material.
+							part.Material = if material.nativeMaterial
+								then Enum.Material[material.nativeMaterial]
+								elseif material.metalness >= 0.5 then Enum.Material.Metal
+								else Enum.Material.SmoothPlastic
+							if not material.nativeMaterial then
+								table.insert(
+									scene.warnings,
+									"untextured PBR preview uses a native material approximation; original factors are preserved"
+								)
+							end
 						end
-						appearance.Parent = part
-						listAt(scene.sourceMap.materials, material.sourceIndex, appearance)
+						owner:SetAttribute("RodeoSceneMaterialName", material.name)
+						owner:SetAttribute("RodeoSceneRoughness", material.roughness)
+						owner:SetAttribute("RodeoSceneMetalness", material.metalness)
+						owner:SetAttribute("RodeoSceneMaterial", part.Material.Name)
+						owner:SetAttribute("RodeoSceneNativeMaterial", material.nativeMaterial)
+						listAt(scene.sourceMap.materials, material.sourceIndex, owner)
 					end
 					local bones, binds, poses = {}, {}, {}
 					local indexOf = {}
@@ -223,21 +309,29 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				if x:Dot(y:Cross(z)) < 0 then
 					worldScale *= Vector3.new(-1, 1, 1)
 				end
-				scene._nodeFrames[nodeInstance] = {
-					scale = worldScale,
-					localScale = node.localScale,
-					size = if nodeInstance:IsA("BasePart") then nodeInstance.Size else nil,
-					modelScale = if nodeInstance:IsA("Model") then nodeInstance:GetScale() else nil,
-				}
+				nodeInstance:SetAttribute("RodeoSceneWorldScale", worldScale)
+				nodeInstance:SetAttribute("RodeoSceneLocalScale", Vector3.new(unpack(node.localScale)))
+				if nodeInstance:IsA("Model") then
+					nodeInstance:SetAttribute("RodeoSceneModelScale", nodeInstance:GetScale())
+				end
 			end
 			for i, node in document.nodes do
 				for _, child in node.children do
-					nodes[child + 1].Parent = nodes[i]
+					local instance = nodes[child + 1]
+					instance.Parent = nodes[i]
+					if instance:IsA("Attachment") then
+						instance.WorldCFrame = cframe(document.nodes[child + 1].transform)
+					end
 				end
 			end
+			local container = own(Instance.new("Model"))
+			container.Name = document.name
+			container.WorldPivot = CFrame.identity
+			container:SetAttribute("RodeoSceneContainer", true)
 			for _, root in document.roots do
-				table.insert(scene.roots, nodes[root + 1])
+				nodes[root + 1].Parent = container
 			end
+			scene.roots = { container }
 			for _, animation in document.animations do
 				local clip = { name = animation.name, sourceIndex = animation.sourceIndex, channels = {} }
 				for _, channel in animation.channels do
@@ -247,8 +341,12 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				end
 				table.insert(scene.animations, clip)
 			end
-			if #scene.animations > 0 and (not options or options.animationRig ~= false) then
-				motion.buildRig(scene, document, nodes, own, options and options.animationSampleRate or 60)
+			if #scene.animations > 0 then
+				motion.buildRig(scene, document, nodes, own)
+			end
+			scene.warnings = warnings(scene.warnings)
+			if options and options.strict and #scene.warnings > 0 then
+				error(scene.warnings[1])
 			end
 			return scene
 		end)
@@ -296,11 +394,12 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		return mesh
 	end
 
-	function roblox.exportEditableScene(path, input)
+	function roblox.exportEditableScene(path, input, options)
 		checkPath(path)
 		local scene = if input.roots then input else nil
 		local roots = if scene then scene.roots else input
-		local document = { roots = {}, nodes = {}, meshes = {}, images = {}, materials = {}, warnings = {} }
+		local document =
+			{ name = "Scene", roots = {}, nodes = {}, meshes = {}, images = {}, materials = {}, warnings = {} }
 		local morphs, weightsFor = {}, {}
 		if scene then
 			for _, morph in scene.morphs or {} do
@@ -316,7 +415,10 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		local materialIds, loadedMeshes = {}, {}
 		local jointNodes, skinBindings = {}, {}
 		local function warning(instance, feature)
-			table.insert(document.warnings, `{instance:GetFullName()}: {feature}`)
+			if options and options.strict then
+				error(`{instance:GetFullName()}: {feature}`)
+			end
+			table.insert(document.warnings, feature)
 		end
 		local function imageFor(content)
 			if content.SourceType == Enum.ContentSourceType.None then
@@ -344,7 +446,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			local appearance = part:FindFirstChildOfClass("SurfaceAppearance")
 			local color = if appearance then appearance.Color else part.Color
 			local material = {
-				name = if appearance then appearance.Name else part.Name,
+				name = if appearance then appearance.Name else part:GetAttribute("RodeoSceneMaterialName") or part.Name,
 				color = { color.R, color.G, color.B, 1 - part.Transparency },
 				doubleSided = part:IsA("MeshPart") and part.DoubleSided,
 				alphaMode = "BLEND",
@@ -366,16 +468,46 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			if next(maps) then
 				material.maps = maps
 			end
+			local owner = appearance or part
+			local native = materialPbr[part.Material.Name] or { 0.70, 0 }
+			local savedMaterial = owner:GetAttribute("RodeoSceneMaterial")
+			local keepFactors = savedMaterial == part.Material.Name
+			material.roughness = if maps.roughness
+				then 1
+				elseif keepFactors then owner:GetAttribute("RodeoSceneRoughness")
+				else native[1] * (1 - 0.9 * part.Reflectance)
+			material.metalness = if maps.metalness
+				then 1
+				elseif keepFactors then owner:GetAttribute("RodeoSceneMetalness")
+				else math.max(native[2], part.Reflectance)
 			if not appearance then
-				warning(
-					part,
-					"native Roblox material shading is approximated with base color and default glTF PBR values"
-				)
-			elseif maps.roughness == nil then
-				warning(appearance, "no roughness map; exported with glTF roughness 1")
+				material.nativeMaterial = if keepFactors
+					then owner:GetAttribute("RodeoSceneNativeMaterial")
+					else part.Material.Name
 			end
-			local keyParts =
-				{ tostring(color), tostring(part.Transparency), tostring(material.doubleSided), material.alphaMode }
+			if
+				not appearance
+				and (
+					part.Material == Enum.Material.Neon
+					or part.Material == Enum.Material.Glass
+					or part.Material == Enum.Material.ForceField
+				)
+			then
+				warning(part, `{part.Material.Name} emissive/transmission behavior is approximated by scalar PBR`)
+			end
+			if part.MaterialVariant ~= "" then
+				warning(part, "MaterialVariant maps are not exported")
+			end
+			local keyParts = {
+				tostring(color),
+				tostring(part.Transparency),
+				tostring(material.doubleSided),
+				material.alphaMode,
+				tostring(material.roughness),
+				tostring(material.metalness),
+				tostring(material.nativeMaterial),
+				tostring(if appearance then appearance.Name else part:GetAttribute("RodeoSceneMaterialName")),
+			}
 			for _, channel in { "color", "normal", "roughness", "metalness" } do
 				table.insert(keyParts, tostring(maps[channel]))
 			end
@@ -418,7 +550,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			if id == nil then
 				id = #document.meshes
 				local morph = morphs[editable]
-				local blob, corners = meshToBlob(editable, if morph then motion.baseOverrides(morph) else nil)
+				local blob, corners = meshToBlob(editable)
 				table.insert(
 					document.meshes,
 					{ jointNodes = {}, morph = if morph then motion.exportMorph(morph, corners) else nil }
@@ -497,19 +629,26 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				warning(instance, `{instance.ClassName} behavior is unsupported; exported hierarchy only`)
 			end
 			local index = #document.nodes
-			local node = { name = instance.Name, transform = components(frame), children = {}, parts = {} }
-			if scene then
-				local sourceFrame = scene._nodeFrames and scene._nodeFrames[instance]
-				local scale = if sourceFrame then sourceFrame.scale else Vector3.one
-				if sourceFrame and sourceFrame.size then
-					scale *= instance.Size / sourceFrame.size
+			local node = {
+				name = instance.Name,
+				className = if instance:IsA("Attachment") then "Attachment" else nil,
+				transform = components(frame),
+				children = {},
+				parts = {},
+			}
+			local sourceScale = instance:GetAttribute("RodeoSceneWorldScale")
+			if sourceScale then
+				local modelScale = instance:GetAttribute("RodeoSceneModelScale")
+				if modelScale then
+					sourceScale *= instance:GetScale() / modelScale
 				end
-				if sourceFrame and sourceFrame.modelScale then
-					scale *= instance:GetScale() / sourceFrame.modelScale
-				end
-				node.world = matrix(frame, scale)
-				node.localScale = sourceFrame and sourceFrame.localScale
-			elseif instance:GetAttribute("RodeoSceneData") then
+				node.world = matrix(frame, sourceScale)
+				local localScale = instance:GetAttribute("RodeoSceneLocalScale")
+				node.localScale = { localScale.X, localScale.Y, localScale.Z }
+			elseif scene then
+				node.world = matrix(frame, Vector3.one)
+			end
+			if not scene and instance:GetAttribute("RodeoSceneData") then
 				warning(instance, "animation/morph data omitted; pass the full EditableScene to preserve it")
 			end
 			table.insert(document.nodes, node)
@@ -528,9 +667,11 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			end
 			return index
 		end
+		local handle
 		local ok, result = pcall(function()
 			for _, root in roots do
-				if root:GetAttribute("RodeoSceneRig") then
+				if root:GetAttribute("RodeoSceneContainer") or root:GetAttribute("RodeoSceneRig") then
+					document.name = root.Name
 					for _, child in root:GetChildren() do
 						if not child:GetAttribute("RodeoSceneHelper") then
 							table.insert(document.roots, visit(child, CFrame.identity))
@@ -588,7 +729,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			for _, blob in imageBlobs do
 				table.insert(chunks, blob)
 			end
-			local handle = fs.open(path, "w")
+			handle = fs.open(path, "w")
 			for _, blob in chunks do
 				local length = buffer.create(4)
 				buffer.writeu32(length, 0, buffer.len(blob))
@@ -596,10 +737,19 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				stream.writeBytes(handle, blob)
 			end
 			rpc.call("roblox_scene_encode", runtime.RobloxSceneEncodeRequest.new({ handle = handle.__handle }))
-			return document.warnings
+			return warnings(document.warnings)
 		end)
 		cleanup(temporary)
 		if not ok then
+			if handle then
+				-- close normally commits raw transport bytes. Discard instead;
+				-- encode may already have consumed the handle, which is harmless.
+				pcall(
+					rpc.call,
+					"stream_close",
+					runtime.StreamCloseRequest.new({ handle = handle.__handle, discard = true })
+				)
+			end
 			error(`exportEditableScene: {path}: {tostring(result)}`, 2)
 		end
 		return result

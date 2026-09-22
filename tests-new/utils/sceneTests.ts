@@ -1,3 +1,4 @@
+import { sceneReview } from "./sceneReviewTests.js";
 import { it, expect } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -11,21 +12,22 @@ const cleanup = `local function destroy(scene)
 end`;
 
 export function scenes(run: RunFn): void {
+  sceneReview(run);
   it("scene: exact curves and sparse morphs survive live edits, corner splits and repeated exports", async () => {
     const output = `rodeo-test-scene-${randomUUID()}.gltf`;
     try {
       const result = await run({ showReturn: true, source: `
         local r=require("@rodeo/roblox")
         ${cleanup}
-        local scene=r.importEditableScene("${fixture}motion.gltf",{animationRig=false})
+        local scene=r.importEditableScene("${fixture}motion.gltf")
         assert(#scene.animations==4 and #scene.animations[1].channels==4)
-        assert(#scene.morphs==2 and #scene.morphWeights==2)
-        assert(scene.morphs[1].mesh~=scene.morphs[2].mesh,"different initial weights require independent editable meshes")
+        assert(#scene.morphs==1 and #scene.morphWeights==2)
+        assert(scene.sourceMap.primitives[1].mesh==scene.sourceMap.primitives[2].mesh,"different weights must share the unposed base mesh")
         local morph=scene.morphs[1]
         assert(morph.targets[1].name=="Tall" and morph.targets[2].name=="Wide")
         local vertices=morph.mesh:GetVertices()
-        assert(math.abs(morph.mesh:GetPosition(vertices[3]).Y-2.5)<0.001,"default morph pose")
-        assert(math.abs(scene.morphs[2].mesh:GetSize().Y-3.5)<0.001)
+        assert(math.abs(morph.mesh:GetPosition(vertices[3]).Y-2)<0.001,"unposed morph base")
+        assert(math.abs(scene.morphs[1].mesh:GetSize().Y-2)<0.001)
         morph.mesh:SetPosition(vertices[1],morph.mesh:GetPosition(vertices[1])+Vector3.new(.125,0,0))
         local face=morph.mesh:AddTriangle(vertices[1],vertices[2],vertices[3])
         local original=morph.mesh:GetFaces()[1]
@@ -33,7 +35,7 @@ export function scenes(run: RunFn): void {
         morph.mesh:SetFaceUVs(face,{morph.mesh:AddUV(Vector2.zero),morph.mesh:AddUV(Vector2.xAxis),morph.mesh:AddUV(Vector2.yAxis)})
         scene.animations[1].channels[1].values[8]=5 -- first cubic out-tangent Y
         r.exportEditableScene("${output}",scene)
-        local copy=r.importEditableScene("${output}",{animationRig=false})
+        local copy=r.importEditableScene("${output}")
         assert(#copy.animations[1].channels==4 and copy.animations[1].channels[1].values[8]==5)
         local deltaCount=0;for _ in copy.morphs[1].targets[1].positions do deltaCount+=1 end
         assert(deltaCount==6,"morph deltas must follow the split face-corner tuples")
@@ -48,7 +50,7 @@ export function scenes(run: RunFn): void {
       ` });
       expect(result.ok, result.output).toBe(true);
       const doc = JSON.parse(readFileSync(output, "utf8"));
-      expect(doc.nodes.length).toBe(3);
+      expect(doc.nodes.length).toBe(5); // resized meshes have separate geometry frames
       expect(doc.nodes[0].matrix[0]).toBe(4);
       expect(doc.animations[0].samplers.map((s: any) => s.interpolation)).toEqual(["CUBICSPLINE","LINEAR","STEP","LINEAR"]);
       expect(doc.meshes[0].extras.targetNames).toEqual(["Tall","Wide"]);
@@ -65,7 +67,7 @@ export function scenes(run: RunFn): void {
         local clip={name="Move",channels={{node=part,path="translation",interpolation="LINEAR",times={0,1},values={0,0,0,4,0,0}}}}
         r.exportEditableScene("${output}",{roots={part},animations={clip}})
         local scene=r.importEditableScene("${output}")
-        assert(scene.animations[1].sequence,table.concat(scene.warnings,";"))
+        assert(scene.animations[1].clip,table.concat(scene.warnings,";"))
         assert(scene.animations[1].channels[1].node.Name=="Moving box")
         assert((scene.sourceMap.primitives[1].part.Size-part.Size).Magnitude<.001)
         destroy(scene);part:Destroy();return "procedural animation passed"
@@ -79,11 +81,11 @@ export function scenes(run: RunFn): void {
       const result=await run({showReturn:true,source:`
         local r=require("@rodeo/roblox")
         ${cleanup}
-        local scene=r.importEditableScene("${fixture}animated-skin.gltf",{animationSampleRate=30})
+        local scene=r.importEditableScene("${fixture}animated-skin.gltf")
         assert(scene.animationRig and scene.animator)
         local clip=scene.animations[1]
-        assert(clip.sequence and clip.animation,table.concat(scene.warnings,"; "))
-        assert(#clip.sequence:GetKeyframes()>=61)
+        assert(clip.clip and clip.animation,table.concat(scene.warnings,"; "))
+        assert(clip.clip:IsA("CurveAnimation"))
         scene.animationRig.Parent=workspace
         local bone=scene.sourceMap.joints[2][1].bone
         local before=bone.Transform
@@ -94,20 +96,22 @@ export function scenes(run: RunFn): void {
         track.TimePosition=.5
         scene.animator:StepAnimations(0)
         assert((bone.Transform.Position-before.Position).Magnitude>.4,"native Animator did not drive the imported Bone")
+        local rootBone=scene.sourceMap.joints[1][1].bone
+        assert(rootBone.Transform.XVector:Dot(Vector3.xAxis)>.99999,"STEP rotation interpolated before its next key")
         track:Stop(0);track:Destroy()
         r.exportEditableScene("${output}",scene)
         local copy=r.importEditableScene("${output}")
-        assert(copy.animations[1].sequence and #copy.animations[1].channels==2)
+        assert(copy.animations[1].clip and #copy.animations[1].channels==2)
         local count=0;for _ in copy.sourceMap.nodes do count+=1 end;assert(count==4,"generated rig leaked into glTF")
         r.exportEditableScene("${output}",copy)
-        local again=r.importEditableScene("${output}",{animationRig=false})
+        local again=r.importEditableScene("${output}")
         count=0;for _ in again.sourceMap.nodes do count+=1 end;assert(count==4,"round trips grew the rig hierarchy")
         destroy(again);destroy(copy);destroy(scene)
         local moving=r.importEditableScene("${fixture}motion.gltf")
-        assert(moving.animations[1].sequence,table.concat(moving.warnings,"; "))
-        assert(moving.animations[4].sequence==nil,"morph-only clip must not pretend to animate native joints")
-        for _,pose in moving.animations[3].sequence:GetDescendants() do
-          if pose:IsA("Pose") and pose.Name=="__RodeoNode3" then assert(pose.Weight==0,"independent clip overwrites another node") end
+        assert(moving.animations[1].clip,table.concat(moving.warnings,"; "))
+        assert(moving.animations[4].clip==nil,"morph-only clip must not pretend to animate native joints")
+        for _,pose in moving.animations[3].clip:GetDescendants() do
+          assert(not (pose:IsA("Folder") and pose.Name=="__RodeoNode3"),"independent clip overwrites another node")
         end
         moving.animationRig.Parent=workspace
         local motor
@@ -133,7 +137,7 @@ export function scenes(run: RunFn): void {
       const result=await run({showReturn:true,source:`
         local r=require("@rodeo/roblox");local fs=require("@rodeo/fs");local stream=require("@rodeo/stream")
         ${cleanup}
-        local scene=r.importEditableScene("${fixture}motion.gltf",{animationRig=false})
+        local scene=r.importEditableScene("${fixture}motion.gltf")
         local warnings=r.exportEditableScene("${output}",scene.roots)
         assert(string.find(table.concat(warnings,";"),"full EditableScene"))
         local function bytes() local h=fs.open("${output}","r");local b=stream.readBytes(h);stream.close(h);return buffer.tostring(b) end
@@ -162,7 +166,7 @@ export function scenes(run: RunFn): void {
         assert(#scene.roots == 1 and scene.roots[1].Parent == nil)
         assert(#scene.meshes == 2 and #scene.sourceMap.primitives == 4)
         local first, second = scene.sourceMap.nodes[1], scene.sourceMap.nodes[3]
-        assert(first.Parent == scene.roots[1] and second.Parent.Name == "Group")
+        assert(first.Parent == scene.sourceMap.nodes[0] and second.Parent.Name == "Group")
         local a, b = scene.sourceMap.primitives[1], scene.sourceMap.primitives[3]
         assert(a.mesh == b.mesh and a.meshIndex == 0 and a.primitiveIndex == 0)
         assert((a.part.CFrame.Position - Vector3.new(13,4,-2)).Magnitude < 0.001)
@@ -243,6 +247,7 @@ export function scenes(run: RunFn): void {
           local vs=geometry:GetFaceVertices(face)
           local a,b,c=geometry:GetPosition(vs[1]),geometry:GetPosition(vs[2]),geometry:GetPosition(vs[3])
           local normal=(b-a):Cross(c-a).Unit
+          assert(normal:Dot((a+b+c)/3-geometry:GetCenter())>0,"box winding points inward")
           for _,n in geometry:GetFaceNormals(face) do assert(geometry:GetNormal(n):Dot(normal)>0.999) end
         end
         local h=fs.open("${output}","r");local before=stream.readBytes(h);stream.close(h)

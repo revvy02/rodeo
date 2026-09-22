@@ -71,6 +71,8 @@ message StreamWriteBytesRequest {
 
 message StreamCloseRequest {
   string handle = 1;
+  // Drop buffered data without committing it (codec failure cleanup).
+  bool discard = 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +201,8 @@ message RobloxMeshDecodeResponse {
 }
 
 // Scene metadata and resource blobs are streamed, never embedded in RPC envelopes.
+// TODO(#25): the first chunk is currently the typed Rust Scene serialized as JSON;
+// migrate that descriptor to messages here while leaving resource chunks separate.
 message RobloxSceneDecodeRequest {
   string path = 1;
   string handle = 2;

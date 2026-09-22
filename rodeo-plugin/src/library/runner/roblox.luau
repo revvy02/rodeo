@@ -235,7 +235,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 	-- Writes an EditableMesh to `path` as glTF (.glb or .gltf). Geometry,
 	-- per-corner normals/UVs/colors, and skinning (bones with bind poses, up to
 	-- four influences per vertex) are written; FACS poses are not.
-	local function meshToBlob(mesh: EditableMesh, overrides)
+	local function meshToBlob(mesh: EditableMesh)
 		local okClass, className = pcall(function()
 			return (mesh :: any).ClassName
 		end)
@@ -261,7 +261,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 			local cs = mesh:GetFaceColors(faceId) or {}
 			for k = 1, 3 do
 				local v, n, u, c = vs[k], ns[k], us[k], cs[k]
-				local nv = if n and n ~= 0 then (overrides and overrides.normals[n]) or mesh:GetNormal(n) else nil
+				local nv = if n and n ~= 0 then mesh:GetNormal(n) else nil
 				local uv = if u and u ~= 0 then mesh:GetUV(u) else nil
 				local cv = if c and c ~= 0 then mesh:GetColor(c) else nil
 				if not nv then hasNormals = false end
@@ -273,7 +273,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 					count += 1
 					idx = count
 					tuples[key] = idx
-					positions[idx] = (overrides and overrides.positions[v]) or mesh:GetPosition(v)
+					positions[idx] = mesh:GetPosition(v)
 					normals[idx] = nv
 					uvs[idx] = uv
 					colors[idx] = cv

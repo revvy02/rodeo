@@ -2,12 +2,12 @@
 name: rodeo
 description: CLI tool for Roblox Studio that lets you create studio instances, and run code in any studio environment. Includes commands, flags, DOM targeting, directives, return values, and @rodeo APIs. Use when writing rodeo commands, scripts, or working with Roblox Studio.
 metadata:
-  version: 1.5.0-rc.7
+  version: 1.5.0-rc.8
 ---
 
 # rodeo
 
-This skill describes rodeo **1.5.0-rc.7**. Projects pin their own rodeo version, so
+This skill describes rodeo **1.5.0-rc.8**. Projects pin their own rodeo version, so
 check `rodeo --version` in the project: if it differs, this copy of the skill may
 document flags or APIs that binary does not have (or lack ones it does).
 
@@ -365,7 +365,7 @@ be triangulated report the source line.
 
 `importEditableScene` preserves the default glTF scene's hierarchy, separate
 material primitives, compatible shared meshes, PBR textures and supported skins.
-Returns `{ roots, meshes, images, sourceMap, warnings, animations, morphs, morphWeights, animationRig?, animator? }`. Roots are unparented;
+Returns `{ roots, meshes, images, sourceMap, warnings, animations, morphs, morphWeights, animationRig?, animator? }`. `roots` always contains one unparented Model named after the selected glTF scene;
 all returned objects belong to the caller. Destroying roots does not destroy the
 editable resources. `sourceMap.nodes`, `.images`, `.materials` and `.joints`
 use original **zero-based glTF indices**; `.primitives` is a one-based binding
@@ -373,14 +373,20 @@ array with `nodeIndex`, `meshIndex`, `primitiveIndex`, `skinIndex`, `materialInd
 `mesh` and `part`. Joint bindings expose the numeric EditableMesh `boneId` and
 renderable `Bone`, so names need not be unique in the source.
 
-`exportEditableScene(path, sceneOrRoots)` accepts imported or procedural instance trees:
+`exportEditableScene(path, sceneOrRoots, { strict = true }?)` accepts imported or procedural instance trees:
 Models/Folders, MeshParts, block Parts, Attachments, and supported Bone rigs.
 Exports current poses, sizes, meshes and readable textures, embedding resources
 in both file formats. Shear, scaled skins, unreadable resources and unsupported
 part shapes error. Cameras, material extensions, occlusion/emissive channels
 and sampler differences are unsupported and reported;
-required glTF extensions error. Native Roblox materials and absent roughness maps
-use approximate glTF PBR values, with warnings. No publishing is performed.
+required glTF extensions error. Native Roblox materials use scalar PBR baselines;
+emissive/transmission behavior warns. Untextured imports have no SurfaceAppearance
+or images: source factors survive as attributes, and approximate native previews
+are reported. `strict = true` on import/export aborts on warnings, cleans temporary
+objects, and preserves the destination. Repeated warnings include a count.
+Attachments carry explicit glTF metadata; arbitrary empty nodes remain Models.
+Source scale attributes survive cloning; animation/morph references still need
+retargeting to cloned instances. No publishing is performed.
 
 ```luau
 local scene = roblox.importEditableScene("vehicle.glb")
@@ -400,32 +406,33 @@ motion data is omitted. `animations` contains named clips with a zero-based
 STEP, LINEAR, CUBICSPLINE. Values are flat XYZ/XYZW/scalars; cubic keys contain
 incoming tangent, value, outgoing tangent, with tangents per second. Curves are
 not resampled for glTF export. Edit these channels for portable changes; editing
-a generated KeyframeSequence does not change them.
+a generated CurveAnimation does not change them.
 
 `morphs` contains `{ mesh, targets, tangents? }`. Each target has an optional
 name and optional position/normal/tangent delta maps. Positions and tangents
 are keyed by stable EditableMesh vertex IDs; normals use normal IDs. An omitted
 attribute means all-zero deltas; a supplied map must cover every referenced ID.
 Base tangents are XYZW arrays keyed by vertex ID. `morphWeights` contains
-`{ node, part, weights }` per primitive instance. Initial weights are rendered,
-with separate editables for differing weights. Export removes the applied
-initial position offsets to recover the base mesh, preserving subsequent live
-position edits. Edited normals become base normals. Update delta maps after
-topology edits; absent mappings error. Changing portable weights/deltas affects
-the next import, not the current preview automatically.
+`{ node, part, weights }` per primitive instance. Meshes remain the shared,
+unposed base even when instances have different initial weights. Mesh edits
+modify that base directly; export does not subtract hidden pose offsets.
+Update delta maps after topology edits; absent mappings error. Generic morph
+weights remain editable data and are not automatically rendered by Animator.
 
-By default, scenes with translation/rotation clips get a Model rig with
-Motor6Ds/Bones, an Animator, and a `sequence` + `animation` on each convertible
-clip. The Animation IDs are temporary Studio IDs; publishing remains separate.
-Parent `scene.animationRig` to workspace, then load `clip.animation` through
-`scene.animator`. Wait for the track's Length to become nonzero before seeking.
-Playback clips are sampled at 60 Hz by default; configure
-`{ animationSampleRate = 30 }` or disable native conversion with
-`{ animationRig = false }`. Independent clips leave unrelated joints unweighted.
-Native preview cannot animate part scale or arbitrary morph deltas: those channels
-stay exact in the portable data and produce warnings. Unrepresentable sampled
-poses warn and omit that native clip. Helpers are excluded from scene export,
-so repeated import/export does not grow the hierarchy.
+Every import has the same scene Model container. Translation/rotation clips
+build a rig inside it with Motor6Ds/Bones, an Animator, and `clip: CurveAnimation`
+plus `animation: Animation` on convertible clips. IDs are temporary Studio IDs;
+publishing remains separate. Parent `scene.roots[1]` to workspace, then load
+`clip.animation` through `scene.animator`. Wait for the track's Length before
+seeking. STEP/LINEAR keys and cubic translation tangents are preserved directly
+where the joint-frame conversion permits it. Quaternion cubic/composed motion
+uses adaptive linear curves and reports that approximation; portable channels
+stay exact. Native timestamps use Studio's clock and quantization warns;
+colliding keys and Attachment-targeted animation omit the native clip and warn.
+Independent clips omit unrelated joints. Scale and generic morph
+channels remain portable data and warn. `animationRig` and `animationSampleRate`
+options were removed. Generated helpers and scene containers are omitted as
+nodes on export, so repeated round trips do not accumulate wrappers.
 
 `captureViewport` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to
