@@ -21,6 +21,10 @@ type CaptureOptions = {
 	device: string?,
 	viewportSize: Vector2?,
 	resample: boolean?,
+	scalingMode: string?,
+	pixelDensity: number?,
+	orientation: string?,
+	deviceForm: string?,
 }
 
 type CaptureInfo = {
@@ -77,6 +81,26 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 	if resolved.resample ~= nil and type(resolved.resample) ~= "boolean" then
 		error("roblox.captureViewport: resample must be a boolean", 2)
 	end
+	-- Simulator overrides, applied for the shot and restored after like the
+	-- camera fields. They need a device to act on, so device or viewportSize
+	-- must come with them; the plugin validates the names and the engine's
+	-- own limits (density 72..10000, orientation on mobile forms) propagate.
+	for _, name in { "scalingMode", "orientation", "deviceForm" } do
+		local value = (resolved :: any)[name]
+		if value ~= nil and type(value) ~= "string" then
+			error(`roblox.captureViewport: {name} must be an enum item name string`, 2)
+		end
+	end
+	if resolved.pixelDensity ~= nil and type(resolved.pixelDensity) ~= "number" then
+		error("roblox.captureViewport: pixelDensity must be a number (DPI)", 2)
+	end
+	local simulatorOptions = resolved.scalingMode ~= nil or resolved.pixelDensity ~= nil or resolved.orientation ~= nil or resolved.deviceForm ~= nil
+	if simulatorOptions and resolved.device == nil and viewportSize == nil then
+		error("roblox.captureViewport: scalingMode, pixelDensity, orientation and deviceForm drive the device simulator; pass device or viewportSize with them", 2)
+	end
+	if resolved.scalingMode == "FitToWindow" then
+		error("roblox.captureViewport: FitToWindow renders the device at whatever size fits the Studio window, not at its resolution, so there is no frame to capture; use ActualResolution or ScaleToPhysicalSize", 2)
+	end
 	-- Default: the image is exactly the viewport, so UI offsets map 1:1 onto
 	-- pixels. `resample = false` keeps the engine's frame at its rendered size
 	-- (the viewport times the display scale, or whatever a caller-driven
@@ -102,6 +126,10 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 	local savedFov = camera.FieldOfView
 	local connection: RBXScriptConnection? = nil
 	local simulatorApplied = false
+	-- With the simulator driving the shot, the frame the engine renders is the
+	-- device's full resolution (rotated in portrait), which for a preset with
+	-- safe-area insets is larger than Camera.ViewportSize; the plugin reports it.
+	local frameSize: Vector2? = nil
 
 	local function captureAndWrite(): (string, CaptureInfo)
 		if resolved.device or viewportSize then
@@ -109,15 +137,20 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			-- its message propagates as this call's error, minus the rpc
 			-- layer's prefix. The plugin has already put the simulator back.
 			simulatorApplied = true
-			local okSim, simErr = pcall(
+			local okSim, frameW, frameH = pcall(
 				roblox._simulatorApply,
 				resolved.device,
 				viewportSize and viewportSize.X,
-				viewportSize and viewportSize.Y
+				viewportSize and viewportSize.Y,
+				resolved.scalingMode,
+				resolved.pixelDensity,
+				resolved.orientation,
+				resolved.deviceForm
 			)
 			if not okSim then
-				error(`roblox.captureViewport: {engineMessage(simErr)}`, 0)
+				error(`roblox.captureViewport: {engineMessage(frameW)}`, 0)
 			end
+			frameSize = Vector2.new(frameW, frameH)
 		end
 
 		local cframe = resolved.cframe
@@ -150,9 +183,10 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 
 		task.wait(resolved.settle or 0)
 
-		-- The viewport the frame is rendered at; the finalize step verifies the
-		-- frame against it and resamples to exactly this size.
-		local viewport = camera.ViewportSize
+		-- The logical size the frame is rendered at; the finalize step verifies
+		-- the frame against it and resamples to exactly this size. Without the
+		-- simulator that is the window's viewport.
+		local viewport = frameSize or camera.ViewportSize
 		local width, height = math.floor(viewport.X + 0.5), math.floor(viewport.Y + 0.5)
 
 		local outputPath

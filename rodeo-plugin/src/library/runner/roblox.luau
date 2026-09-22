@@ -435,11 +435,23 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 	-- Ask the plugin to select a simulator preset and/or a custom desktop device
 	-- at width x height for this execution. Returns the resulting
 	-- Camera.ViewportSize.
-	function roblox._simulatorApply(device: string?, width: number?, height: number?): (number, number)
+	function roblox._simulatorApply(
+		device: string?,
+		width: number?,
+		height: number?,
+		scalingMode: string?,
+		pixelDensity: number?,
+		orientation: string?,
+		deviceForm: string?
+	): (number, number)
 		local res = rpc.call("roblox_simulator_apply", runtime.RobloxSimulatorApplyRequest.new({
 			device = device,
 			width = width,
 			height = height,
+			scalingMode = scalingMode,
+			pixelDensity = pixelDensity,
+			orientation = orientation,
+			deviceForm = deviceForm,
 		}))
 		return res.width, res.height
 	end

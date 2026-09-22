@@ -444,7 +444,7 @@ export function process(run: RunFn): void {
   });
 }
 
-// ── capture (10 tests, plugin-only) ────────────────────────────────────────
+// ── capture (15 tests, plugin-only) ────────────────────────────────────────
 //
 // roblox.captureViewport drives Studio's device simulator for `device` / `viewportSize`
 // (plugin-handled RPCs) and finalizes the engine's frame on the run client,
@@ -577,6 +577,89 @@ export function capture(run: RunFn): void {
     }
   });
 
+  it("capture: a phone preset renders its full resolution, not the inset viewport", async () => {
+    // iPhone 13 is 844x390; its Camera.ViewportSize in landscape is the safe
+    // area (750x369), but the engine renders and captures the whole screen.
+    const out = captureOut("phone-landscape");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: captureSource(out, '{ device = "iphone_13", orientation = "LandscapeLeft", settle = 1 }'),
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string; width: number; height: number };
+      expect(pngSize(r.path)).toEqual({ width: 844, height: 390 });
+      expect({ width: r.width, height: r.height }).toEqual({ width: 844, height: 390 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: orientation Portrait on a phone preset yields a portrait image", async () => {
+    const out = captureOut("portrait");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: captureSource(out, '{ device = "iphone_13", orientation = "Portrait", settle = 1 }'),
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string; width: number; height: number };
+      const size = pngSize(r.path);
+      expect(size.height).toBeGreaterThan(size.width);
+      expect({ width: r.width, height: r.height }).toEqual(size);
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: doubling pixelDensity in ScaleToPhysicalSize halves the kept frame", async () => {
+    // The absolute scale is host DPI / density and varies by display; the
+    // ratio between two densities does not.
+    const a = captureOut("density-a");
+    const b = captureOut("density-b");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          local _, lo = roblox.captureViewport("${a}", { viewportSize = Vector2.new(640, 360), scalingMode = "ScaleToPhysicalSize", pixelDensity = 110, resample = false, settle = 1 })
+          local _, hi = roblox.captureViewport("${b}", { viewportSize = Vector2.new(640, 360), scalingMode = "ScaleToPhysicalSize", pixelDensity = 220, resample = false, settle = 1 })
+          return { lo = lo.width, hi = hi.width }`,
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { lo: number; hi: number };
+      expect(Math.abs(r.lo / r.hi - 2)).toBeLessThan(0.02);
+      expect(pngSize(a).width).toBe(r.lo);
+      expect(pngSize(b).width).toBe(r.hi);
+    } finally {
+      rmrf(a);
+      rmrf(b);
+    }
+  });
+
+  it("capture: an unknown scalingMode errors naming the option, before capturing", async () => {
+    const out = captureOut("bad-mode");
+    try {
+      const result = await run({ source: captureSource(out, '{ viewportSize = Vector2.new(320, 180), scalingMode = "Nope" }') });
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain("scalingMode");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: simulator options without device or viewportSize error", async () => {
+    const out = captureOut("no-device");
+    try {
+      const result = await run({ source: captureSource(out, "{ pixelDensity = 72 }") });
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain("viewportSize");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      rmrf(out);
+    }
+  });
+
   it("capture: viewportSize over 4320 tall errors before capturing", async () => {
     const out = captureOut("too-tall");
     try {
@@ -624,15 +707,19 @@ export function capture(run: RunFn): void {
           local sim = game:GetService("StudioDeviceSimulatorService")
           local function snapshot()
             local active, res = pcall(function() return sim:GetResolutionAsync() end)
+            local okMode, mode = pcall(function() return sim:GetScalingModeAsync().Name end)
+            local okDensity, density = pcall(function() return sim:GetPixelDensityAsync() end)
             return {
               device = sim:GetDeviceAsync(),
               active = active,
               resolution = active and (res.X .. "x" .. res.Y) or "off",
+              mode = okMode and mode or "off",
+              density = okDensity and density or "off",
               viewport = workspace.CurrentCamera.ViewportSize.X .. "x" .. workspace.CurrentCamera.ViewportSize.Y,
             }
           end
           local before = snapshot()
-          roblox.captureViewport("${out}", { viewportSize = Vector2.new(320, 180), settle = 1 })
+          roblox.captureViewport("${out}", { viewportSize = Vector2.new(320, 180), scalingMode = "ScaleToPhysicalSize", pixelDensity = 150, settle = 1 })
           task.wait(0.5)
           local after = snapshot()
           local leftovers = 0

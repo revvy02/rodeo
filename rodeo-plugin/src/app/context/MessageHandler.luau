@@ -142,7 +142,7 @@ local function createHandler(args: CreateHandlerArgs): () -> ()
 					if reqType == "robloxSimulatorApply" then
 						local req = typedCall.req.value
 						task.spawn(function()
-							local okApply, width, height = pcall(simulator.apply, executionId, req.device, req.width, req.height)
+							local okApply, width, height = pcall(simulator.apply, executionId, req.device, req.width, req.height, req.scalingMode, req.pixelDensity, req.orientation, req.deviceForm)
 							if okApply then
 								respond({ type = "robloxSimulatorApply", value = { width = width, height = height } })
 							else

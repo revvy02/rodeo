@@ -31,6 +31,7 @@ type Prior = {
 	width: number?,
 	height: number?,
 	density: number?,
+	orientation: Enum.ScreenOrientation?,
 }
 
 type Session = {
@@ -70,6 +71,9 @@ local function readPrior(sim: any): Prior?
 		prior.mode = sim:GetScalingModeAsync()
 	end)
 	pcall(function()
+		prior.orientation = sim:GetOrientationAsync()
+	end)
+	pcall(function()
 		prior.density = sim:GetPixelDensityAsync()
 	end)
 	return prior
@@ -103,9 +107,36 @@ end
 	execution. Returns the resulting Camera.ViewportSize. On any failure the
 	simulator is put back before the error propagates.
 ]]
-function simulator.apply(executionId: string, device: string?, width: number?, height: number?): (number, number)
+-- Resolve an enum item by name for an option; the engine's own limits apply
+-- once the item is set, this only turns a typo into a message naming the option.
+local function enumItem(enum: Enum, name: string, option: string): EnumItem
+	for _, item in enum:GetEnumItems() do
+		if item.Name == name then
+			return item
+		end
+	end
+	local names = {}
+	for _, item in enum:GetEnumItems() do
+		table.insert(names, item.Name)
+	end
+	error(`roblox.captureViewport: unknown {option} "{name}" (expected one of {table.concat(names, ", ")})`, 0)
+end
+
+function simulator.apply(
+	executionId: string,
+	device: string?,
+	width: number?,
+	height: number?,
+	scalingMode: string?,
+	pixelDensity: number?,
+	orientation: string?,
+	deviceForm: string?
+): (number, number)
 	if not device and not (width and height) then
 		error("roblox.captureViewport: a device or a viewportSize is required to drive the simulator", 0)
+	end
+	if device and deviceForm then
+		error("roblox.captureViewport: deviceForm shapes the custom viewportSize device; a preset brings its own form", 0)
 	end
 
 	local sim = service()
@@ -119,11 +150,23 @@ function simulator.apply(executionId: string, device: string?, width: number?, h
 
 	local expected: Vector2? = nil
 	local ok, err = pcall(function()
+		-- Resolve names first so a typo fails before anything is touched.
+		local form = enumItem(Enum.DeviceForm, deviceForm or "Desktop", "deviceForm")
+		local mode = enumItem(Enum.DeviceSimulatorScalingMode, scalingMode or "ActualResolution", "scalingMode")
+		local orient = if orientation then enumItem(Enum.ScreenOrientation, orientation, "orientation") else nil
 		if device then
 			sim:SetDeviceAsync(device)
 			if width and height then
 				sim:SetResolutionAsync(width, height)
 				expected = Vector2.new(width, height)
+			end
+			-- A phone/tablet preset's viewport is its resolution minus the
+			-- safe-area insets, so an exact match never comes; wait for a change.
+			local okInfo, info = pcall(function()
+				return sim:GetDeviceInfoAsync(device)
+			end)
+			if okInfo and info.DeviceForm ~= Enum.DeviceForm.Desktop then
+				expected = nil
 			end
 		else
 			local name = DEVICE_PREFIX .. executionId
@@ -137,12 +180,26 @@ function simulator.apply(executionId: string, device: string?, width: number?, h
 				Width = width,
 				Height = height,
 				PixelDensity = 96,
-				DeviceForm = Enum.DeviceForm.Desktop,
+				DeviceForm = form,
 			})
 			sim:SetDeviceAsync(session.created)
 			expected = Vector2.new(width :: number, height :: number)
+			-- Phone/tablet/console forms add their chrome, so the viewport is
+			-- not the requested size; wait for any change instead of a match.
+			if form ~= Enum.DeviceForm.Desktop then
+				expected = nil
+			end
 		end
-		sim:SetScalingModeAsync(Enum.DeviceSimulatorScalingMode.ActualResolution)
+		sim:SetScalingModeAsync(mode)
+		if pixelDensity then
+			sim:SetPixelDensityAsync(pixelDensity)
+		end
+		if orient then
+			-- Portrait swaps the axes and moves the insets: the engine errors
+			-- on non-mobile forms, and that message propagates.
+			sim:SetOrientationAsync(orient)
+			expected = nil
+		end
 	end)
 	if not ok then
 		simulator.restore(executionId)
@@ -155,8 +212,26 @@ function simulator.apply(executionId: string, device: string?, width: number?, h
 		RunService.RenderStepped:Wait()
 	end
 
-	local vp = viewport()
-	return math.floor(vp.X + 0.5), math.floor(vp.Y + 0.5)
+	-- The engine renders and captures the device's full resolution, rotated in
+	-- portrait, even when safe-area insets make Camera.ViewportSize smaller
+	-- (iPhone 13: 844x390 rendered, 750x369 viewport). That is the logical
+	-- size the frame is matched and resampled against, so return it, not the
+	-- viewport; for a desktop device the two are the same.
+	local okRes, res = pcall(function()
+		return sim:GetResolutionAsync()
+	end)
+	if not okRes then
+		local vp = viewport()
+		return math.floor(vp.X + 0.5), math.floor(vp.Y + 0.5)
+	end
+	local okOrient, orient = pcall(function()
+		return sim:GetOrientationAsync()
+	end)
+	local w, h = math.floor(res.X + 0.5), math.floor(res.Y + 0.5)
+	if okOrient and orient == Enum.ScreenOrientation.Portrait then
+		w, h = h, w
+	end
+	return w, h
 end
 
 --[[
@@ -183,6 +258,12 @@ function simulator.restore(executionId: string)
 			end
 			if prior.density then
 				sim:SetPixelDensityAsync(prior.density)
+			end
+			if prior.orientation then
+				-- Only mobile forms accept it; the prior device may not.
+				pcall(function()
+					sim:SetOrientationAsync(prior.orientation)
+				end)
 			end
 		else
 			sim:StopSimulationAsync()

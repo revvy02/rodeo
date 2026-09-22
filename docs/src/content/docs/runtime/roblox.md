@@ -13,7 +13,7 @@ These APIs are not finalized and may change in backwards incompatible ways.
 
 | Entry | Description |
 | :--- | :--- |
-| [CaptureInfo](#captureinfo) | Size of the image `captureViewport` wrote, in pixels. Always the capture's |
+| [CaptureInfo](#captureinfo) | Size of the image `captureViewport` wrote, in pixels. The capture's logical |
 | [CaptureOptions](#captureoptions) | Camera and device options for `captureViewport`. All fields optional. |
 | [bake](#robloxbake) | Writes `value` to `path` as a Luau module (`return <value>`), so the data |
 | [capture](#robloxcapture) | Deprecated alias of `roblox.captureViewport`. |
@@ -33,7 +33,13 @@ These APIs are not finalized and may change in backwards incompatible ways.
 
 ### CaptureInfo
 
-Size of the image `captureViewport` wrote, in pixels. Always the capture's
+Size of the image `captureViewport` wrote, in pixels. The capture's logical
+
+size: the window's viewport, the `viewportSize`, or a preset's resolution
+
+(rotated in portrait; a phone or tablet preset renders its full screen, so
+
+this is larger than its inset `Camera.ViewportSize`). Always the capture's
 
 `Camera.ViewportSize`: the engine's frame is larger on high-DPI displays and
 
@@ -80,7 +86,33 @@ the viewport, so UI offsets map 1:1 onto pixels; `false` writes the frame
 
 at its rendered size, the viewport times the display scale (2x on Retina),
 
-or whatever scale a script-driven device simulator set.
+or whatever scale `scalingMode`/`pixelDensity` produced.
+
+Simulator overrides, applied for the shot and restored after like the
+
+camera fields; each needs `device` or `viewportSize`: `scalingMode` —
+
+`"ActualResolution"` (default, the display's scale) or `"ScaleToPhysicalSize"`
+
+(host DPI over `pixelDensity`); `"FitToWindow"` renders at window size and is
+
+refused, there is no frame to capture. `pixelDensity` — DPI,
+
+72 to 10000, the scale knob in ScaleToPhysicalSize mode (density 72 on a
+
+2x display renders 3.06x: 7680x4320 becomes 23466x13200 with `resample =
+
+false`). `orientation` — `"Portrait"`, `"LandscapeLeft"` or
+
+`"LandscapeRight"`, phone and tablet forms only. `deviceForm` — the form of
+
+the custom `viewportSize` device, `"Desktop"` (default), `"Phone"`,
+
+`"Tablet"`, `"Console"` or `"VR"`; non-desktop forms add their chrome.
+
+Presets on Studio 0.739 (`StudioDeviceSimulatorService:GetDeviceListAsync()`
+
+has the live list): consoles `xbox`, `ps4`, `ps5`, `android_tv_1080`; desktops `average_laptop`, `hd_720`, `hd_1080`, `vga`; handhelds `generic_handheld_720`, `generic_handheld_1080`; VR `meta_quest_2`, `meta_quest_3`; phones `iphone_6_Plus`, `iphone_7`, `iphone_XR`, `iphone_11`, `iphone_13`, `iphone_13_pro`, `iphone_13_pro_max`, `iphone_14`, `iphone_16`, `iphone_16_pro`, `iphone_16_pro_max`, `iphone_17_pro`, `samsung_galaxy_a06`, `samsung_galaxy_a16`, `samsung_galaxy_s22_ultra`, `samsung_galaxy_s25_ultra`; tablets `ipad_6th_generation`, `ipad_8th_generation`, `ipad_9th_generation`, `ipad_10th_generation`, `ipad_a16`, `ipad_air_5th_generation`, `ipad_pro_M4_11in`, `ipad_pro_M5_13in`, `xiaomi_redmi_pad_se`, `amazon_fire_hd10_2023`, `samsung_galaxy_tab_a8`, `samsung_galaxy_tab_a9`, `samsung_galaxy_tab_a9+`, `samsung_galaxy_tab_S11`.
 
 ```luau
 type CaptureOptions = {
@@ -91,6 +123,10 @@ type CaptureOptions = {
 	device: string?,
 	viewportSize: Vector2?,
 	resample: boolean?,
+	scalingMode: string?,
+	pixelDensity: number?,
+	orientation: string?,
+	deviceForm: string?,
 }
 ```
 

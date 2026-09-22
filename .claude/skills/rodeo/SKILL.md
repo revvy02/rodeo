@@ -366,6 +366,16 @@ and `resample` (default `true`: the image is exactly the viewport so UI offsets
 map 1:1 onto pixels; `false` writes the engine's frame at its rendered size, the
 viewport times the display scale, or whatever a script-driven device simulator
 set; that is how to get the engine's largest frame, 23466x13200 on a 2x display).
+Simulator overrides, applied for the shot and restored after like the camera
+fields, each needing `device` or `viewportSize`: `scalingMode` (`"ActualResolution"`
+default, `"ScaleToPhysicalSize"` = host DPI over `pixelDensity`; `"FitToWindow"` is
+refused, it renders at window size), a phone/tablet preset renders its full
+resolution so the image is larger than its inset viewport,
+`pixelDensity` (DPI 72 to 10000; 72 on a 2x display is 3.06x), `orientation`
+(`"Portrait"`, `"LandscapeLeft"`, `"LandscapeRight"`; phone/tablet forms only) and
+`deviceForm` (`"Desktop"` default, `"Phone"`, `"Tablet"`, `"Console"`, `"VR"` for the
+custom viewportSize device). Bad names error naming the option; the engine's own
+limits propagate. Presets: consoles `xbox`, `ps4`, `ps5`, `android_tv_1080`; desktops `average_laptop`, `hd_720`, `hd_1080`, `vga`; handhelds `generic_handheld_720`, `generic_handheld_1080`; VR `meta_quest_2`, `meta_quest_3`; phones `iphone_6_Plus`, `iphone_7`, `iphone_XR`, `iphone_11`, `iphone_13`, `iphone_13_pro`, `iphone_13_pro_max`, `iphone_14`, `iphone_16`, `iphone_16_pro`, `iphone_16_pro_max`, `iphone_17_pro`, `samsung_galaxy_a06`, `samsung_galaxy_a16`, `samsung_galaxy_s22_ultra`, `samsung_galaxy_s25_ultra`; tablets `ipad_6th_generation`, `ipad_8th_generation`, `ipad_9th_generation`, `ipad_10th_generation`, `ipad_a16`, `ipad_air_5th_generation`, `ipad_pro_M4_11in`, `ipad_pro_M5_13in`, `xiaomi_redmi_pad_se`, `amazon_fire_hd10_2023`, `samsung_galaxy_tab_a8`, `samsung_galaxy_tab_a9`, `samsung_galaxy_tab_a9+`, `samsung_galaxy_tab_S11`.
 
 The written image is always exactly the capture's `Camera.ViewportSize`, so
 UI offsets map 1:1 onto pixels and the size is the same on every machine;

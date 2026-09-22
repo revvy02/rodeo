@@ -98,11 +98,17 @@ message RobloxSimulatorApplyRequest {
   optional string device = 1;   // StudioDeviceSimulatorService preset id
   optional uint32 width = 2;    // viewport override / custom device size
   optional uint32 height = 3;
+  // Session overrides applied for the shot and restored after, like the
+  // camera fields. Enum item names; the plugin resolves and validates them.
+  optional string scaling_mode = 4;   // DeviceSimulatorScalingMode (default ActualResolution)
+  optional uint32 pixel_density = 5;  // DPI 72..10000; the scale in ScaleToPhysicalSize mode
+  optional string orientation = 6;    // ScreenOrientation Portrait/LandscapeLeft/LandscapeRight (phone/tablet forms)
+  optional string device_form = 7;    // DeviceForm for the custom viewportSize device (default Desktop)
 }
 
 message RobloxSimulatorApplyResponse {
-  uint32 width = 1;             // Camera.ViewportSize after the change
-  uint32 height = 2;
+  uint32 width = 1;             // logical size of the frame the engine renders: the device
+  uint32 height = 2;            // resolution, rotated in portrait (the viewport minus insets is smaller)
 }
 
 message RobloxSimulatorRestoreRequest {}

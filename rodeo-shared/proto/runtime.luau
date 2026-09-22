@@ -437,12 +437,20 @@ type _RobloxSimulatorApplyRequestFields = {
 	device: string?,
 	width: number?,
 	height: number?,
+	scalingMode: string?,
+	pixelDensity: number?,
+	orientation: string?,
+	deviceForm: string?,
 }
 
 export type _RobloxSimulatorApplyRequestPartialFields = {
 	device: string?,
 	width: number?,
 	height: number?,
+	scalingMode: string?,
+	pixelDensity: number?,
+	orientation: string?,
+	deviceForm: string?,
 }
 
 export type RobloxSimulatorApplyRequest = typeof(setmetatable(
@@ -3242,6 +3250,10 @@ do
 			device = if data == nil or data.device == nil then nil else data.device,
 			width = if data == nil or data.width == nil then nil else data.width,
 			height = if data == nil or data.height == nil then nil else data.height,
+			scalingMode = if data == nil or data.scalingMode == nil then nil else data.scalingMode,
+			pixelDensity = if data == nil or data.pixelDensity == nil then nil else data.pixelDensity,
+			orientation = if data == nil or data.orientation == nil then nil else data.orientation,
+			deviceForm = if data == nil or data.deviceForm == nil then nil else data.deviceForm,
 		}, _RobloxSimulatorApplyRequestImpl :: _RobloxSimulatorApplyRequestImpl)
 	end
 
@@ -3262,6 +3274,26 @@ do
 		if self.height ~= nil then
 			output, cursor = proto.writeTag(output, cursor, 3, proto.wireTypes.varint)
 			output, cursor = proto.writeVarInt(output, cursor, self.height)
+		end
+
+		if self.scalingMode ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 4, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.scalingMode)
+		end
+
+		if self.pixelDensity ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, self.pixelDensity)
+		end
+
+		if self.orientation ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 6, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.orientation)
+		end
+
+		if self.deviceForm ~= nil then
+			output, cursor = proto.writeTag(output, cursor, 7, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.deviceForm)
 		end
 
 		local shrunkBuffer = buffer.create(cursor)
@@ -3288,6 +3320,11 @@ do
 					value, cursor = proto.readVarIntU32(input, cursor)
 					self.height = value
 					continue
+				elseif field == 5 then
+					local value
+					value, cursor = proto.readVarIntU32(input, cursor)
+					self.pixelDensity = value
+					continue
 				end
 
 				local _
@@ -3297,6 +3334,21 @@ do
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
 					self.device = proto.decodeString(value)
+					continue
+				elseif field == 4 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.scalingMode = proto.decodeString(value)
+					continue
+				elseif field == 6 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.orientation = proto.decodeString(value)
+					continue
+				elseif field == 7 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.deviceForm = proto.decodeString(value)
 					continue
 				end
 
@@ -3337,6 +3389,22 @@ do
 			output.height = self.height
 		end
 
+		if self.scalingMode ~= nil then
+			output.scalingMode = self.scalingMode
+		end
+
+		if self.pixelDensity ~= nil then
+			output.pixelDensity = self.pixelDensity
+		end
+
+		if self.orientation ~= nil then
+			output.orientation = self.orientation
+		end
+
+		if self.deviceForm ~= nil then
+			output.deviceForm = self.deviceForm
+		end
+
 		return output
 	end
 
@@ -3353,6 +3421,22 @@ do
 
 		if input.height ~= nil then
 			self.height = input.height
+		end
+
+		if input.scalingMode ~= nil then
+			self.scalingMode = input.scalingMode
+		end
+
+		if input.pixelDensity ~= nil then
+			self.pixelDensity = input.pixelDensity
+		end
+
+		if input.orientation ~= nil then
+			self.orientation = input.orientation
+		end
+
+		if input.deviceForm ~= nil then
+			self.deviceForm = input.deviceForm
 		end
 
 		return self
