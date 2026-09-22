@@ -893,6 +893,58 @@ export function meshes(run: RunFn): void {
     }
   });
 
+  it("meshes: a 48000-vertex textured, colored mesh imports (issue #20)", async () => {
+    // The importer used to BatchAdd every attribute, and the engine validates
+    // a batch of N items as if it added N vertices, so UV and color batches
+    // failed once the mesh passed about 30000 vertices. The engine's real
+    // caps are 60000 vertices and 20000 triangles per mesh; this sits under
+    // both, as a triangle soup with normals, UVs and colors on every corner.
+    const glb = meshOut("large", "glb");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          local AssetService = game:GetService("AssetService")
+          local mesh = AssetService:CreateEditableMesh()
+          local TRIANGLES = 16000
+          for f = 0, TRIANGLES - 1 do
+            local x, z = (f % 160) * 2, (f // 160) * 2
+            local vs, ns, us, cs = {}, {}, {}, {}
+            for k, offset in { Vector3.new(0, 0, 0), Vector3.new(1, 0, 0), Vector3.new(0, 0, 1) } do
+              vs[k] = mesh:AddVertex(Vector3.new(x, 0, z) + offset)
+              ns[k] = mesh:AddNormal(Vector3.yAxis)
+              us[k] = mesh:AddUV(Vector2.new((x + offset.X) / 320, (z + offset.Z) / 200))
+              cs[k] = mesh:AddColor(Color3.fromHSV(f / TRIANGLES, 1, 1), 1)
+            end
+            local face = mesh:AddTriangle(vs[1], vs[2], vs[3])
+            mesh:SetFaceNormals(face, ns)
+            mesh:SetFaceUVs(face, us)
+            mesh:SetFaceColors(face, cs)
+          end
+          roblox.exportEditableMesh("${glb}", mesh)
+          local t0 = os.clock()
+          local back = roblox.importEditableMesh("${glb}")
+          local seconds = os.clock() - t0
+          local faces = back:GetFaces()
+          local sample = faces[#faces]
+          local ok = back:GetUV(back:GetFaceUVs(sample)[3]) ~= nil
+            and back:GetColor(back:GetFaceColors(sample)[3]) ~= nil
+            and back:GetNormal(back:GetFaceNormals(sample)[3]) ~= nil
+          local vertices = #back:GetVertices()
+          mesh:Destroy(); back:Destroy()
+          return { vertices = vertices, faces = #faces, attributesOk = ok, seconds = seconds }`,
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { vertices: number; faces: number; attributesOk: boolean; seconds: number };
+      expect(r.vertices).toBe(48000);
+      expect(r.faces).toBe(16000);
+      expect(r.attributesOk).toBe(true);
+      expect(r.seconds).toBeLessThan(30);
+    } finally {
+      rmrf(glb);
+    }
+  });
+
   it("meshes: skinning round-trips bones, parents, bind poses and weights", async () => {
     const glb = meshOut("skin", "glb");
     try {

@@ -330,6 +330,14 @@ Relative paths resolve against the run client's cwd. Turn the result into a
 
 part with `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
 
+The mesh is built with the per-element EditableMesh calls, so only the
+
+engine's own per-mesh limits apply (60000 vertices and 20000 triangles on
+
+Studio 0.739); past one, the engine's error surfaces with the count reached,
+
+and the file needs splitting into smaller primitives.
+
 ```luau
 (path: string) -> EditableMesh
 ```

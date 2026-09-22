@@ -363,6 +363,26 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 		rpc.call("roblox_mesh_encode", runtime.RobloxMeshEncodeRequest.new({ handle = h.__handle }))
 	end
 
+	-- Add `count` items one at a time and return their ids in order. The batch
+	-- API is deliberately not used for attributes: the engine validates a
+	-- BatchAdd of N items as if it added N vertices and fails with "Vertex
+	-- count above limit" whenever vertexCount + N exceeds its cap, so a
+	-- 32768-vertex mesh cannot batch its own 32768 UVs (issue #20). The
+	-- per-element calls apply only the real per-mesh caps, and when one is hit
+	-- the engine's own error is kept and annotated with how far the add got,
+	-- so the message names the count without hardcoding a limit that may change.
+	local function addEach(count: number, what: string, add: (number) -> number): { number }
+		local ids = table.create(count)
+		for i = 1, count do
+			local ok, result = pcall(add, i)
+			if not ok then
+				error(`{tostring(result)} (adding {what} {i} of {count})`, 0)
+			end
+			ids[i] = result
+		end
+		return ids
+	end
+
 	-- Reads a .glb or .gltf into a new EditableMesh. Node transforms are baked
 	-- into the geometry and all primitives merge into one mesh.
 	function roblox.importEditableMesh(path: string): EditableMesh
@@ -378,23 +398,44 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 
 		local mesh = AssetService:CreateEditableMesh()
 		local ok, err = pcall(function()
-			local vIds = mesh:BatchAdd(Enum.MeshAttribute.Vertex, data.positions)
-			local nIds = if data.normals then mesh:BatchAdd(Enum.MeshAttribute.Normal, data.normals) else nil
-			local uIds = if data.uvs then mesh:BatchAdd(Enum.MeshAttribute.UV, data.uvs) else nil
-			local cIds = if data.colors then mesh:BatchAdd(Enum.MeshAttribute.Color, data.colors, data.alphas) else nil
+			local vertexCount = #data.positions
+			local vIds = addEach(vertexCount, "vertex", function(i)
+				return mesh:AddVertex(data.positions[i])
+			end)
+			local nIds = if data.normals
+				then addEach(vertexCount, "normal", function(i)
+					return mesh:AddNormal(data.normals[i])
+				end)
+				else nil
+			local uIds = if data.uvs
+				then addEach(vertexCount, "UV", function(i)
+					return mesh:AddUV(data.uvs[i])
+				end)
+				else nil
+			local cIds = if data.colors
+				then addEach(vertexCount, "color", function(i)
+					return mesh:AddColor(data.colors[i], data.alphas[i])
+				end)
+				else nil
 			local faceCount = #data.indices // 3
-			local function perFace(ids: { number }): { { number } }
-				local out = table.create(faceCount)
-				for f = 1, faceCount do
-					local b = (f - 1) * 3
-					out[f] = { ids[data.indices[b + 1] + 1], ids[data.indices[b + 2] + 1], ids[data.indices[b + 3] + 1] }
-				end
-				return out
+			-- The k-th corner of face f, as an id from `ids` (indices are 0-based).
+			local function corner(ids: { number }, f: number, k: number): number
+				return ids[data.indices[(f - 1) * 3 + k] + 1]
 			end
-			local fIds = mesh:BatchAdd(Enum.MeshAttribute.Face, perFace(vIds))
-			if nIds then mesh:BatchSetFaceAttributes(fIds, perFace(nIds)) end
-			if uIds then mesh:BatchSetFaceAttributes(fIds, perFace(uIds)) end
-			if cIds then mesh:BatchSetFaceAttributes(fIds, perFace(cIds)) end
+			local fIds = addEach(faceCount, "triangle", function(f)
+				return mesh:AddTriangle(corner(vIds, f, 1), corner(vIds, f, 2), corner(vIds, f, 3))
+			end)
+			for f = 1, faceCount do
+				if nIds then
+					mesh:SetFaceNormals(fIds[f], { corner(nIds, f, 1), corner(nIds, f, 2), corner(nIds, f, 3) })
+				end
+				if uIds then
+					mesh:SetFaceUVs(fIds[f], { corner(uIds, f, 1), corner(uIds, f, 2), corner(uIds, f, 3) })
+				end
+				if cIds then
+					mesh:SetFaceColors(fIds[f], { corner(cIds, f, 1), corner(cIds, f, 2), corner(cIds, f, 3) })
+				end
+			end
 
 			local boneIds: { number } = {}
 			for i, b in ipairs(data.bones) do
