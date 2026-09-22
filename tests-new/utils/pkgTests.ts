@@ -1066,6 +1066,16 @@ export function meshes(run: RunFn): void {
             return n
           end
           local srcColors, backColors = distinctColors(mesh), distinctColors(back)
+          -- Match corners by their face's position sum and their own position,
+          -- independent of face/vertex ids and cyclic corner order.
+          local expectedUVs = {}
+          for _, f in mesh:GetFaces() do
+            local vs, us = mesh:GetFaceVertices(f), mesh:GetFaceUVs(f)
+            local sum = mesh:GetPosition(vs[1]) + mesh:GetPosition(vs[2]) + mesh:GetPosition(vs[3])
+            for k, v in vs do
+              expectedUVs[tostring(sum) .. ":" .. tostring(mesh:GetPosition(v))] = mesh:GetUV(us[k])
+            end
+          end
           local faces = back:GetFaces()
           local corners, normalsOk, uvsOk = 0, true, true
           for _, f in faces do
@@ -1077,7 +1087,8 @@ export function meshes(run: RunFn): void {
               local geo = (b - a):Cross(c - a).Unit
               local n = back:GetNormal(ns[k])
               if not n or (n - geo).Magnitude > 1e-3 then normalsOk = false end
-              if not back:GetUV(us[k]) then uvsOk = false end
+              local expected = expectedUVs[tostring(a + b + c) .. ":" .. tostring(back:GetPosition(vs[k]))]
+              if (back:GetUV(us[k]) - expected).Magnitude > 1e-5 then uvsOk = false end
             end
           end
           local part = AssetService:CreateMeshPartAsync(Content.fromObject(back), { CollisionFidelity = Enum.CollisionFidelity.Box })
@@ -1101,6 +1112,70 @@ export function meshes(run: RunFn): void {
     } finally {
       rmrf(obj);
     }
+  });
+
+  it("meshes: OBJ imports independent UV/normal indices at a shared position", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local roblox = require("@rodeo/roblox")
+        local mesh = roblox.importEditableMesh("./tests-new/fixtures/pkg/obj/seams.obj")
+        local found = {}
+        for _, f in mesh:GetFaces() do
+          local vs, us, ns = mesh:GetFaceVertices(f), mesh:GetFaceUVs(f), mesh:GetFaceNormals(f)
+          for k, v in vs do
+            if mesh:GetPosition(v) == Vector3.zero then
+              local uv, n = mesh:GetUV(us[k]), mesh:GetNormal(ns[k])
+              table.insert(found, { u = uv.X, v = uv.Y, nx = n.X, nz = n.Z })
+            end
+          end
+        end
+        mesh:Destroy()
+        return found`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.return).toEqual(expect.arrayContaining([
+      { u: 0, v: 1, nx: 0, nz: 1 },
+      { u: 0.5, v: 0.5, nx: 1, nz: 0 },
+    ]));
+    expect((result.return as unknown[]).length).toBe(2);
+  });
+
+  it("meshes: OBJ concave polygons preserve their area and winding", async () => {
+    const result = await run({
+      showReturn: true,
+      source: `local roblox = require("@rodeo/roblox")
+        local mesh = roblox.importEditableMesh("./tests-new/fixtures/pkg/obj/concave.obj")
+        local area, reversed, attributesOk = 0, 0, true
+        for _, f in mesh:GetFaces() do
+          local vs, us, ns = mesh:GetFaceVertices(f), mesh:GetFaceUVs(f), mesh:GetFaceNormals(f)
+          local a, b, c = mesh:GetPosition(vs[1]), mesh:GetPosition(vs[2]), mesh:GetPosition(vs[3])
+          local cross = (b - a):Cross(c - a)
+          area += cross.Magnitude / 2
+          if cross.Z <= 0 then reversed += 1 end
+          for k, v in vs do
+            local p = mesh:GetPosition(v)
+            attributesOk = attributesOk
+              and (mesh:GetUV(us[k]) - Vector2.new(p.X, 1 - p.Y)).Magnitude < 1e-5
+              and (mesh:GetNormal(ns[k]) - Vector3.zAxis).Magnitude < 1e-5
+          end
+        end
+        local faces = #mesh:GetFaces()
+        mesh:Destroy()
+        return { area = area, reversed = reversed, faces = faces, attributesOk = attributesOk }`,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.return).toEqual({ area: 7, reversed: 0, faces: 6, attributesOk: true });
+  });
+
+  it("meshes: OBJ rejects non-finite coordinates before building the mesh", async () => {
+    const result = await run({
+      source: `local roblox = require("@rodeo/roblox")
+        roblox.importEditableMesh("./tests-new/fixtures/pkg/obj/nonfinite.obj")`,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("nonfinite.obj");
+    expect(result.output).toContain("line 2");
+    expect(result.output).toContain("must be finite");
   });
 }
 

@@ -1,0 +1,19 @@
+# U-shaped face: area 7, with a 1x2 notch. UVs deliberately span multiple tiles.
+v 0 0 0
+v 3 0 0
+v 3 3 0
+v 2 3 0
+v 2 1 0
+v 1 1 0
+v 1 3 0
+v 0 3 0
+vt 0 0
+vt 3 0
+vt 3 3
+vt 2 3
+vt 2 1
+vt 1 1
+vt 1 3
+vt 0 3
+vn 0 0 1
+f 1/1/1 2/2/1 3/3/1 4/4/1 5/5/1 6/6/1 7/7/1 8/8/1

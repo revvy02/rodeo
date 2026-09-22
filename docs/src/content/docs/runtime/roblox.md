@@ -340,13 +340,19 @@ weights. OBJ: positions, per-corner UVs (V flipped from OBJ's bottom-left
 
 origin) and normals; faces as `v`, `v/vt`, `v//vn` or `v/vt/vn` with
 
-negative indices allowed; polygons are fan-triangulated; `o`/`g` groups
+negative indices allowed; planar polygons (including concave faces) are
+
+triangulated with their winding preserved; `o`/`g` groups
 
 merge into the one mesh; materials are ignored. In both formats an
 
 attribute (normals, UVs, colors) is kept only when every primitive, or
 
 every OBJ corner, carries it.
+
+OBJ numeric components must be finite; invalid values and polygons that
+
+cannot be triangulated report the source line.
 
 Relative paths resolve against the run client's cwd. Turn the result into a
 

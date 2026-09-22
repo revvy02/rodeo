@@ -1,0 +1,5 @@
+# Overflow must fail in the parser, before creating an EditableMesh.
+v 1e999 0 0
+v 1 0 0
+v 0 1 0
+f 1 2 3

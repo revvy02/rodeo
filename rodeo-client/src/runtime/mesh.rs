@@ -787,7 +787,7 @@ pub fn write_gltf(mesh: &MeshData, path: &str) -> Result<(), String> {
 // independently, which is EditableMesh's per-corner model: the reader splits
 // corners into unique (v, vt, vn) tuples, so UV seams and hard edges survive,
 // and the writer emits one tuple per vertex since the plugin already split
-// corners on export. Polygons are fan-triangulated. `o`/`g` groups merge into
+// corners on export. Planar polygons are ear-clipped. `o`/`g` groups merge into
 // the one mesh; `mtllib`, `usemtl`, `s`, lines and points are ignored. OBJ has
 // no vertex colors or skinning: export drops them and says so.
 // ---------------------------------------------------------------------------
@@ -831,11 +831,7 @@ fn parse_obj(text: &str) -> Result<MeshData, String> {
                 for token in &rest {
                     polygon.push(parse_corner(token, positions.len(), uvs.len(), normals.len(), line_no)?);
                 }
-                for k in 1..polygon.len() - 1 {
-                    corners.push(polygon[0]);
-                    corners.push(polygon[k]);
-                    corners.push(polygon[k + 1]);
-                }
+                corners.extend(triangulate_obj_face(&polygon, &positions, line_no)?);
             }
             // Groups merge into the one mesh; materials, smoothing groups,
             // lines, points and anything unknown are ignored.
@@ -878,8 +874,38 @@ fn parse_obj(text: &str) -> Result<MeshData, String> {
     Ok(mesh)
 }
 
+fn triangulate_obj_face(polygon: &[Corner], positions: &[[f32; 3]], line_no: usize) -> Result<Vec<Corner>, String> {
+    if polygon.len() == 3 {
+        return Ok(polygon.to_vec());
+    }
+    // Work in f64 relative to the first vertex so distant coordinates do not
+    // lose the face's local detail during projection. Projection follows the
+    // face normal, making Earcut's CCW triangles preserve the source winding.
+    let origin = positions[polygon[0].0 as usize].map(f64::from);
+    let vertices: Vec<[f64; 3]> = polygon.iter().map(|c| {
+        let p = positions[c.0 as usize];
+        std::array::from_fn(|k| f64::from(p[k]) - origin[k])
+    }).collect();
+    let mut projected = Vec::new();
+    if !earcut::utils3d::project3d_to_2d(&vertices, vertices.len(), &mut projected) {
+        return Err(format!("line {line_no}: degenerate polygon; export the face as triangles"));
+    }
+    let mut triangles: Vec<usize> = Vec::new();
+    earcut::Earcut::new().earcut(projected.iter().copied(), &[], &mut triangles);
+    // Inputs are external: refuse an incomplete triangulation rather than
+    // silently importing a different surface (e.g. a self-intersecting face).
+    if triangles.is_empty() || earcut::deviation(projected.iter().copied(), &[], &triangles) > 1e-8 {
+        return Err(format!("line {line_no}: cannot triangulate polygon; export the face as triangles"));
+    }
+    Ok(triangles.into_iter().map(|i| polygon[i]).collect())
+}
+
 fn parse_float(s: &str, key: &str, line_no: usize) -> Result<f32, String> {
-    s.parse::<f32>().map_err(|_| format!("line {line_no}: '{key}' component '{s}' is not a number"))
+    let value = s.parse::<f32>().map_err(|_| format!("line {line_no}: '{key}' component '{s}' is not a number"))?;
+    if !value.is_finite() {
+        return Err(format!("line {line_no}: '{key}' component '{s}' must be finite"));
+    }
+    Ok(value)
 }
 
 /// The first N components of a `v`/`vt`/`vn` line; extra ones (a `w`, or the
@@ -1174,9 +1200,10 @@ mod tests {
             g second\ns 1\n\
             f -4/-4/-1 -3/-3/-1 -2/-2/-1\n";
         let mesh = parse_obj(text).unwrap();
-        assert_eq!(mesh.indices.len(), 9, "quad fan-triangulated plus one triangle");
+        assert_eq!(mesh.indices.len(), 9, "triangulated quad plus one triangle");
         assert_eq!(mesh.positions.len(), 4, "corners with the same v/vt/vn share a vertex");
-        assert_eq!(mesh.uvs.as_ref().unwrap()[2], [1.0, 0.0], "vt 1 1 becomes Roblox (1,0)");
+        let top_right = mesh.positions.iter().position(|p| *p == [1.0, 1.0, 0.0]).unwrap();
+        assert_eq!(mesh.uvs.as_ref().unwrap()[top_right], [1.0, 0.0], "vt 1 1 becomes Roblox (1,0)");
         assert_eq!(mesh.normals.as_ref().unwrap().len(), 4);
 
         // Mixed forms: an attribute missing on any corner is dropped everywhere.
@@ -1202,5 +1229,95 @@ mod tests {
             let err = parse_obj(text).expect_err(text);
             assert!(err.contains(a) && err.contains(b), "{text:?} -> {err}");
         }
+    }
+
+    #[test]
+    fn obj_concave_faces_preserve_area_winding_and_corner_attributes() {
+        let source = include_str!("../../../tests-new/fixtures/pkg/obj/concave.obj");
+        for plane in 0..4 {
+            for reversed in [false, true] {
+                // Exercise XY, YZ, ZX and an oblique plane in both windings.
+                let transform = |x, y| match plane {
+                    0 => [x, y, 0.0],
+                    1 => [0.0, x, y],
+                    2 => [y, 0.0, x],
+                    _ => [x, y, x + 2.0 * y],
+                };
+                let normal: [f32; 3] = match plane {
+                    0 => [0.0, 0.0, 1.0],
+                    1 => [1.0, 0.0, 0.0],
+                    2 => [0.0, 1.0, 0.0],
+                    _ => [-1.0, -2.0, 1.0],
+                };
+                let direction = if reversed { -1.0 } else { 1.0 };
+                let normal = normal.map(|n| n * direction);
+                let mut expected = Vec::new();
+                let text = source.lines().map(|line| {
+                    let fields: Vec<_> = line.split_whitespace().collect();
+                    if fields.first() == Some(&"v") {
+                        let x = fields[1].parse::<f32>().unwrap();
+                        let y = fields[2].parse::<f32>().unwrap();
+                        let p = transform(x, y);
+                        expected.push((p, [x, 1.0 - y]));
+                        format!("v {} {} {}", p[0], p[1], p[2])
+                    } else if fields.first() == Some(&"vn") {
+                        format!("vn {} {} {}", normal[0], normal[1], normal[2])
+                    } else if fields.first() == Some(&"f") && reversed {
+                        format!("f {}", fields[1..].iter().rev().copied().collect::<Vec<_>>().join(" "))
+                    } else {
+                        line.to_string()
+                    }
+                }).collect::<Vec<_>>().join("\n");
+                let mesh = parse_obj(&text).unwrap();
+                assert_eq!(mesh.indices.len(), 18);
+                let normal_length = normal.iter().map(|v| v * v).sum::<f32>().sqrt();
+                let mut area = 0.0;
+                for tri in mesh.indices.chunks_exact(3) {
+                    let [a, b, c] = [mesh.positions[tri[0] as usize], mesh.positions[tri[1] as usize], mesh.positions[tri[2] as usize]];
+                    let ab: [f32; 3] = std::array::from_fn(|k| b[k] - a[k]);
+                    let ac: [f32; 3] = std::array::from_fn(|k| c[k] - a[k]);
+                    let cross = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
+                    let signed = cross.iter().zip(normal).map(|(c, n)| c * n).sum::<f32>();
+                    assert!(signed > 0.0, "triangle winding changed: {tri:?}, plane {plane}, reversed {reversed}");
+                    area += signed / normal_length / 2.0;
+                }
+                assert!(close(area, 7.0 * normal_length), "polygon area changed to {area}");
+                for (i, p) in mesh.positions.iter().enumerate() {
+                    let (_, uv) = expected.iter().find(|(position, _)| position == p).unwrap();
+                    assert_eq!(mesh.uvs.as_ref().unwrap()[i], *uv);
+                    assert_eq!(mesh.normals.as_ref().unwrap()[i], normal);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn obj_independent_indices_preserve_seams_and_hard_normals() {
+        let mesh = parse_obj(include_str!("../../../tests-new/fixtures/pkg/obj/seams.obj")).unwrap();
+        assert_eq!(mesh.positions.len(), 6);
+        let origin: Vec<_> = mesh.positions.iter().enumerate().filter(|(_, p)| **p == [0.0; 3])
+            .map(|(i, _)| (mesh.uvs.as_ref().unwrap()[i], mesh.normals.as_ref().unwrap()[i])).collect();
+        assert_eq!(origin, vec![([0.0, 1.0], [0.0, 0.0, 1.0]), ([0.5, 0.5], [1.0, 0.0, 0.0])]);
+    }
+
+    #[test]
+    fn obj_rejects_nonfinite_components_with_line_numbers() {
+        for bad in ["NaN", "inf", "-inf", "1e999", "-1e999"] {
+            for (key, count) in [("v", 3), ("vt", 2), ("vn", 3)] {
+                for component in 0..count {
+                    let mut values = vec!["0"; count];
+                    values[component] = bad;
+                    let text = format!("# invalid component\n{key} {}\n", values.join(" "));
+                    let err = parse_obj(&text).expect_err(&text);
+                    assert!(err.contains("line 2") && err.contains("finite") && err.contains(bad), "{err}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn obj_rejects_degenerate_polygons_with_line_numbers() {
+        let err = parse_obj("v 0 0 0\nv 1 0 0\nv 2 0 0\nv 3 0 0\nf 1 2 3 4\n").unwrap_err();
+        assert!(err.contains("line 5") && err.contains("degenerate polygon"), "{err}");
     }
 }

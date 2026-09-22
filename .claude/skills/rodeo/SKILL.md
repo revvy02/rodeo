@@ -352,11 +352,14 @@ per-corner normals/UVs/colors and skinning (bones with bind poses, up to four
 influences per vertex) round-trip; FACS poses do not. Import bakes node
 transforms into the geometry and merges all primitives into one mesh. glTF's
 conventions are Roblox's, so nothing is converted. OBJ: positions, per-corner
-UVs and normals; `vt` V is flipped (OBJ's UV origin is bottom-left), polygons
-are fan-triangulated, `o`/`g` groups merge into one mesh, materials are
+UVs and normals; `vt` V is flipped (OBJ's UV origin is bottom-left), planar
+polygons (including concave faces) are triangulated with their winding preserved,
+`o`/`g` groups merge into one mesh, materials are
 ignored. OBJ cannot carry vertex colors or skinning; `exportEditableMesh`
 returns the list of what the format dropped (empty for glTF). Make a part with
 `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
+OBJ numeric components must be finite; invalid values and polygons that cannot
+be triangulated report the source line.
 
 `captureViewport` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to

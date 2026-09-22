@@ -44,3 +44,5 @@ fast_image_resize = "6"
 # decoding), base64 for data-URI buffers. Writing is hand-rolled JSON + GLB.
 gltf = { version = "1.4", default-features = false, features = ["utils", "names"] }
 base64 = "0.22"
+# OBJ polygon triangulation, including concave faces and 3D projection.
+earcut = "0.4.11"

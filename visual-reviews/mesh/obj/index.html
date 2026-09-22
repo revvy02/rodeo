@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OBJ import — concave polygon correction</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#202933;font:16px/1.55 system-ui,sans-serif}
+  main{max-width:1280px;margin:auto;padding:36px 24px}h1{font-size:30px;line-height:1.2;margin:8px 0 16px}
+  h2{font-size:19px;margin:0 0 12px}p{max-width:940px}a{color:#075b78}code{font-size:.9em}
+  .status{display:inline-block;padding:5px 12px;border-radius:20px;background:#dceee3;color:#185438;font-size:14px}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:28px 0}figure{margin:0;background:white;border:1px solid #d6dce2;border-radius:10px;overflow:hidden}
+  figure img{display:block;width:100%;height:auto}figcaption{padding:16px}.note{font-size:14px;color:#52606c}
+  .details{background:white;padding:22px;border:1px solid #d6dce2;border-radius:10px}li{margin:6px 0}
+  @media(max-width:700px){main{padding:24px 16px}.pair{grid-template-columns:1fr}h1{font-size:25px}}
+</style>
+<main>
+  <span class="status">Validated · 14 Rust mesh tests · 10 Studio mesh tests</span>
+  <h1>OBJ import preserves concave faces</h1>
+  <p>The importer now triangulates concave polygons in their face plane, preserving winding and corner attributes.
+     Non-finite positions, UVs, and normals are rejected with source-line errors. UV seam checks now compare actual values.</p>
+  <div class="pair">
+    <figure>
+      <a href="baseline.png"><img src="baseline.png" width="960" height="720" alt="Baseline: the U-shaped notch is partly filled by an incorrect diagonal triangle"></a>
+      <figcaption><h2>Baseline · triangle fan</h2>
+        Sum of triangle areas: <strong>11</strong> · reversed triangles: <strong>1</strong>
+        <p class="note">The original OBJ implementation in dc1443d creates overlap and fills part of the rectangular notch.</p>
+      </figcaption>
+    </figure>
+    <figure>
+      <a href="current.png"><img src="current.png" width="960" height="720" alt="Current: the U-shaped face retains its complete rectangular notch"></a>
+      <figcaption><h2>Current · Earcut triangulation</h2>
+        Sum of triangle areas: <strong>7</strong> · reversed triangles: <strong>0</strong>
+        <p class="note">The corrected import preserves the source face's area and opening.</p>
+      </figcaption>
+    </figure>
+  </div>
+  <section class="details">
+    <h2>Fixture, capture, and validation</h2>
+    <p><a href="../../../tests-new/fixtures/pkg/obj/concave.obj">concave.obj</a>: one planar U-shaped face, expected area 7 square studs.
+       Both captures use the same <a href="capture.luau">capture script</a>, material, lighting, 35° camera, 960 × 720 viewport, and two-second settle time.
+       Click either preview to open its full-resolution PNG.</p>
+    <ul>
+      <li>Area, winding, UVs, and normals checked in XY, YZ, ZX, and an oblique plane, with both face windings.</li>
+      <li>Independent position/UV/normal indices checked using <a href="../../../tests-new/fixtures/pkg/obj/seams.obj">seams.obj</a>, including different UVs at the same position.</li>
+      <li>NaN, infinities, and numeric overflow rejected; Studio confirms the error includes the source path and line.</li>
+      <li>Existing glTF/GLB roundtrips, skinning, large meshes, and over-limit errors pass.</li>
+    </ul>
+    <p class="note">Iteration notes: replaced fan triangulation with GeoRust Earcut and 3D face projection; added a triangulation-area check and finite-number validation.
+      The captures were inspected after matching framing. The baseline CLI identifies as 1.5.0-rc.5+b258ebf (built with the OBJ changes before their commit); the corrected build identifies as 1.5.0-rc.5+dc1443d with this working-tree fix.</p>
+  </section>
+</main>
+</html>
