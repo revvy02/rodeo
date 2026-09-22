@@ -198,6 +198,15 @@ message RobloxMeshDecodeResponse {
   uint32 bone_count = 3;
 }
 
+// Scene metadata and resource blobs are streamed, never embedded in RPC envelopes.
+message RobloxSceneDecodeRequest {
+  string path = 1;
+  string handle = 2;
+}
+message RobloxSceneEncodeRequest {
+  string handle = 1;
+}
+
 // ---------------------------------------------------------------------------
 // Filesystem operations
 // ---------------------------------------------------------------------------
@@ -386,7 +395,7 @@ message ClientRpcCall {
     // mcp: 40-49 (server-context; handled server-side, not forwarded to run-client)
     McpCallRequest          mcp_call           = 40;
 
-    // roblox: 50-59
+    // roblox: 50-61
     RobloxExportRequest            roblox_export            = 50;
     // 51-52 are plugin-handled (see RobloxSimulatorApplyRequest).
     RobloxSimulatorApplyRequest    roblox_simulator_apply   = 51;
@@ -395,6 +404,8 @@ message ClientRpcCall {
     RobloxImageDecodeRequest       roblox_image_decode      = 55;
     RobloxMeshEncodeRequest        roblox_mesh_encode       = 56;
     RobloxMeshDecodeRequest        roblox_mesh_decode       = 57;
+    RobloxSceneDecodeRequest       roblox_scene_decode      = 60;
+    RobloxSceneEncodeRequest       roblox_scene_encode      = 61;
     RobloxCaptureBeginRequest      roblox_capture_begin     = 58;
     RobloxCaptureCollectRequest    roblox_capture_collect   = 59;
   }
@@ -443,7 +454,7 @@ message ClientRpcResponse {
     // mcp: 40-49
     McpCallResponse         mcp_call           = 40;
 
-    // roblox: 50-59
+    // roblox: 50-61
     Ok                             roblox_export            = 50;
     RobloxSimulatorApplyResponse   roblox_simulator_apply   = 51;
     Ok                             roblox_simulator_restore = 52;
@@ -451,6 +462,8 @@ message ClientRpcResponse {
     RobloxImageDecodeResponse      roblox_image_decode      = 55;
     RobloxMeshEncodeResponse       roblox_mesh_encode       = 56;
     RobloxMeshDecodeResponse       roblox_mesh_decode       = 57;
+    Ok                            roblox_scene_decode      = 60;
+    Ok                            roblox_scene_encode      = 61;
     RobloxCaptureBeginResponse     roblox_capture_begin     = 58;
     RobloxCaptureCollectResponse   roblox_capture_collect   = 59;
   }

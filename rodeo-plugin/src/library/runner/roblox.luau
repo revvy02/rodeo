@@ -1,11 +1,11 @@
 -- @rodeo/roblox API: import / export model files via SerializationService,
 -- plus bake (Luau-source data files).
--- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau, runtime) -> roblox module.
+-- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau, runtime, createScene) -> roblox module.
 -- `runtime` is the runner's proto module, captured here rather than read from
 -- _G.__rodeo_runtime_proto at call time: several rodeo plugins can share this
 -- VM, and that global holds whichever build's runner set it last.
 
-return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
+return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScene)
 	local roblox = {}
 	local SerializationService = game:GetService("SerializationService")
 
@@ -235,7 +235,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 	-- Writes an EditableMesh to `path` as glTF (.glb or .gltf). Geometry,
 	-- per-corner normals/UVs/colors, and skinning (bones with bind poses, up to
 	-- four influences per vertex) are written; FACS poses are not.
-	function roblox.exportEditableMesh(path: string, mesh: EditableMesh): { string }
+	local function meshToBlob(mesh: EditableMesh): buffer
 		local okClass, className = pcall(function()
 			return (mesh :: any).ClassName
 		end)
@@ -357,6 +357,11 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 			indices = indices,
 			bones = bones,
 		})
+		return blob
+	end
+
+	function roblox.exportEditableMesh(path: string, mesh: EditableMesh): { string }
+		local blob = meshToBlob(mesh)
 		local h = fs.open(path, "w")
 		stream.writeBytes(h, blob)
 		-- Finalize in place of stream.close: consumes the handle, writes the
@@ -386,20 +391,10 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 		return ids
 	end
 
-	-- Reads a .glb or .gltf into a new EditableMesh. Node transforms are baked
-	-- into the geometry and all primitives merge into one mesh.
-	function roblox.importEditableMesh(path: string): EditableMesh
-		nextMeshId += 1
-		local handle = { __handle = `mesh:{nextMeshId}:{path}` }
-		rpc.call("roblox_mesh_decode", runtime.RobloxMeshDecodeRequest.new({
-			path = path,
-			handle = handle.__handle,
-		}))
-		local blob = stream.readBytes(handle)
-		stream.close(handle)
+	local function meshFromBlob(blob: buffer, path: string): (EditableMesh, { number })
 		local data = readMeshBlob(blob)
-
-		local mesh = AssetService:CreateEditableMesh()
+		local boneIds: { number } = {}
+		local mesh = assert(AssetService:CreateEditableMesh(), `importEditableMesh: {path}: editable mesh memory exhausted`)
 		local ok, err = pcall(function()
 			local vertexCount = #data.positions
 			local vIds = addEach(vertexCount, "vertex", function(i)
@@ -440,7 +435,6 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 				end
 			end
 
-			local boneIds: { number } = {}
 			for i, b in ipairs(data.bones) do
 				local props: { [string]: any } = { Name = b.name, CFrame = b.cframe, Virtual = b.virtual }
 				if b.parent ~= nil then
@@ -469,8 +463,26 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 			mesh:Destroy()
 			error(`importEditableMesh: {path}: {tostring(err)}`, 2)
 		end
+		return mesh, boneIds
+	end
+
+	-- Reads a .glb or .gltf into a new EditableMesh. Node transforms are baked
+	-- into the geometry and all primitives merge into one mesh.
+	function roblox.importEditableMesh(path: string): EditableMesh
+		nextMeshId += 1
+		local handle = { __handle = `mesh:{nextMeshId}:{path}` }
+		rpc.call("roblox_mesh_decode", runtime.RobloxMeshDecodeRequest.new({
+			path = path,
+			handle = handle.__handle,
+		}))
+		local blob = stream.readBytes(handle)
+		stream.close(handle)
+
+		local mesh = meshFromBlob(blob, path)
 		return mesh
 	end
+
+	createScene(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 
 	-- Internal plumbing for the roblox.captureViewport shim (rodeo-pkg/rodeo/shims/
 	-- roblox.luau), which composes these with the fs/process API. Not part of

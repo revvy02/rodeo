@@ -134,6 +134,7 @@ local function createExecutionContext(source: string, context: RunContext, execu
 	local processMod = cloneDep(sharedRoot.process, "@rodeo/process")
 	local streamMod = cloneDep(sharedRoot.stream, "@rodeo/stream")
 	local robloxMod = cloneDep(runnerTemplate.roblox, "@rodeo/roblox")
+	local sceneMod = cloneDep(runnerTemplate.scene, "@rodeo/scene")
 
 	-- Build refs Folder with ObjectValues (runner init.luau resolves deps via script.refs)
 	local refs = Instance.new("Folder")
@@ -167,6 +168,7 @@ local function createExecutionContext(source: string, context: RunContext, execu
 	addRef("process", processMod)
 	addRef("stream", streamMod)
 	addRef("roblox", robloxMod)
+	addRef("scene", sceneMod)
 
 	-- Create thin shim Script/LocalScript for server/client (must be parented to trigger execution)
 	local shim: (Script | LocalScript)? = nil

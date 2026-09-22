@@ -36,6 +36,8 @@ type _Messages = {
 	RobloxMeshEncodeResponse: _RobloxMeshEncodeResponseMessage,
 	RobloxMeshDecodeRequest: _RobloxMeshDecodeRequestMessage,
 	RobloxMeshDecodeResponse: _RobloxMeshDecodeResponseMessage,
+	RobloxSceneDecodeRequest: _RobloxSceneDecodeRequestMessage,
+	RobloxSceneEncodeRequest: _RobloxSceneEncodeRequestMessage,
 	FsExistsRequest: _FsExistsRequestMessage,
 	FsExistsResponse: _FsExistsResponseMessage,
 	FsStatRequest: _FsStatRequestMessage,
@@ -818,6 +820,56 @@ export type RobloxMeshDecodeResponse = typeof(setmetatable(
 ))
 type _RobloxMeshDecodeResponseMessage = proto.Message<RobloxMeshDecodeResponse, _RobloxMeshDecodeResponsePartialFields>
 
+type _RobloxSceneDecodeRequestImpl = {
+	__index: _RobloxSceneDecodeRequestImpl,
+	new: (fields: _RobloxSceneDecodeRequestPartialFields?) -> RobloxSceneDecodeRequest,
+	encode: (self: RobloxSceneDecodeRequest) -> buffer,
+	decode: (input: buffer) -> RobloxSceneDecodeRequest,
+	jsonEncode: (self: RobloxSceneDecodeRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxSceneDecodeRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxSceneDecodeRequestFields = {
+	path: string,
+	handle: string,
+}
+
+export type _RobloxSceneDecodeRequestPartialFields = {
+	path: string?,
+	handle: string?,
+}
+
+export type RobloxSceneDecodeRequest = typeof(setmetatable(
+	{} :: _RobloxSceneDecodeRequestFields,
+	{} :: _RobloxSceneDecodeRequestImpl
+))
+type _RobloxSceneDecodeRequestMessage = proto.Message<RobloxSceneDecodeRequest, _RobloxSceneDecodeRequestPartialFields>
+
+type _RobloxSceneEncodeRequestImpl = {
+	__index: _RobloxSceneEncodeRequestImpl,
+	new: (fields: _RobloxSceneEncodeRequestPartialFields?) -> RobloxSceneEncodeRequest,
+	encode: (self: RobloxSceneEncodeRequest) -> buffer,
+	decode: (input: buffer) -> RobloxSceneEncodeRequest,
+	jsonEncode: (self: RobloxSceneEncodeRequest) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxSceneEncodeRequest,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxSceneEncodeRequestFields = {
+	handle: string,
+}
+
+export type _RobloxSceneEncodeRequestPartialFields = {
+	handle: string?,
+}
+
+export type RobloxSceneEncodeRequest = typeof(setmetatable(
+	{} :: _RobloxSceneEncodeRequestFields,
+	{} :: _RobloxSceneEncodeRequestImpl
+))
+type _RobloxSceneEncodeRequestMessage = proto.Message<RobloxSceneEncodeRequest, _RobloxSceneEncodeRequestPartialFields>
+
 type _FsExistsRequestImpl = {
 	__index: _FsExistsRequestImpl,
 	new: (fields: _FsExistsRequestPartialFields?) -> FsExistsRequest,
@@ -1500,6 +1552,8 @@ type _ClientRpcCallFields = {
 		| { type: "robloxImageDecode", value: RobloxImageDecodeRequest }
 		| { type: "robloxMeshEncode", value: RobloxMeshEncodeRequest }
 		| { type: "robloxMeshDecode", value: RobloxMeshDecodeRequest }
+		| { type: "robloxSceneDecode", value: RobloxSceneDecodeRequest }
+		| { type: "robloxSceneEncode", value: RobloxSceneEncodeRequest }
 		| { type: "robloxCaptureBegin", value: RobloxCaptureBeginRequest }
 		| { type: "robloxCaptureCollect", value: RobloxCaptureCollectRequest }
 	)?,
@@ -1546,6 +1600,8 @@ export type _ClientRpcCallPartialFields = {
 		| { type: "robloxImageDecode", value: RobloxImageDecodeRequest | _RobloxImageDecodeRequestPartialFields }
 		| { type: "robloxMeshEncode", value: RobloxMeshEncodeRequest | _RobloxMeshEncodeRequestPartialFields }
 		| { type: "robloxMeshDecode", value: RobloxMeshDecodeRequest | _RobloxMeshDecodeRequestPartialFields }
+		| { type: "robloxSceneDecode", value: RobloxSceneDecodeRequest | _RobloxSceneDecodeRequestPartialFields }
+		| { type: "robloxSceneEncode", value: RobloxSceneEncodeRequest | _RobloxSceneEncodeRequestPartialFields }
 		| { type: "robloxCaptureBegin", value: RobloxCaptureBeginRequest | _RobloxCaptureBeginRequestPartialFields }
 		| {
 			type: "robloxCaptureCollect",
@@ -1603,6 +1659,8 @@ type _ClientRpcResponseFields = {
 		| { type: "robloxImageDecode", value: RobloxImageDecodeResponse }
 		| { type: "robloxMeshEncode", value: RobloxMeshEncodeResponse }
 		| { type: "robloxMeshDecode", value: RobloxMeshDecodeResponse }
+		| { type: "robloxSceneDecode", value: Ok }
+		| { type: "robloxSceneEncode", value: Ok }
 		| { type: "robloxCaptureBegin", value: RobloxCaptureBeginResponse }
 		| { type: "robloxCaptureCollect", value: RobloxCaptureCollectResponse }
 	)?,
@@ -1647,6 +1705,8 @@ export type _ClientRpcResponsePartialFields = {
 		| { type: "robloxImageDecode", value: RobloxImageDecodeResponse | _RobloxImageDecodeResponsePartialFields }
 		| { type: "robloxMeshEncode", value: RobloxMeshEncodeResponse | _RobloxMeshEncodeResponsePartialFields }
 		| { type: "robloxMeshDecode", value: RobloxMeshDecodeResponse | _RobloxMeshDecodeResponsePartialFields }
+		| { type: "robloxSceneDecode", value: Ok | _OkPartialFields }
+		| { type: "robloxSceneEncode", value: Ok | _OkPartialFields }
 		| { type: "robloxCaptureBegin", value: RobloxCaptureBeginResponse | _RobloxCaptureBeginResponsePartialFields }
 		| {
 			type: "robloxCaptureCollect",
@@ -5006,6 +5066,219 @@ do
 	messages.RobloxMeshDecodeResponse = _RobloxMeshDecodeResponseImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.RobloxMeshDecodeResponse)
+end
+
+do
+	local _RobloxSceneDecodeRequestImpl = {}
+	_RobloxSceneDecodeRequestImpl.__index = _RobloxSceneDecodeRequestImpl
+
+	function _RobloxSceneDecodeRequestImpl.new(data: _RobloxSceneDecodeRequestPartialFields?): RobloxSceneDecodeRequest
+		return setmetatable({
+			path = if data == nil or data.path == nil then "" else data.path,
+			handle = if data == nil or data.handle == nil then "" else data.handle,
+		}, _RobloxSceneDecodeRequestImpl :: _RobloxSceneDecodeRequestImpl)
+	end
+
+	function _RobloxSceneDecodeRequestImpl.encode(self: RobloxSceneDecodeRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.path ~= nil and self.path ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.path)
+		end
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 2, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxSceneDecodeRequestImpl.decode(input: buffer): RobloxSceneDecodeRequest
+		local self = _RobloxSceneDecodeRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.path = proto.decodeString(value)
+					continue
+				elseif field == 2 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.handle = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxSceneDecodeRequestImpl.jsonEncode(self: RobloxSceneDecodeRequest): any
+		local output = {}
+
+		if self.path ~= nil and self.path ~= "" then
+			output.path = self.path
+		end
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
+		end
+
+		return output
+	end
+
+	function _RobloxSceneDecodeRequestImpl.jsonDecode(input: { [string]: any }): RobloxSceneDecodeRequest
+		local self = _RobloxSceneDecodeRequestImpl.new()
+
+		if input.path ~= nil then
+			self.path = input.path
+		end
+
+		if input.handle ~= nil then
+			self.handle = input.handle
+		end
+
+		return self
+	end
+
+	_RobloxSceneDecodeRequestImpl.descriptor = {
+		name = "RobloxSceneDecodeRequest",
+		fullName = "rodeo.runtime.RobloxSceneDecodeRequest",
+	}
+
+	messages.RobloxSceneDecodeRequest = _RobloxSceneDecodeRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxSceneDecodeRequest)
+end
+
+do
+	local _RobloxSceneEncodeRequestImpl = {}
+	_RobloxSceneEncodeRequestImpl.__index = _RobloxSceneEncodeRequestImpl
+
+	function _RobloxSceneEncodeRequestImpl.new(data: _RobloxSceneEncodeRequestPartialFields?): RobloxSceneEncodeRequest
+		return setmetatable({
+			handle = if data == nil or data.handle == nil then "" else data.handle,
+		}, _RobloxSceneEncodeRequestImpl :: _RobloxSceneEncodeRequestImpl)
+	end
+
+	function _RobloxSceneEncodeRequestImpl.encode(self: RobloxSceneEncodeRequest): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+			output, cursor = proto.writeString(output, cursor, self.handle)
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxSceneEncodeRequestImpl.decode(input: buffer): RobloxSceneEncodeRequest
+		local self = _RobloxSceneEncodeRequestImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.handle = proto.decodeString(value)
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxSceneEncodeRequestImpl.jsonEncode(self: RobloxSceneEncodeRequest): any
+		local output = {}
+
+		if self.handle ~= nil and self.handle ~= "" then
+			output.handle = self.handle
+		end
+
+		return output
+	end
+
+	function _RobloxSceneEncodeRequestImpl.jsonDecode(input: { [string]: any }): RobloxSceneEncodeRequest
+		local self = _RobloxSceneEncodeRequestImpl.new()
+
+		if input.handle ~= nil then
+			self.handle = input.handle
+		end
+
+		return self
+	end
+
+	_RobloxSceneEncodeRequestImpl.descriptor = {
+		name = "RobloxSceneEncodeRequest",
+		fullName = "rodeo.runtime.RobloxSceneEncodeRequest",
+	}
+
+	messages.RobloxSceneEncodeRequest = _RobloxSceneEncodeRequestImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxSceneEncodeRequest)
 end
 
 do
@@ -8419,6 +8692,24 @@ do
 							value = messages.RobloxMeshDecodeRequest.new((v :: any).value),
 						} :: any
 				elseif
+					(v :: any).type == "robloxSceneDecode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.RobloxSceneDecodeRequest.new((v :: any).value),
+						} :: any
+				elseif
+					(v :: any).type == "robloxSceneEncode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return {
+							type = (v :: any).type,
+							value = messages.RobloxSceneEncodeRequest.new((v :: any).value),
+						} :: any
+				elseif
 					(v :: any).type == "robloxCaptureBegin"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
@@ -8580,6 +8871,14 @@ do
 			elseif self.req.type == "robloxMeshDecode" then
 				local encoded = self.req.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 57, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxSceneDecode" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 60, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.req.type == "robloxSceneEncode" then
+				local encoded = self.req.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 61, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			elseif self.req.type == "robloxCaptureBegin" then
 				local encoded = self.req.value:encode()
@@ -8791,6 +9090,16 @@ do
 					self.req =
 						{ type = "robloxCaptureCollect", value = messages.RobloxCaptureCollectRequest.decode(value) }
 					continue
+				elseif field == 60 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = { type = "robloxSceneDecode", value = messages.RobloxSceneDecodeRequest.decode(value) }
+					continue
+				elseif field == 61 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.req = { type = "robloxSceneEncode", value = messages.RobloxSceneEncodeRequest.decode(value) }
+					continue
 				end
 
 				local length
@@ -8889,6 +9198,10 @@ do
 				output.robloxMeshEncode = self.req.value:jsonEncode()
 			elseif self.req.type == "robloxMeshDecode" then
 				output.robloxMeshDecode = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxSceneDecode" then
+				output.robloxSceneDecode = self.req.value:jsonEncode()
+			elseif self.req.type == "robloxSceneEncode" then
+				output.robloxSceneEncode = self.req.value:jsonEncode()
 			elseif self.req.type == "robloxCaptureBegin" then
 				output.robloxCaptureBegin = self.req.value:jsonEncode()
 			elseif self.req.type == "robloxCaptureCollect" then
@@ -9059,6 +9372,20 @@ do
 			self.req = {
 				type = "robloxMeshDecode",
 				value = messages.RobloxMeshDecodeRequest.jsonDecode(input.robloxMeshDecode),
+			}
+		end
+
+		if input.robloxSceneDecode ~= nil then
+			self.req = {
+				type = "robloxSceneDecode",
+				value = messages.RobloxSceneDecodeRequest.jsonDecode(input.robloxSceneDecode),
+			}
+		end
+
+		if input.robloxSceneEncode ~= nil then
+			self.req = {
+				type = "robloxSceneEncode",
+				value = messages.RobloxSceneEncodeRequest.jsonDecode(input.robloxSceneEncode),
 			}
 		end
 
@@ -9319,6 +9646,18 @@ do
 							value = messages.RobloxMeshDecodeResponse.new((v :: any).value),
 						} :: any
 				elseif
+					(v :: any).type == "robloxSceneDecode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
+				elseif
+					(v :: any).type == "robloxSceneEncode"
+					and (v :: any).value ~= nil
+					and getmetatable((v :: any).value) == nil
+				then
+					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
+				elseif
 					(v :: any).type == "robloxCaptureBegin"
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
@@ -9483,6 +9822,14 @@ do
 			elseif self.res.type == "robloxMeshDecode" then
 				local encoded = self.res.value:encode()
 				output, cursor = proto.writeTag(output, cursor, 57, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxSceneDecode" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 60, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
+			elseif self.res.type == "robloxSceneEncode" then
+				local encoded = self.res.value:encode()
+				output, cursor = proto.writeTag(output, cursor, 61, proto.wireTypes.lengthDelimited)
 				output, cursor = proto.writeBuffer(output, cursor, encoded, buffer.len(encoded))
 			elseif self.res.type == "robloxCaptureBegin" then
 				local encoded = self.res.value:encode()
@@ -9697,6 +10044,16 @@ do
 					self.res =
 						{ type = "robloxCaptureCollect", value = messages.RobloxCaptureCollectResponse.decode(value) }
 					continue
+				elseif field == 60 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "robloxSceneDecode", value = messages.Ok.decode(value) }
+					continue
+				elseif field == 61 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					self.res = { type = "robloxSceneEncode", value = messages.Ok.decode(value) }
+					continue
 				end
 
 				local length
@@ -9797,6 +10154,10 @@ do
 				output.robloxMeshEncode = self.res.value:jsonEncode()
 			elseif self.res.type == "robloxMeshDecode" then
 				output.robloxMeshDecode = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxSceneDecode" then
+				output.robloxSceneDecode = self.res.value:jsonEncode()
+			elseif self.res.type == "robloxSceneEncode" then
+				output.robloxSceneEncode = self.res.value:jsonEncode()
 			elseif self.res.type == "robloxCaptureBegin" then
 				output.robloxCaptureBegin = self.res.value:jsonEncode()
 			elseif self.res.type == "robloxCaptureCollect" then
@@ -9965,6 +10326,14 @@ do
 			}
 		end
 
+		if input.robloxSceneDecode ~= nil then
+			self.res = { type = "robloxSceneDecode", value = messages.Ok.jsonDecode(input.robloxSceneDecode) }
+		end
+
+		if input.robloxSceneEncode ~= nil then
+			self.res = { type = "robloxSceneEncode", value = messages.Ok.jsonDecode(input.robloxSceneEncode) }
+		end
+
 		if input.robloxCaptureBegin ~= nil then
 			self.res = {
 				type = "robloxCaptureBegin",
@@ -10022,6 +10391,8 @@ return {
 	RobloxMeshEncodeResponse = messages.RobloxMeshEncodeResponse,
 	RobloxMeshDecodeRequest = messages.RobloxMeshDecodeRequest,
 	RobloxMeshDecodeResponse = messages.RobloxMeshDecodeResponse,
+	RobloxSceneDecodeRequest = messages.RobloxSceneDecodeRequest,
+	RobloxSceneEncodeRequest = messages.RobloxSceneEncodeRequest,
 	FsExistsRequest = messages.FsExistsRequest,
 	FsExistsResponse = messages.FsExistsResponse,
 	FsStatRequest = messages.FsStatRequest,

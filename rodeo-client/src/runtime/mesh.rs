@@ -259,11 +259,11 @@ pub fn decode_blob(data: &[u8]) -> Result<MeshData, String> {
 // Matrix helpers (column-major [col][row], as glTF and gltf::scene::Transform)
 // ---------------------------------------------------------------------------
 
-type Mat4 = [[f32; 4]; 4];
+pub(super) type Mat4 = [[f32; 4]; 4];
 
-const IDENTITY: Mat4 = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+pub(super) const IDENTITY: Mat4 = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
 
-fn mat_mul(a: &Mat4, b: &Mat4) -> Mat4 {
+pub(super) fn mat_mul(a: &Mat4, b: &Mat4) -> Mat4 {
     let mut m = [[0f32; 4]; 4];
     for c in 0..4 {
         for r in 0..4 {
@@ -273,7 +273,7 @@ fn mat_mul(a: &Mat4, b: &Mat4) -> Mat4 {
     m
 }
 
-fn transform_point(m: &Mat4, p: [f32; 3]) -> [f32; 3] {
+pub(super) fn transform_point(m: &Mat4, p: [f32; 3]) -> [f32; 3] {
     let mut out = [0f32; 3];
     for r in 0..3 {
         out[r] = m[0][r] * p[0] + m[1][r] * p[1] + m[2][r] * p[2] + m[3][r];
@@ -287,7 +287,7 @@ fn normalize(v: [f32; 3]) -> [f32; 3] {
 }
 
 /// General 4x4 inverse (cofactor expansion). Returns None when singular.
-fn mat_inverse(m: &Mat4) -> Option<Mat4> {
+pub(super) fn mat_inverse(m: &Mat4) -> Option<Mat4> {
     // Flatten column-major into a[row][col] for readability.
     let a = |r: usize, c: usize| m[c][r];
     let mut inv = [[0f32; 4]; 4];
@@ -327,7 +327,7 @@ fn mat_inverse(m: &Mat4) -> Option<Mat4> {
 }
 
 /// Normal matrix: inverse-transpose of the upper 3x3, applied as a direction.
-fn transform_normal(m: &Mat4, n: [f32; 3]) -> [f32; 3] {
+pub(super) fn transform_normal(m: &Mat4, n: [f32; 3]) -> [f32; 3] {
     let inv = match mat_inverse(m) { Some(i) => i, None => return n };
     // (M^-1)^T applied to n: out[r] = sum_k inv[r][k] * n[k] in [col][row] storage → inv[r][k] is column r, row k.
     let mut out = [0f32; 3];
@@ -338,7 +338,7 @@ fn transform_normal(m: &Mat4, n: [f32; 3]) -> [f32; 3] {
 }
 
 /// Roblox CFrame components (x y z R00..R22, rows) from a column-major matrix.
-fn cframe_from_mat(m: &Mat4) -> [f32; 12] {
+pub(super) fn cframe_from_mat(m: &Mat4) -> [f32; 12] {
     let mut c = [0f32; 12];
     c[0] = m[3][0]; c[1] = m[3][1]; c[2] = m[3][2];
     for r in 0..3 {
@@ -349,7 +349,7 @@ fn cframe_from_mat(m: &Mat4) -> [f32; 12] {
     c
 }
 
-fn mat_from_cframe(c: &[f32; 12]) -> Mat4 {
+pub(super) fn mat_from_cframe(c: &[f32; 12]) -> Mat4 {
     let mut m = IDENTITY;
     m[3][0] = c[0]; m[3][1] = c[1]; m[3][2] = c[2];
     for r in 0..3 {
@@ -385,33 +385,22 @@ fn quat_from_mat(m: &Mat4) -> [f32; 4] {
 // glTF read
 // ---------------------------------------------------------------------------
 
-fn load_buffers(gltf: &gltf::Gltf, path: &str) -> Result<Vec<Vec<u8>>, String> {
-    use base64::Engine;
-    let base = std::path::Path::new(path).parent().map(|p| p.to_path_buf()).unwrap_or_default();
+pub(super) fn load_buffers(gltf: &gltf::Gltf, path: &str) -> Result<Vec<Vec<u8>>, String> {
     let mut out = Vec::new();
     for buffer in gltf.buffers() {
         let bytes = match buffer.source() {
             gltf::buffer::Source::Bin => gltf.blob.clone().ok_or("GLB declares a BIN buffer but has no BIN chunk")?,
-            gltf::buffer::Source::Uri(uri) => {
-                if let Some(rest) = uri.strip_prefix("data:") {
-                    let comma = rest.find(',').ok_or("malformed data URI buffer")?;
-                    base64::engine::general_purpose::STANDARD
-                        .decode(&rest[comma + 1..])
-                        .map_err(|e| format!("data URI buffer: {e}"))?
-                } else {
-                    let p = base.join(uri);
-                    std::fs::read(&p).map_err(|e| format!("read buffer {}: {e}", p.display()))?
-                }
-            }
+            gltf::buffer::Source::Uri(uri) => super::scene::uri_bytes(uri, path)?,
         };
+        if bytes.len() < buffer.length() {return Err(format!("buffer {} is shorter than its declared byteLength",buffer.index()));}
         out.push(bytes);
     }
     Ok(out)
 }
 
-struct MeshInstance {
-    node: usize,
-    world: Mat4,
+pub(super) struct MeshInstance {
+    pub node: usize,
+    pub world: Mat4,
 }
 
 fn visit(node: gltf::Node, parent_world: &Mat4, parent: Option<usize>, parents: &mut Vec<Option<usize>>, instances: &mut Vec<MeshInstance>) {
@@ -444,6 +433,11 @@ pub fn read_gltf(path: &str) -> Result<MeshData, String> {
         return Err("glTF scene contains no mesh".into());
     }
 
+    Ok(read_gltf_parts(&gltf, &buffers, &instances, &parents, None)?.0)
+}
+
+pub(super) fn read_gltf_parts(gltf: &gltf::Gltf, buffers: &[Vec<u8>], instances: &[MeshInstance], parents: &[Option<usize>], primitive: Option<usize>) -> Result<(MeshData, Vec<usize>), String> {
+    let mut source_joints = Vec::new();
     let mut mesh = MeshData::default();
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut uvs: Vec<[f32; 2]> = Vec::new();
@@ -454,7 +448,7 @@ pub fn read_gltf(path: &str) -> Result<MeshData, String> {
     let mut skin_index: Option<usize> = None;
     let mut any_primitive = false;
 
-    for inst in &instances {
+    for inst in instances {
         let node = gltf.nodes().nth(inst.node).unwrap();
         let skin = node.skin();
         if let Some(s) = &skin {
@@ -466,6 +460,7 @@ pub fn read_gltf(path: &str) -> Result<MeshData, String> {
         }
         let gmesh = node.mesh().unwrap();
         for prim in gmesh.primitives() {
+            if primitive.is_some_and(|i| i != prim.index()) { continue; }
             if prim.mode() != gltf::mesh::Mode::Triangles {
                 return Err(format!("primitive mode {:?} is not supported; export triangles", prim.mode()));
             }
@@ -532,9 +527,16 @@ pub fn read_gltf(path: &str) -> Result<MeshData, String> {
         let mut used_names = std::collections::HashSet::new();
         for (j, node) in joint_nodes.iter().enumerate() {
             let bind = mat_inverse(&ibms[j]).ok_or_else(|| format!("joint {j} has a singular inverseBindMatrix"))?;
-            let parent = parents.get(node.index()).copied().flatten().and_then(|p| node_to_joint.get(&p).copied());
+            let mut ancestor = parents.get(node.index()).copied().flatten();
+            let mut parent = None;
+            let mut visited = std::collections::HashSet::new();
+            while let Some(p) = ancestor {
+                if !visited.insert(p) {return Err("skin joint ancestry contains a cycle".into());}
+                if let Some(joint) = node_to_joint.get(&p) {parent=Some(*joint);break;}
+                ancestor = parents.get(p).copied().flatten();
+            }
             let mut name = node.name().map(str::to_string).unwrap_or_else(|| format!("Bone{j}"));
-            if name.len() > 100 { name.truncate(100); }
+            while name.len() > 90 { name.pop(); }
             let mut candidate = name.clone();
             let mut n = 2;
             while !used_names.insert(candidate.clone()) {
@@ -558,6 +560,7 @@ pub fn read_gltf(path: &str) -> Result<MeshData, String> {
         let mut new_index = vec![0u32; raw.len()];
         for (new, old) in order.iter().enumerate() { new_index[*old] = new as u32; }
         for old in &order {
+            source_joints.push(joint_nodes[*old].index());
             let (parent, mut bone) = raw[*old].clone();
             bone.parent = parent.map(|p| new_index[p]);
             mesh.bones.push(bone);
@@ -583,7 +586,7 @@ pub fn read_gltf(path: &str) -> Result<MeshData, String> {
             mesh.weights = Some(ws);
         }
     }
-    Ok(mesh)
+    Ok((mesh, source_joints))
 }
 
 // ---------------------------------------------------------------------------
@@ -624,12 +627,11 @@ fn f32s_bytes<const N: usize>(v: &[[f32; N]]) -> Vec<u8> {
 /// the buffer embedded as a data URI). One mesh, one primitive; bones become a
 /// node hierarchy plus a skin with inverse bind matrices.
 pub fn write_gltf(mesh: &MeshData, path: &str) -> Result<(), String> {
-    use base64::Engine;
+    let (root, data) = build_gltf(mesh)?;
+    write_document(root, data, path)
+}
 
-    let lower = path.to_lowercase();
-    let binary = if lower.ends_with(".glb") { true } else if lower.ends_with(".gltf") { false } else {
-        return Err(format!("only .glb or .gltf output is supported (got '{path}')"));
-    };
+pub(super) fn build_gltf(mesh: &MeshData) -> Result<(serde_json::Value, Vec<u8>), String> {
     let vcount = mesh.positions.len();
     if vcount == 0 || mesh.indices.is_empty() { return Err("mesh has no triangles".into()); }
     if mesh.bones.len() > u16::MAX as usize { return Err(format!("{} bones exceed glTF's 65535 joint limit", mesh.bones.len())); }
@@ -733,12 +735,21 @@ pub fn write_gltf(mesh: &MeshData, path: &str) -> Result<(), String> {
     });
     if !skins.is_empty() { root["skins"] = serde_json::json!(skins); }
 
-    while bin.data.len() % 4 != 0 { bin.data.push(0); }
+    Ok((root, bin.data))
+}
+
+pub(super) fn write_document(mut root: serde_json::Value, mut data: Vec<u8>, path: &str) -> Result<(), String> {
+    use base64::Engine;
+    let lower = path.to_lowercase();
+    let binary = if lower.ends_with(".glb") { true } else if lower.ends_with(".gltf") { false } else {
+        return Err(format!("only .glb or .gltf output is supported (got '{path}')"));
+    };
+    while data.len() % 4 != 0 { data.push(0); }
     let output_bytes = if binary {
-        root["buffers"] = serde_json::json!([{ "byteLength": bin.data.len() }]);
+        root["buffers"] = serde_json::json!([{ "byteLength": data.len() }]);
         let mut json = serde_json::to_vec(&root).map_err(|e| format!("glTF json: {e}"))?;
         while json.len() % 4 != 0 { json.push(b' '); }
-        let total = 12 + 8 + json.len() + 8 + bin.data.len();
+        let total = 12 + 8 + json.len() + 8 + data.len();
         let mut out = Vec::with_capacity(total);
         out.extend_from_slice(&0x4654_6C67u32.to_le_bytes());
         out.extend_from_slice(&2u32.to_le_bytes());
@@ -746,13 +757,13 @@ pub fn write_gltf(mesh: &MeshData, path: &str) -> Result<(), String> {
         out.extend_from_slice(&(json.len() as u32).to_le_bytes());
         out.extend_from_slice(&0x4E4F_534Au32.to_le_bytes());
         out.extend_from_slice(&json);
-        out.extend_from_slice(&(bin.data.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
         out.extend_from_slice(&0x004E_4942u32.to_le_bytes());
-        out.extend_from_slice(&bin.data);
+        out.extend_from_slice(&data);
         out
     } else {
-        let uri = format!("data:application/octet-stream;base64,{}", base64::engine::general_purpose::STANDARD.encode(&bin.data));
-        root["buffers"] = serde_json::json!([{ "byteLength": bin.data.len(), "uri": uri }]);
+        let uri = format!("data:application/octet-stream;base64,{}", base64::engine::general_purpose::STANDARD.encode(&data));
+        root["buffers"] = serde_json::json!([{ "byteLength": data.len(), "uri": uri }]);
         serde_json::to_vec_pretty(&root).map_err(|e| format!("glTF json: {e}"))?
     };
 

@@ -151,6 +151,77 @@ function roblox.importEditableMesh(path: string): EditableMesh
 	return (singleton :: any).roblox.importEditableMesh(path)
 end
 
+--- One imported primitive and its original glTF indices (zero-based).
+export type ScenePrimitive = {
+    nodeIndex: number,
+    meshIndex: number,
+    primitiveIndex: number,
+    skinIndex: number?,
+    materialIndex: number?,
+    mesh: EditableMesh,
+    part: MeshPart,
+}
+
+--- An original glTF joint can bind multiple mesh instances.
+export type SceneJoint = {
+    mesh: EditableMesh,
+    boneId: number,
+    bone: Bone,
+    part: MeshPart,
+}
+
+--- Source indices are zero-based glTF indices, not Luau array positions.
+--- Images/materials/joints can map to several objects after channel splitting
+--- or mesh instancing. `primitives` is an ordinary one-based binding array.
+export type SceneSourceMap = {
+    nodes: { [number]: Instance },
+    primitives: { ScenePrimitive },
+    materials: { [number]: { SurfaceAppearance } },
+    images: { [number]: { EditableImage } },
+    joints: { [number]: { SceneJoint } },
+}
+
+--- Caller-owned unparented roots and live editable resources. Destroy roots,
+--- meshes, and images when finished. Destroying a root does not destroy the
+--- editable resources it references; meshes/images can be shared by parts.
+export type EditableScene = {
+    roots: { Instance },
+    meshes: { EditableMesh },
+    images: { EditableImage },
+    sourceMap: SceneSourceMap,
+    warnings: { string },
+}
+
+--- Imports the default (or first) glTF/GLB scene as Models and anchored
+--- MeshParts, preserving hierarchy, node poses, separate primitives, shared
+--- meshes, UVs/colors/normals, PBR base color/normal/metallic/roughness maps,
+--- and supported skins with Bone instances and their initial poses.
+--- PNG/JPEG textures can be embedded or external. Resources remain live and
+--- editable. Source indices map to objects without depending on their names.
+--- Coordinates follow the mesh APIs: Y-up, one file unit per stud.
+--- Sheared world transforms and scaled skins error; reflected static meshes
+--- are supported. Animation clips, morph targets, cameras, material extensions,
+--- emissive/occlusion maps, and sampler differences are reported in warnings.
+--- Required extensions and unreadable geometry/images error. On failure all
+--- partially created objects are destroyed. No assets are uploaded.
+function roblox.importEditableScene(path: string): EditableScene
+    return (singleton :: any).roblox.importEditableScene(path)
+end
+
+--- Exports supported instance roots to self-contained glTF/GLB, including
+--- live editable or readable asset-backed meshes and images. Works with
+--- procedurally created roots; no import result or source map is required.
+--- Models/Folders, MeshParts, block Parts, Attachments and skins are supported.
+--- Other instance behavior is reported in warnings; unsupported part geometry
+--- and unreadable assets error. Native materials and absent roughness maps
+--- use approximate glTF PBR values with warnings. Mesh centering, size, hierarchy and current
+--- Bone poses are preserved. Publishing and RBXM serialization are separate.
+--- Returns warnings for unsupported features. The destination is replaced
+--- only after successful scene encoding; caller-owned objects are untouched.
+function roblox.exportEditableScene(path: string, roots: { Instance }): { string }
+    return (singleton :: any).roblox.exportEditableScene(path, roots)
+end
+
 --- Captures a Studio screenshot and writes it to a stable path, returning
 --- that absolute path and the image size. `output` ending in `.png` is the
 --- exact file path; any other value is a directory the auto-named `.png` lands

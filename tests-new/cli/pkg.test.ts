@@ -1,3 +1,4 @@
+import { scenes } from "../utils/sceneTests.js";
 import { describe, beforeAll, afterAll } from "bun:test";
 import { smoke, fs, io, process as processTests, roblox, capture, images, meshes } from "../utils/pkgTests.js";
 import { cliStudioHandle } from "./helpers.js";
@@ -15,4 +16,5 @@ describe("rodeo pkg (CLI)", () => {
   describe("rodeo.capture", () => capture(cli.runFn));
   describe("rodeo.images", () => images(cli.runFn));
   describe("rodeo.meshes", () => meshes(cli.runFn));
+  describe("rodeo.scenes", () => scenes(cli.runFn));
 });

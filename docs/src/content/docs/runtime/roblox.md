@@ -15,16 +15,22 @@ These APIs are not finalized and may change in backwards incompatible ways.
 | :--- | :--- |
 | [CaptureInfo](#captureinfo) | Size of the image `captureViewport` wrote, in pixels. The capture's logical |
 | [CaptureOptions](#captureoptions) | Camera and device options for `captureViewport`. All fields optional. |
+| [EditableScene](#editablescene) | Caller-owned unparented roots and live editable resources. Destroy roots, |
+| [SceneJoint](#scenejoint) | An original glTF joint can bind multiple mesh instances. |
+| [ScenePrimitive](#sceneprimitive) | One imported primitive and its original glTF indices (zero-based). |
+| [SceneSourceMap](#scenesourcemap) | Source indices are zero-based glTF indices, not Luau array positions. |
 | [bake](#robloxbake) | Writes `value` to `path` as a Luau module (`return <value>`), so the data |
 | [capture](#robloxcapture) | Deprecated alias of `roblox.captureViewport`. |
 | [captureViewport](#robloxcaptureviewport) | Captures a Studio screenshot and writes it to a stable path, returning |
 | [export](#robloxexport) | Deprecated alias of `roblox.exportInstances`. |
 | [exportEditableImage](#robloxexporteditableimage) | Writes an `EditableImage`'s pixels to `path` as a PNG. Only `.png` is |
 | [exportEditableMesh](#robloxexporteditablemesh) | Writes an `EditableMesh` to `path` as glTF 2.0 (`.glb` binary, or `.gltf` |
+| [exportEditableScene](#robloxexporteditablescene) | Exports supported instance roots to self-contained glTF/GLB, including |
 | [exportInstances](#robloxexportinstances) | Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`. |
 | [import](#robloximport) | Deprecated alias of `roblox.importInstances`. |
 | [importEditableImage](#robloximporteditableimage) | Loads the PNG or JPEG at `path` into a new `EditableImage` (RGBA8) and |
 | [importEditableMesh](#robloximporteditablemesh) | Loads the `.glb`, `.gltf` or `.obj` at `path` into a new `EditableMesh` and |
+| [importEditableScene](#robloximporteditablescene) | Imports the default (or first) glTF/GLB scene as Models and anchored |
 | [importInstances](#robloximportinstances) | Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances. |
 
 ---
@@ -127,6 +133,79 @@ type CaptureOptions = {
 	pixelDensity: number?,
 	orientation: string?,
 	deviceForm: string?,
+}
+```
+
+---
+
+### EditableScene
+
+Caller-owned unparented roots and live editable resources. Destroy roots,
+
+meshes, and images when finished. Destroying a root does not destroy the
+
+editable resources it references; meshes/images can be shared by parts.
+
+```luau
+type EditableScene = {
+    roots: { Instance },
+    meshes: { EditableMesh },
+    images: { EditableImage },
+    sourceMap: SceneSourceMap,
+    warnings: { string },
+}
+```
+
+---
+
+### SceneJoint
+
+An original glTF joint can bind multiple mesh instances.
+
+```luau
+type SceneJoint = {
+    mesh: EditableMesh,
+    boneId: number,
+    bone: Bone,
+    part: MeshPart,
+}
+```
+
+---
+
+### ScenePrimitive
+
+One imported primitive and its original glTF indices (zero-based).
+
+```luau
+type ScenePrimitive = {
+    nodeIndex: number,
+    meshIndex: number,
+    primitiveIndex: number,
+    skinIndex: number?,
+    materialIndex: number?,
+    mesh: EditableMesh,
+    part: MeshPart,
+}
+```
+
+---
+
+### SceneSourceMap
+
+Source indices are zero-based glTF indices, not Luau array positions.
+
+Images/materials/joints can map to several objects after channel splitting
+
+or mesh instancing. `primitives` is an ordinary one-based binding array.
+
+```luau
+type SceneSourceMap = {
+    nodes: { [number]: Instance },
+    primitives: { ScenePrimitive },
+    materials: { [number]: { SurfaceAppearance } },
+    images: { [number]: { EditableImage } },
+    joints: { [number]: { SceneJoint } },
 }
 ```
 
@@ -286,6 +365,34 @@ dropped, empty for glTF.
 
 ---
 
+### roblox.exportEditableScene
+
+Exports supported instance roots to self-contained glTF/GLB, including
+
+live editable or readable asset-backed meshes and images. Works with
+
+procedurally created roots; no import result or source map is required.
+
+Models/Folders, MeshParts, block Parts, Attachments and skins are supported.
+
+Other instance behavior is reported in warnings; unsupported part geometry
+
+and unreadable assets error. Native materials and absent roughness maps
+
+use approximate glTF PBR values with warnings. Mesh centering, size, hierarchy and current
+
+Bone poses are preserved. Publishing and RBXM serialization are separate.
+
+Returns warnings for unsupported features. The destination is replaced
+
+only after successful scene encoding; caller-owned objects are untouched.
+
+```luau
+(path: string, roots: { Instance }) -> { string }
+```
+
+---
+
 ### roblox.exportInstances
 
 Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`.
@@ -368,6 +475,38 @@ and the file needs splitting into smaller primitives.
 
 ```luau
 (path: string) -> EditableMesh
+```
+
+---
+
+### roblox.importEditableScene
+
+Imports the default (or first) glTF/GLB scene as Models and anchored
+
+MeshParts, preserving hierarchy, node poses, separate primitives, shared
+
+meshes, UVs/colors/normals, PBR base color/normal/metallic/roughness maps,
+
+and supported skins with Bone instances and their initial poses.
+
+PNG/JPEG textures can be embedded or external. Resources remain live and
+
+editable. Source indices map to objects without depending on their names.
+
+Coordinates follow the mesh APIs: Y-up, one file unit per stud.
+
+Sheared world transforms and scaled skins error; reflected static meshes
+
+are supported. Animation clips, morph targets, cameras, material extensions,
+
+emissive/occlusion maps, and sampler differences are reported in warnings.
+
+Required extensions and unreadable geometry/images error. On failure all
+
+partially created objects are destroyed. No assets are uploaded.
+
+```luau
+(path: string) -> EditableScene
 ```
 
 ---

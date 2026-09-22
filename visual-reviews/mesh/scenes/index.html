@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rodeo editable scene round-trip review</title>
+<style>
+:root{color-scheme:dark;font:16px/1.55 system-ui;background:#10151d;color:#e3eaf4}body{max-width:1500px;margin:auto;padding:38px 24px}h1{font-size:32px;line-height:1.2}p{max-width:1000px}a{color:#8dc4ff}code{color:#b8ddff}.views{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:28px 0}figure{margin:0;background:#1c2430;border-radius:10px;overflow:hidden}figure img{width:100%;display:block}figcaption{padding:12px 16px}small{color:#a4b4c7}.status{border-left:4px solid #57c7a0;padding:12px 18px;background:#192922}.note{background:#242530;padding:18px;border-radius:8px}.overlay{position:relative;max-width:1000px;margin:20px 0}.overlay img{width:100%;display:block}.overlay .after{position:absolute;inset:0;clip-path:inset(0 50% 0 0)}input{width:min(100%,1000px)}@media(max-width:800px){.views{grid-template-columns:1fr}}
+</style>
+<h1>Editable scenes: export → import</h1>
+<p>Three panels share one live EditableMesh and a tinted checkerboard EditableImage. A nested scene includes rotated panels, nonuniform size, off-center mesh coordinates, explicit PBR maps, and a block Part. The scene is exported to GLB and reimported using Rodeo's new scene APIs.</p>
+<p class="status">Validation: hierarchy, primitive bindings, mesh/image sharing, live edits, skin poses, source joint mappings, independent cloned rigs, procedural roots, and payloads over 4 MiB are covered by automated tests. Rendered PBR panels match the baseline pixel for pixel in the panel region.</p>
+<div class="views">
+<figure><a href="baseline.png"><img src="baseline.png" alt="Authored scene baseline with three colored checkerboard panels above a plinth"></a><figcaption>Baseline — authored instances before export<br><small>1200 × 700 · full-resolution source linked</small></figcaption></figure>
+<figure><a href="current.png"><img src="current.png" alt="Scene after GLB export and editable scene import"></a><figcaption>Current — after GLB round trip<br><small>Same camera, lighting, resolution, and scene placement</small></figcaption></figure>
+</div>
+<p class="note"><strong>Known material approximation:</strong> the native SmoothPlastic plinth is converted to glTF PBR and returns with slightly different shading. Export reports this explicitly. Geometry and face normals are preserved. Native Roblox materials are not a lossless glTF representation.</p>
+<label for="wipe">Overlay comparison: move the divider</label><br>
+<input id="wipe" type="range" min="0" max="100" value="50">
+<div class="overlay"><img src="baseline.png" alt="Baseline comparison"><img class="after" id="after" src="current.png" alt="Current comparison overlay"></div>
+<p><strong>Iteration notes:</strong> visual inspection exposed missing explicit face normals in generated block meshes; these are now emitted and verified by a regression assertion. The textured panels use explicit roughness and metalness maps to isolate scene transport from native material defaults. Panel region (480,130)–(965,310): mean absolute RGB difference 0. Full frame: 0.590 / 0.522 / 0.399 on the 0–255 channel scale.</p>
+<p><a href="capture.luau">Reproduce these captures</a> · <code>rodeo run visual-reviews/mesh/scenes/capture.luau</code></p>
+<script>document.getElementById('wipe').addEventListener('input',e=>document.getElementById('after').style.clipPath=`inset(0 ${100-e.target.value}% 0 0)`);</script>
+</html>

@@ -1,0 +1,170 @@
+{
+  "asset": {
+    "version": "2.0"
+  },
+  "scene": 0,
+  "materials": [
+    {
+      "name": "Paint",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.8,
+          0.4,
+          0.2,
+          1
+        ],
+        "metallicFactor": 0.3,
+        "roughnessFactor": 0.7,
+        "baseColorTexture": {
+          "index": 0
+        }
+      },
+      "doubleSided": true
+    },
+    {
+      "name": "Plain",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.2,
+          0.7,
+          0.9,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "doubleSided": true
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "material": 0,
+          "mode": 4
+        },
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1
+          },
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Assembly",
+      "translation": [
+        10,
+        3,
+        -2
+      ],
+      "children": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "First",
+      "mesh": 0
+    },
+    {
+      "name": "Group",
+      "translation": [
+        0,
+        5,
+        0
+      ],
+      "children": [
+        3
+      ]
+    },
+    {
+      "name": "Second",
+      "mesh": 0,
+      "scale": [
+        2,
+        1,
+        1
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "images": [
+    {
+      "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR4nGP4z8DwHwyBNBgAAEnICff5q7YNAAAAAElFTkSuQmCC"
+    }
+  ],
+  "textures": [
+    {
+      "source": 0
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 36
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 36,
+      "byteLength": 36
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 72,
+      "byteLength": 24
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3",
+      "min": [
+        2,
+        0,
+        0
+      ],
+      "max": [
+        4,
+        2,
+        0
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC2"
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 96,
+      "uri": "data:application/octet-stream;base64,AAAAQAAAAAAAAAAAAACAQAAAAAAAAAAAAAAAQAAAAEAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/"
+    }
+  ]
+}

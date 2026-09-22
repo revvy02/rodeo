@@ -1,0 +1,183 @@
+{
+  "asset": {
+    "version": "2.0"
+  },
+  "scene": 0,
+  "materials": [
+    {
+      "name": "Paint",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.8,
+          0.4,
+          0.2,
+          1
+        ],
+        "metallicFactor": 0.3,
+        "roughnessFactor": 0.7
+      },
+      "doubleSided": true
+    },
+    {
+      "name": "Plain",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.2,
+          0.7,
+          0.9,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "doubleSided": true
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "JOINTS_0": 3,
+            "WEIGHTS_0": 4
+          },
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Rig",
+      "children": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "same\ud83d\udc0e",
+      "children": [
+        2
+      ]
+    },
+    {
+      "name": "same\ud83d\udc0e",
+      "translation": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "name": "Body",
+      "mesh": 0,
+      "skin": 0
+    }
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "skins": [
+    {
+      "joints": [
+        1,
+        2
+      ],
+      "inverseBindMatrices": 5
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 36
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 36,
+      "byteLength": 36
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 72,
+      "byteLength": 24
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 96,
+      "byteLength": 24
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 120,
+      "byteLength": 48
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 168,
+      "byteLength": 128
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3",
+      "min": [
+        2,
+        0,
+        0
+      ],
+      "max": [
+        4,
+        2,
+        0
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 3,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 2,
+      "type": "MAT4"
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 296,
+      "uri": "data:application/octet-stream;base64,AAAAQAAAAAAAAAAAAACAQAAAAAAAAAAAAAAAQAAAAEAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAABAAAAAAAAAAEAAAAAAAAAAQAAAAAAAACAPgAAQD8AAAAAAAAAAAAAgD4AAEA/AAAAAAAAAAAAAIA+AABAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAgD8="
+    }
+  ]
+}

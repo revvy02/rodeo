@@ -329,6 +329,8 @@ roblox.exportEditableImage(path, image)   -- write an EditableImage as .png
 roblox.importEditableImage(path) -> EditableImage  -- load a .png/.jpg as an EditableImage
 roblox.exportEditableMesh(path, mesh) -> { string }  -- write an EditableMesh as .glb/.gltf/.obj; returns what the format dropped
 roblox.importEditableMesh(path) -> EditableMesh    -- load a .glb/.gltf/.obj as an EditableMesh
+roblox.importEditableScene(path) -> EditableScene -- .glb/.gltf hierarchy + live meshes/images + sourceMap + warnings
+roblox.exportEditableScene(path, roots) -> { string } -- supported instance roots to self-contained .glb/.gltf
 ```
 
 `bake` emits `return <value>` and writes Roblox types as constructors
@@ -360,6 +362,35 @@ returns the list of what the format dropped (empty for glTF). Make a part with
 `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
 OBJ numeric components must be finite; invalid values and polygons that cannot
 be triangulated report the source line.
+
+`importEditableScene` preserves the default glTF scene's hierarchy, separate
+material primitives, compatible shared meshes, PBR textures and supported skins.
+Returns `{ roots, meshes, images, sourceMap, warnings }`. Roots are unparented;
+all returned objects belong to the caller. Destroying roots does not destroy the
+editable resources. `sourceMap.nodes`, `.images`, `.materials` and `.joints`
+use original **zero-based glTF indices**; `.primitives` is a one-based binding
+array with `nodeIndex`, `meshIndex`, `primitiveIndex`, `skinIndex`, `materialIndex`,
+`mesh` and `part`. Joint bindings expose the numeric EditableMesh `boneId` and
+renderable `Bone`, so names need not be unique in the source.
+
+`exportEditableScene(path, roots)` accepts imported or procedural instance trees:
+Models/Folders, MeshParts, block Parts, Attachments, and supported Bone rigs.
+Exports current poses, sizes, meshes and readable textures, embedding resources
+in both file formats. Shear, scaled skins, unreadable resources and unsupported
+part shapes error. Animation clips, morph targets, cameras, material extensions,
+occlusion/emissive channels and sampler differences are unsupported and reported;
+required glTF extensions error. Native Roblox materials and absent roughness maps
+use approximate glTF PBR values, with warnings. No publishing is performed.
+
+```luau
+local scene = roblox.importEditableScene("vehicle.glb")
+for _, root in scene.roots do root.Parent = workspace end
+-- Edit scene.meshes, scene.images, or the instance hierarchy.
+local warnings = roblox.exportEditableScene("edited.glb", scene.roots)
+for _, root in scene.roots do root:Destroy() end
+for _, mesh in scene.meshes do mesh:Destroy() end
+for _, image in scene.images do image:Destroy() end
+```
 
 `captureViewport` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to
