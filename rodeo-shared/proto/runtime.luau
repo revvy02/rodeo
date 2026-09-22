@@ -33,6 +33,7 @@ type _Messages = {
 	RobloxImageDecodeRequest: _RobloxImageDecodeRequestMessage,
 	RobloxImageDecodeResponse: _RobloxImageDecodeResponseMessage,
 	RobloxMeshEncodeRequest: _RobloxMeshEncodeRequestMessage,
+	RobloxMeshEncodeResponse: _RobloxMeshEncodeResponseMessage,
 	RobloxMeshDecodeRequest: _RobloxMeshDecodeRequestMessage,
 	RobloxMeshDecodeResponse: _RobloxMeshDecodeResponseMessage,
 	FsExistsRequest: _FsExistsRequestMessage,
@@ -738,6 +739,30 @@ export type RobloxMeshEncodeRequest = typeof(setmetatable(
 	{} :: _RobloxMeshEncodeRequestImpl
 ))
 type _RobloxMeshEncodeRequestMessage = proto.Message<RobloxMeshEncodeRequest, _RobloxMeshEncodeRequestPartialFields>
+
+type _RobloxMeshEncodeResponseImpl = {
+	__index: _RobloxMeshEncodeResponseImpl,
+	new: (fields: _RobloxMeshEncodeResponsePartialFields?) -> RobloxMeshEncodeResponse,
+	encode: (self: RobloxMeshEncodeResponse) -> buffer,
+	decode: (input: buffer) -> RobloxMeshEncodeResponse,
+	jsonEncode: (self: RobloxMeshEncodeResponse) -> { [string]: any },
+	jsonDecode: (input: { [string]: any }) -> RobloxMeshEncodeResponse,
+	descriptor: proto.Descriptor,
+}
+
+type _RobloxMeshEncodeResponseFields = {
+	dropped: { string },
+}
+
+export type _RobloxMeshEncodeResponsePartialFields = {
+	dropped: { string }?,
+}
+
+export type RobloxMeshEncodeResponse = typeof(setmetatable(
+	{} :: _RobloxMeshEncodeResponseFields,
+	{} :: _RobloxMeshEncodeResponseImpl
+))
+type _RobloxMeshEncodeResponseMessage = proto.Message<RobloxMeshEncodeResponse, _RobloxMeshEncodeResponsePartialFields>
 
 type _RobloxMeshDecodeRequestImpl = {
 	__index: _RobloxMeshDecodeRequestImpl,
@@ -1576,7 +1601,7 @@ type _ClientRpcResponseFields = {
 		| { type: "robloxSimulatorRestore", value: Ok }
 		| { type: "robloxImageEncode", value: Ok }
 		| { type: "robloxImageDecode", value: RobloxImageDecodeResponse }
-		| { type: "robloxMeshEncode", value: Ok }
+		| { type: "robloxMeshEncode", value: RobloxMeshEncodeResponse }
 		| { type: "robloxMeshDecode", value: RobloxMeshDecodeResponse }
 		| { type: "robloxCaptureBegin", value: RobloxCaptureBeginResponse }
 		| { type: "robloxCaptureCollect", value: RobloxCaptureCollectResponse }
@@ -1620,7 +1645,7 @@ export type _ClientRpcResponsePartialFields = {
 		| { type: "robloxSimulatorRestore", value: Ok | _OkPartialFields }
 		| { type: "robloxImageEncode", value: Ok | _OkPartialFields }
 		| { type: "robloxImageDecode", value: RobloxImageDecodeResponse | _RobloxImageDecodeResponsePartialFields }
-		| { type: "robloxMeshEncode", value: Ok | _OkPartialFields }
+		| { type: "robloxMeshEncode", value: RobloxMeshEncodeResponse | _RobloxMeshEncodeResponsePartialFields }
 		| { type: "robloxMeshDecode", value: RobloxMeshDecodeResponse | _RobloxMeshDecodeResponsePartialFields }
 		| { type: "robloxCaptureBegin", value: RobloxCaptureBeginResponse | _RobloxCaptureBeginResponsePartialFields }
 		| {
@@ -4622,6 +4647,114 @@ do
 	messages.RobloxMeshEncodeRequest = _RobloxMeshEncodeRequestImpl :: any -- Luau: Not sure why this intersection fails.
 
 	typeRegistry.default:register(messages.RobloxMeshEncodeRequest)
+end
+
+do
+	local _RobloxMeshEncodeResponseImpl = {}
+	_RobloxMeshEncodeResponseImpl.__index = _RobloxMeshEncodeResponseImpl
+
+	function _RobloxMeshEncodeResponseImpl.new(data: _RobloxMeshEncodeResponsePartialFields?): RobloxMeshEncodeResponse
+		return setmetatable({
+			dropped = if data == nil or data.dropped == nil then {} else data.dropped,
+		}, _RobloxMeshEncodeResponseImpl :: _RobloxMeshEncodeResponseImpl)
+	end
+
+	function _RobloxMeshEncodeResponseImpl.encode(self: RobloxMeshEncodeResponse): buffer
+		local output = buffer.create(0)
+		local cursor = 0
+
+		if self.dropped ~= nil and #self.dropped > 0 then
+			for _, value in self.dropped do
+				output, cursor = proto.writeTag(output, cursor, 1, proto.wireTypes.lengthDelimited)
+				output, cursor = proto.writeString(output, cursor, value)
+			end
+		end
+
+		local shrunkBuffer = buffer.create(cursor)
+		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
+		return shrunkBuffer
+	end
+
+	function _RobloxMeshEncodeResponseImpl.decode(input: buffer): RobloxMeshEncodeResponse
+		local self = _RobloxMeshEncodeResponseImpl.new()
+		local cursor = 0
+
+		while cursor < buffer.len(input) do
+			local field, wireType
+			field, wireType, cursor = proto.readTag(input, cursor)
+
+			if wireType == proto.wireTypes.varint then
+				-- No fields
+
+				local _
+				_, cursor = proto.readVarInt(input, cursor)
+			elseif wireType == proto.wireTypes.lengthDelimited then
+				if field == 1 then
+					local value
+					value, cursor = proto.readBuffer(input, cursor)
+					table.insert(self.dropped, proto.decodeString(value))
+					continue
+				end
+
+				local length
+				length, cursor = proto.readVarInt(input, cursor)
+
+				cursor += length
+			elseif wireType == proto.wireTypes.i32 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed32(input, cursor)
+			elseif wireType == proto.wireTypes.i64 then
+				-- No fields
+
+				local _
+				_, cursor = proto.readFixed64(input, cursor)
+			else
+				error("Unsupported wire type: " .. wireType)
+			end
+		end
+
+		return self
+	end
+
+	function _RobloxMeshEncodeResponseImpl.jsonEncode(self: RobloxMeshEncodeResponse): any
+		local output = {}
+
+		if self.dropped ~= nil and #self.dropped > 0 then
+			local newOutput = {}
+			for _, value in self.dropped do
+				table.insert(newOutput, value)
+			end
+			output.dropped = newOutput
+		end
+
+		return output
+	end
+
+	function _RobloxMeshEncodeResponseImpl.jsonDecode(input: { [string]: any }): RobloxMeshEncodeResponse
+		local self = _RobloxMeshEncodeResponseImpl.new()
+
+		if input.dropped ~= nil then
+			local newOutput: { string } = {}
+			for _, value in input.dropped do
+				table.insert(newOutput, value)
+			end
+
+			self.dropped = newOutput
+		end
+
+		return self
+	end
+
+	_RobloxMeshEncodeResponseImpl.descriptor = {
+		name = "RobloxMeshEncodeResponse",
+		fullName = "rodeo.runtime.RobloxMeshEncodeResponse",
+	}
+
+	messages.RobloxMeshEncodeResponse = _RobloxMeshEncodeResponseImpl :: any -- Luau: Not sure why this intersection fails.
+
+	typeRegistry.default:register(messages.RobloxMeshEncodeResponse)
 end
 
 do
@@ -9172,7 +9305,10 @@ do
 					and (v :: any).value ~= nil
 					and getmetatable((v :: any).value) == nil
 				then
-					return { type = (v :: any).type, value = messages.Ok.new((v :: any).value) } :: any
+					return {
+							type = (v :: any).type,
+							value = messages.RobloxMeshEncodeResponse.new((v :: any).value),
+						} :: any
 				elseif
 					(v :: any).type == "robloxMeshDecode"
 					and (v :: any).value ~= nil
@@ -9542,7 +9678,7 @@ do
 				elseif field == 56 then
 					local value
 					value, cursor = proto.readBuffer(input, cursor)
-					self.res = { type = "robloxMeshEncode", value = messages.Ok.decode(value) }
+					self.res = { type = "robloxMeshEncode", value = messages.RobloxMeshEncodeResponse.decode(value) }
 					continue
 				elseif field == 57 then
 					local value
@@ -9816,7 +9952,10 @@ do
 		end
 
 		if input.robloxMeshEncode ~= nil then
-			self.res = { type = "robloxMeshEncode", value = messages.Ok.jsonDecode(input.robloxMeshEncode) }
+			self.res = {
+				type = "robloxMeshEncode",
+				value = messages.RobloxMeshEncodeResponse.jsonDecode(input.robloxMeshEncode),
+			}
 		end
 
 		if input.robloxMeshDecode ~= nil then
@@ -9880,6 +10019,7 @@ return {
 	RobloxImageDecodeRequest = messages.RobloxImageDecodeRequest,
 	RobloxImageDecodeResponse = messages.RobloxImageDecodeResponse,
 	RobloxMeshEncodeRequest = messages.RobloxMeshEncodeRequest,
+	RobloxMeshEncodeResponse = messages.RobloxMeshEncodeResponse,
 	RobloxMeshDecodeRequest = messages.RobloxMeshDecodeRequest,
 	RobloxMeshDecodeResponse = messages.RobloxMeshDecodeResponse,
 	FsExistsRequest = messages.FsExistsRequest,

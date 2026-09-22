@@ -70,15 +70,38 @@ pub struct MeshData {
 
 /// `roblox.exportEditableMesh`: consume the FileWriter the plugin streamed the
 /// blob into, write its path as glTF.
-pub async fn roblox_mesh_encode(state: SharedRpcState, req: &rt::RobloxMeshEncodeRequest) -> Result<rt::Ok, String> {
+pub async fn roblox_mesh_encode(
+    state: SharedRpcState,
+    req: &rt::RobloxMeshEncodeRequest,
+) -> Result<rt::RobloxMeshEncodeResponse, String> {
     let (path, blob) = stream::take_file_writer(&state, &req.handle).await?;
     tokio::task::spawn_blocking(move || {
         let mesh = decode_blob(&blob).map_err(|e| format!("exportEditableMesh: {e}"))?;
-        write_gltf(&mesh, &path).map_err(|e| format!("exportEditableMesh: {e}"))?;
-        Ok(rt::Ok::default())
+        let dropped = write_mesh(&mesh, &path).map_err(|e| format!("exportEditableMesh: {e}"))?;
+        Ok(rt::RobloxMeshEncodeResponse { dropped, ..Default::default() })
     })
     .await
     .map_err(|e| format!("mesh encode task failed: {e}"))?
+}
+
+/// Write `mesh` in the format the extension names: glTF (`.glb`, `.gltf`) or
+/// Wavefront OBJ (`.obj`). Returns the features the format could not carry.
+pub fn write_mesh(mesh: &MeshData, path: &str) -> Result<Vec<String>, String> {
+    let lower = path.to_lowercase();
+    if lower.ends_with(".obj") {
+        write_obj(mesh, path)
+    } else if lower.ends_with(".glb") || lower.ends_with(".gltf") {
+        write_gltf(mesh, path)?;
+        Ok(Vec::new())
+    } else {
+        Err(format!("only .glb, .gltf or .obj output is supported (got '{path}')"))
+    }
+}
+
+/// Read the format the extension names: `.obj` as Wavefront OBJ, anything
+/// else as glTF (`.glb` or `.gltf`).
+pub fn read_mesh(path: &str) -> Result<MeshData, String> {
+    if path.to_lowercase().ends_with(".obj") { read_obj(path) } else { read_gltf(path) }
 }
 
 /// `roblox.importEditableMesh`: read the glTF, register the blob under the
@@ -88,7 +111,7 @@ pub async fn roblox_mesh_decode(
     req: &rt::RobloxMeshDecodeRequest,
 ) -> Result<rt::RobloxMeshDecodeResponse, String> {
     let path = req.path.clone();
-    let mesh = tokio::task::spawn_blocking(move || read_gltf(&path))
+    let mesh = tokio::task::spawn_blocking(move || read_mesh(&path))
         .await
         .map_err(|e| format!("mesh decode task failed: {e}"))?
         .map_err(|e| format!("importEditableMesh: {e}"))?;
@@ -751,6 +774,226 @@ pub fn write_gltf(mesh: &MeshData, path: &str) -> Result<(), String> {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Wavefront OBJ. Same per-vertex `MeshData` as glTF, so the plugin side and the
+// interchange blob are untouched; only the file codec differs.
+//
+// OBJ carries no units or handedness. Blender and the common exporters write
+// Y-up, right-handed, CCW files, which is Roblox's frame, so positions and
+// winding pass through unchanged and one unit is one stud. The one conversion
+// is UV V: OBJ's `vt` origin is bottom-left, Roblox's (and glTF's) top-left,
+// so V is flipped both ways. Faces index positions, UVs and normals
+// independently, which is EditableMesh's per-corner model: the reader splits
+// corners into unique (v, vt, vn) tuples, so UV seams and hard edges survive,
+// and the writer emits one tuple per vertex since the plugin already split
+// corners on export. Polygons are fan-triangulated. `o`/`g` groups merge into
+// the one mesh; `mtllib`, `usemtl`, `s`, lines and points are ignored. OBJ has
+// no vertex colors or skinning: export drops them and says so.
+// ---------------------------------------------------------------------------
+
+pub fn read_obj(path: &str) -> Result<MeshData, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    parse_obj(&text).map_err(|e| format!("{path}: {e}"))
+}
+
+/// A face corner as 0-based indices into the file's v / vt / vn lists.
+type Corner = (u32, Option<u32>, Option<u32>);
+
+fn parse_obj(text: &str) -> Result<MeshData, String> {
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut uvs: Vec<[f32; 2]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut corners: Vec<Corner> = Vec::new();
+    for (i, raw) in text.lines().enumerate() {
+        let line_no = i + 1;
+        let line = raw.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.split_whitespace();
+        let key = parts.next().unwrap_or("");
+        let rest: Vec<&str> = parts.collect();
+        match key {
+            "v" => positions.push(parse_floats::<3>(&rest, "v", line_no)?),
+            "vt" => {
+                // `vt u [v [w]]`: v defaults to 0; extra components are ignored.
+                let uv = parse_floats::<1>(&rest, "vt", line_no)?;
+                let v = rest.get(1).map(|s| parse_float(s, "vt", line_no)).transpose()?.unwrap_or(0.0);
+                uvs.push([uv[0], 1.0 - v]);
+            }
+            "vn" => normals.push(parse_floats::<3>(&rest, "vn", line_no)?),
+            "f" => {
+                if rest.len() < 3 {
+                    return Err(format!("line {line_no}: face with {} corner(s); a face needs at least 3", rest.len()));
+                }
+                let mut polygon = Vec::with_capacity(rest.len());
+                for token in &rest {
+                    polygon.push(parse_corner(token, positions.len(), uvs.len(), normals.len(), line_no)?);
+                }
+                for k in 1..polygon.len() - 1 {
+                    corners.push(polygon[0]);
+                    corners.push(polygon[k]);
+                    corners.push(polygon[k + 1]);
+                }
+            }
+            // Groups merge into the one mesh; materials, smoothing groups,
+            // lines, points and anything unknown are ignored.
+            _ => {}
+        }
+    }
+    if corners.is_empty() {
+        return Err("no faces found".to_string());
+    }
+    // An attribute is kept only when every corner carries it, as the glTF
+    // importer does across primitives; a partial set would leave holes.
+    let all_uvs = corners.iter().all(|c| c.1.is_some());
+    let all_normals = corners.iter().all(|c| c.2.is_some());
+    let mut mesh = MeshData {
+        normals: if all_normals { Some(Vec::new()) } else { None },
+        uvs: if all_uvs { Some(Vec::new()) } else { None },
+        indices: Vec::with_capacity(corners.len()),
+        ..Default::default()
+    };
+    let mut seen: std::collections::HashMap<Corner, u32> = std::collections::HashMap::new();
+    for corner in corners {
+        let key: Corner = (corner.0, if all_uvs { corner.1 } else { None }, if all_normals { corner.2 } else { None });
+        let index = match seen.get(&key) {
+            Some(&index) => index,
+            None => {
+                mesh.positions.push(positions[key.0 as usize]);
+                if let (Some(out), Some(vt)) = (mesh.uvs.as_mut(), key.1) {
+                    out.push(uvs[vt as usize]);
+                }
+                if let (Some(out), Some(vn)) = (mesh.normals.as_mut(), key.2) {
+                    out.push(normals[vn as usize]);
+                }
+                let index = (mesh.positions.len() - 1) as u32;
+                seen.insert(key, index);
+                index
+            }
+        };
+        mesh.indices.push(index);
+    }
+    Ok(mesh)
+}
+
+fn parse_float(s: &str, key: &str, line_no: usize) -> Result<f32, String> {
+    s.parse::<f32>().map_err(|_| format!("line {line_no}: '{key}' component '{s}' is not a number"))
+}
+
+/// The first N components of a `v`/`vt`/`vn` line; extra ones (a `w`, or the
+/// nonstandard vertex colors some exporters append) are ignored.
+fn parse_floats<const N: usize>(rest: &[&str], key: &str, line_no: usize) -> Result<[f32; N], String> {
+    if rest.len() < N {
+        return Err(format!("line {line_no}: '{key}' has {} component(s); {N} are needed", rest.len()));
+    }
+    let mut out = [0.0f32; N];
+    for (slot, s) in out.iter_mut().zip(rest) {
+        *slot = parse_float(s, key, line_no)?;
+    }
+    Ok(out)
+}
+
+/// Resolve one OBJ index: 1-based, or negative counting back from the items
+/// defined so far. `count` is that number of items.
+fn resolve_index(s: &str, count: usize, what: &str, line_no: usize) -> Result<u32, String> {
+    let n: i64 = s.parse().map_err(|_| format!("line {line_no}: face corner '{s}' is not a {what} index"))?;
+    let index = if n > 0 {
+        n - 1
+    } else if n < 0 {
+        count as i64 + n
+    } else {
+        return Err(format!("line {line_no}: {what} index 0 is not valid (OBJ indices start at 1)"));
+    };
+    if index < 0 || index >= count as i64 {
+        return Err(format!("line {line_no}: {what} index {n} is out of range ({count} defined so far)"));
+    }
+    Ok(index as u32)
+}
+
+/// One face corner: `v`, `v/vt`, `v//vn` or `v/vt/vn`.
+fn parse_corner(token: &str, nv: usize, nvt: usize, nvn: usize, line_no: usize) -> Result<Corner, String> {
+    let fields: Vec<&str> = token.split('/').collect();
+    if fields.len() > 3 || fields[0].is_empty() {
+        return Err(format!("line {line_no}: face corner '{token}' is not v, v/vt, v//vn or v/vt/vn"));
+    }
+    let v = resolve_index(fields[0], nv, "vertex", line_no)?;
+    let vt = match fields.get(1) {
+        Some(s) if !s.is_empty() => Some(resolve_index(s, nvt, "texture coordinate", line_no)?),
+        _ => None,
+    };
+    let vn = match fields.get(2) {
+        Some(s) if !s.is_empty() => Some(resolve_index(s, nvn, "normal", line_no)?),
+        _ => None,
+    };
+    Ok((v, vt, vn))
+}
+
+/// Write `mesh` as OBJ. Returns the features OBJ cannot carry that the mesh
+/// had, so the caller can be told: vertex colors, and skinning.
+pub fn write_obj(mesh: &MeshData, path: &str) -> Result<Vec<String>, String> {
+    use std::fmt::Write as _;
+    if mesh.indices.len() % 3 != 0 {
+        return Err(format!("{} indices is not a whole number of triangles", mesh.indices.len()));
+    }
+    let mut dropped = Vec::new();
+    if mesh.colors.is_some() {
+        dropped.push("vertex colors".to_string());
+    }
+    if !mesh.bones.is_empty() || mesh.joints.is_some() {
+        dropped.push("skinning (bones and vertex weights)".to_string());
+    }
+    let mut out = String::new();
+    out.push_str("# rodeo roblox.exportEditableMesh: studs, Y-up, right-handed, CCW; vt V flipped from Roblox's top-left origin\n");
+    out.push_str("o mesh\n");
+    for p in &mesh.positions {
+        let _ = writeln!(out, "v {} {} {}", p[0], p[1], p[2]);
+    }
+    if let Some(uvs) = &mesh.uvs {
+        for uv in uvs {
+            let _ = writeln!(out, "vt {} {}", uv[0], 1.0 - uv[1]);
+        }
+    }
+    if let Some(normals) = &mesh.normals {
+        for n in normals {
+            let _ = writeln!(out, "vn {} {} {}", n[0], n[1], n[2]);
+        }
+    }
+    let (has_uv, has_n) = (mesh.uvs.is_some(), mesh.normals.is_some());
+    for tri in mesh.indices.chunks_exact(3) {
+        out.push('f');
+        for &i in tri {
+            let k = i + 1;
+            match (has_uv, has_n) {
+                (true, true) => { let _ = write!(out, " {k}/{k}/{k}"); }
+                (true, false) => { let _ = write!(out, " {k}/{k}"); }
+                (false, true) => { let _ = write!(out, " {k}//{k}"); }
+                (false, false) => { let _ = write!(out, " {k}"); }
+            }
+        }
+        out.push('\n');
+    }
+    write_atomic(path, out.as_bytes())?;
+    Ok(dropped)
+}
+
+/// `.tmp` + rename, creating parent directories, so a failed export leaves no
+/// partial file.
+fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("create parent dirs for {}: {e}", parent.display()))?;
+        }
+    }
+    let tmp = format!("{path}.tmp");
+    std::fs::write(&tmp, bytes).map_err(|e| format!("write {tmp}: {e}"))?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("rename {tmp} -> {path}: {e}")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -883,8 +1126,8 @@ mod tests {
 
     #[test]
     fn unsupported_extension_and_missing_file_error_clearly() {
-        let err = write_gltf(&sample(false), "/tmp/rodeo-mesh.obj").expect_err("obj");
-        assert!(err.contains(".glb") && err.contains(".gltf"), "{err}");
+        let err = write_mesh(&sample(false), "/tmp/rodeo-mesh.stl").expect_err("stl");
+        assert!(err.contains(".glb") && err.contains(".gltf") && err.contains(".obj"), "{err}");
         let err = read_gltf("/definitely/not/here.glb").expect_err("missing");
         assert!(err.contains("not/here.glb"), "{err}");
     }
@@ -898,5 +1141,66 @@ mod tests {
         let inv = mat_inverse(&m).unwrap();
         let id = mat_mul(&m, &inv);
         for c in 0..4 { for r in 0..4 { assert!(close(id[c][r], IDENTITY[c][r]), "{id:?}"); } }
+    }
+
+    #[test]
+    fn obj_round_trip_keeps_geometry_uvs_normals_and_reports_drops() {
+        let dir = scratch("obj-roundtrip");
+        let path = dir.join("nested").join("quad.obj");
+        let dropped = write_obj(&sample(true), path.to_str().unwrap()).unwrap();
+        assert_eq!(dropped, vec!["vertex colors".to_string(), "skinning (bones and vertex weights)".to_string()]);
+        let back = read_obj(path.to_str().unwrap()).unwrap();
+        let src = sample(false);
+        assert_eq!(back.positions, src.positions);
+        assert_eq!(back.uvs, src.uvs, "V flips out and back in");
+        assert_eq!(back.normals, src.normals);
+        assert_eq!(back.indices, src.indices);
+        assert!(back.colors.is_none() && back.bones.is_empty());
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("vt 1 0\n"), "Roblox (1,1) is OBJ's (1,0): {text}");
+        let mut plain = sample(false);
+        plain.colors = None;
+        assert!(write_obj(&plain, path.to_str().unwrap()).unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn obj_face_forms_negative_indices_polygons_and_groups() {
+        let text = "mtllib scene.mtl\no first\nusemtl red\n\
+            v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\n\
+            vt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\n\
+            vn 0 0 1\n\
+            f 1/1/1 2/2/1 3/3/1 4/4/1  # a quad: two triangles\n\
+            g second\ns 1\n\
+            f -4/-4/-1 -3/-3/-1 -2/-2/-1\n";
+        let mesh = parse_obj(text).unwrap();
+        assert_eq!(mesh.indices.len(), 9, "quad fan-triangulated plus one triangle");
+        assert_eq!(mesh.positions.len(), 4, "corners with the same v/vt/vn share a vertex");
+        assert_eq!(mesh.uvs.as_ref().unwrap()[2], [1.0, 0.0], "vt 1 1 becomes Roblox (1,0)");
+        assert_eq!(mesh.normals.as_ref().unwrap().len(), 4);
+
+        // Mixed forms: an attribute missing on any corner is dropped everywhere.
+        let mixed = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvn 0 0 1\nf 1/1/1 2/1/1 3/1/1\nf 1 2 3\nf 1//1 2//1 3//1\n";
+        let mesh = parse_obj(mixed).unwrap();
+        assert!(mesh.uvs.is_none() && mesh.normals.is_none());
+        assert_eq!(mesh.indices.len(), 9);
+        assert_eq!(mesh.positions.len(), 3);
+    }
+
+    #[test]
+    fn obj_errors_name_the_line() {
+        let cases = [
+            ("v 0 0 0\nv 1 0 0\nf 1 2\n", "line 3", "corner(s)"),
+            ("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 9\n", "line 4", "out of range"),
+            ("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 x\n", "line 4", "not a vertex index"),
+            ("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 0 1 2\n", "line 4", "start at 1"),
+            ("v 0 0\n", "line 1", "component(s)"),
+            ("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1/1 2/1 3/1\n", "line 4", "texture coordinate index 1 is out of range"),
+            ("# nothing\n", "no faces", ""),
+        ];
+        for (text, a, b) in cases {
+            let err = parse_obj(text).expect_err(text);
+            assert!(err.contains(a) && err.contains(b), "{text:?} -> {err}");
+        }
     }
 }

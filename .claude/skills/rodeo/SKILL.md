@@ -327,8 +327,8 @@ roblox.bake(path, value)                 -- write a table/value as a Luau module
 roblox.captureViewport(output?, options?) -> (string, { width, height })  -- screenshot the viewport
 roblox.exportEditableImage(path, image)   -- write an EditableImage as .png
 roblox.importEditableImage(path) -> EditableImage  -- load a .png/.jpg as an EditableImage
-roblox.exportEditableMesh(path, mesh)     -- write an EditableMesh as .glb/.gltf
-roblox.importEditableMesh(path) -> EditableMesh    -- load a .glb/.gltf as an EditableMesh
+roblox.exportEditableMesh(path, mesh) -> { string }  -- write an EditableMesh as .glb/.gltf/.obj; returns what the format dropped
+roblox.importEditableMesh(path) -> EditableMesh    -- load a .glb/.gltf/.obj as an EditableMesh
 ```
 
 `bake` emits `return <value>` and writes Roblox types as constructors
@@ -346,12 +346,16 @@ import reads PNG and JPEG. Studio bounds EditableImage dimensions and the
 import errors with the size if it refuses one.
 
 `exportEditableMesh` and `importEditableMesh` do the same for `EditableMesh`
-with glTF 2.0 (`.glb` binary, or `.gltf` with an embedded buffer). Geometry,
+with glTF 2.0 (`.glb` binary, or `.gltf` with an embedded buffer) or Wavefront
+OBJ (`.obj`). Faces must be triangles (`mesh:Triangulate()`). glTF: geometry,
 per-corner normals/UVs/colors and skinning (bones with bind poses, up to four
-influences per vertex) round-trip; FACS poses do not. Faces must be triangles
-(`mesh:Triangulate()`). Import bakes node transforms into the geometry and
-merges all primitives into one mesh. glTF's conventions are Roblox's, so
-nothing is converted. Make a part with
+influences per vertex) round-trip; FACS poses do not. Import bakes node
+transforms into the geometry and merges all primitives into one mesh. glTF's
+conventions are Roblox's, so nothing is converted. OBJ: positions, per-corner
+UVs and normals; `vt` V is flipped (OBJ's UV origin is bottom-left), polygons
+are fan-triangulated, `o`/`g` groups merge into one mesh, materials are
+ignored. OBJ cannot carry vertex colors or skinning; `exportEditableMesh`
+returns the list of what the format dropped (empty for glTF). Make a part with
 `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
 
 `captureViewport` treats `output` as an exact file path when it ends in `.png`.

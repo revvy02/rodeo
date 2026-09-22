@@ -235,7 +235,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 	-- Writes an EditableMesh to `path` as glTF (.glb or .gltf). Geometry,
 	-- per-corner normals/UVs/colors, and skinning (bones with bind poses, up to
 	-- four influences per vertex) are written; FACS poses are not.
-	function roblox.exportEditableMesh(path: string, mesh: EditableMesh)
+	function roblox.exportEditableMesh(path: string, mesh: EditableMesh): { string }
 		local okClass, className = pcall(function()
 			return (mesh :: any).ClassName
 		end)
@@ -359,8 +359,11 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 		})
 		local h = fs.open(path, "w")
 		stream.writeBytes(h, blob)
-		-- Finalize in place of stream.close: consumes the handle, writes glTF.
-		rpc.call("roblox_mesh_encode", runtime.RobloxMeshEncodeRequest.new({ handle = h.__handle }))
+		-- Finalize in place of stream.close: consumes the handle, writes the
+		-- file in the format the extension names. Returns what that format
+		-- could not carry (empty for glTF; OBJ drops colors and skinning).
+		local res = rpc.call("roblox_mesh_encode", runtime.RobloxMeshEncodeRequest.new({ handle = h.__handle }))
+		return res.dropped or {}
 	end
 
 	-- Add `count` items one at a time and return their ids in order. The batch

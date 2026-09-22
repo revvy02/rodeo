@@ -113,20 +113,31 @@ function roblox.importEditableImage(path: string): EditableImage
 	return (singleton :: any).roblox.importEditableImage(path)
 end
 
---- Writes an `EditableMesh` to `path` as glTF 2.0: `.glb` (binary) or
---- `.gltf` (JSON with an embedded buffer). Positions, faces, per-corner
---- normals, UVs and colors, and skinning (bones with bind poses, up to four
---- influences per vertex) are written; FACS poses are not. Faces must be
---- triangles (`mesh:Triangulate()` first). glTF's conventions are Roblox's, so
---- nothing is converted: studs, Y-up, right-handed, UV origin top-left.
-function roblox.exportEditableMesh(path: string, mesh: EditableMesh)
-	(singleton :: any).roblox.exportEditableMesh(path, mesh)
+--- Writes an `EditableMesh` to `path` as glTF 2.0 (`.glb` binary, or `.gltf`
+--- with an embedded buffer) or Wavefront OBJ (`.obj`). Positions, per-corner
+--- normals, UVs and colors, triangles, and skinning (bones with bind poses and
+--- up to four influences per vertex) are written to glTF; FACS poses are not.
+--- Faces must be triangles (`mesh:Triangulate()` first). glTF's conventions
+--- are Roblox's, so nothing is converted: studs, Y-up, right-handed, UV origin
+--- top-left. OBJ has no units or handedness, so the same frame is written
+--- (Blender's default), with one conversion: `vt` V is flipped, since OBJ's UV
+--- origin is bottom-left. OBJ faces index positions, UVs and normals per
+--- corner, so seams and hard edges survive; no MTL is written. OBJ cannot
+--- carry vertex colors or skinning. Returns the list of features the format
+--- dropped, empty for glTF.
+function roblox.exportEditableMesh(path: string, mesh: EditableMesh): { string }
+	return (singleton :: any).roblox.exportEditableMesh(path, mesh)
 end
 
---- Loads the `.glb` or `.gltf` at `path` into a new `EditableMesh` and returns
---- it. Node transforms are baked into the geometry, all primitives merge into
---- one mesh, and a skin becomes bones plus vertex weights. An attribute
---- (normals, UVs, colors) is kept only when every primitive carries it.
+--- Loads the `.glb`, `.gltf` or `.obj` at `path` into a new `EditableMesh` and
+--- returns it. glTF: node transforms are baked into the geometry, all
+--- primitives merge into one mesh, and a skin becomes bones plus vertex
+--- weights. OBJ: positions, per-corner UVs (V flipped from OBJ's bottom-left
+--- origin) and normals; faces as `v`, `v/vt`, `v//vn` or `v/vt/vn` with
+--- negative indices allowed; polygons are fan-triangulated; `o`/`g` groups
+--- merge into the one mesh; materials are ignored. In both formats an
+--- attribute (normals, UVs, colors) is kept only when every primitive, or
+--- every OBJ corner, carries it.
 --- Relative paths resolve against the run client's cwd. Turn the result into a
 --- part with `AssetService:CreateMeshPartAsync(Content.fromObject(mesh), opts)`.
 --- The mesh is built with the per-element EditableMesh calls, so only the

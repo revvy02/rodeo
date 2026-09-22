@@ -181,6 +181,12 @@ message RobloxMeshEncodeRequest {
 // roblox.importEditableMesh: the host reads the glTF at `path`, bakes node
 // transforms, merges primitives, and registers `handle` as a reader over the
 // packed blob for the plugin to pull with chunked stream_read_bytes.
+// What the export format could not carry, for the caller to know: empty for
+// glTF; OBJ drops vertex colors and skinning.
+message RobloxMeshEncodeResponse {
+  repeated string dropped = 1;
+}
+
 message RobloxMeshDecodeRequest {
   string path = 1;
   string handle = 2;
@@ -443,7 +449,7 @@ message ClientRpcResponse {
     Ok                             roblox_simulator_restore = 52;
     Ok                             roblox_image_encode      = 54;
     RobloxImageDecodeResponse      roblox_image_decode      = 55;
-    Ok                             roblox_mesh_encode       = 56;
+    RobloxMeshEncodeResponse       roblox_mesh_encode       = 56;
     RobloxMeshDecodeResponse       roblox_mesh_decode       = 57;
     RobloxCaptureBeginResponse     roblox_capture_begin     = 58;
     RobloxCaptureCollectResponse   roblox_capture_collect   = 59;

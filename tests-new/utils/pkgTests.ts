@@ -1025,8 +1025,8 @@ export function meshes(run: RunFn): void {
     expect(result.output).toContain("rodeo-no-such-mesh-12345.glb");
   });
 
-  it("meshes: export to a non-glTF path errors", async () => {
-    const out = meshOut("obj", "obj");
+  it("meshes: export to an unsupported extension errors naming the supported ones", async () => {
+    const out = meshOut("stl", "stl");
     try {
       const result = await run({
         source: `local roblox = require("@rodeo/roblox")
@@ -1035,9 +1035,71 @@ export function meshes(run: RunFn): void {
       });
       expect(result.ok).toBe(false);
       expect(result.output).toContain(".glb");
+      expect(result.output).toContain(".obj");
       expect(existsSync(out)).toBe(false);
     } finally {
       rmrf(out);
+    }
+  });
+
+  it("meshes: OBJ export and import keep geometry, UV seams and hard normals, and report dropped colors", async () => {
+    const obj = meshOut("mesh", "obj");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: `local roblox = require("@rodeo/roblox")
+          ${TETRA_LUAU}
+          local dropped = roblox.exportEditableMesh("${obj}", mesh)
+          local back = roblox.importEditableMesh("${obj}")
+          -- The engine hands every face default color ids even when none were
+          -- set, so "colors dropped" means the source's four distinct face
+          -- colors collapse to one default, not that the ids are gone.
+          local function distinctColors(m)
+            local seen = {}
+            for _, f in m:GetFaces() do
+              for _, id in m:GetFaceColors(f) do
+                seen[tostring(m:GetColor(id)) .. "@" .. tostring(m:GetColorAlpha(id))] = true
+              end
+            end
+            local n = 0
+            for _ in seen do n += 1 end
+            return n
+          end
+          local srcColors, backColors = distinctColors(mesh), distinctColors(back)
+          local faces = back:GetFaces()
+          local corners, normalsOk, uvsOk = 0, true, true
+          for _, f in faces do
+            local vs = back:GetFaceVertices(f)
+            local ns, us = back:GetFaceNormals(f), back:GetFaceUVs(f)
+            for k = 1, 3 do
+              corners += 1
+              local a, b, c = back:GetPosition(vs[1]), back:GetPosition(vs[2]), back:GetPosition(vs[3])
+              local geo = (b - a):Cross(c - a).Unit
+              local n = back:GetNormal(ns[k])
+              if not n or (n - geo).Magnitude > 1e-3 then normalsOk = false end
+              if not back:GetUV(us[k]) then uvsOk = false end
+            end
+          end
+          local part = AssetService:CreateMeshPartAsync(Content.fromObject(back), { CollisionFidelity = Enum.CollisionFidelity.Box })
+          local sizeOk = (part.Size - Vector3.new(4, 4, 4)).Magnitude < 1e-3
+          part:Destroy(); mesh:Destroy(); back:Destroy()
+          return { dropped = dropped, faces = #faces, corners = corners, normalsOk = normalsOk, uvsOk = uvsOk, srcColors = srcColors, backColors = backColors, sizeOk = sizeOk }`,
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as Record<string, unknown>;
+      expect(r.dropped).toEqual(["vertex colors"]);
+      expect(r.faces).toBe(4);
+      expect(r.corners).toBe(12);
+      expect(r.normalsOk).toBe(true);
+      expect(r.uvsOk).toBe(true);
+      expect(r.srcColors).toBe(8);
+      expect(r.backColors).toBeLessThanOrEqual(1);
+      expect(r.sizeOk).toBe(true);
+      const text = readFileSync(obj, "utf8");
+      expect(text.startsWith("# rodeo")).toBe(true);
+      expect(text).toContain("\nf ");
+    } finally {
+      rmrf(obj);
     }
   });
 }

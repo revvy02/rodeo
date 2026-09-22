@@ -20,11 +20,11 @@ These APIs are not finalized and may change in backwards incompatible ways.
 | [captureViewport](#robloxcaptureviewport) | Captures a Studio screenshot and writes it to a stable path, returning |
 | [export](#robloxexport) | Deprecated alias of `roblox.exportInstances`. |
 | [exportEditableImage](#robloxexporteditableimage) | Writes an `EditableImage`'s pixels to `path` as a PNG. Only `.png` is |
-| [exportEditableMesh](#robloxexporteditablemesh) | Writes an `EditableMesh` to `path` as glTF 2.0: `.glb` (binary) or |
+| [exportEditableMesh](#robloxexporteditablemesh) | Writes an `EditableMesh` to `path` as glTF 2.0 (`.glb` binary, or `.gltf` |
 | [exportInstances](#robloxexportinstances) | Exports `instances` as a `.rbxm` or `.rbxmx` model file at `path`. |
 | [import](#robloximport) | Deprecated alias of `roblox.importInstances`. |
 | [importEditableImage](#robloximporteditableimage) | Loads the PNG or JPEG at `path` into a new `EditableImage` (RGBA8) and |
-| [importEditableMesh](#robloximporteditablemesh) | Loads the `.glb` or `.gltf` at `path` into a new `EditableMesh` and returns |
+| [importEditableMesh](#robloximporteditablemesh) | Loads the `.glb`, `.gltf` or `.obj` at `path` into a new `EditableMesh` and |
 | [importInstances](#robloximportinstances) | Imports a `.rbxm` or `.rbxmx` model file at `path` as Instances. |
 
 ---
@@ -256,20 +256,32 @@ the source tree.
 
 ### roblox.exportEditableMesh
 
-Writes an `EditableMesh` to `path` as glTF 2.0: `.glb` (binary) or
+Writes an `EditableMesh` to `path` as glTF 2.0 (`.glb` binary, or `.gltf`
 
-`.gltf` (JSON with an embedded buffer). Positions, faces, per-corner
+with an embedded buffer) or Wavefront OBJ (`.obj`). Positions, per-corner
 
-normals, UVs and colors, and skinning (bones with bind poses, up to four
+normals, UVs and colors, triangles, and skinning (bones with bind poses and
 
-influences per vertex) are written; FACS poses are not. Faces must be
+up to four influences per vertex) are written to glTF; FACS poses are not.
 
-triangles (`mesh:Triangulate()` first). glTF's conventions are Roblox's, so
+Faces must be triangles (`mesh:Triangulate()` first). glTF's conventions
 
-nothing is converted: studs, Y-up, right-handed, UV origin top-left.
+are Roblox's, so nothing is converted: studs, Y-up, right-handed, UV origin
+
+top-left. OBJ has no units or handedness, so the same frame is written
+
+(Blender's default), with one conversion: `vt` V is flipped, since OBJ's UV
+
+origin is bottom-left. OBJ faces index positions, UVs and normals per
+
+corner, so seams and hard edges survive; no MTL is written. OBJ cannot
+
+carry vertex colors or skinning. Returns the list of features the format
+
+dropped, empty for glTF.
 
 ```luau
-(path: string, mesh: EditableMesh) -> ()
+(path: string, mesh: EditableMesh) -> { string }
 ```
 
 ---
@@ -318,13 +330,23 @@ bounds EditableImage dimensions; an image it refuses errors with its size.
 
 ### roblox.importEditableMesh
 
-Loads the `.glb` or `.gltf` at `path` into a new `EditableMesh` and returns
+Loads the `.glb`, `.gltf` or `.obj` at `path` into a new `EditableMesh` and
 
-it. Node transforms are baked into the geometry, all primitives merge into
+returns it. glTF: node transforms are baked into the geometry, all
 
-one mesh, and a skin becomes bones plus vertex weights. An attribute
+primitives merge into one mesh, and a skin becomes bones plus vertex
 
-(normals, UVs, colors) is kept only when every primitive carries it.
+weights. OBJ: positions, per-corner UVs (V flipped from OBJ's bottom-left
+
+origin) and normals; faces as `v`, `v/vt`, `v//vn` or `v/vt/vn` with
+
+negative indices allowed; polygons are fan-triangulated; `o`/`g` groups
+
+merge into the one mesh; materials are ignored. In both formats an
+
+attribute (normals, UVs, colors) is kept only when every primitive, or
+
+every OBJ corner, carries it.
 
 Relative paths resolve against the run client's cwd. Turn the result into a
 
