@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
+#[path = "scene_motion.rs"]
+mod motion;
+
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Scene {
@@ -19,8 +22,10 @@ pub(super) struct Scene {
     pub materials: Vec<Material>,
     pub images: Vec<ImageInfo>,
     pub warnings: Vec<String>,
+    #[serde(default)]
+    pub animations: Vec<motion::Animation>,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Node {
     pub name: String,
@@ -30,8 +35,13 @@ pub(super) struct Node {
     #[serde(default)]
     pub parts: Vec<Binding>,
     pub source_index: Option<usize>,
+    /// Full world frame, before Roblox's size/rigid-pivot split. Rich scene
+    /// export keeps this frame so animation channels stay in source local space.
+    pub world: Option<Mat4>,
+    pub local_scale: Option<[f32; 3]>,
+    pub rest: Option<motion::Trs>,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Binding {
     pub mesh: usize,
@@ -41,6 +51,8 @@ pub(super) struct Binding {
     pub poses: Vec<[f32; 12]>,
     #[serde(default)]
     pub joint_nodes: Vec<usize>,
+    #[serde(default)]
+    pub weights: Vec<f32>,
 }
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,6 +62,8 @@ pub(super) struct MeshInfo {
     pub skin_index: Option<usize>,
     #[serde(default)]
     pub joint_nodes: Vec<usize>,
+    #[serde(default)]
+    pub morph: motion::Morph,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -238,10 +252,40 @@ pub(super) fn uri_bytes(uri: &str, path: &str) -> Result<Vec<u8>, String> {
     std::fs::read(base.join(relative)).map_err(|e| format!("glTF resource {uri}: {e}"))
 }
 
+fn parse_gltf(bytes: &[u8]) -> Result<gltf::Gltf, String> {
+    let (mut json, blob): (Value, _) = if bytes.starts_with(b"glTF") {
+        let glb = gltf::binary::Glb::from_slice(bytes).map_err(|e| e.to_string())?;
+        (
+            serde_json::from_slice(&glb.json).map_err(|e| e.to_string())?,
+            glb.bin.map(|b| b.into_owned()),
+        )
+    } else {
+        (
+            serde_json::from_slice(bytes).map_err(|e| e.to_string())?,
+            None,
+        )
+    };
+    // gltf-json 1.4 omits serde(default) on Scene.nodes even though glTF makes
+    // it optional. Normalize for that reader only; empty arrays are not valid
+    // glTF output, so the writer still omits them from the actual file.
+    if let Some(scenes) = json["scenes"].as_array_mut() {
+        for scene in scenes {
+            if let Some(object) = scene.as_object_mut() {
+                object.entry("nodes").or_insert(json!([]));
+            }
+        }
+    }
+    let root = serde_json::from_value(json).map_err(|e| e.to_string())?;
+    Ok(gltf::Gltf {
+        document: gltf::Document::from_json(root).map_err(|e| e.to_string())?,
+        blob,
+    })
+}
+
 pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8>>), String> {
     extension(path)?;
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    let gltf = gltf::Gltf::from_slice(&bytes).map_err(|e| format!("glTF: {e}"))?;
+    let gltf = parse_gltf(&bytes).map_err(|e| format!("glTF: {e}"))?;
     let raw: Value = serde_json::to_value(gltf.document.as_json()).map_err(|e| e.to_string())?;
     if let Some(required) = raw["extensionsRequired"].as_array() {
         if !required.is_empty() {
@@ -262,12 +306,6 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
         scene
             .warnings
             .push("Only the default (or first) glTF scene was imported".into());
-    }
-    if gltf.animations().len() > 0 {
-        scene.warnings.push(format!(
-            "{} animation clips are unsupported; skinning and the initial pose are imported",
-            gltf.animations().len()
-        ));
     }
     if raw["extensionsUsed"]
         .as_array()
@@ -323,6 +361,9 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
             transform: mesh::cframe_from_mat(&rigid),
             children: node.children().map(|n| node_ids[&n.index()]).collect(),
             parts: vec![],
+            world: Some(worlds[&source]),
+            local_scale: Some(node.transform().decomposed().2),
+            rest: Some(motion::Trs::from_node(&node)),
         };
         if node.camera().is_some() {
             scene
@@ -336,11 +377,17 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                     return Err(format!("node {source}: scaled skins are unsupported; apply scale to the rig before importing"));
                 }
                 let reflected = scale[0] < 0.;
+                let weights = node
+                    .weights()
+                    .or_else(|| gmesh.weights())
+                    .map(|w| w.to_vec())
+                    .unwrap_or_else(|| vec![0.; primitive.morph_targets().len()]);
                 let key = (
                     gmesh.index(),
                     primitive.index(),
                     skin.as_ref().map(|s| s.index()),
                     reflected,
+                    weights.iter().map(|w| w.to_bits()).collect::<Vec<_>>(),
                 );
                 let mesh_id = if let Some(id) = geometries.get(&key) {
                     *id
@@ -405,22 +452,17 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                         primitive_index: Some(primitive.index()),
                         skin_index: skin.as_ref().map(|s| s.index()),
                         joint_nodes,
+                        morph: motion::read_morph(&primitive, &gmesh, &buffers, reflected)?,
                     });
                     geometries.insert(key, id);
                     id
                 };
-                if primitive.morph_targets().len() > 0 {
-                    scene.warnings.push(format!(
-                        "mesh {} primitive {}: morph targets are unsupported",
-                        gmesh.index(),
-                        primitive.index()
-                    ));
-                }
                 for (semantic, _) in primitive.attributes() {
                     if !matches!(
                         semantic,
                         gltf::Semantic::Positions
                             | gltf::Semantic::Normals
+                            | gltf::Semantic::Tangents
                             | gltf::Semantic::TexCoords(0)
                             | gltf::Semantic::Colors(0)
                             | gltf::Semantic::Joints(0)
@@ -644,11 +686,14 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                     matrix,
                     poses,
                     joint_nodes: vec![],
+                    weights,
                 });
             }
         }
         scene.nodes.push(out);
     }
+    scene.animations = motion::read_animations(&gltf, &buffers, &node_ids, &mut scene.warnings)?;
+    motion::validate(&scene, &meshes)?;
     Ok((scene, meshes, pixels))
 }
 
@@ -659,10 +704,11 @@ pub(super) fn write_scene(
     path: &str,
 ) -> Result<(), String> {
     extension(path)?;
+    motion::validate(scene, meshes)?;
     let mut root = json!({"asset":{"version":"2.0","generator":"rodeo"},"scene":0,"scenes":[{"nodes":scene.roots}],"nodes":[],"meshes":[],"materials":[],"textures":[],"images":[],"samplers":[{"wrapS":10497,"wrapT":10497}],"accessors":[],"bufferViews":[],"skins":[]});
     let mut binary = Vec::new();
     let mut pieces = Vec::new();
-    for mesh in meshes {
+    for (mesh_index, mesh) in meshes.iter().enumerate() {
         let (mut part, bytes) = mesh::build_gltf(mesh)?;
         while binary.len() % 4 != 0 {
             binary.push(0);
@@ -689,6 +735,12 @@ pub(super) fn write_scene(
         }
         primitive["indices"] =
             json!(primitive["indices"].as_u64().unwrap() + accessor_offset as u64);
+        motion::write_morph(
+            &scene.meshes[mesh_index].morph,
+            &mut primitive,
+            &mut root,
+            &mut binary,
+        )?;
         if let Some(skins) = part["skins"].as_array_mut() {
             for s in skins {
                 s["inverseBindMatrices"] =
@@ -776,6 +828,9 @@ pub(super) fn write_scene(
         .nodes
         .iter()
         .map(|node| {
+            if let Some(world) = node.world {
+                return world;
+            }
             let world = mesh::mat_from_cframe(&node.transform);
             if node.parts.len() == 1 {
                 mesh::mat_mul(&world, &node.parts[0].matrix)
@@ -793,9 +848,20 @@ pub(super) fn write_scene(
         } else {
             worlds[i]
         };
-        root["nodes"].as_array_mut().unwrap().push(json!({"name":node.name,"matrix":local.iter().flatten().copied().collect::<Vec<_>>(),"children":node.children}));
+        let mut output = json!({"name":node.name,"children":node.children});
+        if scene.animations.iter().any(|a| {
+            a.channels
+                .iter()
+                .any(|c| c.node == i && c.path != "weights")
+        }) {
+            motion::write_trs(&mut output, local, node.local_scale)?;
+        } else {
+            output["matrix"] = json!(local.iter().flatten().copied().collect::<Vec<_>>());
+        }
+        root["nodes"].as_array_mut().unwrap().push(output);
     }
     let mut mesh_ids = HashMap::new();
+    let mut geometry_nodes = vec![Vec::new(); scene.nodes.len()];
     for (i, node) in scene.nodes.iter().enumerate() {
         for binding in &node.parts {
             let (primitive, part) = pieces
@@ -817,21 +883,37 @@ pub(super) fn write_scene(
                     .as_array_mut()
                     .unwrap()
                     .push(json!({"primitives":[primitive]}));
+                motion::write_morph_names(
+                    &scene.meshes[binding.mesh].morph,
+                    &mut root["meshes"][id],
+                );
                 mesh_ids.insert(key, id);
                 id
             };
-            let geometry_id = if node.parts.len() == 1 {
+            let geometry_world =
+                mesh::mat_mul(&mesh::mat_from_cframe(&node.transform), &binding.matrix);
+            let relative = mesh::mat_mul(
+                &mesh::mat_inverse(&worlds[i]).ok_or("singular node frame")?,
+                &geometry_world,
+            );
+            let on_node =
+                node.parts.len() == 1 && (node.world.is_none() || motion::is_identity(&relative));
+            let geometry_id = if on_node {
                 root["nodes"][i]["mesh"] = json!(mesh_id);
                 i
             } else {
                 let id = root["nodes"].as_array().unwrap().len();
-                root["nodes"].as_array_mut().unwrap().push(json!({"name":"Geometry","mesh":mesh_id,"matrix":binding.matrix.iter().flatten().copied().collect::<Vec<_>>(),"children":[]}));
+                root["nodes"].as_array_mut().unwrap().push(json!({"name":"Geometry","mesh":mesh_id,"matrix":relative.iter().flatten().copied().collect::<Vec<_>>(),"children":[]}));
                 root["nodes"][i]["children"]
                     .as_array_mut()
                     .unwrap()
                     .push(json!(id));
                 id
             };
+            geometry_nodes[i].push(geometry_id);
+            if !binding.weights.is_empty() {
+                root["nodes"][geometry_id]["weights"] = json!(binding.weights);
+            }
             if let Some(skin) = part["skins"].as_array().and_then(|s| s.first()) {
                 if !binding.joint_nodes.is_empty() {
                     if binding.joint_nodes.len() != meshes[binding.mesh].bones.len()
@@ -898,7 +980,18 @@ pub(super) fn write_scene(
             }
         }
     }
+    motion::write_animations(scene, &geometry_nodes, &mut root, &mut binary)?;
+    // glTF optional arrays have minItems=1; omit empty child/root lists.
+    for node in root["nodes"].as_array_mut().unwrap() {
+        if node["children"].as_array().is_some_and(Vec::is_empty) {
+            node.as_object_mut().unwrap().remove("children");
+        }
+    }
+    if scene.roots.is_empty() {
+        root["scenes"][0].as_object_mut().unwrap().remove("nodes");
+    }
     for key in [
+        "nodes",
         "skins",
         "materials",
         "textures",
@@ -917,7 +1010,7 @@ pub(super) fn write_scene(
     if binary.is_empty() {
         binary.push(0);
     }
-    gltf::Gltf::from_slice(&serde_json::to_vec(&root).map_err(|e| e.to_string())?)
+    parse_gltf(&serde_json::to_vec(&root).map_err(|e| e.to_string())?)
         .map_err(|e| format!("exported glTF: {e}"))?;
     mesh::write_document(root, binary, path)
 }
@@ -994,6 +1087,7 @@ mod tests {
                     children: vec![1, 2],
                     parts: vec![],
                     source_index: None,
+                    ..Default::default()
                 },
                 Node {
                     name: "First".into(),
@@ -1005,8 +1099,10 @@ mod tests {
                         matrix: IDENTITY,
                         poses: vec![],
                         joint_nodes: vec![],
+                        ..Default::default()
                     }],
                     source_index: None,
+                    ..Default::default()
                 },
                 Node {
                     name: "Second".into(),
@@ -1022,8 +1118,10 @@ mod tests {
                         matrix: IDENTITY,
                         poses: vec![],
                         joint_nodes: vec![],
+                        ..Default::default()
                     }],
                     source_index: None,
+                    ..Default::default()
                 },
             ],
             meshes: vec![MeshInfo::default()],
@@ -1042,6 +1140,7 @@ mod tests {
                 maps: HashMap::from([("color".into(), 0)]),
             }],
             warnings: vec![],
+            ..Default::default()
         };
         (
             scene,
@@ -1149,5 +1248,135 @@ mod tests {
         let f = Temp::new("gltf");
         write_scene(&Scene::default(), &[], &[], &f.0).unwrap();
         assert!(read_scene(&f.0).unwrap().0.nodes.is_empty());
+        let json: Value = serde_json::from_slice(&std::fs::read(&f.0).unwrap()).unwrap();
+        assert!(json.get("nodes").is_none());
+        assert!(json["scenes"][0].get("nodes").is_none());
+    }
+
+    fn motion_fixture() -> (Scene, Vec<MeshData>, Vec<Vec<u8>>) {
+        read_scene(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../tests-new/fixtures/pkg/scenes/motion.gltf"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn curves_sparse_morphs_tangents_and_instance_weights_roundtrip() {
+        for extension in ["glb", "gltf"] {
+            let (scene, meshes, images) = motion_fixture();
+            assert_eq!(scene.animations[0].channels.len(), 4);
+            assert_eq!(
+                scene.meshes[0].morph.targets[0].positions.as_ref().unwrap(),
+                &vec![[0., 0., 0.], [0., 0., 0.], [0., 2., 0.]]
+            );
+            assert_eq!(
+                scene.meshes[0].morph.targets[0].name.as_deref(),
+                Some("Tall")
+            );
+            assert_ne!(
+                scene.nodes[1].parts[0].weights,
+                scene.nodes[2].parts[0].weights
+            );
+            let file = Temp::new(extension);
+            write_scene(&scene, &meshes, &images, &file.0).unwrap();
+            let (out, geometry, _) = read_scene(&file.0).unwrap();
+            assert_eq!(scene.animations, out.animations);
+            assert_eq!(scene.meshes[0].morph, out.meshes[0].morph);
+            assert_eq!(meshes, geometry);
+            for (a, b) in scene.nodes.iter().zip(&out.nodes) {
+                assert_eq!(a.world, b.world);
+                assert_eq!(
+                    a.parts.iter().map(|p| &p.weights).collect::<Vec<_>>(),
+                    b.parts.iter().map(|p| &p.weights).collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cubic_quaternions_and_weight_channels_keep_tangents_and_fan_out_primitives() {
+        let (mut scene, meshes, images) = motion_fixture();
+        let (mesh, matrix) = (scene.nodes[1].parts[0].mesh, scene.nodes[1].parts[0].matrix);
+        scene.nodes[1].parts.push(Binding {
+            mesh,
+            matrix,
+            weights: vec![0.25, 0.5],
+            ..Default::default()
+        });
+        scene.animations[0].channels[1] = motion::Channel {
+            node: 2,
+            path: "rotation".into(),
+            interpolation: "CUBICSPLINE".into(),
+            times: vec![0., 2.],
+            values: vec![
+                0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0.5, 0., 0., 0., 0.5, 0., 0., 0., 1., 0.,
+                0., 0., 0., 0.,
+            ],
+        };
+        let file = Temp::new("glb");
+        write_scene(&scene, &meshes, &images, &file.0).unwrap();
+        let (out, _, _) = read_scene(&file.0).unwrap();
+        assert_eq!(out.animations[0].channels.len(), 5);
+        let original = &scene.animations[0].channels[1];
+        let channel = out.animations[0]
+            .channels
+            .iter()
+            .find(|c| c.path == "rotation")
+            .unwrap();
+        assert_eq!(channel.values, original.values);
+        let weights: Vec<_> = out.animations[0]
+            .channels
+            .iter()
+            .filter(|c| c.path == "weights")
+            .collect();
+        assert_eq!(weights.len(), 2);
+        assert_eq!(weights[0].values, weights[1].values);
+        assert_ne!(weights[0].node, weights[1].node);
+    }
+
+    #[test]
+    fn animated_negative_scale_keeps_original_trs_basis() {
+        let mut matrix = IDENTITY;
+        matrix[1][1] = -2.;
+        let mut node = json!({});
+        motion::write_trs(&mut node, matrix, Some([1., -2., 1.])).unwrap();
+        assert_eq!(node["scale"], json!([1., -2., 1.]));
+        assert_eq!(node["rotation"], json!([0., 0., 0., 1.]));
+    }
+
+    #[test]
+    fn invalid_motion_data_errors_before_replacing_destination() {
+        let (mut scene, mut meshes, images) = motion_fixture();
+        let file = Temp::new("glb");
+        std::fs::write(&file.0, b"keep me").unwrap();
+        scene.animations[0].channels[0].times[1] = 0.;
+        assert!(write_scene(&scene, &meshes, &images, &file.0)
+            .unwrap_err()
+            .contains("increasing"));
+        scene.animations[0].channels[0].times[1] = 1.;
+        scene.meshes[0].morph.targets[0]
+            .positions
+            .as_mut()
+            .unwrap()
+            .pop();
+        assert!(write_scene(&scene, &meshes, &images, &file.0)
+            .unwrap_err()
+            .contains("vertex count"));
+        scene.meshes[0].morph.targets[0]
+            .positions
+            .as_mut()
+            .unwrap()
+            .push([0., 2., 0.]);
+        scene.nodes[1].parts[0].weights.push(1.);
+        assert!(write_scene(&scene, &meshes, &images, &file.0)
+            .unwrap_err()
+            .contains("weight count"));
+        scene.nodes[1].parts[0].weights.pop();
+        meshes[0].normals = None;
+        assert!(write_scene(&scene, &meshes, &images, &file.0)
+            .unwrap_err()
+            .contains("base normals"));
+        assert_eq!(std::fs::read(&file.0).unwrap(), b"keep me");
     }
 }

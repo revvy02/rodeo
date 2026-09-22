@@ -68,7 +68,7 @@ local apis = {
 	io = require(ref("io"))(rpc, runtime),
 	process = processApi,
 	stream = streamApi,
-	roblox = require(ref("roblox"))(rpc, fsApi, streamApi, normalize, serializeToLuau, runtime, require(ref("scene"))),
+	roblox = require(ref("roblox"))(rpc, fsApi, streamApi, normalize, serializeToLuau, runtime, require(ref("scene")), require(ref("sceneMotion"))),
 }
 
 -- Publish for the inlined @rodeo/* shims: they read ns.procs[run id] through

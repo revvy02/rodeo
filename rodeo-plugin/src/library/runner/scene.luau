@@ -1,6 +1,6 @@
 -- Scene assembly is separate from mesh/image codecs. All objects created by
 -- import are caller-owned; failures destroy the entire partial result.
-return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
+return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, motion)
 	local AssetService = game:GetService("AssetService")
 	local HttpService = game:GetService("HttpService")
 	local mapProperties = {
@@ -47,7 +47,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 		end
 	end
 
-	function roblox.importEditableScene(path)
+	function roblox.importEditableScene(path, options)
 		checkPath(path)
 		nextId += 1
 		local handle = { __handle = `scene:{nextId}:{path}` }
@@ -69,6 +69,10 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 			meshes = {},
 			images = {},
 			warnings = document.warnings,
+			animations = {},
+			morphs = {},
+			morphWeights = {},
+			_nodeFrames = {},
 			sourceMap = { nodes = {}, primitives = {}, materials = {}, images = {}, joints = {} },
 		}
 		local owned = {}
@@ -78,9 +82,18 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 		end
 		local ok, result = pcall(function()
 			local boneIds = {}
-			for i in document.meshes do
-				local mesh, ids = meshFromBlob(chunk(), path)
+			local defaultWeights = {}
+			for _, node in document.nodes do
+				for _, binding in node.parts do
+					defaultWeights[binding.mesh + 1] = binding.weights
+				end
+			end
+			for i, info in document.meshes do
+				local mesh, ids, attributes = meshFromBlob(chunk(), path)
 				scene.meshes[i], boneIds[i] = own(mesh), ids
+				if #info.morph.targets > 0 or info.morph.tangents then
+					table.insert(scene.morphs, motion.importMorph(mesh, attributes, info.morph, defaultWeights[i]))
+				end
 			end
 			for i, info in document.images do
 				local image = own(
@@ -186,6 +199,15 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 						mesh = mesh,
 						part = part,
 					})
+					if #info.morph.targets > 0 then
+						table.insert(
+							scene.morphWeights,
+							{ node = nodeInstance, part = part, weights = binding.weights }
+						)
+					end
+					if #info.morph.targets > 0 or info.morph.tangents then
+						part:SetAttribute("RodeoSceneData", true)
+					end
 				end
 				nodeInstance.Name = node.name
 				if node.sourceIndex ~= nil then
@@ -195,6 +217,18 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 					end
 				end
 				nodes[i] = nodeInstance
+				local m = node.world
+				local x, y, z = Vector3.new(unpack(m[1])), Vector3.new(unpack(m[2])), Vector3.new(unpack(m[3]))
+				local worldScale = Vector3.new(x.Magnitude, y.Magnitude, z.Magnitude)
+				if x:Dot(y:Cross(z)) < 0 then
+					worldScale *= Vector3.new(-1, 1, 1)
+				end
+				scene._nodeFrames[nodeInstance] = {
+					scale = worldScale,
+					localScale = node.localScale,
+					size = if nodeInstance:IsA("BasePart") then nodeInstance.Size else nil,
+					modelScale = if nodeInstance:IsA("Model") then nodeInstance:GetScale() else nil,
+				}
 			end
 			for i, node in document.nodes do
 				for _, child in node.children do
@@ -203,6 +237,18 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 			end
 			for _, root in document.roots do
 				table.insert(scene.roots, nodes[root + 1])
+			end
+			for _, animation in document.animations do
+				local clip = { name = animation.name, sourceIndex = animation.sourceIndex, channels = {} }
+				for _, channel in animation.channels do
+					channel.node = nodes[channel.node + 1]
+					channel.node:SetAttribute("RodeoSceneData", true)
+					table.insert(clip.channels, channel)
+				end
+				table.insert(scene.animations, clip)
+			end
+			if #scene.animations > 0 and (not options or options.animationRig ~= false) then
+				motion.buildRig(scene, document, nodes, own, options and options.animationSampleRate or 60)
 			end
 			return scene
 		end)
@@ -250,9 +296,21 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 		return mesh
 	end
 
-	function roblox.exportEditableScene(path, roots)
+	function roblox.exportEditableScene(path, input)
 		checkPath(path)
+		local scene = if input.roots then input else nil
+		local roots = if scene then scene.roots else input
 		local document = { roots = {}, nodes = {}, meshes = {}, images = {}, materials = {}, warnings = {} }
+		local morphs, weightsFor = {}, {}
+		if scene then
+			for _, morph in scene.morphs or {} do
+				assert(not morphs[morph.mesh], "duplicate morph record for a mesh")
+				morphs[morph.mesh] = morph
+			end
+			for _, binding in scene.morphWeights or {} do
+				weightsFor[binding.part] = binding.weights
+			end
+		end
 		local meshBlobs, imageBlobs, temporary = {}, {}, {}
 		local meshIds, imageIds, seen = {}, {}, {}
 		local materialIds, loadedMeshes = {}, {}
@@ -359,8 +417,13 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 			local id = meshIds[editable]
 			if id == nil then
 				id = #document.meshes
-				table.insert(document.meshes, { jointNodes = {} })
-				table.insert(meshBlobs, meshToBlob(editable))
+				local morph = morphs[editable]
+				local blob, corners = meshToBlob(editable, if morph then motion.baseOverrides(morph) else nil)
+				table.insert(
+					document.meshes,
+					{ jointNodes = {}, morph = if morph then motion.exportMorph(morph, corners) else nil }
+				)
+				table.insert(meshBlobs, blob)
 				meshIds[editable] = id
 			end
 			local native = if part:IsA("MeshPart") then part.MeshSize else Vector3.one
@@ -375,6 +438,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 				material = materialFor(part),
 				matrix = matrix(part:GetPivot():ToObjectSpace(origin), scale),
 				poses = {},
+				weights = weightsFor[part],
 			}
 			local ids = editable:GetBones()
 			if #ids > 0 then
@@ -423,7 +487,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 		end
 		local function visit(instance, parentFrame)
 			assert(not seen[instance], `exportEditableScene: roots overlap at {instance:GetFullName()}`)
-			seen[instance] = true
+			seen[instance] = #document.nodes
 			local frame = parentFrame
 			if instance:IsA("Model") or instance:IsA("BasePart") then
 				frame = instance:GetPivot()
@@ -434,6 +498,20 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 			end
 			local index = #document.nodes
 			local node = { name = instance.Name, transform = components(frame), children = {}, parts = {} }
+			if scene then
+				local sourceFrame = scene._nodeFrames and scene._nodeFrames[instance]
+				local scale = if sourceFrame then sourceFrame.scale else Vector3.one
+				if sourceFrame and sourceFrame.size then
+					scale *= instance.Size / sourceFrame.size
+				end
+				if sourceFrame and sourceFrame.modelScale then
+					scale *= instance:GetScale() / sourceFrame.modelScale
+				end
+				node.world = matrix(frame, scale)
+				node.localScale = sourceFrame and sourceFrame.localScale
+			elseif instance:GetAttribute("RodeoSceneData") then
+				warning(instance, "animation/morph data omitted; pass the full EditableScene to preserve it")
+			end
 			table.insert(document.nodes, node)
 			local jointKey = instance:GetAttribute("RodeoSceneJoint")
 			if jointKey then
@@ -443,7 +521,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 				table.insert(node.parts, geometryFor(instance))
 			end
 			for _, child in instance:GetChildren() do
-				if child:IsA("SurfaceAppearance") or child:IsA("Bone") then
+				if child:IsA("SurfaceAppearance") or child:IsA("Bone") or child:GetAttribute("RodeoSceneHelper") then
 					continue
 				end
 				table.insert(node.children, visit(child, frame))
@@ -452,7 +530,15 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 		end
 		local ok, result = pcall(function()
 			for _, root in roots do
-				table.insert(document.roots, visit(root, CFrame.identity))
+				if root:GetAttribute("RodeoSceneRig") then
+					for _, child in root:GetChildren() do
+						if not child:GetAttribute("RodeoSceneHelper") then
+							table.insert(document.roots, visit(child, CFrame.identity))
+						end
+					end
+				else
+					table.insert(document.roots, visit(root, CFrame.identity))
+				end
 			end
 			local assignedJointPoses = {}
 			for _, record in skinBindings do
@@ -485,8 +571,14 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
 					for i, index in nodes do
 						assignedJointPoses[index] = poses[i]
 						document.nodes[index + 1].transform = components(poses[i])
+						if document.nodes[index + 1].world then
+							document.nodes[index + 1].world = matrix(poses[i], Vector3.one)
+						end
 					end
 				end
+			end
+			if scene then
+				document.animations = motion.exportAnimations(scene, seen)
 			end
 
 			local chunks = { buffer.fromstring(HttpService:JSONEncode(document)) }

@@ -329,8 +329,8 @@ roblox.exportEditableImage(path, image)   -- write an EditableImage as .png
 roblox.importEditableImage(path) -> EditableImage  -- load a .png/.jpg as an EditableImage
 roblox.exportEditableMesh(path, mesh) -> { string }  -- write an EditableMesh as .glb/.gltf/.obj; returns what the format dropped
 roblox.importEditableMesh(path) -> EditableMesh    -- load a .glb/.gltf/.obj as an EditableMesh
-roblox.importEditableScene(path) -> EditableScene -- .glb/.gltf hierarchy + live meshes/images + sourceMap + warnings
-roblox.exportEditableScene(path, roots) -> { string } -- supported instance roots to self-contained .glb/.gltf
+roblox.importEditableScene(path, options?) -> EditableScene -- .glb/.gltf hierarchy, live resources, curves/morphs and optional playback rig
+roblox.exportEditableScene(path, sceneOrRoots) -> { string } -- full scene preserves motion; roots-only exports static pose
 ```
 
 `bake` emits `return <value>` and writes Roblox types as constructors
@@ -365,7 +365,7 @@ be triangulated report the source line.
 
 `importEditableScene` preserves the default glTF scene's hierarchy, separate
 material primitives, compatible shared meshes, PBR textures and supported skins.
-Returns `{ roots, meshes, images, sourceMap, warnings }`. Roots are unparented;
+Returns `{ roots, meshes, images, sourceMap, warnings, animations, morphs, morphWeights, animationRig?, animator? }`. Roots are unparented;
 all returned objects belong to the caller. Destroying roots does not destroy the
 editable resources. `sourceMap.nodes`, `.images`, `.materials` and `.joints`
 use original **zero-based glTF indices**; `.primitives` is a one-based binding
@@ -373,12 +373,12 @@ array with `nodeIndex`, `meshIndex`, `primitiveIndex`, `skinIndex`, `materialInd
 `mesh` and `part`. Joint bindings expose the numeric EditableMesh `boneId` and
 renderable `Bone`, so names need not be unique in the source.
 
-`exportEditableScene(path, roots)` accepts imported or procedural instance trees:
+`exportEditableScene(path, sceneOrRoots)` accepts imported or procedural instance trees:
 Models/Folders, MeshParts, block Parts, Attachments, and supported Bone rigs.
 Exports current poses, sizes, meshes and readable textures, embedding resources
 in both file formats. Shear, scaled skins, unreadable resources and unsupported
-part shapes error. Animation clips, morph targets, cameras, material extensions,
-occlusion/emissive channels and sampler differences are unsupported and reported;
+part shapes error. Cameras, material extensions, occlusion/emissive channels
+and sampler differences are unsupported and reported;
 required glTF extensions error. Native Roblox materials and absent roughness maps
 use approximate glTF PBR values, with warnings. No publishing is performed.
 
@@ -386,11 +386,46 @@ use approximate glTF PBR values, with warnings. No publishing is performed.
 local scene = roblox.importEditableScene("vehicle.glb")
 for _, root in scene.roots do root.Parent = workspace end
 -- Edit scene.meshes, scene.images, or the instance hierarchy.
-local warnings = roblox.exportEditableScene("edited.glb", scene.roots)
+local warnings = roblox.exportEditableScene("edited.glb", scene)
 for _, root in scene.roots do root:Destroy() end
 for _, mesh in scene.meshes do mesh:Destroy() end
 for _, image in scene.images do image:Destroy() end
 ```
+
+Scene motion is portable data in the returned result. Pass the **full scene** to
+export to preserve it; roots-only export captures the static pose and warns when
+motion data is omitted. `animations` contains named clips with a zero-based
+`sourceIndex` and channels (`node: Instance`, `path`, `interpolation`, `times`,
+`values`). Paths are translation, rotation, scale, weights; interpolation is
+STEP, LINEAR, CUBICSPLINE. Values are flat XYZ/XYZW/scalars; cubic keys contain
+incoming tangent, value, outgoing tangent, with tangents per second. Curves are
+not resampled for glTF export. Edit these channels for portable changes; editing
+a generated KeyframeSequence does not change them.
+
+`morphs` contains `{ mesh, targets, tangents? }`. Each target has an optional
+name and optional position/normal/tangent delta maps. Positions and tangents
+are keyed by stable EditableMesh vertex IDs; normals use normal IDs. An omitted
+attribute means all-zero deltas; a supplied map must cover every referenced ID.
+Base tangents are XYZW arrays keyed by vertex ID. `morphWeights` contains
+`{ node, part, weights }` per primitive instance. Initial weights are rendered,
+with separate editables for differing weights. Export removes the applied
+initial position offsets to recover the base mesh, preserving subsequent live
+position edits. Edited normals become base normals. Update delta maps after
+topology edits; absent mappings error. Changing portable weights/deltas affects
+the next import, not the current preview automatically.
+
+By default, scenes with translation/rotation clips get a Model rig with
+Motor6Ds/Bones, an Animator, and a `sequence` + `animation` on each convertible
+clip. The Animation IDs are temporary Studio IDs; publishing remains separate.
+Parent `scene.animationRig` to workspace, then load `clip.animation` through
+`scene.animator`. Wait for the track's Length to become nonzero before seeking.
+Playback clips are sampled at 60 Hz by default; configure
+`{ animationSampleRate = 30 }` or disable native conversion with
+`{ animationRig = false }`. Independent clips leave unrelated joints unweighted.
+Native preview cannot animate part scale or arbitrary morph deltas: those channels
+stay exact in the portable data and produce warnings. Unrepresentable sampled
+poses warn and omit that native clip. Helpers are excluded from scene export,
+so repeated import/export does not grow the hierarchy.
 
 `captureViewport` treats `output` as an exact file path when it ends in `.png`.
 Otherwise it treats it as a directory for the auto-named file, and defaults to

@@ -11,6 +11,147 @@ const cleanup = `local function destroy(scene)
 end`;
 
 export function scenes(run: RunFn): void {
+  it("scene: exact curves and sparse morphs survive live edits, corner splits and repeated exports", async () => {
+    const output = `rodeo-test-scene-${randomUUID()}.gltf`;
+    try {
+      const result = await run({ showReturn: true, source: `
+        local r=require("@rodeo/roblox")
+        ${cleanup}
+        local scene=r.importEditableScene("${fixture}motion.gltf",{animationRig=false})
+        assert(#scene.animations==4 and #scene.animations[1].channels==4)
+        assert(#scene.morphs==2 and #scene.morphWeights==2)
+        assert(scene.morphs[1].mesh~=scene.morphs[2].mesh,"different initial weights require independent editable meshes")
+        local morph=scene.morphs[1]
+        assert(morph.targets[1].name=="Tall" and morph.targets[2].name=="Wide")
+        local vertices=morph.mesh:GetVertices()
+        assert(math.abs(morph.mesh:GetPosition(vertices[3]).Y-2.5)<0.001,"default morph pose")
+        assert(math.abs(scene.morphs[2].mesh:GetSize().Y-3.5)<0.001)
+        morph.mesh:SetPosition(vertices[1],morph.mesh:GetPosition(vertices[1])+Vector3.new(.125,0,0))
+        local face=morph.mesh:AddTriangle(vertices[1],vertices[2],vertices[3])
+        local original=morph.mesh:GetFaces()[1]
+        morph.mesh:SetFaceNormals(face,morph.mesh:GetFaceNormals(original))
+        morph.mesh:SetFaceUVs(face,{morph.mesh:AddUV(Vector2.zero),morph.mesh:AddUV(Vector2.xAxis),morph.mesh:AddUV(Vector2.yAxis)})
+        scene.animations[1].channels[1].values[8]=5 -- first cubic out-tangent Y
+        r.exportEditableScene("${output}",scene)
+        local copy=r.importEditableScene("${output}",{animationRig=false})
+        assert(#copy.animations[1].channels==4 and copy.animations[1].channels[1].values[8]==5)
+        local deltaCount=0;for _ in copy.morphs[1].targets[1].positions do deltaCount+=1 end
+        assert(deltaCount==6,"morph deltas must follow the split face-corner tuples")
+        local found=false
+        for _,id in copy.morphs[1].mesh:GetVertices() do if math.abs(copy.morphs[1].mesh:GetPosition(id).X-.125)<.001 then found=true end end
+        assert(found,"live base position edit survived default-pose removal")
+        assert(math.abs(copy.sourceMap.nodes[0]:GetPivot().X-10)<.001)
+        copy.sourceMap.nodes[0]:ScaleTo(2)
+        r.exportEditableScene("${output}",copy)
+        destroy(copy);destroy(scene)
+        return "motion roundtrip passed"
+      ` });
+      expect(result.ok, result.output).toBe(true);
+      const doc = JSON.parse(readFileSync(output, "utf8"));
+      expect(doc.nodes.length).toBe(3);
+      expect(doc.nodes[0].matrix[0]).toBe(4);
+      expect(doc.animations[0].samplers.map((s: any) => s.interpolation)).toEqual(["CUBICSPLINE","LINEAR","STEP","LINEAR"]);
+      expect(doc.meshes[0].extras.targetNames).toEqual(["Tall","Wide"]);
+    } finally { rmSync(output,{force:true}); }
+  });
+
+  it("scene: procedural roots can supply portable animation channels",async()=>{
+    const output=`rodeo-test-scene-${randomUUID()}.glb`;
+    try{
+      const result=await run({showReturn:true,source:`
+        local r=require("@rodeo/roblox")
+        ${cleanup}
+        local part=Instance.new("Part");part.Name="Moving box";part.Anchored=true;part.Size=Vector3.new(2,3,4)
+        local clip={name="Move",channels={{node=part,path="translation",interpolation="LINEAR",times={0,1},values={0,0,0,4,0,0}}}}
+        r.exportEditableScene("${output}",{roots={part},animations={clip}})
+        local scene=r.importEditableScene("${output}")
+        assert(scene.animations[1].sequence,table.concat(scene.warnings,";"))
+        assert(scene.animations[1].channels[1].node.Name=="Moving box")
+        assert((scene.sourceMap.primitives[1].part.Size-part.Size).Magnitude<.001)
+        destroy(scene);part:Destroy();return "procedural animation passed"
+      `});expect(result.ok,result.output).toBe(true);
+    }finally{rmSync(output,{force:true});}
+  });
+
+  it("scene: native clips animate node rigs and Bones while portable export omits generated helpers", async () => {
+    const output=`rodeo-test-scene-${randomUUID()}.glb`;
+    try {
+      const result=await run({showReturn:true,source:`
+        local r=require("@rodeo/roblox")
+        ${cleanup}
+        local scene=r.importEditableScene("${fixture}animated-skin.gltf",{animationSampleRate=30})
+        assert(scene.animationRig and scene.animator)
+        local clip=scene.animations[1]
+        assert(clip.sequence and clip.animation,table.concat(scene.warnings,"; "))
+        assert(#clip.sequence:GetKeyframes()>=61)
+        scene.animationRig.Parent=workspace
+        local bone=scene.sourceMap.joints[2][1].bone
+        local before=bone.Transform
+        local track=scene.animator:LoadAnimation(clip.animation)
+        local deadline=os.clock()+5;while track.Length==0 and os.clock()<deadline do task.wait() end
+        assert(track.Length>0,"animation did not load")
+        track:Play(0,1,0)
+        track.TimePosition=.5
+        scene.animator:StepAnimations(0)
+        assert((bone.Transform.Position-before.Position).Magnitude>.4,"native Animator did not drive the imported Bone")
+        track:Stop(0);track:Destroy()
+        r.exportEditableScene("${output}",scene)
+        local copy=r.importEditableScene("${output}")
+        assert(copy.animations[1].sequence and #copy.animations[1].channels==2)
+        local count=0;for _ in copy.sourceMap.nodes do count+=1 end;assert(count==4,"generated rig leaked into glTF")
+        r.exportEditableScene("${output}",copy)
+        local again=r.importEditableScene("${output}",{animationRig=false})
+        count=0;for _ in again.sourceMap.nodes do count+=1 end;assert(count==4,"round trips grew the rig hierarchy")
+        destroy(again);destroy(copy);destroy(scene)
+        local moving=r.importEditableScene("${fixture}motion.gltf")
+        assert(moving.animations[1].sequence,table.concat(moving.warnings,"; "))
+        assert(moving.animations[4].sequence==nil,"morph-only clip must not pretend to animate native joints")
+        for _,pose in moving.animations[3].sequence:GetDescendants() do
+          if pose:IsA("Pose") and pose.Name=="__RodeoNode3" then assert(pose.Weight==0,"independent clip overwrites another node") end
+        end
+        moving.animationRig.Parent=workspace
+        local motor
+        for _,obj in moving.animationRig:GetDescendants() do
+          if obj:IsA("Motor6D") and obj.Part1.Name=="__RodeoNode2" then motor=obj end
+        end
+        assert(motor)
+        track=moving.animator:LoadAnimation(moving.animations[1].animation)
+        deadline=os.clock()+5;while track.Length==0 and os.clock()<deadline do task.wait() end
+        assert(track.Length>0,"animation did not load")
+        track:Play(0,1,0);track.TimePosition=.5;moving.animator:StepAnimations(0)
+        assert(math.abs(motor.Transform.Y-2)<.02,"cubic motion under scaled parent sampled incorrectly")
+        track:Stop(0);track:Destroy();destroy(moving)
+        return "native animation passed"
+      `});
+      expect(result.ok,result.output).toBe(true);
+    }finally{rmSync(output,{force:true});}
+  });
+
+  it("scene: dropping sidecar data warns, invalid edits preserve the destination",async()=>{
+    const output=`rodeo-test-scene-${randomUUID()}.glb`;
+    try{
+      const result=await run({showReturn:true,source:`
+        local r=require("@rodeo/roblox");local fs=require("@rodeo/fs");local stream=require("@rodeo/stream")
+        ${cleanup}
+        local scene=r.importEditableScene("${fixture}motion.gltf",{animationRig=false})
+        local warnings=r.exportEditableScene("${output}",scene.roots)
+        assert(string.find(table.concat(warnings,";"),"full EditableScene"))
+        local function bytes() local h=fs.open("${output}","r");local b=stream.readBytes(h);stream.close(h);return buffer.tostring(b) end
+        local before=bytes()
+        scene.animations[1].channels[1].times[2]=0
+        local ok,err=pcall(r.exportEditableScene,"${output}",scene)
+        assert(not ok and string.find(tostring(err),"increasing"));assert(bytes()==before)
+        scene.animations[1].channels[1].times[2]=1
+        scene.animations[1].channels[1].node=Instance.new("Model")
+        ok,err=pcall(r.exportEditableScene,"${output}",scene)
+        assert(not ok and string.find(tostring(err),"outside"));assert(bytes()==before)
+        scene.animations[1].channels[1].node:Destroy()
+        destroy(scene)
+        return "motion validation passed"
+      `});expect(result.ok,result.output).toBe(true);
+    }finally{rmSync(output,{force:true});}
+  });
+
   it("scene: hierarchy, primitive bindings, shared resources and live edits survive round trips", async () => {
     const output = `rodeo-test-scene-${randomUUID()}.gltf`;
     try {

@@ -1,11 +1,11 @@
 -- @rodeo/roblox API: import / export model files via SerializationService,
 -- plus bake (Luau-source data files).
--- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau, runtime, createScene) -> roblox module.
+-- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau, runtime, createScene, sceneMotion) -> roblox module.
 -- `runtime` is the runner's proto module, captured here rather than read from
 -- _G.__rodeo_runtime_proto at call time: several rodeo plugins can share this
 -- VM, and that global holds whichever build's runner set it last.
 
-return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScene)
+return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScene, sceneMotion)
 	local roblox = {}
 	local SerializationService = game:GetService("SerializationService")
 
@@ -235,7 +235,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 	-- Writes an EditableMesh to `path` as glTF (.glb or .gltf). Geometry,
 	-- per-corner normals/UVs/colors, and skinning (bones with bind poses, up to
 	-- four influences per vertex) are written; FACS poses are not.
-	local function meshToBlob(mesh: EditableMesh): buffer
+	local function meshToBlob(mesh: EditableMesh, overrides)
 		local okClass, className = pcall(function()
 			return (mesh :: any).ClassName
 		end)
@@ -247,6 +247,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 		local tuples: { [string]: number } = {}
 		local positions, normals, uvs, colors, alphas = {}, {}, {}, {}, {}
 		local vertexOfTuple: { number } = {}
+		local normalOfTuple: { number } = {}
 		local indices: { number } = {}
 		local hasNormals, hasUVs, hasColors = true, true, true
 		local count = 0
@@ -260,7 +261,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 			local cs = mesh:GetFaceColors(faceId) or {}
 			for k = 1, 3 do
 				local v, n, u, c = vs[k], ns[k], us[k], cs[k]
-				local nv = if n and n ~= 0 then mesh:GetNormal(n) else nil
+				local nv = if n and n ~= 0 then (overrides and overrides.normals[n]) or mesh:GetNormal(n) else nil
 				local uv = if u and u ~= 0 then mesh:GetUV(u) else nil
 				local cv = if c and c ~= 0 then mesh:GetColor(c) else nil
 				if not nv then hasNormals = false end
@@ -272,12 +273,13 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 					count += 1
 					idx = count
 					tuples[key] = idx
-					positions[idx] = mesh:GetPosition(v)
+					positions[idx] = (overrides and overrides.positions[v]) or mesh:GetPosition(v)
 					normals[idx] = nv
 					uvs[idx] = uv
 					colors[idx] = cv
 					alphas[idx] = if cv then (mesh:GetColorAlpha(c) or 1) else 1
 					vertexOfTuple[idx] = v
+					normalOfTuple[idx] = n or 0
 				end
 				indices[#indices + 1] = idx - 1
 			end
@@ -357,7 +359,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 			indices = indices,
 			bones = bones,
 		})
-		return blob
+		return blob, { vertices = vertexOfTuple, normals = normalOfTuple }
 	end
 
 	function roblox.exportEditableMesh(path: string, mesh: EditableMesh): { string }
@@ -391,9 +393,10 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 		return ids
 	end
 
-	local function meshFromBlob(blob: buffer, path: string): (EditableMesh, { number })
+	local function meshFromBlob(blob: buffer, path: string)
 		local data = readMeshBlob(blob)
 		local boneIds: { number } = {}
+		local attributes
 		local mesh = assert(AssetService:CreateEditableMesh(), `importEditableMesh: {path}: editable mesh memory exhausted`)
 		local ok, err = pcall(function()
 			local vertexCount = #data.positions
@@ -405,6 +408,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 					return mesh:AddNormal(data.normals[i])
 				end)
 				else nil
+			attributes = { vertices = vIds, normals = nIds or {} }
 			local uIds = if data.uvs
 				then addEach(vertexCount, "UV", function(i)
 					return mesh:AddUV(data.uvs[i])
@@ -463,7 +467,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 			mesh:Destroy()
 			error(`importEditableMesh: {path}: {tostring(err)}`, 2)
 		end
-		return mesh, boneIds
+		return mesh, boneIds, attributes
 	end
 
 	-- Reads a .glb or .gltf into a new EditableMesh. Node transforms are baked
@@ -482,7 +486,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 		return mesh
 	end
 
-	createScene(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob)
+	createScene(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, sceneMotion)
 
 	-- Internal plumbing for the roblox.captureViewport shim (rodeo-pkg/rodeo/shims/
 	-- roblox.luau), which composes these with the fs/process API. Not part of

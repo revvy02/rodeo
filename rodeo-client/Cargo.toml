@@ -42,7 +42,7 @@ fast_image_resize = "6"
 # roblox.exportEditableMesh / importEditableMesh: glTF 2.0 reader (`utils` for
 # typed accessor readers, `names` for node names; no `import` so no texture
 # decoding), base64 for data-URI buffers. Writing is hand-rolled JSON + GLB.
-gltf = { version = "1.4", default-features = false, features = ["utils", "names"] }
+gltf = { version = "1.4", default-features = false, features = ["utils", "names", "extras"] }
 base64 = "0.22"
 # OBJ polygon triangulation, including concave faces and 3D projection.
 earcut = "0.4.11"

@@ -361,7 +361,7 @@ pub(super) fn mat_from_cframe(c: &[f32; 12]) -> Mat4 {
 }
 
 /// Unit quaternion (x, y, z, w) from the rotation part of a column-major matrix.
-fn quat_from_mat(m: &Mat4) -> [f32; 4] {
+pub(super) fn quat_from_mat(m: &Mat4) -> [f32; 4] {
     let r = |row: usize, col: usize| m[col][row];
     let trace = r(0, 0) + r(1, 1) + r(2, 2);
     let q = if trace > 0.0 {
@@ -670,7 +670,17 @@ pub(super) fn build_gltf(mesh: &MeshData) -> Result<(serde_json::Value, Vec<u8>)
         let v = bin.view(&jbytes, Some(34962));
         let a = bin.accessor(v, 5123, vcount, "VEC4", None, None);
         attributes.insert("JOINTS_0".into(), serde_json::json!(a));
-        let v = bin.view(&f32s_bytes(mesh.weights.as_ref().unwrap()), Some(34962));
+        // EditableMesh quantizes each influence independently (e.g. two 0.5
+        // influences come back as 128/255). glTF requires their sum to be one.
+        let weights: Vec<[f32; 4]> = mesh.weights.as_ref().unwrap().iter().enumerate().map(|(i, slots)| {
+            let sum: f32 = slots.iter().sum();
+            if !sum.is_finite() || slots.iter().any(|v| *v < 0.) {
+                return Err(format!("vertex {i} has invalid skin weights"));
+            }
+            if sum <= 0. { return Err(format!("vertex {i} has zero total skin weight; glTF skins require weighted vertices")); }
+            Ok(slots.map(|v| v / sum))
+        }).collect::<Result<_, String>>()?;
+        let v = bin.view(&f32s_bytes(&weights), Some(34962));
         let a = bin.accessor(v, 5126, vcount, "VEC4", None, None);
         attributes.insert("WEIGHTS_0".into(), serde_json::json!(a));
     }
@@ -1129,6 +1139,19 @@ mod tests {
         let back = read_gltf(&path.to_string_lossy()).expect("read gltf");
         assert_geometry_eq(&m, &back);
         assert!(back.bones.is_empty() && back.joints.is_none());
+    }
+
+    #[test]
+    fn gltf_normalizes_quantized_skin_weights_and_rejects_unweighted_vertices() {
+        let dir = scratch("skin_weights");
+        let path = dir.join("mesh.glb");
+        let mut mesh = sample(true);
+        mesh.weights.as_mut().unwrap()[1] = [128. / 255., 128. / 255., 0., 0.];
+        write_gltf(&mesh, &path.to_string_lossy()).unwrap();
+        let decoded = read_gltf(&path.to_string_lossy()).unwrap();
+        assert_eq!(decoded.weights.as_ref().unwrap()[1], [0.5, 0.5, 0., 0.]);
+        mesh.weights.as_mut().unwrap()[1] = [0.; 4];
+        assert!(build_gltf(&mesh).unwrap_err().contains("zero total skin weight"));
     }
 
     #[test]
