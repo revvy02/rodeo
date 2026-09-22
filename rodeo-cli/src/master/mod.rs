@@ -1105,8 +1105,13 @@ pub async fn run_reconciliation(state: SharedBackendState) {
                             // string keys ("studio_id_from_server"/_client) are kept
                             // as-is for plugin wire compatibility — the VALUE they
                             // carry is an mcp_studio_id.
+                            // The edit DOM has no play peers, so it only fires the
+                            // bindable. It must be tested first: a Team Create edit
+                            // DOM reports IsClient() (it is a client of Roblox's Team
+                            // Create server), and a FireServer there would go to that
+                            // server — and, unpcall'd, skip the bindable fire.
                             let unify_code = format!(
-                                r#"local u = game:GetService("ReplicatedStorage"):FindFirstChild("RODEO_UNIFIER") if not u then return end local RunService = game:GetService("RunService") if RunService:IsServer() then u.RemoteEvent:FireAllClients("studio_id_from_server", "{msid}") end if RunService:IsClient() then u.RemoteEvent:FireServer("studio_id_from_client", "{msid}") end u.BindableEvent:Fire("{msid}")"#,
+                                r#"local u = game:GetService("ReplicatedStorage"):FindFirstChild("RODEO_UNIFIER") if not u then return end local RunService = game:GetService("RunService") if RunService:IsEdit() then elseif RunService:IsServer() then u.RemoteEvent:FireAllClients("studio_id_from_server", "{msid}") elseif RunService:IsClient() then u.RemoteEvent:FireServer("studio_id_from_client", "{msid}") end u.BindableEvent:Fire("{msid}")"#,
                                 msid = studio.mcp_studio_id,
                             );
                             // StudioMCP requires a datamodel_type ("Edit" /

@@ -12,10 +12,19 @@ local RunService = game:GetService("RunService")
 local StudioTestService = game:GetService("StudioTestService")
 
 local constants = require(script.Parent.constants)
+local dom_role = require(script.Parent.dom_role)
 
 -- Static (never change for this VM's lifetime)
 local isServer = RunService:IsServer()
 local isClient = RunService:IsClient()
+-- Role in the unifier exchange. Derived from DOM kind, not from the two
+-- network flags above: a Team Create edit DOM reports IsClient() only, yet
+-- must still host (see dom_role.luau).
+local role = dom_role.derive({
+	isEdit = RunService:IsEdit(),
+	isServer = isServer,
+	isClient = isClient,
+})
 
 -- RODEO_UNIFIER: cross-VM identity exchange
 local RODEO_UNIFIER: Folder
@@ -23,13 +32,19 @@ local RODEO_UNIFIER_REMOTE: RemoteEvent
 local RODEO_UNIFIER_BINDABLE: BindableEvent
 local RODEO_UNIFIER_MODULE: ModuleScript
 
-if isServer then
+if role.hosts then
 	RODEO_UNIFIER = ReplicatedStorage:FindFirstChild("RODEO_UNIFIER") :: Folder
 	if not RODEO_UNIFIER then
 		RODEO_UNIFIER = Instance.new("Folder")
 		RODEO_UNIFIER.Name = "RODEO_UNIFIER"
 		RODEO_UNIFIER.Parent = ReplicatedStorage
 	end
+	-- Rodeo scratch, not place content: never serialize it. In a Team Create
+	-- session ReplicatedStorage is a synced, autosaved DataModel, and in plain
+	-- edit this keeps `--save` output free of it. Play DataModels are clones
+	-- of the edit DataModel and drop non-archivable instances, so the play
+	-- server recreates its own (the FindFirstChild above then misses).
+	RODEO_UNIFIER.Archivable = false
 
 	RODEO_UNIFIER_REMOTE = RODEO_UNIFIER:FindFirstChild("RemoteEvent") :: RemoteEvent
 	if not RODEO_UNIFIER_REMOTE then
@@ -52,7 +67,7 @@ if isServer then
 		RODEO_UNIFIER_MODULE.Name = "ModuleScript"
 		RODEO_UNIFIER_MODULE.Parent = RODEO_UNIFIER
 	end
-elseif isClient then
+elseif role.joins then
 	RODEO_UNIFIER = ReplicatedStorage:WaitForChild("RODEO_UNIFIER") :: Folder
 	RODEO_UNIFIER_REMOTE = RODEO_UNIFIER:WaitForChild("RemoteEvent") :: RemoteEvent
 	RODEO_UNIFIER_BINDABLE = RODEO_UNIFIER:WaitForChild("BindableEvent") :: BindableEvent
@@ -155,7 +170,7 @@ local function computeState(): State
 	local isEdit = RunService:IsEdit()
 	local isRunMode = RunService:IsRunMode()
 
-	local clientMcpStudioId = if isClient then inputs.bindableMcpStudioId else next(inputs.clientMcpStudioIds)
+	local clientMcpStudioId = if role.joins then inputs.bindableMcpStudioId else next(inputs.clientMcpStudioIds)
 	local serverMcpStudioId = inputs.serverMcpStudioId or clientMcpStudioId or inputs.bindableMcpStudioId
 
 	-- test vs play (running, non-run-mode) comes from `inputs.sessionKind`, set
@@ -168,7 +183,7 @@ local function computeState(): State
 	local mode: "edit" | "run" | "test" | "play" = if isEdit then "edit" elseif isRunMode then "run" else sessionKind
 
 	local clientDomIds = nil
-	if isServer then
+	if role.serves then
 		local ids = {}
 		for id, player in inputs.clientDomIds do
 			ids[id] = {
@@ -179,15 +194,12 @@ local function computeState(): State
 		clientDomIds = ids
 	end
 
-	local domKind: "edit" | "server" | "client" = if isClient and isServer
-		then "edit"
-		elseif isServer then "server"
-		else "client"
+	local domKind: "edit" | "server" | "client" = role.domKind
 
 	return {
 		domId = domId,
 		studioId = studioId,
-		mcpStudioId = if isClient then clientMcpStudioId else serverMcpStudioId,
+		mcpStudioId = if role.joins then clientMcpStudioId else serverMcpStudioId,
 
 		isServer = isServer,
 		isClient = isClient,
@@ -201,7 +213,7 @@ local function computeState(): State
 		placeId = game.PlaceId,
 		gameId = game.GameId,
 
-		clientInfo = if isClient and Players.LocalPlayer
+		clientInfo = if role.joins and Players.LocalPlayer
 			then {
 				name = Players.LocalPlayer.Name,
 				userId = Players.LocalPlayer.UserId,
@@ -269,7 +281,7 @@ end)
 
 -- Event handlers: just update inputs, Heartbeat picks them up
 
-if isServer then
+if role.serves then
 	RODEO_UNIFIER_REMOTE.OnServerEvent:Connect(function(player, action, id)
 		if action == "register_client_dom_id" then
 			inputs.clientDomIds[id] = player
@@ -296,7 +308,7 @@ if isServer then
 	end)
 end
 
-if isClient then
+if role.joins then
 	RODEO_UNIFIER_REMOTE.OnClientEvent:Connect(function(action, id)
 		if action == "register_server_dom_id" then
 			inputs.serverDomId = id

@@ -232,6 +232,37 @@ export async function waitForDom(port: number, timeoutMs = 60_000): Promise<void
   }
 }
 
+// Waits until the Studio this port's serve launched (the one with a
+// sessionId) has its edit DOM connected, and returns its snapshot. Stricter
+// than waitForDom: every running backend's plugin also loads into hand-opened
+// Studios, which register on this port too — one already sitting in the same
+// place would satisfy "some DOM connected" before the launch has worked.
+export type OwnedStudioSnap = {
+  studioId: string;
+  sessionId?: string | null;
+  placeId: number | string;
+  placeName: string;
+  status: string;
+  editDomId?: string | null;
+  doms: Array<{ domId: string; domKind: string }>;
+};
+
+export async function waitForOwnedStudio(port: number, timeoutMs = 60_000): Promise<OwnedStudioSnap> {
+  const client = await RodeoClient.connect(`http://localhost:${port}`);
+  const start = Date.now();
+  try {
+    while (Date.now() - start < timeoutMs) {
+      const state = await client.getState().catch(() => null) as { studios?: OwnedStudioSnap[] } | null;
+      const owned = (state?.studios ?? []).find((s) => s.sessionId && s.editDomId);
+      if (owned) return owned;
+      await Bun.sleep(250);
+    }
+    throw new Error(`timed out waiting for the launched Studio's edit DOM on port ${port}`);
+  } finally {
+    await client.close();
+  }
+}
+
 // The Studio this port's serve launched, when there is exactly one. Every
 // running backend's plugin connects to every hand-opened Studio, so a harness
 // backend can see Studios it did not launch — and an unpinned run picks any
@@ -379,19 +410,45 @@ export type CliStudioHandle = {
   runFn: (opts: RunCodeOpts) => Promise<RunResult>;
   spawn: () => Promise<void>;
   close: () => Promise<void>;
+  /** The launched Studio's snapshot; set once spawn resolves. */
+  studio: () => OwnedStudioSnap;
 };
 
-export function cliStudioHandle(port: number): CliStudioHandle {
+export type CliStudioOpts = {
+  /** `--place` value: a place id or file. Omitted = empty place. */
+  place?: string;
+  /** How long to wait for the launched Studio to register (cloud and Team
+   *  Create places take longer than an empty one). */
+  timeoutMs?: number;
+};
+
+export function cliStudioHandle(port: number, opts: CliStudioOpts = {}): CliStudioHandle {
   let bg: BackgroundProcess | null = null;
+  let studio: OwnedStudioSnap | null = null;
   return {
     runFn: makeCliRunFn(port),
     spawn: async () => {
-      bg = spawnBackground(["run", "--port", String(port), "--place"]);
-      await waitForDom(port);
+      const args = ["run", "--port", String(port), "--place"];
+      if (opts.place !== undefined) args.push(opts.place);
+      bg = spawnBackground(args);
+      // A launch that dies (bad place, Studio's automatic-login account
+      // can't open it, ...) exits the run client: fail then, not at the
+      // deadline.
+      const died = bg.exited.then((code) => {
+        throw new Error(
+          `rodeo ${args.join(" ")} exited (${code}) before its Studio registered` +
+            (opts.place ? "; does Studio's automatic-login account have edit access to the place?" : ""),
+        );
+      });
+      studio = await Promise.race([waitForOwnedStudio(port, opts.timeoutMs), died]);
     },
     close: async () => {
       bg?.kill();
       await bg?.exited;
+    },
+    studio: () => {
+      if (!studio) throw new Error("cliStudioHandle: spawn has not resolved");
+      return studio;
     },
   };
 }
