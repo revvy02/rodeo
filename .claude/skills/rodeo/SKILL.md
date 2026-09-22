@@ -361,7 +361,11 @@ for the shot, restored afterward), `fov`, `focus`, `settle` (seconds to wait
 before capturing), `device` (a Studio device-simulator preset id such as
 `"iphone_13"` or `"hd_1080"`; layout, insets and orientation come from the
 preset), and `viewportSize` (a `Vector2`, the `Camera.ViewportSize` to capture
-at, at most 7680 by 4320; with `device` it overrides the preset's resolution).
+at, at most 7680 by 4320; with `device` it overrides the preset's resolution),
+and `resample` (default `true`: the image is exactly the viewport so UI offsets
+map 1:1 onto pixels; `false` writes the engine's frame at its rendered size, the
+viewport times the display scale, or whatever a script-driven device simulator
+set; that is how to get the engine's largest frame, 23466x13200 on a 2x display).
 
 The written image is always exactly the capture's `Camera.ViewportSize`, so
 UI offsets map 1:1 onto pixels and the size is the same on every machine;

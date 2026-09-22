@@ -444,7 +444,7 @@ export function process(run: RunFn): void {
   });
 }
 
-// ── capture (9 tests, plugin-only) ────────────────────────────────────────
+// ── capture (10 tests, plugin-only) ────────────────────────────────────────
 //
 // roblox.captureViewport drives Studio's device simulator for `device` / `viewportSize`
 // (plugin-handled RPCs) and finalizes the engine's frame on the run client,
@@ -549,6 +549,29 @@ export function capture(run: RunFn): void {
       const r = result.return as { path: string; width: number; height: number };
       expect(pngSize(r.path)).toEqual({ width: 7680, height: 4320 });
       expect({ width: r.width, height: r.height }).toEqual({ width: 7680, height: 4320 });
+    } finally {
+      rmrf(out);
+    }
+  });
+
+  it("capture: resample = false writes the engine's frame at its rendered size", async () => {
+    // The frame is the viewport times the display scale (2x on Retina, 1x on a
+    // 1x monitor), so assert the scale rather than a number: both axes share
+    // one whole-ish multiple of the requested 640x360, at least 1.
+    const out = captureOut("keep-frame");
+    try {
+      const result = await run({
+        showReturn: true,
+        source: captureSource(out, "{ viewportSize = Vector2.new(640, 360), resample = false, settle = 1 }"),
+      });
+      expect(result.ok).toBe(true);
+      const r = result.return as { path: string; width: number; height: number };
+      const size = pngSize(r.path);
+      expect({ width: r.width, height: r.height }).toEqual(size);
+      const sx = size.width / 640;
+      const sy = size.height / 360;
+      expect(sx).toBeGreaterThanOrEqual(1);
+      expect(Math.abs(sx - sy)).toBeLessThan(0.02);
     } finally {
       rmrf(out);
     }

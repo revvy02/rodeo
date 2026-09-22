@@ -62,6 +62,7 @@ fn finalize_pixels(
     source_height: u32,
     width: u32,
     height: u32,
+    keep_frame: bool,
     output: &str,
 ) -> Result<rt::RobloxCaptureCollectResponse, String> {
     use fast_image_resize::images::Image;
@@ -101,7 +102,7 @@ fn finalize_pixels(
         );
     }
 
-    let pixels: Vec<u8> = if (source_width, source_height) == (width, height) {
+    let pixels: Vec<u8> = if keep_frame || (source_width, source_height) == (width, height) {
         rgba
     } else {
         let src = Image::from_vec_u8(source_width, source_height, rgba, PixelType::U8x4)
@@ -117,11 +118,15 @@ fn finalize_pixels(
         dst.into_vec()
     };
 
-    write_png_atomic(&pixels, width, height, output)?;
+    // `keep_frame` writes the engine's frame as rendered (the viewport times the
+    // display scale, or whatever scale a caller-driven simulator produced);
+    // the default resamples to the viewport so pixels map 1:1 onto UI offsets.
+    let (out_width, out_height) = if keep_frame { (source_width, source_height) } else { (width, height) };
+    write_png_atomic(&pixels, out_width, out_height, output)?;
 
     Ok(rt::RobloxCaptureCollectResponse {
-        width,
-        height,
+        width: out_width,
+        height: out_height,
         source_width,
         source_height,
         ..Default::default()
@@ -235,7 +240,7 @@ pub async fn roblox_capture_collect(
         .capture_snapshots
         .remove(&req.token)
         .ok_or_else(|| format!("capture collect: unknown capture token {}", req.token))?;
-    let (width, height, output) = (req.width, req.height, req.output.clone());
+    let (width, height, keep_frame, output) = (req.width, req.height, req.keep_frame, req.output.clone());
     let deadline = tokio::time::Instant::now() + CAPTURE_FILE_TIMEOUT;
     loop {
         let snap = snapshot.clone();
@@ -247,7 +252,7 @@ pub async fn roblox_capture_collect(
             Ok(Some(frame)) => {
                 let out = output.clone();
                 return tokio::task::spawn_blocking(move || {
-                    finalize_pixels(frame.rgba, frame.width, frame.height, width, height, &out)
+                    finalize_pixels(frame.rgba, frame.width, frame.height, width, height, keep_frame, &out)
                 })
                 .await
                 .map_err(|e| format!("capture finalize task failed: {e}"))?;
@@ -380,17 +385,24 @@ fn scan_for_frame(snapshot: &CaptureSnapshot, width: u32, height: u32) -> Result
             let Ok(bytes) = std::fs::read(&path) else {
                 return Ok(None);
             };
-            // Still being written: no IEND yet, or the decoder rejects it. Try again.
+            // Still being written: no IEND yet. Try again.
             if !bytes.ends_with(&PNG_IEND) {
                 return Ok(None);
             }
-            match image::load_from_memory(&bytes) {
-                Ok(decoded) => {
-                    let (width, height) = (decoded.width(), decoded.height());
-                    Ok(Some(Frame { rgba: decoded.into_rgba8().into_raw(), width, height }))
-                }
-                Err(_) => Ok(None),
-            }
+            // The crate's default allocation cap is 512 MiB, which a 2x 8K frame
+            // just clears and the simulator's 3x frames (up to 23466x13200,
+            // 929 MB of RGB) do not; the file comes from the engine and its
+            // size is bounded by the simulator, so decode without a cap. A
+            // complete file the decoder still rejects is an error, not a wait.
+            let mut reader = image::ImageReader::new(std::io::Cursor::new(&bytes))
+                .with_guessed_format()
+                .map_err(|e| format!("roblox.captureViewport: could not read {}: {e}", path.display()))?;
+            reader.limits(image::Limits::no_limits());
+            let decoded = reader
+                .decode()
+                .map_err(|e| format!("roblox.captureViewport: the engine's capture file {} did not decode: {e}", path.display()))?;
+            let (width, height) = (decoded.width(), decoded.height());
+            Ok(Some(Frame { rgba: decoded.into_rgba8().into_raw(), width, height }))
         }
     }
 }
@@ -538,7 +550,7 @@ mod capture_finalize_tests {
 
     fn finalize(dir: &std::path::Path, sw: u32, sh: u32, w: u32, h: u32) -> Result<rt::RobloxCaptureCollectResponse, String> {
         let output = dir.join("nested").join("out.png");
-        finalize_pixels(frame(sw, sh), sw, sh, w, h, &output.to_string_lossy())
+        finalize_pixels(frame(sw, sh), sw, sh, w, h, false, &output.to_string_lossy())
     }
 
     #[test]
@@ -579,7 +591,7 @@ mod capture_finalize_tests {
     fn buffer_length_must_match_the_frame() {
         let dir = scratch("len");
         let output = dir.join("out.png");
-        let err = finalize_pixels(vec![0; 100], 10, 10, 10, 10, &output.to_string_lossy()).expect_err("short buffer");
+        let err = finalize_pixels(vec![0; 100], 10, 10, 10, 10, false, &output.to_string_lossy()).expect_err("short buffer");
         assert!(err.contains("100 bytes") && err.contains("400"), "{err}");
     }
 }
@@ -687,16 +699,51 @@ mod capture_collect_tests {
     }
 
     #[test]
+    fn keep_frame_writes_the_engine_frame_at_its_own_size() {
+        let dir = scratch("capture-keep");
+        let out = dir.join("keep.png");
+        let mut rgba = vec![0u8; 8 * 4 * 4];
+        rgba[0] = 255;
+        rgba[3] = 255;
+        // An 8x4 frame for a 4x2 viewport: resampled by default, kept as-is with keep_frame.
+        let res = finalize_pixels(rgba.clone(), 8, 4, 4, 2, true, out.to_str().unwrap()).unwrap();
+        assert_eq!((res.width, res.height, res.source_width, res.source_height), (8, 4, 8, 4));
+        let written = image::open(&out).unwrap();
+        assert_eq!((written.width(), written.height()), (8, 4));
+        let res = finalize_pixels(rgba, 8, 4, 4, 2, false, out.to_str().unwrap()).unwrap();
+        assert_eq!((res.width, res.height), (4, 2));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_complete_but_undecodable_file_is_an_error_not_a_wait() {
+        let dir = scratch("capture-corrupt");
+        let snapshot = CaptureSnapshot { dir: dir.clone(), files: list_dir(&dir) };
+        let mut bytes = PNG_SIGNATURE.to_vec();
+        bytes.extend_from_slice(&13u32.to_be_bytes());
+        bytes.extend_from_slice(b"IHDR");
+        bytes.extend_from_slice(&8u32.to_be_bytes());
+        bytes.extend_from_slice(&4u32.to_be_bytes());
+        bytes.extend_from_slice(&[8, 6, 0, 0, 0, 0, 0, 0, 0]);
+        bytes.extend_from_slice(b"garbage where the image data should be");
+        bytes.extend_from_slice(&PNG_IEND);
+        std::fs::write(dir.join("wob-4400000000"), &bytes).unwrap();
+        let err = scan_for_frame(&snapshot, 4, 2).expect_err("complete but corrupt");
+        assert!(err.contains("did not decode"), "{err}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn finalize_refuses_an_all_black_frame_and_writes_nothing() {
         let dir = scratch("capture-black");
         let out = dir.join("black.png");
-        let err = finalize_pixels(vec![0u8; 4 * 2 * 4], 4, 2, 4, 2, out.to_str().unwrap()).expect_err("black frame");
+        let err = finalize_pixels(vec![0u8; 4 * 2 * 4], 4, 2, 4, 2, false, out.to_str().unwrap()).expect_err("black frame");
         assert!(err.contains("entirely black"), "{err}");
         assert!(!out.exists(), "nothing written for a black frame");
 
         let mut rgba = vec![0u8; 4 * 2 * 4];
         rgba[5] = 1;
-        finalize_pixels(rgba, 4, 2, 4, 2, out.to_str().unwrap()).expect("one lit pixel is a frame");
+        finalize_pixels(rgba, 4, 2, 4, 2, false, out.to_str().unwrap()).expect("one lit pixel is a frame");
         assert!(out.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }

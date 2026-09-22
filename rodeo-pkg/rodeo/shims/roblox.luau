@@ -20,6 +20,7 @@ type CaptureOptions = {
 	settle: number?,
 	device: string?,
 	viewportSize: Vector2?,
+	resample: boolean?,
 }
 
 type CaptureInfo = {
@@ -73,6 +74,14 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 	if resolved.device ~= nil and type(resolved.device) ~= "string" then
 		error("roblox.captureViewport: device must be a simulator preset id string", 2)
 	end
+	if resolved.resample ~= nil and type(resolved.resample) ~= "boolean" then
+		error("roblox.captureViewport: resample must be a boolean", 2)
+	end
+	-- Default: the image is exactly the viewport, so UI offsets map 1:1 onto
+	-- pixels. `resample = false` keeps the engine's frame at its rendered size
+	-- (the viewport times the display scale, or whatever a caller-driven
+	-- simulator produced) for the largest image the engine will give.
+	local keepFrame = resolved.resample == false
 	if output then
 		output = output:gsub("\\", "/")
 	end
@@ -188,7 +197,7 @@ local function capture(output: string?, options: CaptureOptions?): (string, Capt
 			task.wait()
 		end
 
-		local outWidth, outHeight = roblox._captureCollect(captureToken, outputPath, width, height)
+		local outWidth, outHeight = roblox._captureCollect(captureToken, outputPath, width, height, keepFrame)
 		return outputPath, { width = outWidth, height = outHeight }
 	end
 

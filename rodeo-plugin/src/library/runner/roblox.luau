@@ -457,12 +457,13 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime)
 		return res.token
 	end
 
-	function roblox._captureCollect(token: string, output: string, width: number, height: number): (number, number)
+	function roblox._captureCollect(token: string, output: string, width: number, height: number, keepFrame: boolean): (number, number)
 		local res = rpc.call("roblox_capture_collect", runtime.RobloxCaptureCollectRequest.new({
 			token = token,
 			output = output,
 			width = width,
 			height = height,
+			keepFrame = keepFrame,
 		}))
 		return res.width, res.height
 	end

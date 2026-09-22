@@ -135,8 +135,9 @@ message RobloxCaptureBeginResponse {
 message RobloxCaptureCollectRequest {
   string token = 1;             // from roblox_capture_begin
   string output = 2;            // absolute output .png path
-  uint32 width = 3;             // Camera.ViewportSize at capture time = output size
+  uint32 width = 3;             // Camera.ViewportSize at capture time; the output size unless keep_frame
   uint32 height = 4;
+  bool keep_frame = 5;          // write the engine's frame at its own size instead of resampling to the viewport
 }
 
 // roblox.exportEditableImage: the plugin streamed an EditableImage's RGBA8

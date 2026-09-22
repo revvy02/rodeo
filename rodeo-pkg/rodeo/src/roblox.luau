@@ -16,6 +16,10 @@ local roblox = {}
 --- custom desktop device (at most 7680 by 4320); with `device`, overrides the
 --- preset's resolution. Either drives Studio's device simulator for the shot
 --- and restores it afterward, the way the camera fields are restored.
+--- `resample` — `true` (the default) resamples the engine's frame to exactly
+--- the viewport, so UI offsets map 1:1 onto pixels; `false` writes the frame
+--- at its rendered size, the viewport times the display scale (2x on Retina),
+--- or whatever scale a script-driven device simulator set.
 export type CaptureOptions = {
 	cframe: CFrame?,
 	fov: number?,
@@ -23,6 +27,7 @@ export type CaptureOptions = {
 	settle: number?,
 	device: string?,
 	viewportSize: Vector2?,
+	resample: boolean?,
 }
 
 --- Size of the image `captureViewport` wrote, in pixels. Always the capture's

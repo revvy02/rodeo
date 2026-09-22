@@ -604,6 +604,7 @@ type _RobloxCaptureCollectRequestFields = {
 	output: string,
 	width: number,
 	height: number,
+	keepFrame: boolean,
 }
 
 export type _RobloxCaptureCollectRequestPartialFields = {
@@ -611,6 +612,7 @@ export type _RobloxCaptureCollectRequestPartialFields = {
 	output: string?,
 	width: number?,
 	height: number?,
+	keepFrame: boolean?,
 }
 
 export type RobloxCaptureCollectRequest = typeof(setmetatable(
@@ -3909,6 +3911,7 @@ do
 			output = if data == nil or data.output == nil then "" else data.output,
 			width = if data == nil or data.width == nil then 0 else data.width,
 			height = if data == nil or data.height == nil then 0 else data.height,
+			keepFrame = if data == nil or data.keepFrame == nil then false else data.keepFrame,
 		}, _RobloxCaptureCollectRequestImpl :: _RobloxCaptureCollectRequestImpl)
 	end
 
@@ -3936,6 +3939,11 @@ do
 			output, cursor = proto.writeVarInt(output, cursor, self.height)
 		end
 
+		if self.keepFrame then
+			output, cursor = proto.writeTag(output, cursor, 5, proto.wireTypes.varint)
+			output, cursor = proto.writeVarInt(output, cursor, if self.keepFrame then 1 else 0)
+		end
+
 		local shrunkBuffer = buffer.create(cursor)
 		buffer.copy(shrunkBuffer, 0, output, 0, cursor)
 		return shrunkBuffer
@@ -3959,6 +3967,11 @@ do
 					local value
 					value, cursor = proto.readVarIntU32(input, cursor)
 					self.height = value
+					continue
+				elseif field == 5 then
+					local value
+					value, cursor = proto.readVarInt(input, cursor)
+					self.keepFrame = value ~= 0
 					continue
 				end
 
@@ -4018,6 +4031,10 @@ do
 			output.height = self.height
 		end
 
+		if self.keepFrame then
+			output.keepFrame = self.keepFrame
+		end
+
 		return output
 	end
 
@@ -4038,6 +4055,10 @@ do
 
 		if input.height ~= nil then
 			self.height = input.height
+		end
+
+		if input.keepFrame ~= nil then
+			self.keepFrame = input.keepFrame
 		end
 
 		return self
