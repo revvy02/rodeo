@@ -6,6 +6,7 @@ import { it, expect } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import type { RunCodeOpts, RunResult } from "../../rodeo-client-ts/src/run.js";
+import { writeMinimalGlb } from "./glb.js";
 
 export type RunFn = (opts: RunCodeOpts) => Promise<RunResult>;
 
@@ -940,6 +941,27 @@ export function meshes(run: RunFn): void {
       expect(r.faces).toBe(16000);
       expect(r.attributesOk).toBe(true);
       expect(r.seconds).toBeLessThan(30);
+    } finally {
+      rmrf(glb);
+    }
+  });
+
+  it("meshes: past the engine's vertex cap, its error surfaces with the count reached (issue #20)", async () => {
+    // No cap is hardcoded in rodeo: the engine refuses the add (60000 vertices
+    // per mesh on Studio 0.739) and rodeo keeps its words, annotated with how
+    // far the build got. 200000 stays over any plausible raise of the cap, and
+    // the assertions avoid the exact refusal index for the same reason.
+    const glb = meshOut("over-cap", "glb");
+    try {
+      writeMinimalGlb(glb, 200000, 1);
+      const result = await run({
+        source: `local roblox = require("@rodeo/roblox")
+          roblox.importEditableMesh("${glb}")`,
+      });
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain("above limit");
+      expect(result.output).toContain("adding vertex");
+      expect(result.output).toContain("of 200000");
     } finally {
       rmrf(glb);
     }
