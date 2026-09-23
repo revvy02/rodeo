@@ -22,7 +22,7 @@ local constraint=Instance.new('AnimationConstraint');constraint.Attachment0=a;co
 local controller=Instance.new('AnimationController');controller.Parent=rig
 local animator=Instance.new('Animator');animator.Parent=controller
 local clip=Instance.new('KeyframeSequence');clip.Name='Ease';clip.Loop=false;clip.Priority=Enum.AnimationPriority.Action2
-for i=0,1 do
+for _,i in {0,.1,.3,1} do
  local key=Instance.new('Keyframe');key.Time=i;key.Parent=clip
  if i==1 then local marker=Instance.new('KeyframeMarker');marker.Name='Done';marker.Value='left';marker.Parent=key end
  local p=Instance.new('Pose');p.Name='Root';p.Weight=0;p.Parent=key
@@ -63,6 +63,7 @@ rig:Destroy();clip:Destroy();return true
 `});expect(result.ok,result.output).toBe(true);
    const bytes=readFileSync(path),doc=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)));
    expect(doc.animations[0].extras.rodeo).toEqual({loop:false,priority:'Action2',sampleRate:60,markers:[{time:1,name:'Done',value:'left'}]});
+   expect(doc.accessors[doc.animations[0].samplers[0].input].count).toBe(61);
    const report=await validateBytes(new Uint8Array(bytes));expect(report.issues.numErrors,JSON.stringify(report.issues)).toBe(0);
   }finally{rmSync(path,{force:true});}
  });
@@ -73,6 +74,14 @@ rig:Destroy();clip:Destroy();return true
 local r=require('@rodeo/roblox');local fs=require('@rodeo/fs');local stream=require('@rodeo/stream')
 local scene=r.importEditableScene('tests/fixtures/pkg/scenes/animated-skin.gltf')
 local rig=scene.roots[1];local clip=scene.animations[1].clip
+-- Authored fractional keys must deduplicate against 60 Hz samples after
+-- conversion to glTF float32 timestamps, for curve clips as well as poses.
+for _,curve in clip:GetDescendants() do
+ if curve:IsA('FloatCurve') then
+  curve:InsertKey(FloatCurveKey.new(.1,0,Enum.KeyInterpolationMode.Linear))
+  curve:InsertKey(FloatCurveKey.new(.3,.2,Enum.KeyInterpolationMode.Linear));break
+ end
+end
 local options={animationClips={{rig=rig,clip=clip}}}
 r.exportEditableScene('${path}',{rig},options)
 local function read() local h=fs.open('${path}','r');local b=buffer.tostring(stream.readBytes(h));stream.close(h);return b end

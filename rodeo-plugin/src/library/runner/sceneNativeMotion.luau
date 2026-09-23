@@ -12,26 +12,34 @@ end
 
 local function clipTimes(clip, rate)
 	local times, duration = { [0] = true }, 0
+	local packed = buffer.create(4)
+	local function add(time)
+		assert(time >= 0 and time < math.huge, "animation times must be finite and nonnegative")
+		-- glTF stores times as float32. Deduplicate in that representation,
+		-- before source keys and uniform samples can collapse to equal keys.
+		buffer.writef32(packed, 0, time)
+		local rounded = buffer.readf32(packed, 0)
+		assert(rounded < math.huge, "animation time exceeds glTF float32 range")
+		times[rounded] = true
+		return rounded
+	end
 	for _, child in clip:GetDescendants() do
 		if child:IsA("Keyframe") then
-			times[child.Time] = true
-			duration = math.max(duration, child.Time)
+			duration = math.max(duration, add(child.Time))
 		elseif child:IsA("FloatCurve") or child:IsA("RotationCurve") then
 			for _, key in child:GetKeys() do
-				times[key.Time] = true
-				duration = math.max(duration, key.Time)
+				duration = math.max(duration, add(key.Time))
 			end
 		elseif child:IsA("NumberPose") then
 			error("native animation export does not support NumberPose/facial tracks")
 		end
 	end
 	for i = 1, math.ceil(duration * rate) - 1 do
-		times[i / rate] = true
+		add(i / rate)
 	end
-	times[duration] = true
+	add(duration)
 	local ordered = {}
 	for time in times do
-		assert(time >= 0 and time < math.huge, "animation times must be finite and nonnegative")
 		table.insert(ordered, time)
 	end
 	table.sort(ordered)
