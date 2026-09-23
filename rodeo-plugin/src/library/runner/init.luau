@@ -77,7 +77,8 @@ local apis = {
 		runtime,
 		require(ref("scene")),
 		require(ref("sceneMotion")),
-		require(ref("scenePrimitives"))
+		require(ref("scenePrimitives")),
+		require(ref("sceneNativeMotion"))
 	),
 }
 

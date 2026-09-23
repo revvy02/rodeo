@@ -39,6 +39,7 @@ pub(in crate::runtime) struct Target {
 pub(in crate::runtime) struct Animation {
     pub name: String,
     pub source_index: Option<usize>,
+    pub metadata: Option<Value>,
     pub channels: Vec<Channel>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -163,6 +164,11 @@ pub(super) fn read_animations(
             animations.push(Animation {
                 name: animation.name().unwrap_or("Animation").into(),
                 source_index: Some(animation.index()),
+                metadata: animation
+                    .extras()
+                    .as_ref()
+                    .and_then(|e| serde_json::from_str::<Value>(e.get()).ok())
+                    .and_then(|e| e.get("rodeo").cloned()),
                 channels,
             });
         }
@@ -466,7 +472,11 @@ pub(super) fn write_animations(
                     .push(json!({"sampler":sampler,"target":{"node":node,"path":channel.path}}));
             }
         }
-        animations.push(json!({"name":animation.name,"channels":channels,"samplers":samplers}));
+        let mut output = json!({"name":animation.name,"channels":channels,"samplers":samplers});
+        if let Some(metadata) = &animation.metadata {
+            output["extras"] = json!({"rodeo":metadata});
+        }
+        animations.push(output);
     }
     root["animations"] = json!(animations);
     Ok(())

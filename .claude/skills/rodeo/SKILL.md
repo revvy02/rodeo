@@ -2,12 +2,12 @@
 name: rodeo
 description: CLI tool for Roblox Studio that lets you create studio instances, and run code in any studio environment. Includes commands, flags, DOM targeting, directives, return values, and @rodeo APIs. Use when writing rodeo commands, scripts, or working with Roblox Studio.
 metadata:
-  version: 1.5.0-rc.9
+  version: 1.5.0-rc.10
 ---
 
 # rodeo
 
-This skill describes rodeo **1.5.0-rc.9**. Projects pin their own rodeo version, so
+This skill describes rodeo **1.5.0-rc.10**. Projects pin their own rodeo version, so
 check `rodeo --version` in the project: if it differs, this copy of the skill may
 document flags or APIs that binary does not have (or lack ones it does).
 
@@ -330,7 +330,7 @@ roblox.importEditableImage(path) -> EditableImage  -- load a .png/.jpg as an Edi
 roblox.exportEditableMesh(path, mesh) -> { string }  -- write an EditableMesh as .glb/.gltf/.obj; returns what the format dropped
 roblox.importEditableMesh(path) -> EditableMesh    -- load a .glb/.gltf/.obj as an EditableMesh
 roblox.importEditableScene(path, options?) -> EditableScene -- .glb/.gltf hierarchy, live resources, curves/morphs and optional playback rig
-roblox.exportEditableScene(path, sceneOrRoots) -> { string } -- full scene preserves motion; roots-only exports static pose
+roblox.exportEditableScene(path, sceneOrRoots, options?) -> { string } -- portable motion or native clip/rig pairs
 ```
 
 `bake` emits `return <value>` and writes Roblox types as constructors
@@ -383,6 +383,32 @@ Neon emission and Glass/ForceField transmission use glTF material factors and
 report approximation warnings. Scalar factors survive import/export; emissive
 textures remain unsupported. Unposed skins without Bone instances can export
 with MeshPart sizing; scaled live Bone poses still require baking.
+
+Native Roblox clips can be exported with an explicit rig pairing:
+
+```luau
+roblox.exportEditableScene("walk.glb", {rig}, {
+    animationClips = {{rig = rig, clip = keyframeSequenceOrCurveAnimation}},
+    animationSampleRate = 60, -- optional; Hz, maximum 1000
+})
+```
+
+An isolated clone evaluates each clip through Roblox's Animator. Motor6Ds,
+kinematic AnimationConstraints and Bones become glTF joint hierarchies; welds
+carry rigid attachments. This bakes **full rig poses**, including unkeyed joints,
+so exported clips are standalone poses rather than additive/partial layers.
+Source key times are retained, with uniform samples between them; interpolation
+between samples approximates native easing and always reports a warning.
+`strict = true` therefore rejects native baking. Use portable `scene.animations`
+for exact glTF curve round trips; it cannot be combined with `animationClips`.
+Rigs/clips must be Archivable. Non-kinematic constraints, scaled rig frames,
+cycles, multiple joints driving one part, incomplete live skins, and facial
+NumberPose tracks error.
+Zero-duration clips export a static pose; empty clips error. The source rig,
+its current pose, and its Animator tracks are not modified. Clip loop, priority,
+named keyframes and markers survive in `SceneAnimation.metadata` and glTF
+animation `extras.rodeo`. Markers are portable metadata, not restored native
+event tracks. Clip registration is local to Studio; no upload is performed.
 
 `imageSources` in export options maps an `EditableImage` (or a URI `Content`)
 to an original host image path. This replaces preview pixels during export and

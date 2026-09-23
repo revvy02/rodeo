@@ -70,7 +70,8 @@ end
 function motion.exportAnimations(scene, nodeIds)
 	local result = {}
 	for _, animation in scene.animations or {} do
-		local clip = { name = animation.name, sourceIndex = animation.sourceIndex, channels = {} }
+		local clip =
+			{ name = animation.name, sourceIndex = animation.sourceIndex, metadata = animation.metadata, channels = {} }
 		for _, channel in animation.channels do
 			local targets = { channel.node }
 			if channel.path == "weights" then
@@ -376,7 +377,15 @@ function motion.buildRig(scene, document, nodes, own)
 		end
 
 		local native = own(Instance.new("CurveAnimation"))
-		native.Name, native.Loop = clip.name, false
+		native.Name, native.Loop = clip.name, type(clip.metadata) == "table" and clip.metadata.loop == true
+		if type(clip.metadata) == "table" and clip.metadata.priority then
+			for _, priority in Enum.AnimationPriority:GetEnumItems() do
+				if priority.Name == clip.metadata.priority then
+					native.Priority = priority
+					break
+				end
+			end
+		end
 		local approximated, quantized = false, false
 		local ok, err = xpcall(function()
 			for index in animated do

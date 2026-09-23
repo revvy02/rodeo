@@ -1,3 +1,4 @@
+import { sceneNativeMotion } from "./sceneNativeMotionTests.js";
 import { sceneExport } from "./sceneExportTests.js";
 import { sceneReview } from "./sceneReviewTests.js";
 import { it, expect } from "bun:test";
@@ -13,6 +14,7 @@ const cleanup = `local function destroy(scene)
 end`;
 
 export function scenes(run: RunFn): void {
+  sceneNativeMotion(run);
   sceneReview(run);
   sceneExport(run);
   it("scene: exact curves and sparse morphs survive live edits, corner splits and repeated exports", async () => {

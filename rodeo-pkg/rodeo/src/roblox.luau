@@ -199,6 +199,11 @@ export type SceneAnimationChannel = {
 export type SceneAnimation = {
     name: string,
     sourceIndex: number?,
+    metadata: {
+        loop: boolean?, priority: string?, sampleRate: number?,
+        markers: { {time: number, name: string, value: string} }?,
+        keyframes: { {time: number, name: string} }?,
+    }?,
     channels: { SceneAnimationChannel },
     clip: CurveAnimation?,
     animation: Animation?,
@@ -233,6 +238,13 @@ export type ImportEditableSceneOptions = {
 --- Procedural scenes can supply portable motion along with their roots.
 --- The full import result is also accepted and retains source coordinate frames.
 export type ExportEditableSceneOptions = {
+    -- Bake full native rig poses through an isolated Animator. Source key times
+    -- are retained; interpolation between samples approximates native easing.
+    -- Choose these or portable scene.animations, not both. Rigs and clips must
+    -- be Archivable, with rigid unscaled frames and kinematic constraints.
+    animationClips: { { rig: Model, clip: AnimationClip } }?,
+    animationSampleRate: number?, -- default 60 Hz; maximum 1000
+
     -- Replace a preview image/URI with an original host file during export.
     -- Keys are EditableImage objects (Object content) or Content URI values.
     -- Paths resolve against the calling process working directory. Images are

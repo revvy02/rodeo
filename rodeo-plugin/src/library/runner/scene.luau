@@ -1,6 +1,6 @@
 -- Scene assembly is separate from mesh/image codecs. All objects created by
 -- import are caller-owned; failures destroy the entire partial result.
-return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, motion, primitives)
+return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, motion, primitives, nativeMotion)
 	local AssetService = game:GetService("AssetService")
 	local HttpService = game:GetService("HttpService")
 	local mapProperties = {
@@ -336,7 +336,12 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			end
 			scene.roots = { container }
 			for _, animation in document.animations do
-				local clip = { name = animation.name, sourceIndex = animation.sourceIndex, channels = {} }
+				local clip = {
+					name = animation.name,
+					sourceIndex = animation.sourceIndex,
+					metadata = animation.metadata,
+					channels = {},
+				}
 				for _, channel in animation.channels do
 					channel.node = nodes[channel.node + 1]
 					channel.node:SetAttribute("RodeoSceneData", true)
@@ -364,6 +369,14 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		checkPath(path)
 		local scene = if input.roots then input else nil
 		local roots = if scene then scene.roots else input
+		local nativeClips = options and options.animationClips
+		if nativeClips and #nativeClips == 0 then
+			nativeClips = nil
+		end
+		assert(
+			not (nativeClips and scene and scene.animations and #scene.animations > 0),
+			"choose portable animations or native animationClips for one export"
+		)
 		local document =
 			{ name = "Scene", roots = {}, nodes = {}, meshes = {}, images = {}, materials = {}, warnings = {} }
 		local morphs, weightsFor = {}, {}
@@ -625,7 +638,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 					)
 					table.insert(bound, bone or false)
 				end
-				table.insert(skinBindings, { binding = binding, bones = bound })
+				table.insert(skinBindings, { binding = binding, bones = bound, part = part })
 			end
 			return binding
 		end
@@ -657,7 +670,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				node.world = matrix(frame, sourceScale)
 				local localScale = instance:GetAttribute("RodeoSceneLocalScale")
 				node.localScale = { localScale.X, localScale.Y, localScale.Z }
-			elseif scene then
+			elseif scene or nativeClips then
 				node.world = matrix(frame, Vector3.one)
 			end
 			if not scene and instance:GetAttribute("RodeoSceneData") then
@@ -677,6 +690,18 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 					or child:IsA("Bone")
 					or child:IsA("DataModelMesh")
 					or child:GetAttribute("RodeoSceneHelper")
+					or (
+						nativeClips
+						and (
+							child:IsA("JointInstance")
+							or child:IsA("Constraint")
+							or child:IsA("AnimationController")
+							or child:IsA("Humanoid")
+							or child:IsA("AnimationClip")
+							or child:IsA("Animation")
+							or child:IsA("BaseScript")
+						)
+					)
 				then
 					continue
 				end
@@ -687,7 +712,9 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		local handle
 		local ok, result = pcall(function()
 			for _, root in roots do
-				if root:GetAttribute("RodeoSceneContainer") or root:GetAttribute("RodeoSceneRig") then
+				if
+					not nativeClips and (root:GetAttribute("RodeoSceneContainer") or root:GetAttribute("RodeoSceneRig"))
+				then
 					document.name = root.Name
 					for _, child in root:GetChildren() do
 						if not child:GetAttribute("RodeoSceneHelper") then
@@ -737,6 +764,18 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			end
 			if scene then
 				document.animations = motion.exportAnimations(scene, seen)
+			end
+
+			if nativeClips then
+				nativeMotion(
+					document,
+					seen,
+					skinBindings,
+					nativeClips,
+					options.animationSampleRate or 60,
+					matrix,
+					warning
+				)
 			end
 
 			local chunks = { buffer.fromstring(HttpService:JSONEncode(document)) }

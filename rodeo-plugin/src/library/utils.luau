@@ -136,6 +136,7 @@ local function createExecutionContext(source: string, context: RunContext, execu
 	local robloxMod = cloneDep(runnerTemplate.roblox, "@rodeo/roblox")
 	local sceneMod = cloneDep(runnerTemplate.scene, "@rodeo/scene")
 	local scenePrimitivesMod = cloneDep(runnerTemplate.scenePrimitives, "@rodeo/scenePrimitives")
+	local sceneNativeMotionMod = cloneDep(runnerTemplate.sceneNativeMotion, "@rodeo/sceneNativeMotion")
 	local sceneMotionMod = cloneDep(runnerTemplate.sceneMotion, "@rodeo/sceneMotion")
 
 	-- Build refs Folder with ObjectValues (runner init.luau resolves deps via script.refs)
@@ -173,6 +174,7 @@ local function createExecutionContext(source: string, context: RunContext, execu
 	addRef("scene", sceneMod)
 	addRef("sceneMotion", sceneMotionMod)
 	addRef("scenePrimitives", scenePrimitivesMod)
+	addRef("sceneNativeMotion", sceneNativeMotionMod)
 
 	-- Create thin shim Script/LocalScript for server/client (must be parented to trigger execution)
 	local shim: (Script | LocalScript)? = nil
