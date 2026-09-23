@@ -74,6 +74,8 @@ pub(super) struct MeshInfo {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ImageInfo {
+    #[serde(default)]
+    pub path: Option<String>,
     pub width: u32,
     pub height: u32,
     pub source_index: Option<usize>,
@@ -82,6 +84,12 @@ pub(super) struct ImageInfo {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Material {
+    #[serde(default)]
+    pub emissive: [f32; 3],
+    #[serde(default = "one")]
+    pub emissive_strength: f32,
+    #[serde(default)]
+    pub transmission: f32,
     pub name: String,
     pub source_index: Option<usize>,
     pub color: [f32; 4],
@@ -166,16 +174,28 @@ fn unpack(bytes: &[u8]) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8>>), String> 
         pos += len;
         Ok(chunk)
     };
-    let scene: Scene =
+    let mut scene: Scene =
         serde_json::from_slice(next()?).map_err(|e| format!("scene metadata: {e}"))?;
     let meshes = (0..scene.meshes.len())
         .map(|_| mesh::decode_blob(next()?))
         .collect::<Result<Vec<_>, _>>()?;
     let images = scene
         .images
-        .iter()
+        .iter_mut()
         .map(|i| {
             let data = next()?;
+            if let Some(path) = i.path.take() {
+                if !data.is_empty() {
+                    return Err("file-backed scene image must not carry pixels".into());
+                }
+                let bytes = std::fs::read(&path).map_err(|e| format!("scene image {path}: {e}"))?;
+                let image = image::load_from_memory(&bytes)
+                    .map_err(|e| format!("scene image {path}: {e}"))?
+                    .into_rgba8();
+                i.width = image.width();
+                i.height = image.height();
+                return Ok(image.into_raw());
+            }
             if u64::from(i.width) * u64::from(i.height) * 4 != data.len() as u64 {
                 return Err("scene image dimensions do not match pixels".into());
             }
@@ -304,7 +324,12 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
     let gltf = parse_gltf(&bytes).map_err(|e| format!("glTF: {e}"))?;
     let raw: Value = serde_json::to_value(gltf.document.as_json()).map_err(|e| e.to_string())?;
     if let Some(required) = raw["extensionsRequired"].as_array() {
-        if !required.is_empty() {
+        if required.iter().any(|v| {
+            !matches!(
+                v.as_str(),
+                Some("KHR_materials_emissive_strength" | "KHR_materials_transmission")
+            )
+        }) {
             return Err(format!(
                 "required glTF extensions are unsupported: {required:?}"
             ));
@@ -326,14 +351,17 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
             .warnings
             .push("Only the default (or first) glTF scene was imported".into());
     }
-    if raw["extensionsUsed"]
-        .as_array()
-        .is_some_and(|v| !v.is_empty())
-    {
-        scene.warnings.push(format!(
-            "glTF extensions are unsupported: {}",
-            raw["extensionsUsed"]
-        ));
+    if let Some(used) = raw["extensionsUsed"].as_array() {
+        for name in used {
+            if !matches!(
+                name.as_str(),
+                Some("KHR_materials_emissive_strength" | "KHR_materials_transmission")
+            ) {
+                scene
+                    .warnings
+                    .push(format!("glTF extension is unsupported: {name}"));
+            }
+        }
     }
     let mut parents = vec![None; gltf.nodes().len()];
     for node in gltf.nodes() {
@@ -537,6 +565,9 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                     let pbr = mat.pbr_metallic_roughness();
                     let mut record = Material {
                         name: mat.name().unwrap_or("Material").into(),
+                        emissive: mat.emissive_factor(),
+                        emissive_strength: mat.emissive_strength().unwrap_or(1.),
+                        transmission: mat.transmission().map_or(0., |t| t.transmission_factor()),
                         source_index: mat.index(),
                         color: pbr.base_color_factor(),
                         double_sided: mat.double_sided(),
@@ -648,6 +679,7 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                         }
                         let id = pixels.len();
                         scene.images.push(ImageInfo {
+                            path: None,
                             width: image.width(),
                             height: image.height(),
                             source_index: source_id,
@@ -711,13 +743,21 @@ pub(super) fn read_scene(path: &str) -> Result<(Scene, Vec<MeshData>, Vec<Vec<u8
                             .warnings
                             .push(format!("{label}: normal texture scale is unsupported"));
                     }
-                    if mat.occlusion_texture().is_some()
-                        || mat.emissive_texture().is_some()
-                        || mat.emissive_factor() != [0.; 3]
-                    {
+                    if mat.occlusion_texture().is_some() || mat.emissive_texture().is_some() {
                         scene.warnings.push(format!(
-                            "{label}: occlusion and emissive channels are unsupported"
+                            "{label}: occlusion and emissive textures are unsupported"
                         ));
+                    }
+                    if record.emissive != [0.; 3] || record.transmission != 0. {
+                        scene.warnings.push(format!("{label}: emission/transmission factors are preserved; Roblox preview is approximate"));
+                    }
+                    if mat
+                        .transmission()
+                        .is_some_and(|t| t.transmission_texture().is_some())
+                    {
+                        scene
+                            .warnings
+                            .push(format!("{label}: transmission textures are unsupported"));
                     }
                     if mat.alpha_mode() == gltf::material::AlphaMode::Mask {
                         record.alpha_mode = "BLEND".into();
@@ -822,9 +862,23 @@ pub(super) fn write_scene(
         }
         pieces.push((primitive, part));
     }
+    let mut extensions = std::collections::BTreeSet::new();
     let mut image_ids = HashMap::new();
     for material in &scene.materials {
         let mut out = json!({"name":material.name,"pbrMetallicRoughness":{"baseColorFactor":material.color,"metallicFactor":material.metalness,"roughnessFactor":material.roughness},"doubleSided":material.double_sided,"alphaMode":material.alpha_mode});
+        if material.emissive != [0.; 3] {
+            out["emissiveFactor"] = json!(material.emissive);
+            if material.emissive_strength != 1. {
+                out["extensions"]["KHR_materials_emissive_strength"] =
+                    json!({"emissiveStrength": material.emissive_strength});
+                extensions.insert("KHR_materials_emissive_strength");
+            }
+        }
+        if material.transmission != 0. {
+            out["extensions"]["KHR_materials_transmission"] =
+                json!({"transmissionFactor": material.transmission});
+            extensions.insert("KHR_materials_transmission");
+        }
         if let Some(native) = &material.native_material {
             out["extras"] = json!({"rodeo":{"material":native}});
         }
@@ -887,6 +941,9 @@ pub(super) fn write_scene(
             out["pbrMetallicRoughness"]["metallicRoughnessTexture"] = json!({"index":t});
         }
         root["materials"].as_array_mut().unwrap().push(out);
+    }
+    if !extensions.is_empty() {
+        root["extensionsUsed"] = json!(extensions);
     }
     let mut parents = vec![None; scene.nodes.len()];
     for (i, node) in scene.nodes.iter().enumerate() {
@@ -1207,6 +1264,7 @@ mod tests {
             ],
             meshes: vec![MeshInfo::default()],
             images: vec![ImageInfo {
+                path: None,
                 width: 2,
                 height: 1,
                 source_index: None,
@@ -1214,6 +1272,9 @@ mod tests {
             }],
             materials: vec![Material {
                 name: "Paint".into(),
+                emissive: [0.; 3],
+                emissive_strength: 1.,
+                transmission: 0.,
                 source_index: None,
                 color: [0.2, 0.4, 0.8, 0.5],
                 double_sided: true,
@@ -1250,6 +1311,26 @@ mod tests {
             write_scene(&out, &geometry, &images, &f.0).unwrap();
             assert_eq!(read_scene(&f.0).unwrap().0.nodes.len(), 3);
         }
+    }
+    #[test]
+    fn textured_emission_and_transmission_warn_once_per_material() {
+        let file = Temp::new("glb");
+        let (mut scene, meshes, pixels) = fixture();
+        scene.materials[0].emissive = [0.1, 0.5, 0.8];
+        scene.materials[0].emissive_strength = 3.;
+        scene.materials[0].transmission = 0.9;
+        write_scene(&scene, &meshes, &pixels, &file.0).unwrap();
+        let (out, _, _) = read_scene(&file.0).unwrap();
+        assert_eq!(out.materials[0].emissive, [0.1, 0.5, 0.8]);
+        assert_eq!(out.materials[0].emissive_strength, 3.);
+        assert_eq!(out.materials[0].transmission, 0.9);
+        assert_eq!(
+            out.warnings
+                .iter()
+                .filter(|w| w.contains("emission/transmission factors"))
+                .count(),
+            1
+        );
     }
     #[test]
     fn separate_primitives_keep_partial_attributes_and_source_indices() {

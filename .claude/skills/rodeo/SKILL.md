@@ -2,12 +2,12 @@
 name: rodeo
 description: CLI tool for Roblox Studio that lets you create studio instances, and run code in any studio environment. Includes commands, flags, DOM targeting, directives, return values, and @rodeo APIs. Use when writing rodeo commands, scripts, or working with Roblox Studio.
 metadata:
-  version: 1.5.0-rc.8
+  version: 1.5.0-rc.9
 ---
 
 # rodeo
 
-This skill describes rodeo **1.5.0-rc.8**. Projects pin their own rodeo version, so
+This skill describes rodeo **1.5.0-rc.9**. Projects pin their own rodeo version, so
 check `rodeo --version` in the project: if it differs, this copy of the skill may
 document flags or APIs that binary does not have (or lack ones it does).
 
@@ -374,12 +374,25 @@ array with `nodeIndex`, `meshIndex`, `primitiveIndex`, `skinIndex`, `materialInd
 renderable `Bone`, so names need not be unique in the source.
 
 `exportEditableScene(path, sceneOrRoots, { strict = true }?)` accepts imported or procedural instance trees:
-Models/Folders, MeshParts, block Parts, Attachments, and supported Bone rigs.
+Models/Folders, MeshParts, block/ball/cylinder Parts, WedgeParts,
+CornerWedgeParts, primitive legacy meshes, Attachments, and supported Bone rigs.
+Curved primitives use 24 segments (balls: 16 latitude intervals). Native
+ball/cylinder sizing and legacy Scale/Offset are respected. Legacy
+FileMesh/Head/Torso meshes and reflected legacy scales require baking.
+Neon emission and Glass/ForceField transmission use glTF material factors and
+report approximation warnings. Scalar factors survive import/export; emissive
+textures remain unsupported. Unposed skins without Bone instances can export
+with MeshPart sizing; scaled live Bone poses still require baking.
+
+`imageSources` in export options maps an `EditableImage` (or a URI `Content`)
+to an original host image path. This replaces preview pixels during export and
+avoids EditableImage's 1024-pixel limit; paths are relative to the caller's cwd.
+For example: `{ imageSources = { [previewImage] = "textures/original.png" } }`.
 Exports current poses, sizes, meshes and readable textures, embedding resources
-in both file formats. Shear, scaled skins, unreadable resources and unsupported
-part shapes error. Cameras, material extensions, occlusion/emissive channels
+in both file formats. Shear, scaled posed skins, unreadable resources and unsupported
+part shapes error. Cameras, other material extensions, occlusion/emissive textures
 and sampler differences are unsupported and reported;
-required glTF extensions error. Native Roblox materials use scalar PBR baselines;
+unsupported required glTF extensions error. Native Roblox materials use scalar PBR baselines;
 emissive/transmission behavior warns. Untextured imports have no SurfaceAppearance
 or images: source factors survive as attributes, and approximate native previews
 are reported. `strict = true` on import/export aborts on warnings, cleans temporary

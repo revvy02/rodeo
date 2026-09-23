@@ -1,3 +1,4 @@
+import { sceneExport } from "./sceneExportTests.js";
 import { sceneReview } from "./sceneReviewTests.js";
 import { it, expect } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
@@ -13,6 +14,7 @@ end`;
 
 export function scenes(run: RunFn): void {
   sceneReview(run);
+  sceneExport(run);
   it("scene: exact curves and sparse morphs survive live edits, corner splits and repeated exports", async () => {
     const output = `rodeo-test-scene-${randomUUID()}.gltf`;
     try {
@@ -251,7 +253,7 @@ export function scenes(run: RunFn): void {
           for _,n in geometry:GetFaceNormals(face) do assert(geometry:GetNormal(n):Dot(normal)>0.999) end
         end
         local h=fs.open("${output}","r");local before=stream.readBytes(h);stream.close(h)
-        part.Shape=Enum.PartType.Ball
+        local unsupported=Instance.new("TrussPart");unsupported.Parent=root
         local ok,err=pcall(r.exportEditableScene,"${output}",{root})
         assert(not ok and string.find(tostring(err),"unsupported geometry"))
         h=fs.open("${output}","r");local after=stream.readBytes(h);stream.close(h)

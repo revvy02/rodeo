@@ -56,9 +56,9 @@ end
 local hostInfo = rpc.call("process_get_info", runtime.ProcessGetInfoRequest.new({}))
 
 -- Create RPC-backed API implementations via factories
+local fsApi = require(ref("fs"))(rpc, runtime)
 local processApi = require(ref("process"))(rpc, scriptArgs, hostInfo, runtime)
 local streamApi = require(ref("stream"))(rpc, runtime)
-local fsApi = require(ref("fs"))(rpc, runtime)
 -- Required before `apis` so roblox.bake can close over them (the return-value
 -- handling below uses the same pair directly for its JSON form).
 local normalize = require(ref("normalize"))
@@ -68,7 +68,17 @@ local apis = {
 	io = require(ref("io"))(rpc, runtime),
 	process = processApi,
 	stream = streamApi,
-	roblox = require(ref("roblox"))(rpc, fsApi, streamApi, normalize, serializeToLuau, runtime, require(ref("scene")), require(ref("sceneMotion"))),
+	roblox = require(ref("roblox"))(
+		rpc,
+		fsApi,
+		streamApi,
+		normalize,
+		serializeToLuau,
+		runtime,
+		require(ref("scene")),
+		require(ref("sceneMotion")),
+		require(ref("scenePrimitives"))
+	),
 }
 
 -- Publish for the inlined @rodeo/* shims: they read ns.procs[run id] through
@@ -80,8 +90,8 @@ _G.__rodeo_procs = _G.__rodeo_procs or {}
 _G.__rodeo_procs[executionId] = apis
 _G.__rodeo_eid = executionId
 
-local setupLogging = require(ref("logging"))
 local limits = require(ref("limits"))
+local setupLogging = require(ref("logging"))
 
 -- Setup log capture (LogService → stdout stream, optional output file)
 local logConnection, outputFileStream = setupLogging(LogService, apis.fs, apis.stream, apis.io, logFilter, outputFile)
@@ -97,10 +107,7 @@ local success, result = xpcall(function()
 		-- should run in. This DOM knows its own DataModel via RunService; map it
 		-- to StudioMCP's enum (Edit / Server / Client). Without it the call is
 		-- rejected with "datamodel_type is required".
-		local datamodelType = if RunService:IsEdit()
-			then "Edit"
-			elseif RunService:IsClient() then "Client"
-			else "Server"
+		local datamodelType = if RunService:IsEdit() then "Edit" elseif RunService:IsClient() then "Client" else "Server"
 		local refName = "RODEO_" .. executionId
 		local ref = Instance.new("ObjectValue")
 		ref.Name = refName
@@ -126,10 +133,13 @@ local success, result = xpcall(function()
 			if jsonOk then return "__RODEO_ELEVATED_JSON__" .. jsonResult end
 			return tostring(result) -- non-JSON-encodable (Instance, Vector3, etc.) → string fallback
 		]]
-		local r: runtime.McpCallResponse = rpc.call("mcp_call", runtime.McpCallRequest.new({
-			tool = "execute_luau",
-			argumentsJson = HttpService:JSONEncode({ code = code, datamodel_type = datamodelType }),
-		}))
+		local r: runtime.McpCallResponse = rpc.call(
+			"mcp_call",
+			runtime.McpCallRequest.new({
+				tool = "execute_luau",
+				argumentsJson = HttpService:JSONEncode({ code = code, datamodel_type = datamodelType }),
+			})
+		)
 		ref:Destroy()
 		if typeof(r.result) == "string" then
 			if string.sub(r.result, 1, 24) == "__RODEO_ELEVATED_ERROR__" then

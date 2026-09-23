@@ -1,11 +1,11 @@
 -- @rodeo/roblox API: import / export model files via SerializationService,
 -- plus bake (Luau-source data files).
--- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau, runtime, createScene, sceneMotion) -> roblox module.
+-- Returns a factory: (rpc, fs, stream, normalize, serializeToLuau, runtime, createScene, sceneMotion, scenePrimitives) -> roblox module.
 -- `runtime` is the runner's proto module, captured here rather than read from
 -- _G.__rodeo_runtime_proto at call time: several rodeo plugins can share this
 -- VM, and that global holds whichever build's runner set it last.
 
-return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScene, sceneMotion)
+return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScene, sceneMotion, scenePrimitives)
 	local roblox = {}
 	local SerializationService = game:GetService("SerializationService")
 
@@ -486,7 +486,7 @@ return function(rpc, fs, stream, normalize, serializeToLuau, runtime, createScen
 		return mesh
 	end
 
-	createScene(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, sceneMotion)
+	createScene(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, sceneMotion, scenePrimitives)
 
 	-- Internal plumbing for the roblox.captureViewport shim (rodeo-pkg/rodeo/shims/
 	-- roblox.luau), which composes these with the fs/process API. Not part of

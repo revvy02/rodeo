@@ -1,6 +1,6 @@
 -- Scene assembly is separate from mesh/image codecs. All objects created by
 -- import are caller-owned; failures destroy the entire partial result.
-return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, motion)
+return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, motion, primitives)
 	local AssetService = game:GetService("AssetService")
 	local HttpService = game:GetService("HttpService")
 	local mapProperties = {
@@ -241,6 +241,9 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 								)
 							end
 						end
+						owner:SetAttribute("RodeoSceneEmissive", Color3.new(unpack(material.emissive)))
+						owner:SetAttribute("RodeoSceneEmissiveStrength", material.emissiveStrength)
+						owner:SetAttribute("RodeoSceneTransmission", material.transmission)
 						owner:SetAttribute("RodeoSceneMaterialName", material.name)
 						owner:SetAttribute("RodeoSceneRoughness", material.roughness)
 						owner:SetAttribute("RodeoSceneMetalness", material.metalness)
@@ -357,43 +360,6 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		return result
 	end
 
-	local function boxMesh(part)
-		assert(
-			part:IsA("Part") and part.Shape == Enum.PartType.Block,
-			`{part:GetFullName()}: unsupported geometry {part.ClassName}; convert it to a MeshPart`
-		)
-		local mesh = assert(AssetService:CreateEditableMesh(), "editable mesh memory exhausted")
-		local vertices = {}
-		for _, p in
-			{
-				Vector3.new(-0.5, -0.5, -0.5),
-				Vector3.new(0.5, -0.5, -0.5),
-				Vector3.new(0.5, 0.5, -0.5),
-				Vector3.new(-0.5, 0.5, -0.5),
-				Vector3.new(-0.5, -0.5, 0.5),
-				Vector3.new(0.5, -0.5, 0.5),
-				Vector3.new(0.5, 0.5, 0.5),
-				Vector3.new(-0.5, 0.5, 0.5),
-			}
-		do
-			table.insert(vertices, mesh:AddVertex(p))
-		end
-		for _, face in
-			{ { 1, 4, 3, 2 }, { 5, 6, 7, 8 }, { 1, 5, 8, 4 }, { 2, 3, 7, 6 }, { 1, 2, 6, 5 }, { 4, 8, 7, 3 } }
-		do
-			local a, b, c =
-				mesh:GetPosition(vertices[face[1]]),
-				mesh:GetPosition(vertices[face[2]]),
-				mesh:GetPosition(vertices[face[3]])
-			local normal = mesh:AddNormal((b - a):Cross(c - a).Unit)
-			local first = mesh:AddTriangle(vertices[face[1]], vertices[face[2]], vertices[face[3]])
-			local second = mesh:AddTriangle(vertices[face[1]], vertices[face[3]], vertices[face[4]])
-			mesh:SetFaceNormals(first, { normal, normal, normal })
-			mesh:SetFaceNormals(second, { normal, normal, normal })
-		end
-		return mesh
-	end
-
 	function roblox.exportEditableScene(path, input, options)
 		checkPath(path)
 		local scene = if input.roots then input else nil
@@ -412,7 +378,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 		end
 		local meshBlobs, imageBlobs, temporary = {}, {}, {}
 		local meshIds, imageIds, seen = {}, {}, {}
-		local materialIds, loadedMeshes = {}, {}
+		local materialIds, loadedMeshes, primitiveMeshes = {}, {}, {}
 		local jointNodes, skinBindings = {}, {}
 		local function warning(instance, feature)
 			if options and options.strict then
@@ -427,6 +393,14 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			local key = if content.SourceType == Enum.ContentSourceType.Object then content.Object else content
 			if imageIds[key] ~= nil then
 				return imageIds[key]
+			end
+			local sourcePath = options and options.imageSources and options.imageSources[key]
+			if sourcePath then
+				local id = #document.images
+				table.insert(document.images, { width = 0, height = 0, path = sourcePath })
+				table.insert(imageBlobs, buffer.create(0))
+				imageIds[key] = id
+				return id
 			end
 			local editable
 			if content.SourceType == Enum.ContentSourceType.Object then
@@ -449,12 +423,15 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				name = if appearance then appearance.Name else part:GetAttribute("RodeoSceneMaterialName") or part.Name,
 				color = { color.R, color.G, color.B, 1 - part.Transparency },
 				doubleSided = part:IsA("MeshPart") and part.DoubleSided,
-				alphaMode = "BLEND",
+				alphaMode = if part.Transparency == 0 then "OPAQUE" else "BLEND",
 			}
 			local maps = {}
 			if appearance then
 				for channel, property in mapProperties do
 					maps[channel] = imageFor(appearance[property])
+				end
+				if appearance.AlphaMode == Enum.AlphaMode.Transparency and maps.color ~= nil then
+					material.alphaMode = "BLEND"
 				end
 				if appearance.AlphaMode == Enum.AlphaMode.Overlay then
 					warning(appearance, "Overlay alpha compositing is unsupported; exported as transparency")
@@ -485,15 +462,20 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 					then owner:GetAttribute("RodeoSceneNativeMaterial")
 					else part.Material.Name
 			end
-			if
-				not appearance
-				and (
-					part.Material == Enum.Material.Neon
-					or part.Material == Enum.Material.Glass
-					or part.Material == Enum.Material.ForceField
-				)
-			then
-				warning(part, `{part.Material.Name} emissive/transmission behavior is approximated by scalar PBR`)
+			if keepFactors then
+				local emission = owner:GetAttribute("RodeoSceneEmissive")
+				if emission then
+					material.emissive = { emission.R, emission.G, emission.B }
+				end
+				material.emissiveStrength = owner:GetAttribute("RodeoSceneEmissiveStrength")
+				material.transmission = owner:GetAttribute("RodeoSceneTransmission")
+			elseif part.Material == Enum.Material.Neon then
+				material.emissive = { color.R, color.G, color.B }
+				material.emissiveStrength = 3
+				warning(part, "Neon glow is approximated by glTF emission")
+			elseif part.Material == Enum.Material.Glass or part.Material == Enum.Material.ForceField then
+				material.transmission = 0.9
+				warning(part, `{part.Material.Name} refraction is approximated by glTF transmission`)
 			end
 			if part.MaterialVariant ~= "" then
 				warning(part, "MaterialVariant maps are not exported")
@@ -511,6 +493,10 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			for _, channel in { "color", "normal", "roughness", "metalness" } do
 				table.insert(keyParts, tostring(maps[channel]))
 			end
+			table.insert(
+				keyParts,
+				HttpService:JSONEncode({ material.emissive, material.emissiveStrength, material.transmission })
+			)
 			local key = table.concat(keyParts, "|")
 			if materialIds[key] ~= nil then
 				return materialIds[key]
@@ -521,6 +507,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			return id
 		end
 		local function geometryFor(part)
+			local primitiveShape, legacyMesh
 			local editable
 			if part:IsA("MeshPart") then
 				local content = part.MeshContent
@@ -539,8 +526,14 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 					end
 				end
 			else
-				editable = boxMesh(part)
-				table.insert(temporary, editable)
+				local shape, legacy = primitives.kind(part)
+				primitiveShape, legacyMesh = shape, legacy
+				editable = primitiveMeshes[shape]
+				if not editable then
+					editable = primitives.create(shape)
+					primitiveMeshes[shape] = editable
+					table.insert(temporary, editable)
+				end
 			end
 			assert(
 				editable:IsA("EditableMesh"),
@@ -564,7 +557,23 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				if native.Y > 0 then part.Size.Y / native.Y else 1,
 				if native.Z > 0 then part.Size.Z / native.Z else 1
 			)
-			local origin = part.CFrame * CFrame.new(-editable:GetCenter() * scale)
+			if primitiveShape == "Cylinder" then
+				local diameter = math.min(scale.Y, scale.Z)
+				scale = Vector3.new(scale.X, diameter, diameter)
+			elseif primitiveShape == "Ball" and not legacyMesh then
+				scale = Vector3.one * math.min(scale.X, scale.Y, scale.Z)
+			end
+			if legacyMesh then
+				if legacyMesh:IsA("SpecialMesh") and legacyMesh.TextureId ~= "" then
+					warning(part, "legacy primitive mesh textures are unsupported")
+				end
+				if legacyMesh.VertexColor ~= Vector3.one then
+					warning(part, "legacy mesh vertex tint is unsupported")
+				end
+				scale *= legacyMesh.Scale
+			end
+			local origin = part.CFrame
+				* CFrame.new((if legacyMesh then legacyMesh.Offset else Vector3.zero) - editable:GetCenter() * scale)
 			local binding = {
 				mesh = id,
 				material = materialFor(part),
@@ -574,7 +583,6 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			}
 			local ids = editable:GetBones()
 			if #ids > 0 then
-				assert((scale - Vector3.one).Magnitude < 1e-4, `{part:GetFullName()}: scaled skins are unsupported`)
 				local bones = {}
 				for _, descendant in part:GetDescendants() do
 					if descendant:IsA("Bone") and descendant:FindFirstAncestorWhichIsA("MeshPart") == part then
@@ -585,6 +593,10 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 						bones[descendant.Name] = descendant
 					end
 				end
+				assert(
+					next(bones) == nil or (scale - Vector3.one).Magnitude < 1e-4,
+					`{part:GetFullName()}: scaled posed skins are unsupported`
+				)
 				-- Match meshToBlob's parent-first order, which is stable even when
 				-- the engine's bone IDs are sparse or returned in another order.
 				local present, placed, ordered = {}, {}, {}
@@ -660,7 +672,12 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 				table.insert(node.parts, geometryFor(instance))
 			end
 			for _, child in instance:GetChildren() do
-				if child:IsA("SurfaceAppearance") or child:IsA("Bone") or child:GetAttribute("RodeoSceneHelper") then
+				if
+					child:IsA("SurfaceAppearance")
+					or child:IsA("Bone")
+					or child:IsA("DataModelMesh")
+					or child:GetAttribute("RodeoSceneHelper")
+				then
 					continue
 				end
 				table.insert(node.children, visit(child, frame))
@@ -685,7 +702,7 @@ return function(roblox, rpc, fs, stream, runtime, meshToBlob, meshFromBlob, moti
 			for _, record in skinBindings do
 				local nodes, poses = {}, {}
 				for _, bone in record.bones do
-					local key = bone and bone:GetAttribute("RodeoSceneJoint")
+					local key = if bone then bone:GetAttribute("RodeoSceneJoint") else nil
 					local index = key and jointNodes[key]
 					if index == nil then
 						break

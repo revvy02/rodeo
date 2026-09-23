@@ -233,6 +233,11 @@ export type ImportEditableSceneOptions = {
 --- Procedural scenes can supply portable motion along with their roots.
 --- The full import result is also accepted and retains source coordinate frames.
 export type ExportEditableSceneOptions = {
+    -- Replace a preview image/URI with an original host file during export.
+    -- Keys are EditableImage objects (Object content) or Content URI values.
+    -- Paths resolve against the calling process working directory. Images are
+    -- decoded and packed on the host, without EditableImage's 1024px limit.
+    imageSources: { [EditableImage | Content]: string }?,
     strict: boolean?, -- abort before writing on any warning
 }
 
@@ -296,7 +301,14 @@ end
 --- Exports supported instance roots to self-contained glTF/GLB, including
 --- live editable or readable asset-backed meshes and images. Works with
 --- procedurally created roots; no import result or source map is required.
---- Models/Folders, MeshParts, block Parts, Attachments and skins are supported.
+--- Models/Folders, MeshParts, block/ball/cylinder Parts, WedgeParts,
+--- CornerWedgeParts, primitive legacy meshes, Attachments and skins are supported.
+--- Curved primitives use 24 segments (balls: 16 latitude intervals). Native
+--- ball/cylinder Size constraints and legacy mesh Scale/Offset are respected.
+--- Legacy FileMesh/Head/Torso meshes and reflected legacy scales require baking.
+--- Neon emission and Glass/ForceField transmission are explicit approximations
+--- with warnings; scalar emission/transmission factors survive re-export.
+--- Texture emission and MaterialVariant maps remain unsupported.
 --- Other instance behavior is reported in warnings; unsupported part geometry
 --- and unreadable assets error. Native materials use documented scalar PBR
 --- approximations; emissive/transmission behavior warns. Mesh centering, size, hierarchy and current
