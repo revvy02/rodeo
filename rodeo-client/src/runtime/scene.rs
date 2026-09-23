@@ -1340,7 +1340,7 @@ mod tests {
     fn motion_fixture() -> (Scene, Vec<MeshData>, Vec<Vec<u8>>) {
         read_scene(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../tests-new/fixtures/pkg/scenes/motion.gltf"
+            "/../tests/fixtures/pkg/scenes/motion.gltf"
         ))
         .unwrap()
     }

@@ -28,7 +28,7 @@ into every open Studio, which is how hand-opened Studios join a serve. That
 does not disturb the plugin another serve already has loaded: a run in one
 serve's Studio survives another serve starting and stopping, another project's
 one-shot `rodeo run --place`, and unrelated files appearing in the folder, with
-no reconnect (tests-new/cli/operations/pluginFolderChurn.test.ts). What the
+no reconnect (tests/cli/operations/pluginFolderChurn.test.ts). What the
 per-backend file removed is the permanent corruption a single shared plugin
 file caused when a different build overwrote it (issue #12).
 

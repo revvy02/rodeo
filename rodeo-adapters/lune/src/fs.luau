@@ -1,5 +1,5 @@
 -- @lune/fs shim — maps to rodeo's fs + stream RPCs.
--- Conformance target: lune's own fs tests (tests-new/adapters/lune/fs/).
+-- Conformance target: lune's own fs tests (tests/adapters/lune/fs/).
 local g = _G.__rodeo_procs[_G.__rodeo_eid]
 
 -- Byte streams rather than the string stream: file contents are arbitrary

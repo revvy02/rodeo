@@ -1,7 +1,7 @@
 --!strict
 -- Which part this DOM's plugin plays in the RODEO_UNIFIER exchange, derived
 -- from RunService's flags. Pure: no Roblox globals, so it runs under lune
--- (tests-new/plugin/dom_role.spec.luau) as well as in Studio.
+-- (tests/plugin/dom_role.spec.luau) as well as in Studio.
 
 export type Flags = {
 	isEdit: boolean,

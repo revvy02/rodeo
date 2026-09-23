@@ -1,6 +1,6 @@
 //! Thin JSON-RPC wrappers over `rodeo __spawn_canonical_client`.
 //!
-//! Public API is preserved 1:1 from the pre-daemon client so `tests-new/`
+//! Public API is preserved 1:1 from the pre-daemon client so `tests/`
 //! needs no changes. All Studio lifecycle / DOM discovery / runCode streaming
 //! logic lives in the `rodeo-client` Rust crate; this file is just handle
 //! plumbing + a runCode-to-final-RunResult collector.

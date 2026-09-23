@@ -31,7 +31,7 @@ parts[1]:PivotTo(CFrame.new(10,2,0))
 parts[2]:PivotTo(CFrame.new(18,0,0)*CFrame.Angles(0,0,.4))
 r.captureViewport(directory..'baseline-motion.png',camera)
 baseline.Parent=nil
-local scene=r.importEditableScene('tests-new/fixtures/pkg/scenes/motion.gltf')
+local scene=r.importEditableScene('tests/fixtures/pkg/scenes/motion.gltf')
 assert(scene.animations[1].sequence,table.concat(scene.warnings,'; '))
 scene.animationRig.Parent=workspace
 r.captureViewport(directory..'current-initial.png',camera)

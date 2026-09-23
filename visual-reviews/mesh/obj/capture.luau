@@ -4,7 +4,7 @@ local process = require("@rodeo/process")
 local AssetService = game:GetService("AssetService")
 local Lighting = game:GetService("Lighting")
 
-local mesh = roblox.importEditableMesh("tests-new/fixtures/pkg/obj/concave.obj")
+local mesh = roblox.importEditableMesh("tests/fixtures/pkg/obj/concave.obj")
 local part = AssetService:CreateMeshPartAsync(Content.fromObject(mesh), {
     CollisionFidelity = Enum.CollisionFidelity.Box,
 })

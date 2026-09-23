@@ -1267,7 +1267,7 @@ mod tests {
 
     #[test]
     fn obj_concave_faces_preserve_area_winding_and_corner_attributes() {
-        let source = include_str!("../../../tests-new/fixtures/pkg/obj/concave.obj");
+        let source = include_str!("../../../tests/fixtures/pkg/obj/concave.obj");
         for plane in 0..4 {
             for reversed in [false, true] {
                 // Exercise XY, YZ, ZX and an oblique plane in both windings.
@@ -1327,7 +1327,7 @@ mod tests {
 
     #[test]
     fn obj_independent_indices_preserve_seams_and_hard_normals() {
-        let mesh = parse_obj(include_str!("../../../tests-new/fixtures/pkg/obj/seams.obj")).unwrap();
+        let mesh = parse_obj(include_str!("../../../tests/fixtures/pkg/obj/seams.obj")).unwrap();
         assert_eq!(mesh.positions.len(), 6);
         let origin: Vec<_> = mesh.positions.iter().enumerate().filter(|(_, p)| **p == [0.0; 3])
             .map(|(i, _)| (mesh.uvs.as_ref().unwrap()[i], mesh.normals.as_ref().unwrap()[i])).collect();

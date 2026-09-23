@@ -11,7 +11,7 @@ lighting.OutdoorAmbient = Color3.fromRGB(128,128,128)
 workspace.Terrain:Clear()
 for _, item in workspace:GetChildren() do if item:IsA("BasePart") and not item:IsA("Terrain") then item:Destroy() end end
 for _, fixture in {"Box", "BoxTextured", "AnimatedMorphCube", "animated-skin"} do
- local path = if fixture == "animated-skin" then "tests-new/fixtures/pkg/scenes/animated-skin.gltf" else `tests-new/fixtures/pkg/scenes/khronos/{fixture}.glb`
+ local path = if fixture == "animated-skin" then "tests/fixtures/pkg/scenes/animated-skin.gltf" else `tests/fixtures/pkg/scenes/khronos/{fixture}.glb`
  local scene = r.importEditableScene(path)
  for _, root in scene.roots do root.Parent = workspace end
  local track
